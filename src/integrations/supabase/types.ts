@@ -14,7 +14,333 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      arguments: {
+        Row: {
+          argument_type: string
+          content: string
+          created_at: string
+          debate_id: string
+          edited_at: string | null
+          id: string
+          is_edited: boolean
+          original_content: string | null
+          parent_argument_id: string | null
+          participant_id: string | null
+          subtopic_id: string | null
+        }
+        Insert: {
+          argument_type?: string
+          content: string
+          created_at?: string
+          debate_id: string
+          edited_at?: string | null
+          id?: string
+          is_edited?: boolean
+          original_content?: string | null
+          parent_argument_id?: string | null
+          participant_id?: string | null
+          subtopic_id?: string | null
+        }
+        Update: {
+          argument_type?: string
+          content?: string
+          created_at?: string
+          debate_id?: string
+          edited_at?: string | null
+          id?: string
+          is_edited?: boolean
+          original_content?: string | null
+          parent_argument_id?: string | null
+          participant_id?: string | null
+          subtopic_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arguments_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arguments_parent_argument_id_fkey"
+            columns: ["parent_argument_id"]
+            isOneToOne: false
+            referencedRelation: "arguments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arguments_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "debate_participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arguments_subtopic_id_fkey"
+            columns: ["subtopic_id"]
+            isOneToOne: false
+            referencedRelation: "debate_subtopics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debate_participants: {
+        Row: {
+          debate_id: string
+          id: string
+          joined_at: string
+          side_id: string | null
+          user_id: string
+        }
+        Insert: {
+          debate_id: string
+          id?: string
+          joined_at?: string
+          side_id?: string | null
+          user_id: string
+        }
+        Update: {
+          debate_id?: string
+          id?: string
+          joined_at?: string
+          side_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_participants_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debate_participants_side_id_fkey"
+            columns: ["side_id"]
+            isOneToOne: false
+            referencedRelation: "debate_sides"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debate_sides: {
+        Row: {
+          created_at: string
+          debate_id: string
+          id: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          id?: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          id?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_sides_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debate_subtopics: {
+        Row: {
+          created_at: string
+          debate_id: string
+          id: string
+          sort_order: number
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          id?: string
+          sort_order?: number
+          title: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          id?: string
+          sort_order?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_subtopics_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debate_templates: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          is_public: boolean
+          name: string
+          sides: Json
+          subtopics: Json
+          time_per_turn: string
+          topic: string
+          turns_per_subtopic: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          is_public?: boolean
+          name: string
+          sides?: Json
+          subtopics?: Json
+          time_per_turn?: string
+          topic: string
+          turns_per_subtopic?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_public?: boolean
+          name?: string
+          sides?: Json
+          subtopics?: Json
+          time_per_turn?: string
+          topic?: string
+          turns_per_subtopic?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      debates: {
+        Row: {
+          community_tag: string | null
+          created_at: string
+          created_by: string
+          edit_window_ends_at: string | null
+          ended_at: string | null
+          facilitator_type: string
+          facilitator_user_id: string | null
+          id: string
+          institution_tag: string | null
+          is_public: boolean
+          is_verified: boolean
+          join_code: string | null
+          location: string | null
+          scheduled_at: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["debate_status"]
+          time_per_turn: string
+          topic: string
+          topic_category: string | null
+          turns_per_subtopic: number
+          updated_at: string
+        }
+        Insert: {
+          community_tag?: string | null
+          created_at?: string
+          created_by: string
+          edit_window_ends_at?: string | null
+          ended_at?: string | null
+          facilitator_type?: string
+          facilitator_user_id?: string | null
+          id?: string
+          institution_tag?: string | null
+          is_public?: boolean
+          is_verified?: boolean
+          join_code?: string | null
+          location?: string | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["debate_status"]
+          time_per_turn?: string
+          topic: string
+          topic_category?: string | null
+          turns_per_subtopic?: number
+          updated_at?: string
+        }
+        Update: {
+          community_tag?: string | null
+          created_at?: string
+          created_by?: string
+          edit_window_ends_at?: string | null
+          ended_at?: string | null
+          facilitator_type?: string
+          facilitator_user_id?: string | null
+          id?: string
+          institution_tag?: string | null
+          is_public?: boolean
+          is_verified?: boolean
+          join_code?: string | null
+          location?: string | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["debate_status"]
+          time_per_turn?: string
+          topic?: string
+          topic_category?: string | null
+          turns_per_subtopic?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          affiliation: string | null
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          is_public: boolean
+          location: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          affiliation?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_public?: boolean
+          location?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          affiliation?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_public?: boolean
+          location?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +349,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      app_role: "personal" | "education" | "community"
+      debate_status: "draft" | "scheduled" | "live" | "completed" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +477,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["personal", "education", "community"],
+      debate_status: ["draft", "scheduled", "live", "completed", "archived"],
+    },
   },
 } as const
