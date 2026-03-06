@@ -8,6 +8,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import EditWindowBanner from "@/components/debate/EditWindowBanner";
+import EditableArgument from "@/components/debate/EditableArgument";
 
 type ViewMode = "facilitator" | "participant" | "audience";
 
@@ -22,6 +24,8 @@ interface DebateData {
   current_turn: number;
   current_speaker_side_id: string | null;
   is_public: boolean;
+  edit_window_ends_at: string | null;
+  ended_at: string | null;
 }
 
 interface Side {
@@ -43,6 +47,9 @@ interface Argument {
   participant_id: string;
   subtopic_id: string;
   created_at: string;
+  is_edited: boolean;
+  original_content: string | null;
+  edited_at: string | null;
 }
 
 interface Participant {
@@ -130,10 +137,11 @@ const DebateRoomPage = () => {
 
     const channel = supabase
       .channel(`debate-${id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "arguments", filter: `debate_id=eq.${id}` }, (payload) => {
-        if (payload.eventType === "INSERT") {
-          setArguments((prev) => [...prev, payload.new as Argument]);
-        }
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "arguments", filter: `debate_id=eq.${id}` }, (payload) => {
+        setArguments((prev) => [...prev, payload.new as Argument]);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "arguments", filter: `debate_id=eq.${id}` }, (payload) => {
+        setArguments((prev) => prev.map((a) => a.id === (payload.new as Argument).id ? (payload.new as Argument) : a));
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debates", filter: `id=eq.${id}` }, (payload) => {
         setDebate(payload.new as unknown as DebateData);
@@ -267,9 +275,14 @@ const DebateRoomPage = () => {
 
       // Check if debate is over
       if (nextSubIdx >= subtopics.length) {
+        const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
         await supabase
           .from("debates")
-          .update({ status: "completed", ended_at: new Date().toISOString() })
+          .update({
+            status: "completed",
+            ended_at: new Date().toISOString(),
+            edit_window_ends_at: editWindowEnd,
+          })
           .eq("id", id);
 
         // Generate closing synthesis
@@ -504,6 +517,14 @@ const DebateRoomPage = () => {
             )}
           </AnimatePresence>
 
+          {/* Edit window banner */}
+          {isCompleted && debate.edit_window_ends_at && (
+            <EditWindowBanner
+              editWindowEndsAt={debate.edit_window_ends_at}
+              isParticipant={!!myParticipant}
+            />
+          )}
+
           {/* Arguments feed */}
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
             {isDraft && viewMode === "facilitator" && (
@@ -544,28 +565,42 @@ const DebateRoomPage = () => {
                       const participant = participants.find((p) => p.id === arg.participant_id);
                       const side = sides.find((s) => s.id === participant?.side_id);
                       const isLeft = side?.sort_order === 0;
+                      const isInEditWindow =
+                        isCompleted &&
+                        debate.edit_window_ends_at &&
+                        new Date(debate.edit_window_ends_at).getTime() > Date.now();
+                      const canEditThis =
+                        isInEditWindow &&
+                        participant?.user_id === user?.id;
 
                       return (
-                        <motion.div
+                        <EditableArgument
                           key={arg.id}
-                          initial={{ opacity: 0, x: isLeft ? -20 : 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className={`flex ${isLeft ? "justify-start" : "justify-end"}`}
-                        >
-                          <div className={`max-w-[75%] rounded-xl px-4 py-3 ${
-                            isLeft ? "bg-blue-500/10 border border-blue-500/20" : "bg-orange-500/10 border border-orange-500/20"
-                          }`}>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`text-[10px] font-semibold uppercase tracking-wider ${isLeft ? "text-blue-400" : "text-orange-400"}`}>
-                                {side?.label}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-secondary/50 rounded">
-                                {arg.argument_type}
-                              </span>
-                            </div>
-                            <p className="text-sm text-foreground">{arg.content}</p>
-                          </div>
-                        </motion.div>
+                          id={arg.id}
+                          content={arg.content}
+                          originalContent={arg.original_content}
+                          isEdited={arg.is_edited}
+                          argumentType={arg.argument_type}
+                          sideLabel={side?.label || "Unknown"}
+                          sideOrder={side?.sort_order ?? 0}
+                          isLeft={!!isLeft}
+                          canEdit={!!canEditThis}
+                          onUpdate={(argId, newContent) => {
+                            setArguments((prev) =>
+                              prev.map((a) =>
+                                a.id === argId
+                                  ? {
+                                      ...a,
+                                      content: newContent,
+                                      is_edited: true,
+                                      original_content: a.original_content || a.content,
+                                      edited_at: new Date().toISOString(),
+                                    }
+                                  : a
+                              )
+                            );
+                          }}
+                        />
                       );
                     })}
                     {stArgs.length === 0 && st.id === currentSubtopic?.id && (
@@ -579,7 +614,11 @@ const DebateRoomPage = () => {
             {isCompleted && (
               <div className="text-center py-8">
                 <h3 className="text-xl font-display font-bold text-primary mb-2">Debate Complete</h3>
-                <p className="text-muted-foreground text-sm">The record is now finalized.</p>
+                <p className="text-muted-foreground text-sm">
+                  {debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now()
+                    ? "Participants may edit their arguments before the record is finalized."
+                    : "The debate record is permanently finalized."}
+                </p>
               </div>
             )}
           </div>
