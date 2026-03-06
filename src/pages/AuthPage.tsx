@@ -19,17 +19,22 @@ const AuthPage = () => {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success("Check your email to verify your account!");
+        if (data.session) {
+          // Auto-confirmed — go straight to onboarding
+          navigate("/onboarding");
+        } else {
+          toast.success("Check your email to verify your account!");
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate("/");
+        navigate("/onboarding");
       }
     } catch (err: any) {
       toast.error(err.message || "Authentication failed");
