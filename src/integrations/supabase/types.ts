@@ -235,6 +235,9 @@ export type Database = {
           community_tag: string | null
           created_at: string
           created_by: string
+          current_speaker_side_id: string | null
+          current_subtopic_index: number
+          current_turn: number
           edit_window_ends_at: string | null
           ended_at: string | null
           facilitator_type: string
@@ -258,6 +261,9 @@ export type Database = {
           community_tag?: string | null
           created_at?: string
           created_by: string
+          current_speaker_side_id?: string | null
+          current_subtopic_index?: number
+          current_turn?: number
           edit_window_ends_at?: string | null
           ended_at?: string | null
           facilitator_type?: string
@@ -281,6 +287,9 @@ export type Database = {
           community_tag?: string | null
           created_at?: string
           created_by?: string
+          current_speaker_side_id?: string | null
+          current_subtopic_index?: number
+          current_turn?: number
           edit_window_ends_at?: string | null
           ended_at?: string | null
           facilitator_type?: string
@@ -300,7 +309,15 @@ export type Database = {
           turns_per_subtopic?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "debates_current_speaker_side_id_fkey"
+            columns: ["current_speaker_side_id"]
+            isOneToOne: false
+            referencedRelation: "debate_sides"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -340,6 +357,48 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      round_summaries: {
+        Row: {
+          created_at: string
+          debate_id: string
+          id: string
+          key_arguments: Json
+          subtopic_id: string
+          summary: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          id?: string
+          key_arguments?: Json
+          subtopic_id: string
+          summary: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          id?: string
+          key_arguments?: Json
+          subtopic_id?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "round_summaries_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "round_summaries_subtopic_id_fkey"
+            columns: ["subtopic_id"]
+            isOneToOne: false
+            referencedRelation: "debate_subtopics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

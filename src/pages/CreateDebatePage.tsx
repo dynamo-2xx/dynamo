@@ -1,8 +1,12 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface GeneratedDebate {
   topic: string;
@@ -15,30 +19,52 @@ interface GeneratedDebate {
 const TIME_OPTIONS = ["30s", "1 min", "2 min", "3 min", "5 min"];
 
 const CreateDebatePage = () => {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [prompt, setPrompt] = useState("");
   const [debate, setDebate] = useState<GeneratedDebate | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleGenerate = useCallback(() => {
+  const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
     setStep(2);
+
+    try {
+      const response = await supabase.functions.invoke("ai-facilitator", {
+        body: { action: "generate_debate", payload: { topic: prompt } },
+      });
+
+      if (response.error) throw response.error;
+
+      const data = response.data;
+      setDebate({
+        topic: data.topic,
+        subtopics: data.subtopics,
+        sides: data.sides,
+        turnsPerSubtopic: data.turns_per_subtopic,
+        timePerTurn: data.time_per_turn,
+      });
+      setStep(3);
+    } catch (err) {
+      console.error("Generation failed:", err);
+      // Fallback to a basic structure
+      setDebate({
+        topic: prompt.charAt(0).toUpperCase() + prompt.slice(1) + (prompt.endsWith("?") ? "" : "?"),
+        subtopics: ["Key considerations", "Potential impacts", "Alternative approaches"],
+        sides: ["For", "Against"],
+        turnsPerSubtopic: 2,
+        timePerTurn: "2 min",
+      });
+      setStep(3);
+      toast.error("AI generation had an issue — using a default structure. You can edit everything.");
+    }
   }, [prompt]);
 
   const handleGenerationComplete = useCallback(() => {
-    // Simulate AI generation
-    setDebate({
-      topic: prompt.charAt(0).toUpperCase() + prompt.slice(1) + (prompt.endsWith("?") ? "" : "?"),
-      subtopics: [
-        "Environmental and health impacts",
-        "Economic implications for businesses",
-        "Feasibility of alternatives",
-      ],
-      sides: ["For", "Against"],
-      turnsPerSubtopic: 2,
-      timePerTurn: "2 min",
-    });
-    setStep(3);
-  }, [prompt]);
+    // This is called if step 2 loader finishes before AI — only used as fallback
+  }, []);
 
   const updateSubtopic = (index: number, value: string) => {
     if (!debate) return;
@@ -55,6 +81,70 @@ const CreateDebatePage = () => {
   const removeSubtopic = (index: number) => {
     if (!debate || debate.subtopics.length <= 1) return;
     setDebate({ ...debate, subtopics: debate.subtopics.filter((_, i) => i !== index) });
+  };
+
+  const handleCreateDebate = async () => {
+    if (!debate || !user) return;
+    setSaving(true);
+
+    try {
+      // 1. Create the debate
+      const { data: dbDebate, error: debateError } = await supabase
+        .from("debates")
+        .insert({
+          topic: debate.topic,
+          created_by: user.id,
+          is_public: isPublic,
+          turns_per_subtopic: debate.turnsPerSubtopic,
+          time_per_turn: debate.timePerTurn,
+          facilitator_type: "ai",
+          status: "draft",
+        })
+        .select()
+        .single();
+
+      if (debateError) throw debateError;
+
+      // 2. Create subtopics
+      const subtopicInserts = debate.subtopics.map((title, i) => ({
+        debate_id: dbDebate.id,
+        title,
+        sort_order: i,
+      }));
+      const { error: subError } = await supabase.from("debate_subtopics").insert(subtopicInserts);
+      if (subError) throw subError;
+
+      // 3. Create sides
+      const sideInserts = debate.sides.map((label, i) => ({
+        debate_id: dbDebate.id,
+        label,
+        sort_order: i,
+      }));
+      const { error: sideError } = await supabase.from("debate_sides").insert(sideInserts);
+      if (sideError) throw sideError;
+
+      // 4. Add creator as participant
+      const { data: sides } = await supabase
+        .from("debate_sides")
+        .select("id")
+        .eq("debate_id", dbDebate.id)
+        .order("sort_order")
+        .limit(1);
+
+      await supabase.from("debate_participants").insert({
+        debate_id: dbDebate.id,
+        user_id: user.id,
+        side_id: sides?.[0]?.id ?? null,
+      });
+
+      toast.success("Debate created!");
+      navigate(`/debate/${dbDebate.id}`);
+    } catch (err: any) {
+      console.error("Create debate error:", err);
+      toast.error(err.message || "Failed to create debate");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -89,7 +179,7 @@ const CreateDebatePage = () => {
 
           {step === 2 && (
             <motion.div key="step2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <DynamoLoader onComplete={handleGenerationComplete} duration={2500} />
+              <DynamoLoader duration={8000} />
             </motion.div>
           )}
 
@@ -186,6 +276,25 @@ const CreateDebatePage = () => {
                   </div>
                 </div>
 
+                {/* Visibility */}
+                <div className="bg-card border border-border rounded-xl p-5">
+                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">Visibility</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setIsPublic(false)}
+                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors ${!isPublic ? "bg-primary/10 text-primary border border-primary/30" : "bg-secondary/50 text-muted-foreground border border-transparent"}`}
+                    >
+                      <Lock className="w-4 h-4" /> Private
+                    </button>
+                    <button
+                      onClick={() => setIsPublic(true)}
+                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors ${isPublic ? "bg-primary/10 text-primary border border-primary/30" : "bg-secondary/50 text-muted-foreground border border-transparent"}`}
+                    >
+                      <Globe className="w-4 h-4" /> Public
+                    </button>
+                  </div>
+                </div>
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button
@@ -194,8 +303,12 @@ const CreateDebatePage = () => {
                   >
                     Start Over
                   </button>
-                  <button className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity">
-                    Continue Setup
+                  <button
+                    onClick={handleCreateDebate}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {saving ? "Creating…" : "Create Debate"}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
