@@ -2,6 +2,8 @@ import { ReactNode } from "react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
 import { Home, Compass, PlusCircle, MessageSquare, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ThemeToggle from "@/components/ThemeToggle";
+import logoSmiley from "@/assets/logo-smiley.png";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
@@ -18,9 +20,12 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
     <div className="min-h-screen flex flex-col md:flex-row">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card p-6 gap-2 fixed h-full">
-        <div className="mb-8">
-          <h1 className="text-2xl font-display font-bold text-primary">Dynamo</h1>
-          <p className="text-xs text-muted-foreground mt-1 font-body">People to the Power</p>
+        <div className="mb-8 flex items-center gap-3">
+          <img src={logoSmiley} alt="d. logo" className="w-10 h-10 dark:invert" />
+          <div>
+            <h1 className="text-2xl font-display font-bold text-foreground">d.</h1>
+            <p className="text-xs text-muted-foreground mt-0.5 font-body">People to the Power</p>
+          </div>
         </div>
         <nav className="flex flex-col gap-1 flex-1">
           {navItems.map((item) => {
@@ -42,6 +47,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             );
           })}
         </nav>
+        <div className="flex items-center justify-between mb-2">
+          <ThemeToggle />
+        </div>
         <RouterNavLink
           to="/create"
           className="flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity"
