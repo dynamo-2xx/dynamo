@@ -1,17 +1,18 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, Pause, SkipForward, Users, Eye, Mic, Clock,
-  ChevronRight, Send, MessageSquare, Zap, Shield
+  ChevronRight, Send, MessageSquare, Zap, Shield, Share2, Copy, Check
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import EditWindowBanner from "@/components/debate/EditWindowBanner";
 import EditableArgument from "@/components/debate/EditableArgument";
+import MediaPermissions from "@/components/debate/MediaPermissions";
 
-type ViewMode = "facilitator" | "participant" | "audience";
+type UserRole = "facilitator" | "speaker" | "spectator";
 
 interface DebateData {
   id: string;
@@ -26,36 +27,18 @@ interface DebateData {
   is_public: boolean;
   edit_window_ends_at: string | null;
   ended_at: string | null;
+  join_code: string | null;
 }
 
-interface Side {
-  id: string;
-  label: string;
-  sort_order: number;
-}
-
-interface Subtopic {
-  id: string;
-  title: string;
-  sort_order: number;
-}
-
+interface Side { id: string; label: string; sort_order: number; }
+interface Subtopic { id: string; title: string; sort_order: number; }
 interface Argument {
-  id: string;
-  content: string;
-  argument_type: string;
-  participant_id: string;
-  subtopic_id: string;
-  created_at: string;
-  is_edited: boolean;
-  original_content: string | null;
-  edited_at: string | null;
+  id: string; content: string; argument_type: string;
+  participant_id: string; subtopic_id: string; created_at: string;
+  is_edited: boolean; original_content: string | null; edited_at: string | null;
 }
-
 interface Participant {
-  id: string;
-  user_id: string;
-  side_id: string | null;
+  id: string; user_id: string; side_id: string | null; participant_role: string;
 }
 
 function parseTimeToSeconds(t: string): number {
@@ -74,10 +57,13 @@ const DebateRoomPage = () => {
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [arguments_, setArguments] = useState<Argument[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>("audience");
   const [loading, setLoading] = useState(true);
 
-  // Turn state
+  // Role determination
+  const [userRole, setUserRole] = useState<UserRole>("spectator");
+  const [facilitatorSpeaking, setFacilitatorSpeaking] = useState(false);
+
+  // Timer
   const [timeLeft, setTimeLeft] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
@@ -86,14 +72,17 @@ const DebateRoomPage = () => {
   const [argumentText, setArgumentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // AI facilitator messages
+  // AI
   const [aiMessage, setAiMessage] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Load debate data
+  // Share
+  const [showShare, setShowShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Load data
   useEffect(() => {
     if (!id) return;
-
     const loadDebate = async () => {
       const [debateRes, sidesRes, subtopicsRes, argsRes, participantsRes] = await Promise.all([
         supabase.from("debates").select("*").eq("id", id).single(),
@@ -109,32 +98,33 @@ const DebateRoomPage = () => {
         return;
       }
 
-      setDebate(debateRes.data as unknown as DebateData);
+      const d = debateRes.data as unknown as DebateData;
+      const parts = (participantsRes.data || []) as unknown as Participant[];
+
+      setDebate(d);
       setSides(sidesRes.data || []);
       setSubtopics(subtopicsRes.data || []);
       setArguments(argsRes.data || []);
-      setParticipants(participantsRes.data || []);
+      setParticipants(parts);
 
-      // Determine view mode
-      if (debateRes.data.created_by === user?.id) {
-        setViewMode("facilitator");
-      } else if (participantsRes.data?.some((p) => p.user_id === user?.id)) {
-        setViewMode("participant");
+      // Determine role
+      if (d.created_by === user?.id) {
+        setUserRole("facilitator");
+      } else if (parts.some((p) => p.user_id === user?.id && p.participant_role === "speaker")) {
+        setUserRole("speaker");
       } else {
-        setViewMode("audience");
+        setUserRole("spectator");
       }
 
-      setTimeLeft(parseTimeToSeconds(debateRes.data.time_per_turn));
+      setTimeLeft(parseTimeToSeconds(d.time_per_turn));
       setLoading(false);
     };
-
     loadDebate();
   }, [id, user, navigate]);
 
-  // Realtime subscriptions
+  // Realtime
   useEffect(() => {
     if (!id) return;
-
     const channel = supabase
       .channel(`debate-${id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "arguments", filter: `debate_id=eq.${id}` }, (payload) => {
@@ -148,13 +138,12 @@ const DebateRoomPage = () => {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
         if (payload.eventType === "INSERT") {
-          setParticipants((prev) => [...prev, payload.new as Participant]);
+          setParticipants((prev) => [...prev, payload.new as unknown as Participant]);
         } else if (payload.eventType === "DELETE") {
-          setParticipants((prev) => prev.filter((p) => p.id !== (payload.old as Participant).id));
+          setParticipants((prev) => prev.filter((p) => p.id !== (payload.old as any).id));
         }
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
@@ -163,10 +152,7 @@ const DebateRoomPage = () => {
     if (timerRunning && timeLeft > 0) {
       timerRef.current = setInterval(() => {
         setTimeLeft((t) => {
-          if (t <= 1) {
-            setTimerRunning(false);
-            return 0;
-          }
+          if (t <= 1) { setTimerRunning(false); return 0; }
           return t - 1;
         });
       }, 1000);
@@ -183,180 +169,107 @@ const DebateRoomPage = () => {
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
   const timerColor = timeLeft <= 10 ? "text-destructive" : timeLeft <= 30 ? "text-primary" : "text-foreground";
 
-  // Facilitator actions
+  // SSE stream helper
+  const streamAI = async (action: string, payload: Record<string, unknown>) => {
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-facilitator`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ action, payload }),
+      }
+    );
+    if (!response.ok || !response.body) throw new Error("Stream failed");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        let line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (line.endsWith("\r")) line = line.slice(0, -1);
+        if (!line.startsWith("data: ")) continue;
+        const json = line.slice(6).trim();
+        if (json === "[DONE]") break;
+        try {
+          const parsed = JSON.parse(json);
+          const c = parsed.choices?.[0]?.delta?.content;
+          if (c) { text += c; setAiMessage(text); }
+        } catch {}
+      }
+    }
+    return text;
+  };
+
   const startDebate = async () => {
     if (!debate || !id) return;
     setAiLoading(true);
+    await supabase.from("debates").update({
+      status: "live", started_at: new Date().toISOString(),
+      current_subtopic_index: 0, current_turn: 0, current_speaker_side_id: sides[0]?.id,
+    }).eq("id", id);
 
-    // Set status to live
-    await supabase
-      .from("debates")
-      .update({
-        status: "live",
-        started_at: new Date().toISOString(),
-        current_subtopic_index: 0,
-        current_turn: 0,
-        current_speaker_side_id: sides[0]?.id,
-      })
-      .eq("id", id);
-
-    // Get AI opening statement
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-facilitator`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            action: "opening_statement",
-            payload: {
-              topic: debate.topic,
-              subtopics: subtopics.map((s) => s.title),
-              sides: sides.map((s) => s.label),
-            },
-          }),
-        }
-      );
-
-      if (!response.ok || !response.body) throw new Error("Stream failed");
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let text = "";
-      let buf = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          let line = buf.slice(0, nl);
-          buf = buf.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(json);
-            const c = parsed.choices?.[0]?.delta?.content;
-            if (c) { text += c; setAiMessage(text); }
-          } catch {}
-        }
-      }
-    } catch (err) {
-      console.error("Opening statement error:", err);
+      await streamAI("opening_statement", {
+        topic: debate.topic,
+        subtopics: subtopics.map((s) => s.title),
+        sides: sides.map((s) => s.label),
+      });
+    } catch {
       setAiMessage("Welcome to this debate. Let's begin with the first subtopic.");
     }
-
     setTimerRunning(true);
     setAiLoading(false);
   };
 
   const advanceTurn = async () => {
     if (!debate || !id) return;
-
     const currentSideIdx = sides.findIndex((s) => s.id === debate.current_speaker_side_id);
     let nextSideIdx = (currentSideIdx + 1) % sides.length;
     let nextTurn = debate.current_turn;
     let nextSubIdx = debate.current_subtopic_index;
 
-    if (nextSideIdx === 0) {
-      nextTurn += 1;
-    }
+    if (nextSideIdx === 0) nextTurn += 1;
 
-    // Check if we've exhausted turns for this subtopic
     if (nextTurn >= debate.turns_per_subtopic) {
       nextSubIdx += 1;
       nextTurn = 0;
       nextSideIdx = 0;
 
-      // Check if debate is over
       if (nextSubIdx >= subtopics.length) {
         const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        await supabase
-          .from("debates")
-          .update({
-            status: "completed",
-            ended_at: new Date().toISOString(),
-            edit_window_ends_at: editWindowEnd,
-          })
-          .eq("id", id);
+        await supabase.from("debates").update({
+          status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
+        }).eq("id", id);
 
-        // Generate closing synthesis
         setAiLoading(true);
         try {
           const summaries = subtopics.map((st) => ({
             subtopic: st.title,
-            summary: arguments_
-              .filter((a) => a.subtopic_id === st.id)
-              .map((a) => a.content)
-              .join(" | "),
+            summary: arguments_.filter((a) => a.subtopic_id === st.id).map((a) => a.content).join(" | "),
           }));
-
-          const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-facilitator`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              },
-              body: JSON.stringify({
-                action: "closing_synthesis",
-                payload: { topic: debate.topic, roundSummaries: summaries },
-              }),
-            }
-          );
-
-          if (response.ok && response.body) {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let text = "";
-            let buf = "";
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buf += decoder.decode(value, { stream: true });
-              let nl: number;
-              while ((nl = buf.indexOf("\n")) !== -1) {
-                let line = buf.slice(0, nl);
-                buf = buf.slice(nl + 1);
-                if (line.endsWith("\r")) line = line.slice(0, -1);
-                if (!line.startsWith("data: ")) continue;
-                const json = line.slice(6).trim();
-                if (json === "[DONE]") break;
-                try {
-                  const parsed = JSON.parse(json);
-                  const c = parsed.choices?.[0]?.delta?.content;
-                  if (c) { text += c; setAiMessage(text); }
-                } catch {}
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Closing synthesis error:", err);
-        }
+          await streamAI("closing_synthesis", { topic: debate.topic, roundSummaries: summaries });
+        } catch {}
         setAiLoading(false);
         return;
       }
     }
 
-    await supabase
-      .from("debates")
-      .update({
-        current_subtopic_index: nextSubIdx,
-        current_turn: nextTurn,
-        current_speaker_side_id: sides[nextSideIdx]?.id,
-      })
-      .eq("id", id);
+    await supabase.from("debates").update({
+      current_subtopic_index: nextSubIdx, current_turn: nextTurn, current_speaker_side_id: sides[nextSideIdx]?.id,
+    }).eq("id", id);
 
     setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
     setTimerRunning(true);
 
-    // Get transition prompt from AI
     setAiLoading(true);
     try {
       const response = await supabase.functions.invoke("ai-facilitator", {
@@ -366,10 +279,7 @@ const DebateRoomPage = () => {
             topic: debate.topic,
             subtopic: subtopics[nextSubIdx]?.title,
             previousArguments: currentSubtopicArgs.slice(-3).map((a) => ({
-              side: sides.find((s) => {
-                const p = participants.find((p) => p.id === a.participant_id);
-                return p?.side_id === s.id;
-              })?.label || "Unknown",
+              side: sides.find((s) => { const p = participants.find((p) => p.id === a.participant_id); return p?.side_id === s.id; })?.label || "Unknown",
               content: a.content,
             })),
             nextSide: sides[nextSideIdx]?.label,
@@ -384,33 +294,47 @@ const DebateRoomPage = () => {
   const submitArgument = async () => {
     if (!argumentText.trim() || !debate || !myParticipant || !currentSubtopic || submitting) return;
     setSubmitting(true);
-
     const { error } = await supabase.from("arguments").insert({
-      debate_id: debate.id,
-      content: argumentText.trim(),
-      participant_id: myParticipant.id,
-      subtopic_id: currentSubtopic.id,
-      argument_type: "claim",
+      debate_id: debate.id, content: argumentText.trim(),
+      participant_id: myParticipant.id, subtopic_id: currentSubtopic.id, argument_type: "claim",
     });
-
     if (error) {
       toast.error("Failed to submit argument");
     } else {
       setArgumentText("");
-
-      // Classify argument in background
       supabase.functions.invoke("ai-facilitator", {
-        body: {
-          action: "argument_map",
-          payload: { content: argumentText.trim(), side: currentSide?.label },
-        },
-      }).then((res) => {
-        if (res.data?.argument_type) {
-          // Could update the argument type in DB here
-        }
+        body: { action: "argument_map", payload: { content: argumentText.trim(), side: currentSide?.label } },
       });
     }
     setSubmitting(false);
+  };
+
+  const copyJoinLink = () => {
+    if (!debate?.join_code) return;
+    const link = `${window.location.origin}/join/${debate.join_code}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    toast.success("Join link copied!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const toggleFacilitatorSpeaker = async () => {
+    if (!debate || !user || !id) return;
+    if (facilitatorSpeaking) {
+      // Remove from participants
+      await supabase.from("debate_participants").delete().eq("debate_id", id).eq("user_id", user.id);
+      setFacilitatorSpeaking(false);
+      toast.info("Returned to facilitator-only mode");
+    } else {
+      // Join as speaker on first side
+      const { error } = await supabase.from("debate_participants").insert({
+        debate_id: id, user_id: user.id, side_id: sides[0]?.id, participant_role: "speaker",
+      });
+      if (!error) {
+        setFacilitatorSpeaking(true);
+        toast.success("Joined as speaker");
+      }
+    }
   };
 
   if (loading) {
@@ -427,6 +351,16 @@ const DebateRoomPage = () => {
   const isDraft = debate.status === "draft";
   const isLive = debate.status === "live";
 
+  // Effective view: facilitators see facilitator UI, speakers see participant UI, spectators see read-only
+  const isFacilitator = userRole === "facilitator";
+  const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
+  const isSpectator = userRole === "spectator";
+
+  // Can this user submit arguments?
+  const canSpeak = isSpeaker && isMyTurn && isLive;
+  // Mic enabled only when it's their turn
+  const micEnabled = canSpeak;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -442,31 +376,60 @@ const DebateRoomPage = () => {
                 {debate.status}
               </span>
               <span>{participants.length} participants</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                isFacilitator ? "bg-primary/20 text-primary" : isSpeaker ? "bg-blue-500/20 text-blue-400" : "bg-muted text-muted-foreground"
+              }`}>
+                {isFacilitator ? "Facilitator" : isSpeaker ? "Speaker" : "Spectator"}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* View switcher */}
-        <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-0.5">
-          {(debate.created_by === user?.id ? ["facilitator", "participant", "audience"] as ViewMode[] : ["participant", "audience"] as ViewMode[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setViewMode(v)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                viewMode === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {v === "facilitator" ? <Shield className="w-3.5 h-3.5 inline mr-1" /> : v === "participant" ? <Mic className="w-3.5 h-3.5 inline mr-1" /> : <Eye className="w-3.5 h-3.5 inline mr-1" />}
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* Media permissions for speakers/facilitators */}
+          {(isFacilitator || isSpeaker) && user && (
+            <MediaPermissions
+              role={isFacilitator ? "facilitator" : "speaker"}
+              isMicEnabled={micEnabled}
+              userId={user.id}
+            />
+          )}
+
+          {/* Share button — facilitator only */}
+          {isFacilitator && (
+            <div className="relative">
+              <button
+                onClick={() => setShowShare(!showShare)}
+                className="flex items-center gap-1.5 bg-secondary text-foreground px-3 py-2 rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Share
+              </button>
+              {showShare && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-card border border-border rounded-xl p-4 shadow-lg z-50">
+                  <p className="text-xs text-muted-foreground mb-2">Share this link to invite speakers:</p>
+                  <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
+                    <code className="text-xs text-foreground flex-1 truncate">
+                      {window.location.origin}/join/{debate.join_code}
+                    </code>
+                    <button onClick={copyJoinLink} className="text-primary hover:opacity-80">
+                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Join code: <span className="font-mono font-bold text-foreground">{debate.join_code}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Main content area */}
         <div className="flex-1 flex flex-col">
-          {/* Timer & Current subtopic bar */}
+          {/* Timer bar — visible to all when live */}
           {isLive && (
             <div className="border-b border-border bg-card/50 px-6 py-3 flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -495,7 +458,7 @@ const DebateRoomPage = () => {
             </div>
           )}
 
-          {/* AI Facilitator message */}
+          {/* d. facilitator message */}
           <AnimatePresence>
             {aiMessage && (
               <motion.div
@@ -509,7 +472,7 @@ const DebateRoomPage = () => {
                     <Zap className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-primary mb-1">AI Facilitator</p>
+                    <p className="text-xs font-semibold text-primary mb-1">d.</p>
                     <p className="text-sm text-foreground leading-relaxed">{aiMessage}</p>
                   </div>
                 </div>
@@ -527,12 +490,20 @@ const DebateRoomPage = () => {
 
           {/* Arguments feed */}
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-            {isDraft && viewMode === "facilitator" && (
+            {/* Draft — facilitator only sees start button */}
+            {isDraft && isFacilitator && (
               <div className="text-center py-16">
                 <h3 className="text-xl font-display font-bold mb-2">Ready to begin?</h3>
-                <p className="text-muted-foreground text-sm mb-6">
+                <p className="text-muted-foreground text-sm mb-4">
                   {participants.length} participant{participants.length !== 1 ? "s" : ""} joined · {subtopics.length} subtopics · {debate.turns_per_subtopic} turns each
                 </p>
+                <button
+                  onClick={toggleFacilitatorSpeaker}
+                  className="mb-4 text-sm text-primary underline underline-offset-2 hover:opacity-80"
+                >
+                  {facilitatorSpeaking ? "Leave speaker role" : "Join as Speaker"}
+                </button>
+                <br />
                 <button
                   onClick={startDebate}
                   disabled={aiLoading}
@@ -543,13 +514,15 @@ const DebateRoomPage = () => {
               </div>
             )}
 
-            {isDraft && viewMode !== "facilitator" && (
+            {/* Draft — speakers/spectators wait */}
+            {isDraft && !isFacilitator && (
               <div className="text-center py-16">
                 <h3 className="text-xl font-display font-bold mb-2">Waiting for facilitator…</h3>
                 <p className="text-muted-foreground text-sm">The debate will begin shortly.</p>
               </div>
             )}
 
+            {/* Live/completed argument feed */}
             {(isLive || isCompleted) && subtopics.map((st) => {
               const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
               if (stArgs.length === 0 && st.id !== currentSubtopic?.id) return null;
@@ -565,13 +538,8 @@ const DebateRoomPage = () => {
                       const participant = participants.find((p) => p.id === arg.participant_id);
                       const side = sides.find((s) => s.id === participant?.side_id);
                       const isLeft = side?.sort_order === 0;
-                      const isInEditWindow =
-                        isCompleted &&
-                        debate.edit_window_ends_at &&
-                        new Date(debate.edit_window_ends_at).getTime() > Date.now();
-                      const canEditThis =
-                        isInEditWindow &&
-                        participant?.user_id === user?.id;
+                      const isInEditWindow = isCompleted && debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now();
+                      const canEditThis = isInEditWindow && participant?.user_id === user?.id;
 
                       return (
                         <EditableArgument
@@ -589,13 +557,7 @@ const DebateRoomPage = () => {
                             setArguments((prev) =>
                               prev.map((a) =>
                                 a.id === argId
-                                  ? {
-                                      ...a,
-                                      content: newContent,
-                                      is_edited: true,
-                                      original_content: a.original_content || a.content,
-                                      edited_at: new Date().toISOString(),
-                                    }
+                                  ? { ...a, content: newContent, is_edited: true, original_content: a.original_content || a.content, edited_at: new Date().toISOString() }
                                   : a
                               )
                             );
@@ -623,8 +585,8 @@ const DebateRoomPage = () => {
             )}
           </div>
 
-          {/* Input area — participant view, live, and it's their turn */}
-          {isLive && viewMode === "participant" && isMyTurn && (
+          {/* Input area — speakers only, when it's their turn */}
+          {canSpeak && (
             <div className="border-t border-border bg-card px-4 py-3">
               <div className="flex items-end gap-2">
                 <textarea
@@ -633,9 +595,7 @@ const DebateRoomPage = () => {
                   placeholder="Type your argument…"
                   rows={2}
                   className="flex-1 bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitArgument(); }
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitArgument(); } }}
                 />
                 <button
                   onClick={submitArgument}
@@ -648,18 +608,27 @@ const DebateRoomPage = () => {
             </div>
           )}
 
-          {isLive && viewMode === "participant" && !isMyTurn && (
+          {/* Waiting message for speakers not on turn */}
+          {isSpeaker && isLive && !isMyTurn && (
             <div className="border-t border-border bg-card/50 px-4 py-3 text-center text-sm text-muted-foreground">
               Waiting for {currentSide?.label} to respond…
             </div>
           )}
 
-          {/* Facilitator controls */}
-          {isLive && viewMode === "facilitator" && (
+          {/* Spectator bar */}
+          {isSpectator && isLive && (
+            <div className="border-t border-border bg-card/50 px-4 py-3 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+              <Eye className="w-4 h-4" />
+              You are watching as a spectator
+            </div>
+          )}
+
+          {/* Facilitator controls — ONLY for facilitators */}
+          {isLive && isFacilitator && (
             <div className="border-t border-border bg-card px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => { setTimerRunning(!timerRunning); }}
+                  onClick={() => setTimerRunning(!timerRunning)}
                   className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary/80 transition-colors"
                 >
                   {timerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -683,9 +652,8 @@ const DebateRoomPage = () => {
           )}
         </div>
 
-        {/* Right sidebar — Argument map & participants */}
+        {/* Right sidebar */}
         <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
-          {/* Participants */}
           <div className="border-b border-border p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
               <Users className="w-3.5 h-3.5 inline mr-1" /> Participants ({participants.length})
@@ -698,22 +666,18 @@ const DebateRoomPage = () => {
                   }`}>
                     {side.label}
                   </p>
-                  {participants
-                    .filter((p) => p.side_id === side.id)
-                    .map((p) => (
-                      <div key={p.id} className="text-xs text-foreground flex items-center gap-1.5">
-                        <div className={`w-1.5 h-1.5 rounded-full ${
-                          side.sort_order === 0 ? "bg-blue-400" : "bg-orange-400"
-                        }`} />
-                        {p.user_id === user?.id ? "You" : p.user_id.slice(0, 8)}
-                      </div>
-                    ))}
+                  {participants.filter((p) => p.side_id === side.id).map((p) => (
+                    <div key={p.id} className="text-xs text-foreground flex items-center gap-1.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${side.sort_order === 0 ? "bg-blue-400" : "bg-orange-400"}`} />
+                      {p.user_id === user?.id ? "You" : p.user_id.slice(0, 8)}
+                      <span className="text-[9px] text-muted-foreground ml-1">({p.participant_role})</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Subtopic progress */}
           <div className="p-4 flex-1 overflow-y-auto">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
               <MessageSquare className="w-3.5 h-3.5 inline mr-1" /> Subtopics
@@ -723,19 +687,13 @@ const DebateRoomPage = () => {
                 const isCurrent = i === (debate?.current_subtopic_index ?? 0);
                 const isDone = i < (debate?.current_subtopic_index ?? 0);
                 const argCount = arguments_.filter((a) => a.subtopic_id === st.id).length;
-
                 return (
-                  <div
-                    key={st.id}
-                    className={`rounded-lg px-3 py-2 text-xs transition-colors ${
-                      isCurrent ? "bg-primary/10 border border-primary/30 text-primary" :
-                      isDone ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground"
-                    }`}
-                  >
+                  <div key={st.id} className={`rounded-lg px-3 py-2 text-xs transition-colors ${
+                    isCurrent ? "bg-primary/10 border border-primary/30 text-primary" :
+                    isDone ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground"
+                  }`}>
                     <p className="font-medium">{i + 1}. {st.title}</p>
-                    {argCount > 0 && (
-                      <p className="text-[10px] mt-0.5 opacity-75">{argCount} argument{argCount !== 1 ? "s" : ""}</p>
-                    )}
+                    {argCount > 0 && <p className="text-[10px] mt-0.5 opacity-75">{argCount} argument{argCount !== 1 ? "s" : ""}</p>}
                   </div>
                 );
               })}
