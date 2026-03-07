@@ -6,6 +6,51 @@
 
 @layer base {
   :root {
+    /* Light mode — high-contrast B&W with amber accent */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+
+    --primary: 36 90% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 8%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 36 90% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 36 90% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 96%;
+    --sidebar-foreground: 0 0% 8%;
+    --sidebar-primary: 36 90% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 90%;
+    --sidebar-accent-foreground: 0 0% 8%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 36 90% 50%;
+
+    --font-display: 'Fraunces', serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+
+  .dark {
     --background: 213 43% 11%;
     --foreground: 36 33% 93%;
 
@@ -34,8 +79,6 @@
     --input: 213 25% 22%;
     --ring: 36 90% 55%;
 
-    --radius: 0.5rem;
-
     --sidebar-background: 213 40% 9%;
     --sidebar-foreground: 36 33% 93%;
     --sidebar-primary: 36 90% 55%;
@@ -44,9 +87,6 @@
     --sidebar-accent-foreground: 36 33% 93%;
     --sidebar-border: 213 25% 18%;
     --sidebar-ring: 36 90% 55%;
-
-    --font-display: 'Fraunces', serif;
-    --font-body: 'DM Sans', sans-serif;
   }
 }
 
