@@ -90,6 +90,7 @@ export type Database = {
           debate_id: string
           id: string
           joined_at: string
+          participant_role: string
           side_id: string | null
           user_id: string
         }
@@ -97,6 +98,7 @@ export type Database = {
           debate_id: string
           id?: string
           joined_at?: string
+          participant_role?: string
           side_id?: string | null
           user_id: string
         }
@@ -104,6 +106,7 @@ export type Database = {
           debate_id?: string
           id?: string
           joined_at?: string
+          participant_role?: string
           side_id?: string | null
           user_id?: string
         }
