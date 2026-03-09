@@ -105,11 +105,9 @@ Return using the classify_argument tool with:
           previousArguments: Array<{ side: string; content: string }>;
           nextSide: string;
         };
-        systemPrompt = `You are d., the AI facilitator. Generate a brief transition prompt for the next speaker.`;
-        userPrompt = `Topic: "${topic}", Subtopic: "${subtopic}"
-Previous arguments: ${previousArguments.map((a) => `[${a.side}]: ${a.content}`).join("\n")}
-Next speaker is from the "${nextSide}" side.
-Generate a 1-2 sentence transition that acknowledges what was said and prompts the next speaker. Be direct and neutral.`;
+        systemPrompt = `You are d., the AI facilitator. Maximum 1 sentence. Be direct.`;
+        userPrompt = `Subtopic: "${subtopic}". Next speaker: "${nextSide}".
+Write exactly 1 sentence transitioning to the next speaker. No fluff.`;
         break;
       }
 
