@@ -33,7 +33,7 @@ serve(async (req) => {
     switch (action) {
       case "generate_debate": {
         const { topic } = payload as { topic: string };
-        systemPrompt = `You are Dynamo, an AI debate architect. Given a topic, generate a structured debate format.
+        systemPrompt = `You are d., an AI debate architect. Given a topic, generate a structured debate format.
 Return a JSON object using the suggest_debate tool with:
 - topic: a clear, debatable question  
 - subtopics: 2-4 focused sub-questions that break the topic into key angles
@@ -50,7 +50,7 @@ Return a JSON object using the suggest_debate tool with:
           subtopics: string[];
           sides: string[];
         };
-        systemPrompt = `You are Dynamo, an impartial AI debate facilitator. You set the stage for structured debate with clarity and gravitas. Be concise but substantive — no fluff.`;
+        systemPrompt = `You are d., an impartial AI debate facilitator. You set the stage for structured debate with clarity and gravitas. Be concise but substantive — no fluff.`;
         userPrompt = `Generate an opening statement for a debate on: "${topic}"
 Subtopics: ${subtopics.join(", ")}
 Sides: ${sides.join(" vs ")}
@@ -73,7 +73,7 @@ The opening should:
             type: string;
           }>;
         };
-        systemPrompt = `You are Dynamo, an AI debate analyst. You produce precise, no-fluff round summaries that identify the key arguments, direct quotes worth noting, points of agreement, and unresolved tensions. Your summaries are designed for people reviewing the debate record later — they should be cohesive and navigable, not shortened paraphrases.`;
+        systemPrompt = `You are d., an AI debate analyst. You produce precise, no-fluff round summaries that identify the key arguments, direct quotes worth noting, points of agreement, and unresolved tensions. Your summaries are designed for people reviewing the debate record later — they should be cohesive and navigable, not shortened paraphrases.`;
         userPrompt = `Summarize this debate round.
 
 Topic: "${topic}"
@@ -92,7 +92,7 @@ Return using the round_summary tool with:
           content: string;
           side: string;
         };
-        systemPrompt = `You are Dynamo's argument classifier. Analyze a debate argument and classify it.`;
+        systemPrompt = `You are d.'s argument classifier. Analyze a debate argument and classify it.`;
         userPrompt = `Classify this argument from the "${side}" side:
 "${content}"
 
@@ -110,7 +110,7 @@ Return using the classify_argument tool with:
           previousArguments: Array<{ side: string; content: string }>;
           nextSide: string;
         };
-        systemPrompt = `You are Dynamo, the AI facilitator. Generate a brief transition prompt for the next speaker.`;
+        systemPrompt = `You are d., the AI facilitator. Generate a brief transition prompt for the next speaker.`;
         userPrompt = `Topic: "${topic}", Subtopic: "${subtopic}"
 Previous arguments: ${previousArguments.map((a) => `[${a.side}]: ${a.content}`).join("\n")}
 Next speaker is from the "${nextSide}" side.
@@ -123,7 +123,7 @@ Generate a 1-2 sentence transition that acknowledges what was said and prompts t
           topic: string;
           roundSummaries: Array<{ subtopic: string; summary: string }>;
         };
-        systemPrompt = `You are Dynamo. Generate a closing synthesis that ties together all rounds of a debate. Be analytical, fair to both sides, and identify the strongest arguments, key points of contention, and any emerging consensus.`;
+        systemPrompt = `You are d. Generate a closing synthesis that ties together all rounds of a debate. Be analytical, fair to both sides, and identify the strongest arguments, key points of contention, and any emerging consensus.`;
         userPrompt = `Generate a closing synthesis for the debate on: "${topic}"
 
 Round summaries:

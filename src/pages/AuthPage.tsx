@@ -65,7 +65,7 @@ const AuthPage = () => {
         className="w-full max-w-sm"
       >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-display font-bold text-primary mb-1">Dynamo</h1>
+          <h1 className="text-3xl font-display font-bold text-primary mb-1">d.</h1>
           <p className="text-sm text-muted-foreground font-body">People to the Power</p>
         </div>
 

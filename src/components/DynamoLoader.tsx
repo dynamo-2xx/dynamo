@@ -37,10 +37,9 @@ const DynamoLoader = ({ onComplete, duration = 2500 }: DynamoLoaderProps) => {
             initial={{ opacity: 0.15 }}
             animate={{
               opacity: i < revealedCount ? 1 : 0.15,
-              color: i < revealedCount ? "hsl(36, 90%, 55%)" : "hsl(213, 15%, 30%)",
             }}
             transition={{ duration: 0.08 }}
-            className="inline-block"
+            className={`inline-block ${i < revealedCount ? "text-primary" : "text-muted-foreground"}`}
             style={{ whiteSpace: "pre" }}
           >
             {char}
