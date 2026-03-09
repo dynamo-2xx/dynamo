@@ -50,16 +50,11 @@ Return a JSON object using the suggest_debate tool with:
           subtopics: string[];
           sides: string[];
         };
-        systemPrompt = `You are d., an impartial AI debate facilitator. You set the stage for structured debate with clarity and gravitas. Be concise but substantive — no fluff.`;
-        userPrompt = `Generate an opening statement for a debate on: "${topic}"
-Subtopics: ${subtopics.join(", ")}
+        systemPrompt = `You are d., an impartial AI debate facilitator. Be extremely concise — 1-2 sentences maximum. No fluff, no preamble.`;
+        userPrompt = `Generate a 1-2 sentence opening for a debate on: "${topic}"
 Sides: ${sides.join(" vs ")}
 
-The opening should:
-1. Frame why this topic matters right now
-2. Briefly preview what each subtopic will explore
-3. Set ground rules: respect, evidence-based reasoning, time discipline
-4. Be 3-5 sentences maximum`;
+Rules: Maximum 2 sentences total. State the topic and signal the first speaker. Nothing else.`;
         break;
       }
 
