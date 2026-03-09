@@ -1,47 +1,49 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Video, VideoOff, Mic, MicOff, AlertCircle } from "lucide-react";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { Video, VideoOff, Mic, MicOff, AlertCircle, Camera } from "lucide-react";
 
 interface MediaPermissionsProps {
   role: "facilitator" | "speaker" | "spectator";
-  isMicEnabled: boolean; // controlled by turn system
+  isMicEnabled: boolean;
   userId: string;
 }
 
 const MediaPermissions = ({ role, isMicEnabled, userId }: MediaPermissionsProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [hasVideo, setHasVideo] = useState(false);
-  const [hasAudio, setHasAudio] = useState(false);
+  const [hasStream, setHasStream] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cameraOn, setCameraOn] = useState(true);
 
+  // Must be called from a direct user gesture (click handler)
   const requestMedia = useCallback(async () => {
     if (role === "spectator") return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: true,
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 },
       });
       streamRef.current = stream;
-      setHasVideo(true);
-      setHasAudio(true);
+      setHasStream(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+      // Start with mic muted until it's their turn
+      stream.getAudioTracks().forEach((t) => { t.enabled = isMicEnabled; });
     } catch (err: any) {
-      console.error("Media access error:", err);
-      setError(err.name === "NotAllowedError"
-        ? "Camera/mic access denied. Please allow in browser settings."
-        : "Could not access camera or microphone.");
+      setError(
+        err.name === "NotAllowedError"
+          ? "Camera/mic access denied. Please allow in browser settings."
+          : "Could not access camera or microphone."
+      );
     }
-  }, [role]);
+  }, [role, isMicEnabled]);
 
+  // Cleanup on unmount
   useEffect(() => {
-    requestMedia();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [requestMedia]);
+  }, []);
 
   // Control mic based on turn
   useEffect(() => {
@@ -70,9 +72,21 @@ const MediaPermissions = ({ role, isMicEnabled, userId }: MediaPermissionsProps)
     );
   }
 
+  // Show "Enable Camera & Mic" button if stream not yet acquired
+  if (!hasStream) {
+    return (
+      <button
+        onClick={requestMedia}
+        className="flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-xs font-medium hover:opacity-90 transition-opacity"
+      >
+        <Camera className="w-3.5 h-3.5" />
+        Enable Camera & Mic
+      </button>
+    );
+  }
+
   return (
     <div className="flex items-center gap-2">
-      {/* Video tile */}
       <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-muted border border-border">
         <video
           ref={videoRef}
@@ -87,8 +101,6 @@ const MediaPermissions = ({ role, isMicEnabled, userId }: MediaPermissionsProps)
           </div>
         )}
       </div>
-
-      {/* Controls */}
       <div className="flex flex-col gap-1">
         <button
           onClick={toggleCamera}
