@@ -50,16 +50,11 @@ Return a JSON object using the suggest_debate tool with:
           subtopics: string[];
           sides: string[];
         };
-        systemPrompt = `You are d., an impartial AI debate facilitator. You set the stage for structured debate with clarity and gravitas. Be concise but substantive — no fluff.`;
-        userPrompt = `Generate an opening statement for a debate on: "${topic}"
-Subtopics: ${subtopics.join(", ")}
+        systemPrompt = `You are d., an impartial AI debate facilitator. Be extremely concise — 1-2 sentences maximum. No fluff, no preamble.`;
+        userPrompt = `Generate a 1-2 sentence opening for a debate on: "${topic}"
 Sides: ${sides.join(" vs ")}
 
-The opening should:
-1. Frame why this topic matters right now
-2. Briefly preview what each subtopic will explore
-3. Set ground rules: respect, evidence-based reasoning, time discipline
-4. Be 3-5 sentences maximum`;
+Rules: Maximum 2 sentences total. State the topic and signal the first speaker. Nothing else.`;
         break;
       }
 
@@ -110,11 +105,9 @@ Return using the classify_argument tool with:
           previousArguments: Array<{ side: string; content: string }>;
           nextSide: string;
         };
-        systemPrompt = `You are d., the AI facilitator. Generate a brief transition prompt for the next speaker.`;
-        userPrompt = `Topic: "${topic}", Subtopic: "${subtopic}"
-Previous arguments: ${previousArguments.map((a) => `[${a.side}]: ${a.content}`).join("\n")}
-Next speaker is from the "${nextSide}" side.
-Generate a 1-2 sentence transition that acknowledges what was said and prompts the next speaker. Be direct and neutral.`;
+        systemPrompt = `You are d., the AI facilitator. Maximum 1 sentence. Be direct.`;
+        userPrompt = `Subtopic: "${subtopic}". Next speaker: "${nextSide}".
+Write exactly 1 sentence transitioning to the next speaker. No fluff.`;
         break;
       }
 
@@ -123,17 +116,13 @@ Generate a 1-2 sentence transition that acknowledges what was said and prompts t
           topic: string;
           roundSummaries: Array<{ subtopic: string; summary: string }>;
         };
-        systemPrompt = `You are d. Generate a closing synthesis that ties together all rounds of a debate. Be analytical, fair to both sides, and identify the strongest arguments, key points of contention, and any emerging consensus.`;
-        userPrompt = `Generate a closing synthesis for the debate on: "${topic}"
+        systemPrompt = `You are d. Generate a concise closing synthesis. Maximum 3-4 sentences.`;
+        userPrompt = `Closing synthesis for: "${topic}"
 
 Round summaries:
 ${roundSummaries.map((r) => `## ${r.subtopic}\n${r.summary}`).join("\n\n")}
 
-The synthesis should:
-1. Identify the strongest arguments from each side
-2. Note key points of agreement and contention
-3. Highlight any unresolved questions
-4. Be 4-8 sentences`;
+In 3-4 sentences: strongest arguments from each side and key unresolved questions.`;
         break;
       }
 
