@@ -321,18 +321,25 @@ const DebateRoomPage = () => {
   const toggleFacilitatorSpeaker = async () => {
     if (!debate || !user || !id) return;
     if (facilitatorSpeaking) {
-      // Remove from participants
       await supabase.from("debate_participants").delete().eq("debate_id", id).eq("user_id", user.id);
       setFacilitatorSpeaking(false);
       toast.info("Returned to facilitator-only mode");
     } else {
-      // Join as speaker on first side
-      const { error } = await supabase.from("debate_participants").insert({
-        debate_id: id, user_id: user.id, side_id: sides[0]?.id, participant_role: "speaker",
-      });
-      if (!error) {
+      // Check if already a participant before inserting
+      const existing = participants.find((p) => p.user_id === user.id);
+      if (existing) {
+        // Already joined — just update role if needed
+        await supabase.from("debate_participants").update({ participant_role: "speaker" }).eq("id", existing.id);
         setFacilitatorSpeaking(true);
         toast.success("Joined as speaker");
+      } else {
+        const { error } = await supabase.from("debate_participants").insert({
+          debate_id: id, user_id: user.id, side_id: sides[0]?.id, participant_role: "speaker",
+        });
+        if (!error) {
+          setFacilitatorSpeaking(true);
+          toast.success("Joined as speaker");
+        }
       }
     }
   };
