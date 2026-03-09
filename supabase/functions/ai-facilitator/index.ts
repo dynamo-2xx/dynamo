@@ -116,17 +116,13 @@ Write exactly 1 sentence transitioning to the next speaker. No fluff.`;
           topic: string;
           roundSummaries: Array<{ subtopic: string; summary: string }>;
         };
-        systemPrompt = `You are d. Generate a closing synthesis that ties together all rounds of a debate. Be analytical, fair to both sides, and identify the strongest arguments, key points of contention, and any emerging consensus.`;
-        userPrompt = `Generate a closing synthesis for the debate on: "${topic}"
+        systemPrompt = `You are d. Generate a concise closing synthesis. Maximum 3-4 sentences.`;
+        userPrompt = `Closing synthesis for: "${topic}"
 
 Round summaries:
 ${roundSummaries.map((r) => `## ${r.subtopic}\n${r.summary}`).join("\n\n")}
 
-The synthesis should:
-1. Identify the strongest arguments from each side
-2. Note key points of agreement and contention
-3. Highlight any unresolved questions
-4. Be 4-8 sentences`;
+In 3-4 sentences: strongest arguments from each side and key unresolved questions.`;
         break;
       }
 
