@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import EditWindowBanner from "@/components/debate/EditWindowBanner";
 import EditableArgument from "@/components/debate/EditableArgument";
 import MediaPermissions from "@/components/debate/MediaPermissions";
-import SpeechInput from "@/components/debate/SpeechInput";
+import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechInput";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
@@ -80,6 +80,8 @@ const DebateRoomPage = () => {
   // Share
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const speechRef = useRef<SpeechInputHandle>(null);
 
   // Load data
   useEffect(() => {
@@ -295,6 +297,9 @@ const DebateRoomPage = () => {
   const submitArgument = async () => {
     if (!argumentText.trim() || !debate || !myParticipant || !currentSubtopic || submitting) return;
     setSubmitting(true);
+    // Auto-stop speech recognition on submit
+    speechRef.current?.stop();
+    setIsRecording(false);
     const { error } = await supabase.from("arguments").insert({
       debate_id: debate.id, content: argumentText.trim(),
       participant_id: myParticipant.id, subtopic_id: currentSubtopic.id, argument_type: "claim",
@@ -400,6 +405,8 @@ const DebateRoomPage = () => {
               role={isFacilitator ? "facilitator" : "speaker"}
               isMicEnabled={micEnabled}
               userId={user.id}
+              isActivelySpeaking={isRecording && canSpeak}
+              variant="header"
             />
           )}
 
@@ -600,27 +607,45 @@ const DebateRoomPage = () => {
                 <Mic className="w-4 h-4 text-primary" />
                 <span className="text-xs text-primary font-medium">It's your turn — speak or type your argument</span>
               </div>
-              <div className="flex items-end gap-2">
-                <SpeechInput
-                  isEnabled={canSpeak}
-                  onTranscript={(text) => setArgumentText(text)}
-                  onFinalTranscript={(text) => setArgumentText(text)}
-                />
-                <textarea
-                  value={argumentText}
-                  onChange={(e) => setArgumentText(e.target.value)}
-                  placeholder="Speak into your mic or type here…"
-                  rows={2}
-                  className="flex-1 bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitArgument(); } }}
-                />
-                <button
-                  onClick={submitArgument}
-                  disabled={!argumentText.trim() || submitting}
-                  className="bg-primary text-primary-foreground p-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
+              <div className="flex items-end gap-3">
+                {/* Inline camera preview — enlarged when recording */}
+                {user && (
+                  <MediaPermissions
+                    role={isSpeaker ? "speaker" : "facilitator"}
+                    isMicEnabled={micEnabled}
+                    userId={user.id}
+                    isActivelySpeaking={isRecording}
+                    variant="inline"
+                  />
+                )}
+                <div className="flex-1 flex flex-col gap-2">
+                  <div className="flex items-end gap-2">
+                    <SpeechInput
+                      ref={speechRef}
+                      isEnabled={canSpeak}
+                      onTranscript={(text) => {
+                        setArgumentText(text);
+                        setIsRecording(true);
+                      }}
+                      onFinalTranscript={(text) => setArgumentText(text)}
+                    />
+                    <textarea
+                      value={argumentText}
+                      onChange={(e) => setArgumentText(e.target.value)}
+                      placeholder="Speak into your mic or type here…"
+                      rows={2}
+                      className="flex-1 bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitArgument(); } }}
+                    />
+                    <button
+                      onClick={submitArgument}
+                      disabled={!argumentText.trim() || submitting}
+                      className="bg-primary text-primary-foreground p-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
