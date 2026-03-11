@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import EditWindowBanner from "@/components/debate/EditWindowBanner";
 import EditableArgument from "@/components/debate/EditableArgument";
 import MediaPermissions from "@/components/debate/MediaPermissions";
-import SpeechInput from "@/components/debate/SpeechInput";
+import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechInput";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
