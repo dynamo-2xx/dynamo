@@ -405,6 +405,8 @@ const DebateRoomPage = () => {
               role={isFacilitator ? "facilitator" : "speaker"}
               isMicEnabled={micEnabled}
               userId={user.id}
+              isActivelySpeaking={isRecording && canSpeak}
+              variant="header"
             />
           )}
 
