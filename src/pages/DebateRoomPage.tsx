@@ -80,6 +80,8 @@ const DebateRoomPage = () => {
   // Share
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const speechRef = useRef<SpeechInputHandle>(null);
 
   // Load data
   useEffect(() => {
