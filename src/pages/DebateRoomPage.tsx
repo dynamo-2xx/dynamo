@@ -297,6 +297,9 @@ const DebateRoomPage = () => {
   const submitArgument = async () => {
     if (!argumentText.trim() || !debate || !myParticipant || !currentSubtopic || submitting) return;
     setSubmitting(true);
+    // Auto-stop speech recognition on submit
+    speechRef.current?.stop();
+    setIsRecording(false);
     const { error } = await supabase.from("arguments").insert({
       debate_id: debate.id, content: argumentText.trim(),
       participant_id: myParticipant.id, subtopic_id: currentSubtopic.id, argument_type: "claim",
