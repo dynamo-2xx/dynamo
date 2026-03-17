@@ -1,4 +1,5 @@
-import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus } from "lucide-react";
+import { useState } from "react";
+import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
