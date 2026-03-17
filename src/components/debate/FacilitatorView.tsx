@@ -44,6 +44,7 @@ const FacilitatorView = ({
   timeLeft, timerRunning, aiMessage, aiLoading,
   onToggleTimer, onResetTimer, onExtendTime, onSkipTurn, onNextTurn,
 }: FacilitatorViewProps) => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
   const currentSubtopicArgs = args.filter((a) => a.subtopic_id === currentSubtopic?.id);
