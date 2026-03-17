@@ -3,27 +3,51 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Users, Mic } from "lucide-react";
+
+interface Side {
+  id: string;
+  label: string;
+  sort_order: number;
+}
+
+interface Participant {
+  id: string;
+  user_id: string;
+  side_id: string | null;
+  participant_role: string;
+}
 
 const JoinDebatePage = () => {
   const { code } = useParams<{ code: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
   const [status, setStatus] = useState("Joining debate…");
+  const [debateId, setDebateId] = useState<string | null>(null);
+  const [debateTopic, setDebateTopic] = useState("");
+  const [sides, setSides] = useState<Side[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [selectedSide, setSelectedSide] = useState<string>("");
+  const [showPicker, setShowPicker] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
-      // Redirect to auth, then come back
       navigate(`/auth?redirect=/join/${code}`, { replace: true });
       return;
     }
 
-    const joinDebate = async () => {
+    const loadDebate = async () => {
       // Find debate by join_code
       const { data: debate, error } = await supabase
         .from("debates")
-        .select("id")
+        .select("id, topic")
         .eq("join_code", code?.toUpperCase())
         .single();
 
@@ -42,14 +66,44 @@ const JoinDebatePage = () => {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (!existing) {
-        // Add as speaker
+      if (existing) {
+        toast.success("Rejoining debate!");
+        navigate(`/debate/${debate.id}`, { replace: true });
+        return;
+      }
+
+      // Fetch sides and participants to determine availability
+      const [sidesRes, partsRes] = await Promise.all([
+        supabase.from("debate_sides").select("*").eq("debate_id", debate.id).order("sort_order"),
+        supabase.from("debate_participants").select("*").eq("debate_id", debate.id),
+      ]);
+
+      const debateSides = (sidesRes.data || []) as Side[];
+      const debateParticipants = (partsRes.data || []) as Participant[];
+
+      setDebateId(debate.id);
+      setDebateTopic(debate.topic);
+      setSides(debateSides);
+      setParticipants(debateParticipants);
+
+      // Check if any side has an open speaker slot
+      const speakersPerSide = debateSides.map((side) => ({
+        ...side,
+        speakerCount: debateParticipants.filter(
+          (p) => p.side_id === side.id && p.participant_role === "speaker"
+        ).length,
+      }));
+
+      const hasOpenSlot = speakersPerSide.some((s) => s.speakerCount === 0);
+
+      if (!hasOpenSlot) {
+        // All sides filled — join as audience
         const { error: joinError } = await supabase
           .from("debate_participants")
           .insert({
             debate_id: debate.id,
             user_id: user.id,
-            participant_role: "speaker",
+            participant_role: "spectator",
           });
 
         if (joinError) {
@@ -57,18 +111,139 @@ const JoinDebatePage = () => {
           navigate("/");
           return;
         }
+        toast.success("Joined as audience member!");
+        navigate(`/debate/${debate.id}`, { replace: true });
+      } else {
+        // Show side picker
+        setShowPicker(true);
+        setStatus("");
       }
-
-      toast.success("Joined debate!");
-      navigate(`/debate/${debate.id}`, { replace: true });
     };
 
-    joinDebate();
+    loadDebate();
   }, [code, user, authLoading, navigate]);
 
+  const speakersPerSide = sides.map((side) => ({
+    ...side,
+    speakerCount: participants.filter(
+      (p) => p.side_id === side.id && p.participant_role === "speaker"
+    ).length,
+  }));
+
+  const handleJoinAsSpeaker = async () => {
+    if (!selectedSide || !debateId || !user || joining) return;
+    setJoining(true);
+
+    const { error } = await supabase.from("debate_participants").insert({
+      debate_id: debateId,
+      user_id: user.id,
+      participant_role: "speaker",
+      side_id: selectedSide,
+    });
+
+    if (error) {
+      toast.error("Failed to join debate.");
+      setJoining(false);
+      return;
+    }
+
+    toast.success("Joined as speaker!");
+    navigate(`/debate/${debateId}`, { replace: true });
+  };
+
+  const handleJoinAsAudience = async () => {
+    if (!debateId || !user || joining) return;
+    setJoining(true);
+
+    const { error } = await supabase.from("debate_participants").insert({
+      debate_id: debateId,
+      user_id: user.id,
+      participant_role: "spectator",
+    });
+
+    if (error) {
+      toast.error("Failed to join debate.");
+      setJoining(false);
+      return;
+    }
+
+    toast.success("Joined as audience member!");
+    navigate(`/debate/${debateId}`, { replace: true });
+  };
+
+  if (!showPicker) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground font-body">{status}</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <p className="text-muted-foreground">{status}</p>
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="font-display text-xl">Join Debate</CardTitle>
+          <CardDescription className="font-body mt-1">
+            {debateTopic}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <p className="text-sm font-medium text-foreground mb-3 font-body">
+              Choose a side to speak for:
+            </p>
+            <RadioGroup value={selectedSide} onValueChange={setSelectedSide} className="space-y-2">
+              {speakersPerSide.map((side) => {
+                const isFull = side.speakerCount > 0;
+                return (
+                  <label
+                    key={side.id}
+                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                      selectedSide === side.id
+                        ? "border-primary bg-primary/5"
+                        : isFull
+                        ? "border-border opacity-50 cursor-not-allowed"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <RadioGroupItem value={side.id} disabled={isFull} />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-foreground font-body">
+                        {side.label}
+                      </span>
+                      {isFull && (
+                        <span className="block text-xs text-muted-foreground">Filled</span>
+                      )}
+                    </div>
+                    <Mic className="w-4 h-4 text-muted-foreground" />
+                  </label>
+                );
+              })}
+            </RadioGroup>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={handleJoinAsSpeaker}
+              disabled={!selectedSide || joining}
+              className="w-full"
+            >
+              <Mic className="w-4 h-4 mr-1" />
+              Join as Speaker
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleJoinAsAudience}
+              disabled={joining}
+              className="w-full"
+            >
+              <Users className="w-4 h-4 mr-1" />
+              Join as Audience
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
