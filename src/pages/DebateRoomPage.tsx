@@ -1,17 +1,18 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Pause, SkipForward, Users, Eye, Mic, Clock,
-  ChevronRight, Send, MessageSquare, Zap, Shield, Share2, Copy, Check
+  Play, Users, Share2, Copy, Check, MessageSquare, ChevronRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import EditWindowBanner from "@/components/debate/EditWindowBanner";
 import EditableArgument from "@/components/debate/EditableArgument";
-import MediaPermissions from "@/components/debate/MediaPermissions";
+import MediaPermissions, { type MediaPermissionsHandle } from "@/components/debate/MediaPermissions";
 import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechInput";
+import FacilitatorView from "@/components/debate/FacilitatorView";
+import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
+import AudienceView from "@/components/debate/AudienceView";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
@@ -37,6 +38,7 @@ interface Argument {
   id: string; content: string; argument_type: string;
   participant_id: string; subtopic_id: string; created_at: string;
   is_edited: boolean; original_content: string | null; edited_at: string | null;
+  parent_argument_id: string | null;
 }
 interface Participant {
   id: string; user_id: string; side_id: string | null; participant_role: string;
@@ -60,28 +62,47 @@ const DebateRoomPage = () => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Role determination
   const [userRole, setUserRole] = useState<UserRole>("spectator");
   const [facilitatorSpeaking, setFacilitatorSpeaking] = useState(false);
 
-  // Timer
   const [timeLeft, setTimeLeft] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
-  // Input
   const [argumentText, setArgumentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const speechRef = useRef<SpeechInputHandle>(null);
 
-  // AI
   const [aiMessage, setAiMessage] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Share
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const speechRef = useRef<SpeechInputHandle>(null);
+  const [mediaRequested, setMediaRequested] = useState(false);
+
+  // Request media permissions at session start for non-spectators
+  useEffect(() => {
+    if (mediaRequested) return;
+    if (userRole === "spectator") return;
+    if (loading) return;
+
+    const requestPermissions = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: { echoCancellation: true, noiseSuppression: true },
+        });
+        // Stop tracks immediately — MediaPermissions component will manage the actual stream
+        stream.getTracks().forEach((t) => t.stop());
+        setMediaRequested(true);
+      } catch (err) {
+        console.warn("Media permission denied at session start:", err);
+        setMediaRequested(true);
+      }
+    };
+    requestPermissions();
+  }, [userRole, loading, mediaRequested]);
 
   // Load data
   useEffect(() => {
@@ -110,7 +131,6 @@ const DebateRoomPage = () => {
       setArguments(argsRes.data || []);
       setParticipants(parts);
 
-      // Determine role
       if (d.created_by === user?.id) {
         setUserRole("facilitator");
       } else if (parts.some((p) => p.user_id === user?.id && p.participant_role === "speaker")) {
@@ -169,8 +189,14 @@ const DebateRoomPage = () => {
   const isMyTurn = myParticipant?.side_id === currentSide?.id && debate?.status === "live";
   const currentSubtopicArgs = arguments_.filter((a) => a.subtopic_id === currentSubtopic?.id);
 
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
-  const timerColor = timeLeft <= 10 ? "text-destructive" : timeLeft <= 30 ? "text-primary" : "text-foreground";
+  const isFacilitator = userRole === "facilitator";
+  const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
+  const isSpectator = userRole === "spectator";
+  const isCompleted = debate?.status === "completed";
+  const isDraft = debate?.status === "draft";
+  const isLive = debate?.status === "live";
+  const canSpeak = isSpeaker && isMyTurn && isLive;
+  const micEnabled = canSpeak;
 
   // SSE stream helper
   const streamAI = async (action: string, payload: Record<string, unknown>) => {
@@ -297,7 +323,6 @@ const DebateRoomPage = () => {
   const submitArgument = async () => {
     if (!argumentText.trim() || !debate || !myParticipant || !currentSubtopic || submitting) return;
     setSubmitting(true);
-    // Auto-stop speech recognition on submit
     speechRef.current?.stop();
     setIsRecording(false);
     const { error } = await supabase.from("arguments").insert({
@@ -331,10 +356,8 @@ const DebateRoomPage = () => {
       setFacilitatorSpeaking(false);
       toast.info("Returned to facilitator-only mode");
     } else {
-      // Check if already a participant before inserting
       const existing = participants.find((p) => p.user_id === user.id);
       if (existing) {
-        // Already joined — just update role if needed
         await supabase.from("debate_participants").update({ participant_role: "speaker" }).eq("id", existing.id);
         setFacilitatorSpeaking(true);
         toast.success("Joined as speaker");
@@ -350,47 +373,42 @@ const DebateRoomPage = () => {
     }
   };
 
+  const handleExtendTime = () => {
+    setTimeLeft((t) => t + 60);
+    toast.info("Extended by 1 minute");
+  };
+
+  const handleSkipTurn = () => {
+    advanceTurn();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Loading debate…</div>
+        <div className="animate-pulse text-muted-foreground font-body">Loading debate…</div>
       </div>
     );
   }
 
   if (!debate) return null;
 
-  const isCompleted = debate.status === "completed";
-  const isDraft = debate.status === "draft";
-  const isLive = debate.status === "live";
-
-  // Effective view: facilitators see facilitator UI, speakers see participant UI, spectators see read-only
-  const isFacilitator = userRole === "facilitator";
-  const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
-  const isSpectator = userRole === "spectator";
-
-  // Can this user submit arguments?
-  const canSpeak = isSpeaker && isMyTurn && isLive;
-  // Mic enabled only when it's their turn
-  const micEnabled = canSpeak;
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="text-muted-foreground hover:text-foreground text-sm">← Back</button>
+          <button onClick={() => navigate("/")} className="text-muted-foreground hover:text-foreground text-sm font-body">← Back</button>
           <div>
             <h1 className="text-lg font-display font-bold text-foreground truncate max-w-md">{debate.topic}</h1>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-body">
               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                isLive ? "bg-green-500/20 text-green-400" : isDraft ? "bg-muted text-muted-foreground" : "bg-primary/20 text-primary"
+                isLive ? "bg-primary/20 text-primary" : isDraft ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
               }`}>
                 {debate.status}
               </span>
               <span>{participants.length} participants</span>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                isFacilitator ? "bg-primary/20 text-primary" : isSpeaker ? "bg-blue-500/20 text-blue-400" : "bg-muted text-muted-foreground"
+                isFacilitator ? "bg-primary/20 text-primary" : isSpeaker ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
               }`}>
                 {isFacilitator ? "Facilitator" : isSpeaker ? "Speaker" : "Spectator"}
               </span>
@@ -399,7 +417,6 @@ const DebateRoomPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Media permissions for speakers/facilitators */}
           {(isFacilitator || isSpeaker) && user && (
             <MediaPermissions
               role={isFacilitator ? "facilitator" : "speaker"}
@@ -410,19 +427,18 @@ const DebateRoomPage = () => {
             />
           )}
 
-          {/* Share button — facilitator only */}
           {isFacilitator && (
             <div className="relative">
               <button
                 onClick={() => setShowShare(!showShare)}
-                className="flex items-center gap-1.5 bg-secondary text-foreground px-3 py-2 rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors"
+                className="flex items-center gap-1.5 bg-secondary text-secondary-foreground px-3 py-2 rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors"
               >
                 <Share2 className="w-3.5 h-3.5" />
                 Share
               </button>
               {showShare && (
                 <div className="absolute right-0 top-full mt-2 w-72 bg-card border border-border rounded-xl p-4 shadow-lg z-50">
-                  <p className="text-xs text-muted-foreground mb-2">Share this link to invite speakers:</p>
+                  <p className="text-xs text-muted-foreground mb-2 font-body">Share this link to invite speakers:</p>
                   <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
                     <code className="text-xs text-foreground flex-1 truncate">
                       {window.location.origin}/join/{debate.join_code}
@@ -431,7 +447,7 @@ const DebateRoomPage = () => {
                       {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-2">
+                  <p className="text-[10px] text-muted-foreground mt-2 font-body">
                     Join code: <span className="font-mono font-bold text-foreground">{debate.join_code}</span>
                   </p>
                 </div>
@@ -442,79 +458,18 @@ const DebateRoomPage = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Main content area */}
-        <div className="flex-1 flex flex-col">
-          {/* Timer bar — visible to all when live */}
-          {isLive && (
-            <div className="border-b border-border bg-card/50 px-6 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className={`text-2xl font-display font-bold tabular-nums ${timerColor}`}>
-                    {formatTime(timeLeft)}
-                  </span>
-                </div>
-                <div className="h-6 w-px bg-border" />
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Subtopic {(debate.current_subtopic_index ?? 0) + 1}/{subtopics.length}</p>
-                  <p className="text-sm font-semibold">{currentSubtopic?.title}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                  currentSide?.sort_order === 0 ? "bg-blue-500/20 text-blue-400" : "bg-orange-500/20 text-orange-400"
-                }`}>
-                  {currentSide?.label}'s turn
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  Turn {(debate.current_turn ?? 0) + 1}/{debate.turns_per_subtopic}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* d. facilitator message */}
-          <AnimatePresence>
-            {aiMessage && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="border-b border-primary/20 bg-primary/5 px-6 py-4"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <Zap className="w-4 h-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-primary mb-1">d.</p>
-                    <p className="text-sm text-foreground leading-relaxed">{aiMessage}</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Edit window banner */}
-          {isCompleted && debate.edit_window_ends_at && (
-            <EditWindowBanner
-              editWindowEndsAt={debate.edit_window_ends_at}
-              isParticipant={!!myParticipant}
-            />
-          )}
-
-          {/* Arguments feed */}
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-            {/* Draft — facilitator only sees start button */}
-            {isDraft && isFacilitator && (
+        {/* Draft views */}
+        {isDraft && (
+          <div className="flex-1 flex items-center justify-center">
+            {isFacilitator ? (
               <div className="text-center py-16">
                 <h3 className="text-xl font-display font-bold mb-2">Ready to begin?</h3>
-                <p className="text-muted-foreground text-sm mb-4">
+                <p className="text-muted-foreground text-sm mb-4 font-body">
                   {participants.length} participant{participants.length !== 1 ? "s" : ""} joined · {subtopics.length} subtopics · {debate.turns_per_subtopic} turns each
                 </p>
                 <button
                   onClick={toggleFacilitatorSpeaker}
-                  className="mb-4 text-sm text-primary underline underline-offset-2 hover:opacity-80"
+                  className="mb-4 text-sm text-primary underline underline-offset-2 hover:opacity-80 font-body"
                 >
                   {facilitatorSpeaking ? "Leave speaker role" : "Join as Speaker"}
                 </button>
@@ -522,226 +477,191 @@ const DebateRoomPage = () => {
                 <button
                   onClick={startDebate}
                   disabled={aiLoading}
-                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 font-body"
                 >
                   {aiLoading ? "Starting…" : <><Play className="w-5 h-5" /> Start Debate</>}
                 </button>
               </div>
-            )}
-
-            {/* Draft — speakers/spectators wait */}
-            {isDraft && !isFacilitator && (
+            ) : (
               <div className="text-center py-16">
                 <h3 className="text-xl font-display font-bold mb-2">Waiting for facilitator…</h3>
-                <p className="text-muted-foreground text-sm">The debate will begin shortly.</p>
+                <p className="text-muted-foreground text-sm font-body">The debate will begin shortly.</p>
               </div>
             )}
+          </div>
+        )}
 
-            {/* Live/completed argument feed */}
-            {(isLive || isCompleted) && subtopics.map((st) => {
-              const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
-              if (stArgs.length === 0 && st.id !== currentSubtopic?.id) return null;
+        {/* Live views — role-based */}
+        {isLive && isFacilitator && !facilitatorSpeaking && (
+          <FacilitatorView
+            debate={debate}
+            sides={sides}
+            subtopics={subtopics}
+            arguments={arguments_}
+            participants={participants}
+            timeLeft={timeLeft}
+            timerRunning={timerRunning}
+            aiMessage={aiMessage}
+            aiLoading={aiLoading}
+            onToggleTimer={() => setTimerRunning(!timerRunning)}
+            onResetTimer={() => setTimeLeft(parseTimeToSeconds(debate.time_per_turn))}
+            onExtendTime={handleExtendTime}
+            onSkipTurn={handleSkipTurn}
+            onNextTurn={advanceTurn}
+          />
+        )}
 
-              return (
-                <div key={st.id} className="mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <ChevronRight className="w-4 h-4 text-primary" />
-                    <h3 className="text-sm font-display font-semibold text-primary">{st.title}</h3>
+        {isLive && (isSpeaker || (isFacilitator && facilitatorSpeaking)) && (
+          <ParticipantSharedView
+            debate={debate}
+            sides={sides}
+            subtopics={subtopics}
+            arguments={arguments_}
+            participants={participants}
+            timeLeft={timeLeft}
+            aiMessage={aiMessage}
+            canSpeak={canSpeak}
+            isMyTurn={!!isMyTurn}
+            isSpeaker={isSpeaker}
+            userId={user?.id}
+            micEnabled={micEnabled}
+            isRecording={isRecording}
+            argumentText={argumentText}
+            submitting={submitting}
+            speechRef={speechRef}
+            currentSide={currentSide}
+            onArgumentTextChange={setArgumentText}
+            onSetRecording={setIsRecording}
+            onSubmit={submitArgument}
+          />
+        )}
+
+        {isLive && isSpectator && (
+          <AudienceView
+            debate={debate}
+            sides={sides}
+            subtopics={subtopics}
+            arguments={arguments_}
+            participants={participants}
+            timeLeft={timeLeft}
+            aiMessage={aiMessage}
+          />
+        )}
+
+        {/* Completed view */}
+        {isCompleted && (
+          <div className="flex-1 flex flex-col">
+            {debate.edit_window_ends_at && (
+              <EditWindowBanner
+                editWindowEndsAt={debate.edit_window_ends_at}
+                isParticipant={!!myParticipant}
+              />
+            )}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+              {subtopics.map((st) => {
+                const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
+                if (stArgs.length === 0) return null;
+                return (
+                  <div key={st.id} className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ChevronRight className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-display font-semibold text-primary">{st.title}</h3>
+                    </div>
+                    <div className="space-y-2 pl-6">
+                      {stArgs.map((arg) => {
+                        const participant = participants.find((p) => p.id === arg.participant_id);
+                        const side = sides.find((s) => s.id === participant?.side_id);
+                        const isLeft = side?.sort_order === 0;
+                        const isInEditWindow = debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now();
+                        const canEditThis = isInEditWindow && participant?.user_id === user?.id;
+                        return (
+                          <EditableArgument
+                            key={arg.id}
+                            id={arg.id}
+                            content={arg.content}
+                            originalContent={arg.original_content}
+                            isEdited={arg.is_edited}
+                            argumentType={arg.argument_type}
+                            sideLabel={side?.label || "Unknown"}
+                            sideOrder={side?.sort_order ?? 0}
+                            isLeft={!!isLeft}
+                            canEdit={!!canEditThis}
+                            onUpdate={(argId, newContent) => {
+                              setArguments((prev) =>
+                                prev.map((a) =>
+                                  a.id === argId
+                                    ? { ...a, content: newContent, is_edited: true, original_content: a.original_content || a.content, edited_at: new Date().toISOString() }
+                                    : a
+                                )
+                              );
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="space-y-2 pl-6">
-                    {stArgs.map((arg) => {
-                      const participant = participants.find((p) => p.id === arg.participant_id);
-                      const side = sides.find((s) => s.id === participant?.side_id);
-                      const isLeft = side?.sort_order === 0;
-                      const isInEditWindow = isCompleted && debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now();
-                      const canEditThis = isInEditWindow && participant?.user_id === user?.id;
-
-                      return (
-                        <EditableArgument
-                          key={arg.id}
-                          id={arg.id}
-                          content={arg.content}
-                          originalContent={arg.original_content}
-                          isEdited={arg.is_edited}
-                          argumentType={arg.argument_type}
-                          sideLabel={side?.label || "Unknown"}
-                          sideOrder={side?.sort_order ?? 0}
-                          isLeft={!!isLeft}
-                          canEdit={!!canEditThis}
-                          onUpdate={(argId, newContent) => {
-                            setArguments((prev) =>
-                              prev.map((a) =>
-                                a.id === argId
-                                  ? { ...a, content: newContent, is_edited: true, original_content: a.original_content || a.content, edited_at: new Date().toISOString() }
-                                  : a
-                              )
-                            );
-                          }}
-                        />
-                      );
-                    })}
-                    {stArgs.length === 0 && st.id === currentSubtopic?.id && (
-                      <p className="text-sm text-muted-foreground italic">Awaiting arguments…</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {isCompleted && (
+                );
+              })}
               <div className="text-center py-8">
                 <h3 className="text-xl font-display font-bold text-primary mb-2">Debate Complete</h3>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-muted-foreground text-sm font-body">
                   {debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now()
                     ? "Participants may edit their arguments before the record is finalized."
                     : "The debate record is permanently finalized."}
                 </p>
               </div>
-            )}
+            </div>
           </div>
+        )}
 
-          {/* Input area — speakers only, when it's their turn */}
-          {canSpeak && (
-            <div className="border-t border-border bg-card px-4 py-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Mic className="w-4 h-4 text-primary" />
-                <span className="text-xs text-primary font-medium">It's your turn — speak or type your argument</span>
-              </div>
-              <div className="flex items-end gap-3">
-                {/* Inline camera preview — enlarged when recording */}
-                {user && (
-                  <MediaPermissions
-                    role={isSpeaker ? "speaker" : "facilitator"}
-                    isMicEnabled={micEnabled}
-                    userId={user.id}
-                    isActivelySpeaking={isRecording}
-                    variant="inline"
-                  />
-                )}
-                <div className="flex-1 flex flex-col gap-2">
-                  <div className="flex items-end gap-2">
-                    <SpeechInput
-                      ref={speechRef}
-                      isEnabled={canSpeak}
-                      onTranscript={(text) => {
-                        setArgumentText(text);
-                        setIsRecording(true);
-                      }}
-                      onFinalTranscript={(text) => setArgumentText(text)}
-                    />
-                    <textarea
-                      value={argumentText}
-                      onChange={(e) => setArgumentText(e.target.value)}
-                      placeholder="Speak into your mic or type here…"
-                      rows={2}
-                      className="flex-1 bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none"
-                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitArgument(); } }}
-                    />
-                    <button
-                      onClick={submitArgument}
-                      disabled={!argumentText.trim() || submitting}
-                      className="bg-primary text-primary-foreground p-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
-                    >
-                      <Send className="w-5 h-5" />
-                    </button>
+        {/* Right sidebar — visible in all live views */}
+        {isLive && (
+          <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
+            <div className="border-b border-border p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 font-body">
+                <Users className="w-3.5 h-3.5 inline mr-1" /> Participants ({participants.length})
+              </h3>
+              <div className="space-y-2">
+                {sides.map((side) => (
+                  <div key={side.id}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1 text-primary">
+                      {side.label}
+                    </p>
+                    {participants.filter((p) => p.side_id === side.id).map((p) => (
+                      <div key={p.id} className="text-xs text-foreground flex items-center gap-1.5 font-body">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                        {p.user_id === user?.id ? "You" : p.user_id.slice(0, 8)}
+                        <span className="text-[9px] text-muted-foreground ml-1">({p.participant_role})</span>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                ))}
               </div>
             </div>
-          )}
 
-          {/* Waiting message for speakers not on turn */}
-          {isSpeaker && isLive && !isMyTurn && (
-            <div className="border-t border-border bg-card/50 px-4 py-3 text-center text-sm text-muted-foreground">
-              Waiting for {currentSide?.label} to respond…
-            </div>
-          )}
-
-          {/* Spectator bar */}
-          {isSpectator && isLive && (
-            <div className="border-t border-border bg-card/50 px-4 py-3 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
-              <Eye className="w-4 h-4" />
-              You are watching as a spectator
-            </div>
-          )}
-
-          {/* Facilitator controls — ONLY for facilitators */}
-          {isLive && isFacilitator && (
-            <div className="border-t border-border bg-card px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setTimerRunning(!timerRunning)}
-                  className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {timerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  {timerRunning ? "Pause" : "Resume"}
-                </button>
-                <button
-                  onClick={() => setTimeLeft(parseTimeToSeconds(debate.time_per_turn))}
-                  className="bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  <Clock className="w-4 h-4 inline mr-1" /> Reset Timer
-                </button>
-              </div>
-              <button
-                onClick={advanceTurn}
-                disabled={aiLoading}
-                className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {aiLoading ? "Processing…" : <><SkipForward className="w-4 h-4" /> Next Turn</>}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Right sidebar */}
-        <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
-          <div className="border-b border-border p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              <Users className="w-3.5 h-3.5 inline mr-1" /> Participants ({participants.length})
-            </h3>
-            <div className="space-y-2">
-              {sides.map((side) => (
-                <div key={side.id}>
-                  <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1 ${
-                    side.sort_order === 0 ? "text-blue-400" : "text-orange-400"
-                  }`}>
-                    {side.label}
-                  </p>
-                  {participants.filter((p) => p.side_id === side.id).map((p) => (
-                    <div key={p.id} className="text-xs text-foreground flex items-center gap-1.5">
-                      <div className={`w-1.5 h-1.5 rounded-full ${side.sort_order === 0 ? "bg-blue-400" : "bg-orange-400"}`} />
-                      {p.user_id === user?.id ? "You" : p.user_id.slice(0, 8)}
-                      <span className="text-[9px] text-muted-foreground ml-1">({p.participant_role})</span>
+            <div className="p-4 flex-1 overflow-y-auto">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 font-body">
+                <MessageSquare className="w-3.5 h-3.5 inline mr-1" /> Subtopics
+              </h3>
+              <div className="space-y-2">
+                {subtopics.map((st, i) => {
+                  const isCurrent = i === (debate?.current_subtopic_index ?? 0);
+                  const isDone = i < (debate?.current_subtopic_index ?? 0);
+                  const argCount = arguments_.filter((a) => a.subtopic_id === st.id).length;
+                  return (
+                    <div key={st.id} className={`rounded-lg px-3 py-2 text-xs transition-colors ${
+                      isCurrent ? "bg-primary/10 border border-primary/30 text-primary" :
+                      isDone ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground"
+                    }`}>
+                      <p className="font-medium font-display">{i + 1}. {st.title}</p>
+                      {argCount > 0 && <p className="text-[10px] mt-0.5 opacity-75 font-body">{argCount} argument{argCount !== 1 ? "s" : ""}</p>}
                     </div>
-                  ))}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-
-          <div className="p-4 flex-1 overflow-y-auto">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              <MessageSquare className="w-3.5 h-3.5 inline mr-1" /> Subtopics
-            </h3>
-            <div className="space-y-2">
-              {subtopics.map((st, i) => {
-                const isCurrent = i === (debate?.current_subtopic_index ?? 0);
-                const isDone = i < (debate?.current_subtopic_index ?? 0);
-                const argCount = arguments_.filter((a) => a.subtopic_id === st.id).length;
-                return (
-                  <div key={st.id} className={`rounded-lg px-3 py-2 text-xs transition-colors ${
-                    isCurrent ? "bg-primary/10 border border-primary/30 text-primary" :
-                    isDone ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground"
-                  }`}>
-                    <p className="font-medium">{i + 1}. {st.title}</p>
-                    {argCount > 0 && <p className="text-[10px] mt-0.5 opacity-75">{argCount} argument{argCount !== 1 ? "s" : ""}</p>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   );
