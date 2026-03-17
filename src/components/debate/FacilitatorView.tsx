@@ -1,4 +1,5 @@
-import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus } from "lucide-react";
+import { useState } from "react";
+import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
@@ -43,6 +44,7 @@ const FacilitatorView = ({
   timeLeft, timerRunning, aiMessage, aiLoading,
   onToggleTimer, onResetTimer, onExtendTime, onSkipTurn, onNextTurn,
 }: FacilitatorViewProps) => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
   const currentSubtopicArgs = args.filter((a) => a.subtopic_id === currentSubtopic?.id);
@@ -226,17 +228,28 @@ const FacilitatorView = ({
         </div>
       </div>
 
+      {/* Toggle button */}
+      <button
+        onClick={() => setSidebarOpen((prev) => !prev)}
+        className="hidden lg:flex items-center justify-center w-8 border-l border-border bg-card/50 hover:bg-accent transition-colors shrink-0"
+        aria-label={sidebarOpen ? "Collapse argument map" : "Expand argument map"}
+      >
+        {sidebarOpen ? <PanelRightClose className="w-4 h-4 text-muted-foreground" /> : <PanelRightOpen className="w-4 h-4 text-muted-foreground" />}
+      </button>
+
       {/* Right sidebar — argument map panel */}
-      <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
-        <div className="p-4 border-b border-border">
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Live Argument Map
-          </h3>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <LiveArgumentMap arguments={mapArgs} />
-        </div>
-      </aside>
+      {sidebarOpen && (
+        <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
+          <div className="p-4 border-b border-border">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Live Argument Map
+            </h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <LiveArgumentMap arguments={mapArgs} />
+          </div>
+        </aside>
+      )}
     </div>
   );
 };
