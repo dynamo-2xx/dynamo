@@ -420,6 +420,15 @@ const DebateRoomPage = () => {
     advanceTurn();
   };
 
+  // Issue 4: End turn early
+  const endTurnEarly = () => {
+    setTimerRunning(false);
+    setTimeLeft(0);
+    setAutoAdvancePending(false);
+    clearTimeout(autoAdvanceRef.current);
+    advanceTurn();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
