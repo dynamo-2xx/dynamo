@@ -86,38 +86,9 @@ const JoinDebatePage = () => {
       setSides(debateSides);
       setParticipants(debateParticipants);
 
-      // Check if any side has an open speaker slot
-      const speakersPerSide = debateSides.map((side) => ({
-        ...side,
-        speakerCount: debateParticipants.filter(
-          (p) => p.side_id === side.id && p.participant_role === "speaker"
-        ).length,
-      }));
-
-      const hasOpenSlot = speakersPerSide.some((s) => s.speakerCount === 0);
-
-      if (!hasOpenSlot) {
-        // All sides filled — join as audience
-        const { error: joinError } = await supabase
-          .from("debate_participants")
-          .insert({
-            debate_id: debate.id,
-            user_id: user.id,
-            participant_role: "spectator",
-          });
-
-        if (joinError) {
-          toast.error("Failed to join debate.");
-          navigate("/");
-          return;
-        }
-        toast.success("Joined as audience member!");
-        navigate(`/debate/${debate.id}`, { replace: true });
-      } else {
-        // Show side picker
-        setShowPicker(true);
-        setStatus("");
-      }
+      // Always show side picker — multiple speakers can join the same side
+      setShowPicker(true);
+      setStatus("");
     };
 
     loadDebate();
