@@ -6,14 +6,14 @@ import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
 
 const navItems = [
-  { to: "/", icon: Home, label: "Home" },
-  { to: "/explore", icon: Compass, label: "Explore" },
-  { to: "/create", icon: PlusCircle, label: "Debate" },
-  { to: "/my-debates", icon: MessageSquare, label: "My Debates" },
-  { to: "/profile", icon: User, label: "Profile" },
-];
+{ to: "/", icon: Home, label: "Home" },
+{ to: "/explore", icon: Compass, label: "Explore" },
+{ to: "/create", icon: PlusCircle, label: "Debate" },
+{ to: "/my-debates", icon: MessageSquare, label: "My Debates" },
+{ to: "/profile", icon: User, label: "Profile" }];
 
-const AppLayout = ({ children }: { children: ReactNode }) => {
+
+const AppLayout = ({ children }: {children: ReactNode;}) => {
   const location = useLocation();
 
   return (
@@ -23,7 +23,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         <div className="mb-8 flex items-center gap-3">
           <img src={logoSmiley} alt="d. logo" className="w-10 h-10 dark:invert" />
           <div>
-            <h1 className="text-2xl font-display font-bold text-foreground">d.</h1>
+            <h1 className="text-2xl font-display font-bold text-foreground">dynamo</h1>
             <p className="text-xs text-muted-foreground mt-0.5 font-body">People to the Power</p>
           </div>
         </div>
@@ -36,15 +36,15 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                 to={item.to}
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                )}
-              >
+                  active ?
+                  "bg-primary/10 text-primary" :
+                  "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                )}>
+                
                 <item.icon className="w-5 h-5" />
                 {item.label}
-              </RouterNavLink>
-            );
+              </RouterNavLink>);
+
           })}
         </nav>
         <div className="flex items-center justify-between mb-2">
@@ -52,8 +52,8 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         </div>
         <RouterNavLink
           to="/create"
-          className="flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity"
-        >
+          className="flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity">
+          
           <PlusCircle className="w-4 h-4" />
           Start a Debate
         </RouterNavLink>
@@ -75,21 +75,21 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
               to={item.to}
               className={cn(
                 "flex flex-col items-center gap-0.5 text-[10px] font-medium transition-colors p-1",
-                isCreate
-                  ? "text-primary"
-                  : active
-                    ? "text-primary"
-                    : "text-muted-foreground"
-              )}
-            >
+                isCreate ?
+                "text-primary" :
+                active ?
+                "text-primary" :
+                "text-muted-foreground"
+              )}>
+              
               <item.icon className={cn("w-5 h-5", isCreate && "w-7 h-7")} />
               {!isCreate && <span>{item.label}</span>}
-            </RouterNavLink>
-          );
+            </RouterNavLink>);
+
         })}
       </nav>
-    </div>
-  );
+    </div>);
+
 };
 
 export default AppLayout;
