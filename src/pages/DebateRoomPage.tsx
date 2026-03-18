@@ -21,6 +21,8 @@ interface DebateData {
   topic: string;
   status: string;
   created_by: string;
+  facilitator_type: string;
+  facilitator_user_id: string | null;
   time_per_turn: string;
   turns_per_subtopic: number;
   current_subtopic_index: number;
@@ -80,6 +82,9 @@ const DebateRoomPage = () => {
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
+  const [autoAdvancePending, setAutoAdvancePending] = useState(false);
+  const autoAdvanceRef = useRef<ReturnType<typeof setTimeout>>();
+  const prevTimerRunningRef = useRef(false);
 
   // Request media permissions at session start for non-spectators
   useEffect(() => {
@@ -131,7 +136,8 @@ const DebateRoomPage = () => {
       setArguments(argsRes.data || []);
       setParticipants(parts);
 
-      if (d.created_by === user?.id) {
+      // Creator defaults to speaker when AI is facilitator (Issue 2)
+      if (d.facilitator_user_id && d.facilitator_user_id === user?.id) {
         setUserRole("facilitator");
       } else if (parts.some((p) => p.user_id === user?.id && p.participant_role === "speaker")) {
         setUserRole("speaker");
@@ -183,12 +189,46 @@ const DebateRoomPage = () => {
     return () => clearInterval(timerRef.current);
   }, [timerRunning, timeLeft]);
 
+  // Auto-advance detection: when timer stops at 0 for AI-facilitated debates (Issue 3)
+  useEffect(() => {
+    if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live") {
+      const isAiFacilitated = debate.facilitator_type === "ai" || !debate.facilitator_user_id;
+      if (isAiFacilitated && !autoAdvancePending) {
+        setAutoAdvancePending(true);
+      }
+    }
+    prevTimerRunningRef.current = timerRunning;
+  }, [timerRunning, timeLeft, debate]);
+
+  // Auto-advance with notification (Issue 3)
+  useEffect(() => {
+    if (!autoAdvancePending) return;
+    toast.info("This turn has ended — extend it?", {
+      duration: 5000,
+      action: {
+        label: "Extend +1 min",
+        onClick: () => {
+          setAutoAdvancePending(false);
+          clearTimeout(autoAdvanceRef.current);
+          setTimeLeft((t) => t + 60);
+          setTimerRunning(true);
+        },
+      },
+    });
+    autoAdvanceRef.current = setTimeout(() => {
+      setAutoAdvancePending(false);
+      advanceTurn();
+    }, 5000);
+    return () => clearTimeout(autoAdvanceRef.current);
+  }, [autoAdvancePending]);
+
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const myParticipant = participants.find((p) => p.user_id === user?.id);
   const isMyTurn = myParticipant?.side_id === currentSide?.id && debate?.status === "live";
   const currentSubtopicArgs = arguments_.filter((a) => a.subtopic_id === currentSubtopic?.id);
 
+  const isCreator = user?.id === debate?.created_by;
   const isFacilitator = userRole === "facilitator";
   const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
   const isSpectator = userRole === "spectator";
@@ -382,6 +422,15 @@ const DebateRoomPage = () => {
     advanceTurn();
   };
 
+  // Issue 4: End turn early
+  const endTurnEarly = () => {
+    setTimerRunning(false);
+    setTimeLeft(0);
+    setAutoAdvancePending(false);
+    clearTimeout(autoAdvanceRef.current);
+    advanceTurn();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -427,7 +476,7 @@ const DebateRoomPage = () => {
             />
           )}
 
-          {isFacilitator && (
+          {isCreator && (
             <div className="relative">
               <button
                 onClick={() => setShowShare(!showShare)}
@@ -461,19 +510,23 @@ const DebateRoomPage = () => {
         {/* Draft views */}
         {isDraft && (
           <div className="flex-1 flex items-center justify-center">
-            {isFacilitator ? (
+            {isCreator ? (
               <div className="text-center py-16">
                 <h3 className="text-xl font-display font-bold mb-2">Ready to begin?</h3>
                 <p className="text-muted-foreground text-sm mb-4 font-body">
                   {participants.length} participant{participants.length !== 1 ? "s" : ""} joined · {subtopics.length} subtopics · {debate.turns_per_subtopic} turns each
                 </p>
-                <button
-                  onClick={toggleFacilitatorSpeaker}
-                  className="mb-4 text-sm text-primary underline underline-offset-2 hover:opacity-80 font-body"
-                >
-                  {facilitatorSpeaking ? "Leave speaker role" : "Join as Speaker"}
-                </button>
-                <br />
+                {isFacilitator && (
+                  <>
+                    <button
+                      onClick={toggleFacilitatorSpeaker}
+                      className="mb-4 text-sm text-primary underline underline-offset-2 hover:opacity-80 font-body"
+                    >
+                      {facilitatorSpeaking ? "Leave speaker role" : "Join as Speaker"}
+                    </button>
+                    <br />
+                  </>
+                )}
                 <button
                   onClick={startDebate}
                   disabled={aiLoading}
@@ -484,7 +537,7 @@ const DebateRoomPage = () => {
               </div>
             ) : (
               <div className="text-center py-16">
-                <h3 className="text-xl font-display font-bold mb-2">Waiting for facilitator…</h3>
+                <h3 className="text-xl font-display font-bold mb-2">Waiting for debate to start…</h3>
                 <p className="text-muted-foreground text-sm font-body">The debate will begin shortly.</p>
               </div>
             )}
@@ -533,6 +586,7 @@ const DebateRoomPage = () => {
             onArgumentTextChange={setArgumentText}
             onSetRecording={setIsRecording}
             onSubmit={submitArgument}
+            onEndTurnEarly={endTurnEarly}
           />
         )}
 

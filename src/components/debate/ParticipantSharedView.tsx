@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, ChevronRight, Mic, Send } from "lucide-react";
+import { Zap, ChevronRight, Mic, Send, SkipForward } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
 import MediaPermissions from "./MediaPermissions";
@@ -45,6 +45,7 @@ interface ParticipantSharedViewProps {
   onArgumentTextChange: (text: string) => void;
   onSetRecording: (val: boolean) => void;
   onSubmit: () => void;
+  onEndTurnEarly: () => void;
 }
 
 const ParticipantSharedView = ({
@@ -52,7 +53,7 @@ const ParticipantSharedView = ({
   timeLeft, aiMessage,
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
-  onArgumentTextChange, onSetRecording, onSubmit,
+  onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
 }: ParticipantSharedViewProps) => {
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const activeSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
@@ -178,6 +179,15 @@ const ParticipantSharedView = ({
                 <Send className="w-5 h-5" />
               </button>
             </div>
+          </div>
+          <div className="flex justify-end mt-2 max-w-3xl mx-auto">
+            <button
+              onClick={onEndTurnEarly}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-body"
+            >
+              <SkipForward className="w-3.5 h-3.5" />
+              End my turn early
+            </button>
           </div>
         </div>
       )}
