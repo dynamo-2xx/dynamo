@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, ChevronRight, Mic, Send } from "lucide-react";
+import { Zap, ChevronRight, Mic, Send, SkipForward } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
 import MediaPermissions from "./MediaPermissions";
