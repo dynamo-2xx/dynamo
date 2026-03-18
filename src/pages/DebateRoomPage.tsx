@@ -508,19 +508,23 @@ const DebateRoomPage = () => {
         {/* Draft views */}
         {isDraft && (
           <div className="flex-1 flex items-center justify-center">
-            {isFacilitator ? (
+            {isCreator ? (
               <div className="text-center py-16">
                 <h3 className="text-xl font-display font-bold mb-2">Ready to begin?</h3>
                 <p className="text-muted-foreground text-sm mb-4 font-body">
                   {participants.length} participant{participants.length !== 1 ? "s" : ""} joined · {subtopics.length} subtopics · {debate.turns_per_subtopic} turns each
                 </p>
-                <button
-                  onClick={toggleFacilitatorSpeaker}
-                  className="mb-4 text-sm text-primary underline underline-offset-2 hover:opacity-80 font-body"
-                >
-                  {facilitatorSpeaking ? "Leave speaker role" : "Join as Speaker"}
-                </button>
-                <br />
+                {isFacilitator && (
+                  <>
+                    <button
+                      onClick={toggleFacilitatorSpeaker}
+                      className="mb-4 text-sm text-primary underline underline-offset-2 hover:opacity-80 font-body"
+                    >
+                      {facilitatorSpeaking ? "Leave speaker role" : "Join as Speaker"}
+                    </button>
+                    <br />
+                  </>
+                )}
                 <button
                   onClick={startDebate}
                   disabled={aiLoading}
@@ -531,7 +535,7 @@ const DebateRoomPage = () => {
               </div>
             ) : (
               <div className="text-center py-16">
-                <h3 className="text-xl font-display font-bold mb-2">Waiting for facilitator…</h3>
+                <h3 className="text-xl font-display font-bold mb-2">Waiting for debate to start…</h3>
                 <p className="text-muted-foreground text-sm font-body">The debate will begin shortly.</p>
               </div>
             )}
