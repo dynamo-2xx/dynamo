@@ -53,7 +53,7 @@ const ParticipantSharedView = ({
   timeLeft, aiMessage,
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
-  onArgumentTextChange, onSetRecording, onSubmit,
+  onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
 }: ParticipantSharedViewProps) => {
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const activeSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
