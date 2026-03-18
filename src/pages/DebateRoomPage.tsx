@@ -234,7 +234,6 @@ const DebateRoomPage = () => {
   const currentSpeakerIndex = (debate?.current_turn ?? 0) % (sideSpeakers.length || 1);
   const activeSpeakerParticipant = sideSpeakers[currentSpeakerIndex];
   const isMyTurn = activeSpeakerParticipant?.user_id === user?.id && debate?.status === "live";
-  const currentSubtopicArgs = arguments_.filter((a) => a.subtopic_id === currentSubtopic?.id);
 
   const isCreator = user?.id === debate?.created_by;
   const isFacilitator = userRole === "facilitator";
