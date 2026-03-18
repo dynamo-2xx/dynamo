@@ -86,38 +86,9 @@ const JoinDebatePage = () => {
       setSides(debateSides);
       setParticipants(debateParticipants);
 
-      // Check if any side has an open speaker slot
-      const speakersPerSide = debateSides.map((side) => ({
-        ...side,
-        speakerCount: debateParticipants.filter(
-          (p) => p.side_id === side.id && p.participant_role === "speaker"
-        ).length,
-      }));
-
-      const hasOpenSlot = speakersPerSide.some((s) => s.speakerCount === 0);
-
-      if (!hasOpenSlot) {
-        // All sides filled — join as audience
-        const { error: joinError } = await supabase
-          .from("debate_participants")
-          .insert({
-            debate_id: debate.id,
-            user_id: user.id,
-            participant_role: "spectator",
-          });
-
-        if (joinError) {
-          toast.error("Failed to join debate.");
-          navigate("/");
-          return;
-        }
-        toast.success("Joined as audience member!");
-        navigate(`/debate/${debate.id}`, { replace: true });
-      } else {
-        // Show side picker
-        setShowPicker(true);
-        setStatus("");
-      }
+      // Always show side picker — multiple speakers can join the same side
+      setShowPicker(true);
+      setStatus("");
     };
 
     loadDebate();
@@ -194,32 +165,29 @@ const JoinDebatePage = () => {
               Choose a side to speak for:
             </p>
             <RadioGroup value={selectedSide} onValueChange={setSelectedSide} className="space-y-2">
-              {speakersPerSide.map((side) => {
-                const isFull = side.speakerCount > 0;
-                return (
-                  <label
-                    key={side.id}
-                    className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                      selectedSide === side.id
-                        ? "border-primary bg-primary/5"
-                        : isFull
-                        ? "border-border opacity-50 cursor-not-allowed"
-                        : "border-border hover:border-primary/50"
-                    }`}
-                  >
-                    <RadioGroupItem value={side.id} disabled={isFull} />
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-foreground font-body">
-                        {side.label}
+              {speakersPerSide.map((side) => (
+                <label
+                  key={side.id}
+                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                    selectedSide === side.id
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <RadioGroupItem value={side.id} />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-foreground font-body">
+                      {side.label}
+                    </span>
+                    {side.speakerCount > 0 && (
+                      <span className="block text-xs text-muted-foreground">
+                        {side.speakerCount} speaker{side.speakerCount !== 1 ? "s" : ""} joined
                       </span>
-                      {isFull && (
-                        <span className="block text-xs text-muted-foreground">Filled</span>
-                      )}
-                    </div>
-                    <Mic className="w-4 h-4 text-muted-foreground" />
-                  </label>
-                );
-              })}
+                    )}
+                  </div>
+                  <Mic className="w-4 h-4 text-muted-foreground" />
+                </label>
+              ))}
             </RadioGroup>
           </div>
 

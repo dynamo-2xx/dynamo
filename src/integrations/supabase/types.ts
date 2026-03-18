@@ -85,6 +85,41 @@ export type Database = {
           },
         ]
       }
+      debate_invitations: {
+        Row: {
+          created_at: string
+          debate_id: string
+          id: string
+          invited_user_id: string
+          invited_username: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          id?: string
+          invited_user_id: string
+          invited_username: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          id?: string
+          invited_user_id?: string
+          invited_username?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_invitations_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debate_participants: {
         Row: {
           debate_id: string
