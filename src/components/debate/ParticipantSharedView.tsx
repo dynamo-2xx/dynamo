@@ -45,6 +45,7 @@ interface ParticipantSharedViewProps {
   onArgumentTextChange: (text: string) => void;
   onSetRecording: (val: boolean) => void;
   onSubmit: () => void;
+  onEndTurnEarly: () => void;
 }
 
 const ParticipantSharedView = ({
