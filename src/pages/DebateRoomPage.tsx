@@ -21,6 +21,8 @@ interface DebateData {
   topic: string;
   status: string;
   created_by: string;
+  facilitator_type: string;
+  facilitator_user_id: string | null;
   time_per_turn: string;
   turns_per_subtopic: number;
   current_subtopic_index: number;
