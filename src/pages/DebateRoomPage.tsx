@@ -225,7 +225,15 @@ const DebateRoomPage = () => {
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const myParticipant = participants.find((p) => p.user_id === user?.id);
-  const isMyTurn = myParticipant?.side_id === currentSide?.id && debate?.status === "live";
+  const currentSubtopicArgs = arguments_.filter((a) => a.subtopic_id === currentSubtopic?.id);
+
+  // Multi-speaker rotation: determine which specific speaker on the current side should speak
+  const sideSpeakers = participants
+    .filter((p) => p.side_id === currentSide?.id && p.participant_role === "speaker")
+    .sort((a, b) => a.id.localeCompare(b.id)); // stable sort
+  const currentSpeakerIndex = (debate?.current_turn ?? 0) % (sideSpeakers.length || 1);
+  const activeSpeakerParticipant = sideSpeakers[currentSpeakerIndex];
+  const isMyTurn = activeSpeakerParticipant?.user_id === user?.id && debate?.status === "live";
   const currentSubtopicArgs = arguments_.filter((a) => a.subtopic_id === currentSubtopic?.id);
 
   const isCreator = user?.id === debate?.created_by;

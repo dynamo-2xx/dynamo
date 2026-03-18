@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +26,8 @@ const CreateDebatePage = () => {
   const [debate, setDebate] = useState<GeneratedDebate | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [inviteInput, setInviteInput] = useState("");
+  const [invitedUsernames, setInvitedUsernames] = useState<string[]>([]);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
@@ -49,7 +51,6 @@ const CreateDebatePage = () => {
       setStep(3);
     } catch (err) {
       console.error("Generation failed:", err);
-      // Fallback to a basic structure
       setDebate({
         topic: prompt.charAt(0).toUpperCase() + prompt.slice(1) + (prompt.endsWith("?") ? "" : "?"),
         subtopics: ["Key considerations", "Potential impacts", "Alternative approaches"],
@@ -62,9 +63,7 @@ const CreateDebatePage = () => {
     }
   }, [prompt]);
 
-  const handleGenerationComplete = useCallback(() => {
-    // This is called if step 2 loader finishes before AI — only used as fallback
-  }, []);
+  const handleGenerationComplete = useCallback(() => {}, []);
 
   const updateSubtopic = (index: number, value: string) => {
     if (!debate) return;
@@ -81,6 +80,21 @@ const CreateDebatePage = () => {
   const removeSubtopic = (index: number) => {
     if (!debate || debate.subtopics.length <= 1) return;
     setDebate({ ...debate, subtopics: debate.subtopics.filter((_, i) => i !== index) });
+  };
+
+  const addInvite = () => {
+    const username = inviteInput.trim();
+    if (!username) return;
+    if (invitedUsernames.includes(username)) {
+      toast.error("Already added");
+      return;
+    }
+    setInvitedUsernames((prev) => [...prev, username]);
+    setInviteInput("");
+  };
+
+  const removeInvite = (username: string) => {
+    setInvitedUsernames((prev) => prev.filter((u) => u !== username));
   };
 
   const handleCreateDebate = async () => {
@@ -136,6 +150,30 @@ const CreateDebatePage = () => {
         user_id: user.id,
         side_id: sides?.[0]?.id ?? null,
       });
+
+      // 5. Send invitations
+      if (invitedUsernames.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, display_name")
+          .in("display_name", invitedUsernames);
+
+        if (profiles && profiles.length > 0) {
+          const invitations = profiles.map((p) => ({
+            debate_id: dbDebate.id,
+            invited_user_id: p.user_id,
+            invited_username: p.display_name || "",
+          }));
+          await supabase.from("debate_invitations").insert(invitations);
+          toast.success(`${profiles.length} invitation${profiles.length !== 1 ? "s" : ""} sent`);
+        }
+
+        const foundNames = (profiles || []).map((p) => p.display_name);
+        const notFound = invitedUsernames.filter((u) => !foundNames.includes(u));
+        if (notFound.length > 0) {
+          toast.warning(`Users not found: ${notFound.join(", ")}`);
+        }
+      }
 
       toast.success("Debate created!");
       navigate(`/debate/${dbDebate.id}`);
@@ -276,6 +314,50 @@ const CreateDebatePage = () => {
                   </div>
                 </div>
 
+                {/* Invite Users (optional) */}
+                <div className="bg-card border border-border rounded-xl p-5">
+                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">
+                    <Mail className="w-3.5 h-3.5 inline mr-1" />
+                    Invite Speakers <span className="normal-case font-normal">(optional)</span>
+                  </label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      value={inviteInput}
+                      onChange={(e) => setInviteInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); addInvite(); }
+                      }}
+                      placeholder="Enter a username and press Enter"
+                      className="flex-1 bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                    />
+                    <button
+                      onClick={addInvite}
+                      disabled={!inviteInput.trim()}
+                      className="text-primary hover:opacity-80 transition-opacity disabled:opacity-40"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {invitedUsernames.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {invitedUsernames.map((username) => (
+                        <span
+                          key={username}
+                          className="inline-flex items-center gap-1 bg-primary/10 text-primary rounded-full px-2.5 py-1 text-xs font-medium"
+                        >
+                          {username}
+                          <button
+                            onClick={() => removeInvite(username)}
+                            className="hover:text-destructive transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Visibility */}
                 <div className="bg-card border border-border rounded-xl p-5">
                   <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">Visibility</label>
@@ -298,7 +380,7 @@ const CreateDebatePage = () => {
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button
-                    onClick={() => { setStep(1); setDebate(null); }}
+                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); }}
                     className="flex-1 border border-border rounded-lg py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
                   >
                     Start Over
@@ -308,7 +390,7 @@ const CreateDebatePage = () => {
                     disabled={saving}
                     className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
-                    {saving ? "Creating…" : "Create Debate"}
+                    {saving ? "Creating…" : invitedUsernames.length > 0 ? "Create & Invite" : "Create Debate"}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
