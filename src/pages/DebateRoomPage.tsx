@@ -80,6 +80,9 @@ const DebateRoomPage = () => {
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
+  const [autoAdvancePending, setAutoAdvancePending] = useState(false);
+  const autoAdvanceRef = useRef<ReturnType<typeof setTimeout>>();
+  const prevTimerRunningRef = useRef(false);
 
   // Request media permissions at session start for non-spectators
   useEffect(() => {
