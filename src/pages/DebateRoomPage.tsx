@@ -187,12 +187,46 @@ const DebateRoomPage = () => {
     return () => clearInterval(timerRef.current);
   }, [timerRunning, timeLeft]);
 
+  // Auto-advance detection: when timer stops at 0 for AI-facilitated debates (Issue 3)
+  useEffect(() => {
+    if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live") {
+      const isAiFacilitated = debate.facilitator_type === "ai" || !debate.facilitator_user_id;
+      if (isAiFacilitated && !autoAdvancePending) {
+        setAutoAdvancePending(true);
+      }
+    }
+    prevTimerRunningRef.current = timerRunning;
+  }, [timerRunning, timeLeft, debate]);
+
+  // Auto-advance with notification (Issue 3)
+  useEffect(() => {
+    if (!autoAdvancePending) return;
+    toast.info("This turn has ended — extend it?", {
+      duration: 5000,
+      action: {
+        label: "Extend +1 min",
+        onClick: () => {
+          setAutoAdvancePending(false);
+          clearTimeout(autoAdvanceRef.current);
+          setTimeLeft((t) => t + 60);
+          setTimerRunning(true);
+        },
+      },
+    });
+    autoAdvanceRef.current = setTimeout(() => {
+      setAutoAdvancePending(false);
+      advanceTurn();
+    }, 5000);
+    return () => clearTimeout(autoAdvanceRef.current);
+  }, [autoAdvancePending]);
+
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const myParticipant = participants.find((p) => p.user_id === user?.id);
   const isMyTurn = myParticipant?.side_id === currentSide?.id && debate?.status === "live";
   const currentSubtopicArgs = arguments_.filter((a) => a.subtopic_id === currentSubtopic?.id);
 
+  const isCreator = user?.id === debate?.created_by;
   const isFacilitator = userRole === "facilitator";
   const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
   const isSpectator = userRole === "spectator";
