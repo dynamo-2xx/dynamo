@@ -584,6 +584,7 @@ const DebateRoomPage = () => {
             onArgumentTextChange={setArgumentText}
             onSetRecording={setIsRecording}
             onSubmit={submitArgument}
+            onEndTurnEarly={endTurnEarly}
           />
         )}
 

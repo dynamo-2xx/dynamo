@@ -180,6 +180,15 @@ const ParticipantSharedView = ({
               </button>
             </div>
           </div>
+          <div className="flex justify-end mt-2 max-w-3xl mx-auto">
+            <button
+              onClick={onEndTurnEarly}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-body"
+            >
+              <SkipForward className="w-3.5 h-3.5" />
+              End my turn early
+            </button>
+          </div>
         </div>
       )}
 
