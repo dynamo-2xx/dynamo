@@ -134,7 +134,8 @@ const DebateRoomPage = () => {
       setArguments(argsRes.data || []);
       setParticipants(parts);
 
-      if (d.created_by === user?.id) {
+      // Creator defaults to speaker when AI is facilitator (Issue 2)
+      if (d.facilitator_user_id && d.facilitator_user_id === user?.id) {
         setUserRole("facilitator");
       } else if (parts.some((p) => p.user_id === user?.id && p.participant_role === "speaker")) {
         setUserRole("speaker");
