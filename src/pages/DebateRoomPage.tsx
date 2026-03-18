@@ -474,7 +474,7 @@ const DebateRoomPage = () => {
             />
           )}
 
-          {isFacilitator && (
+          {isCreator && (
             <div className="relative">
               <button
                 onClick={() => setShowShare(!showShare)}
