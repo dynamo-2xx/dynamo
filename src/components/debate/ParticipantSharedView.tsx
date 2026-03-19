@@ -69,7 +69,7 @@ const ParticipantSharedView = ({
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
-  // Camera state management — auto-request on mount
+  // Camera state management
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const [localCameraOn, setLocalCameraOn] = useState(false);
@@ -87,12 +87,13 @@ const ParticipantSharedView = ({
         localStreamRef.current = stream;
         setLocalCameraOn(true);
       } catch {
-        // Camera denied — main box will show chat only
+        // Camera denied
       }
     })();
     return () => {
       cancelled = true;
       localStreamRef.current?.getTracks().forEach(t => t.stop());
+      localStreamRef.current = null;
     };
   }, [isSpeaker]);
 
@@ -102,6 +103,25 @@ const ParticipantSharedView = ({
       localVideoRef.current.srcObject = localStreamRef.current;
     }
   }, [localCameraOn]);
+
+  // Toggle camera on/off
+  const toggleCamera = async () => {
+    if (localCameraOn) {
+      // Turn off
+      localStreamRef.current?.getTracks().forEach(t => t.stop());
+      localStreamRef.current = null;
+      setLocalCameraOn(false);
+    } else {
+      // Turn on
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        localStreamRef.current = stream;
+        setLocalCameraOn(true);
+      } catch {
+        // Camera denied
+      }
+    }
+  };
 
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const activeSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
