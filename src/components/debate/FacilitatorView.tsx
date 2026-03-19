@@ -41,7 +41,7 @@ interface FacilitatorViewProps {
 }
 
 const FacilitatorView = ({
-  debate, sides, subtopics, arguments: args, participants,
+  debateId, debate, sides, subtopics, arguments: args, participants,
   timeLeft, timerRunning, aiMessage, aiLoading,
   onToggleTimer, onResetTimer, onExtendTime, onSkipTurn, onNextTurn,
 }: FacilitatorViewProps) => {
