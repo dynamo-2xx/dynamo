@@ -284,6 +284,41 @@ export type Database = {
         }
         Relationships: []
       }
+      debate_transcripts: {
+        Row: {
+          argument_map: Json
+          created_at: string
+          debate_id: string
+          id: string
+          transcript_entries: Json
+          updated_at: string
+        }
+        Insert: {
+          argument_map?: Json
+          created_at?: string
+          debate_id: string
+          id?: string
+          transcript_entries?: Json
+          updated_at?: string
+        }
+        Update: {
+          argument_map?: Json
+          created_at?: string
+          debate_id?: string
+          id?: string
+          transcript_entries?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_transcripts_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: true
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debates: {
         Row: {
           community_tag: string | null
