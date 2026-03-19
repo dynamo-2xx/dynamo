@@ -32,6 +32,7 @@ interface DebateData {
   edit_window_ends_at: string | null;
   ended_at: string | null;
   join_code: string | null;
+  turn_started_at: string | null;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
