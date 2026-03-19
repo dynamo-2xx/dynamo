@@ -50,6 +50,9 @@ interface ParticipantSharedViewProps {
   currentSide: Side | undefined;
   isPublisher?: boolean;
   timerRunning?: boolean;
+  aiArgumentMap?: ArgumentMapEntry[];
+  deepgramConnected?: boolean;
+  interimText?: string;
   onArgumentTextChange: (text: string) => void;
   onSetRecording: (val: boolean) => void;
   onSubmit: () => void;
