@@ -18,8 +18,8 @@ const AuthPage = () => {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
-  }, [user, navigate]);
+    if (user) navigate(redirectTo || "/", { replace: true });
+  }, [user, navigate, redirectTo]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
