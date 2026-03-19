@@ -98,7 +98,15 @@ const FacilitatorView = ({
                 {currentSpeakers.length} speaker{currentSpeakers.length !== 1 ? "s" : ""} · Side {(currentSide?.sort_order ?? 0) + 1}
               </p>
             </div>
-            <div className="text-right">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => window.open(`/debate/${debateId}/projector`, '_blank')}
+                className="flex items-center gap-1.5 bg-secondary text-secondary-foreground px-3 py-2 rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors"
+                title="Open Projector Mode"
+              >
+                <Monitor className="w-4 h-4" />
+                Projector
+              </button>
               <DebateTimer timeLeft={timeLeft} size="lg" />
             </div>
           </div>

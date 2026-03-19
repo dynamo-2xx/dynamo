@@ -589,6 +589,7 @@ const DebateRoomPage = () => {
         {/* Live views — role-based */}
         {isLive && isFacilitator && !facilitatorSpeaking && (
           <FacilitatorView
+            debateId={id!}
             debate={debate}
             sides={sides}
             subtopics={subtopics}
