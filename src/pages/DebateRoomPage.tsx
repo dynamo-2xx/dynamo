@@ -635,6 +635,9 @@ const DebateRoomPage = () => {
             timerRunning={timerRunning}
             aiMessage={aiMessage}
             aiLoading={aiLoading}
+            aiArgumentMap={aiArgumentMap}
+            deepgramConnected={deepgramConnected}
+            interimText={interimText}
             onToggleTimer={() => setTimerRunning(!timerRunning)}
             onResetTimer={() => setTimeLeft(parseTimeToSeconds(debate.time_per_turn))}
             onExtendTime={handleExtendTime}
