@@ -627,10 +627,16 @@ const DebateRoomPage = () => {
             submitting={submitting}
             speechRef={speechRef}
             currentSide={currentSide}
+            isPublisher={isCreator}
+            timerRunning={timerRunning}
             onArgumentTextChange={setArgumentText}
             onSetRecording={setIsRecording}
             onSubmit={submitArgument}
             onEndTurnEarly={endTurnEarly}
+            onToggleTimer={() => setTimerRunning(!timerRunning)}
+            onExtendTime={handleExtendTime}
+            onSkipTurn={handleSkipTurn}
+            onNextSubtopic={handleNextSubtopic}
           />
         )}
 
