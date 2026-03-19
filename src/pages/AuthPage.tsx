@@ -3,12 +3,15 @@ import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
 const AuthPage = () => {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
+  const initialMode = searchParams.get("mode") === "signup" ? "signup" : "login";
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -16,10 +19,9 @@ const AuthPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Redirect if already logged in
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
-  }, [user, navigate]);
+    if (user) navigate(redirectTo || "/", { replace: true });
+  }, [user, navigate, redirectTo]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,15 +35,14 @@ const AuthPage = () => {
         });
         if (error) throw error;
         if (data.session) {
-          // Auto-confirmed — go straight to onboarding
-          navigate("/onboarding");
+          navigate(redirectTo || "/onboarding");
         } else {
           toast.success("Check your email to verify your account!");
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate("/onboarding");
+        navigate(redirectTo || "/onboarding");
       }
     } catch (err: any) {
       toast.error(err.message || "Authentication failed");
@@ -74,7 +75,6 @@ const AuthPage = () => {
             {mode === "login" ? "Welcome back" : "Create your account"}
           </h2>
 
-          {/* Google */}
           <button
             onClick={handleGoogleAuth}
             className="w-full flex items-center justify-center gap-2 border border-border rounded-lg py-2.5 text-sm font-medium hover:bg-secondary/50 transition-colors mb-4"

@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
-import { Home, Compass, PlusCircle, MessageSquare, User } from "lucide-react";
+import { Home, Compass, PlusCircle, MessageSquare, User, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
@@ -10,6 +10,7 @@ const navItems = [
 { to: "/explore", icon: Compass, label: "Explore" },
 { to: "/create", icon: PlusCircle, label: "Debate" },
 { to: "/my-debates", icon: MessageSquare, label: "My Debates" },
+{ to: "/notifications", icon: Bell, label: "Inbox" },
 { to: "/profile", icon: User, label: "Profile" }];
 
 
