@@ -10,6 +10,7 @@ const navItems = [
 { to: "/explore", icon: Compass, label: "Explore" },
 { to: "/create", icon: PlusCircle, label: "Debate" },
 { to: "/my-debates", icon: MessageSquare, label: "My Debates" },
+{ to: "/notifications", icon: Bell, label: "Inbox" },
 { to: "/profile", icon: User, label: "Profile" }];
 
 
