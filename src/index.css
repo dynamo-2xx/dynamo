@@ -85,6 +85,11 @@
     --input: 271 30% 22%;
     --ring: 271 77% 30%;
 
+    --side-1: 0 72% 55%;
+    --side-1-foreground: 0 0% 100%;
+    --side-2: 217 91% 55%;
+    --side-2-foreground: 0 0% 100%;
+
     --sidebar-background: 271 77% 8%;
     --sidebar-foreground: 38 27% 94%;
     --sidebar-primary: 38 27% 94%;
