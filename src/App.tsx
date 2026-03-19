@@ -37,6 +37,8 @@ const App = () => (
               <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />
               <Route path="/debate/:id" element={<ProtectedRoute><DebateRoomPage /></ProtectedRoute>} />
               <Route path="/join/:code" element={<JoinDebatePage />} />
+              <Route path="/preview/:token" element={<DebatePreviewPage />} />
+              <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
               <Route path="/my-debates" element={<ProtectedRoute><MyDebatesPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
