@@ -48,6 +48,7 @@ interface FacilitatorViewProps {
 const FacilitatorView = ({
   debateId, debate, sides, subtopics, arguments: args, participants,
   timeLeft, timerRunning, aiMessage, aiLoading,
+  aiArgumentMap = [], deepgramConnected, interimText,
   onToggleTimer, onResetTimer, onExtendTime, onSkipTurn, onNextTurn,
 }: FacilitatorViewProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
