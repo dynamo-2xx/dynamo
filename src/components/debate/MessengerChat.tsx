@@ -33,27 +33,28 @@ const MessengerChat = ({ messages }: MessengerChatProps) => {
     <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
       <AnimatePresence initial={false}>
         {messages.map((msg) => {
-          const isLeft = msg.sideOrder === 0;
+          const isSide1 = msg.sideOrder === 0;
           return (
             <motion.div
               key={msg.id}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
-              className={`flex ${isLeft ? "justify-start" : "justify-end"}`}
             >
               <div
-                className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm font-body ${
-                  isLeft
-                    ? "bg-[hsl(var(--side-1))] text-[hsl(var(--side-1-foreground))] rounded-bl-sm"
-                    : "bg-[hsl(var(--side-2))] text-[hsl(var(--side-2-foreground))] rounded-br-sm"
+                className={`w-full rounded-lg px-4 py-3 text-sm font-body border-l-4 ${
+                  isSide1
+                    ? "border-l-[hsl(var(--side-1))] bg-[hsl(var(--side-1)/0.08)]"
+                    : "border-l-[hsl(var(--side-2))] bg-[hsl(var(--side-2)/0.08)]"
                 }`}
               >
-                <p className="text-[10px] font-semibold opacity-80 mb-0.5">
+                <p className={`text-[10px] font-semibold mb-1 ${
+                  isSide1 ? "text-[hsl(var(--side-1))]" : "text-[hsl(var(--side-2))]"
+                }`}>
                   {msg.sideLabel}
                   {msg.isEdited && " · edited"}
                 </p>
-                <p className="leading-relaxed">{msg.content}</p>
+                <p className="leading-relaxed text-foreground break-words whitespace-pre-wrap">{msg.content}</p>
               </div>
             </motion.div>
           );
