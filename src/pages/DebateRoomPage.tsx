@@ -343,65 +343,66 @@ const DebateRoomPage = () => {
   };
 
   const advanceTurn = async () => {
-    if (!debate || !id) return;
-    const currentSideIdx = sides.findIndex((s) => s.id === debate.current_speaker_side_id);
-    let nextSideIdx = (currentSideIdx + 1) % sides.length;
-    let nextTurn = debate.current_turn;
-    let nextSubIdx = debate.current_subtopic_index;
-
-    if (nextSideIdx === 0) nextTurn += 1;
-
-    if (nextTurn >= debate.turns_per_subtopic) {
-      nextSubIdx += 1;
-      nextTurn = 0;
-      nextSideIdx = 0;
-
-      if (nextSubIdx >= subtopics.length) {
-        const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        await supabase.from("debates").update({
-          status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
-        }).eq("id", id);
-
-        setAiLoading(true);
-        try {
-          const summaries = subtopics.map((st) => ({
-            subtopic: st.title,
-            summary: arguments_.filter((a) => a.subtopic_id === st.id).map((a) => a.content).join(" | "),
-          }));
-          await streamAI("closing_synthesis", { topic: debate.topic, roundSummaries: summaries });
-        } catch {}
-        setAiLoading(false);
-        return;
-      }
-    }
-
-    const turnNow = new Date().toISOString();
-    await supabase.from("debates").update({
-      current_subtopic_index: nextSubIdx, current_turn: nextTurn, current_speaker_side_id: sides[nextSideIdx]?.id, turn_started_at: turnNow,
-    }).eq("id", id);
-
-    setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
-    setTimerRunning(true);
-
-    setAiLoading(true);
+    if (!debate || !id || advancingRef.current) return;
+    advancingRef.current = true;
     try {
-      const response = await supabase.functions.invoke("ai-facilitator", {
-        body: {
-          action: "advance_turn",
-          payload: {
-            topic: debate.topic,
-            subtopic: subtopics[nextSubIdx]?.title,
-            previousArguments: currentSubtopicArgs.slice(-3).map((a) => ({
-              side: sides.find((s) => { const p = participants.find((p) => p.id === a.participant_id); return p?.side_id === s.id; })?.label || "Unknown",
-              content: a.content,
-            })),
-            nextSide: sides[nextSideIdx]?.label,
-          },
-        },
-      });
-      if (response.data?.content) setAiMessage(response.data.content);
-    } catch {}
-    setAiLoading(false);
+      const currentSideIdx = sides.findIndex((s) => s.id === debate.current_speaker_side_id);
+      let nextSideIdx = (currentSideIdx + 1) % sides.length;
+      let nextTurn = debate.current_turn;
+      let nextSubIdx = debate.current_subtopic_index;
+
+      if (nextSideIdx === 0) nextTurn += 1;
+
+      if (nextTurn >= debate.turns_per_subtopic) {
+        nextSubIdx += 1;
+        nextTurn = 0;
+        nextSideIdx = 0;
+
+        if (nextSubIdx >= subtopics.length) {
+          const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+          await supabase.from("debates").update({
+            status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
+          }).eq("id", id);
+
+          setAiLoading(true);
+          try {
+            const summaries = subtopics.map((st) => ({
+              subtopic: st.title,
+              summary: arguments_.filter((a) => a.subtopic_id === st.id).map((a) => a.content).join(" | "),
+            }));
+            await streamAI("closing_synthesis", { topic: debate.topic, roundSummaries: summaries });
+          } catch {}
+          setAiLoading(false);
+          return;
+        }
+      }
+
+      const turnNow = new Date().toISOString();
+      await supabase.from("debates").update({
+        current_subtopic_index: nextSubIdx, current_turn: nextTurn, current_speaker_side_id: sides[nextSideIdx]?.id, turn_started_at: turnNow,
+      }).eq("id", id);
+
+      setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
+      setTimerRunning(true);
+
+      setAiLoading(true);
+      try {
+        await streamAI("advance_turn", {
+          topic: debate.topic,
+          subtopic: subtopics[nextSubIdx]?.title,
+          previousArguments: currentSubtopicArgs.slice(-3).map((a) => ({
+            side: sides.find((s) => { const p = participants.find((p) => p.id === a.participant_id); return p?.side_id === s.id; })?.label || "Unknown",
+            content: a.content,
+          })),
+          nextSide: sides[nextSideIdx]?.label,
+        });
+      } catch {
+        setAiMessage(`Now speaking: ${sides[nextSideIdx]?.label}`);
+      }
+      setAiLoading(false);
+    } finally {
+      advancingRef.current = false;
+    }
   };
 
   const submitArgument = async () => {
