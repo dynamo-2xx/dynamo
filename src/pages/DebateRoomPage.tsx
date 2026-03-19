@@ -358,8 +358,9 @@ const DebateRoomPage = () => {
       }
     }
 
+    const turnNow = new Date().toISOString();
     await supabase.from("debates").update({
-      current_subtopic_index: nextSubIdx, current_turn: nextTurn, current_speaker_side_id: sides[nextSideIdx]?.id,
+      current_subtopic_index: nextSubIdx, current_turn: nextTurn, current_speaker_side_id: sides[nextSideIdx]?.id, turn_started_at: turnNow,
     }).eq("id", id);
 
     setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
