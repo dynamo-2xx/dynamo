@@ -172,7 +172,16 @@ const DebateRoomPage = () => {
         setArguments((prev) => prev.map((a) => a.id === (payload.new as Argument).id ? (payload.new as Argument) : a));
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debates", filter: `id=eq.${id}` }, (payload) => {
-        setDebate(payload.new as unknown as DebateData);
+        const updated = payload.new as unknown as DebateData;
+        setDebate(updated);
+        // Sync timer from turn_started_at
+        if (updated.turn_started_at && updated.status === "live") {
+          const elapsed = Math.floor((Date.now() - new Date(updated.turn_started_at).getTime()) / 1000);
+          const remaining = Math.max(0, parseTimeToSeconds(updated.time_per_turn) - elapsed);
+          setTimeLeft(remaining);
+          if (remaining > 0) setTimerRunning(true);
+          else setTimerRunning(false);
+        }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
         if (payload.eventType === "INSERT") {
