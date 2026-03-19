@@ -14,6 +14,7 @@ import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
+import LiveArgumentMapAI from "@/components/debate/LiveArgumentMapAI";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
