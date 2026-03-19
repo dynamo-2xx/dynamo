@@ -207,38 +207,15 @@ const DebateRoomPage = () => {
     return () => clearInterval(timerRef.current);
   }, [timerRunning, timeLeft]);
 
-  // Auto-advance detection: when timer stops at 0 for AI-facilitated debates (Issue 3)
+  // Auto-advance: when timer hits 0 during a live debate, advance immediately
   useEffect(() => {
     if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live") {
-      const isAiFacilitated = debate.facilitator_type === "ai" || !debate.facilitator_user_id;
-      if (isAiFacilitated && !autoAdvancePending) {
-        setAutoAdvancePending(true);
+      if (!advancingRef.current) {
+        advanceTurn();
       }
     }
     prevTimerRunningRef.current = timerRunning;
   }, [timerRunning, timeLeft, debate]);
-
-  // Auto-advance with notification (Issue 3)
-  useEffect(() => {
-    if (!autoAdvancePending) return;
-    toast.info("This turn has ended — extend it?", {
-      duration: 5000,
-      action: {
-        label: "Extend +1 min",
-        onClick: () => {
-          setAutoAdvancePending(false);
-          clearTimeout(autoAdvanceRef.current);
-          setTimeLeft((t) => t + 60);
-          setTimerRunning(true);
-        },
-      },
-    });
-    autoAdvanceRef.current = setTimeout(() => {
-      setAutoAdvancePending(false);
-      advanceTurn();
-    }, 5000);
-    return () => clearTimeout(autoAdvanceRef.current);
-  }, [autoAdvancePending]);
 
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
