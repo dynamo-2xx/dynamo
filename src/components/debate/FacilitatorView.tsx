@@ -17,6 +17,7 @@ interface Participant {
 }
 
 interface FacilitatorViewProps {
+  debateId: string;
   debate: {
     current_subtopic_index: number;
     current_turn: number;
