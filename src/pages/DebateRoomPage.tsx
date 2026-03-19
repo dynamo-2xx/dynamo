@@ -86,6 +86,22 @@ const DebateRoomPage = () => {
   const [mediaRequested, setMediaRequested] = useState(false);
   const prevTimerRunningRef = useRef(false);
 
+  // Deepgram transcription
+  const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
+  const currentSideForTranscript = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
+  const {
+    transcriptEntries,
+    argumentMap: aiArgumentMap,
+    interimText,
+    isConnected: deepgramConnected,
+  } = useDeepgramTranscription({
+    debateId: id || "",
+    currentSpeakerSide: currentSideForTranscript?.label || "",
+    currentSubtopic: currentSubtopicForTranscript?.title || "",
+    sides: sides.map((s) => s.label),
+    isActive: debate?.status === "live" && (userRole === "speaker" || userRole === "facilitator"),
+  });
+
   // Request media permissions at session start for non-spectators
   useEffect(() => {
     if (mediaRequested) return;
