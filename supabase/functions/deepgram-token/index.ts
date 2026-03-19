@@ -13,33 +13,8 @@ serve(async (req) => {
     const DEEPGRAM_API_KEY = Deno.env.get("DEEPGRAM_API_KEY");
     if (!DEEPGRAM_API_KEY) throw new Error("DEEPGRAM_API_KEY is not configured");
 
-    // Create a temporary API key valid for 60 seconds
-    const response = await fetch("https://api.deepgram.com/v1/keys", {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${DEEPGRAM_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        comment: "Temporary debate transcription key",
-        scopes: ["usage:write"],
-        time_to_live_in_seconds: 60,
-      }),
-    });
-
-    if (!response.ok) {
-      // Fallback: return the main key directly (Deepgram allows direct WebSocket auth)
-      // This is acceptable for server-generated short-lived sessions
-      console.warn("Could not create temp key, returning direct key");
-      return new Response(
-        JSON.stringify({ key: DEEPGRAM_API_KEY }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const data = await response.json();
     return new Response(
-      JSON.stringify({ key: data.key || DEEPGRAM_API_KEY }),
+      JSON.stringify({ key: DEEPGRAM_API_KEY }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight
+  Play, Share2, Copy, Check, ChevronRight, AlertCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -87,7 +87,7 @@ const DebateRoomPage = () => {
   const [mediaRequested, setMediaRequested] = useState(false);
   const prevTimerRunningRef = useRef(false);
 
-  // Deepgram transcription
+  // Deepgram transcription — activate for all non-spectators as soon as debate is live
   const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSideForTranscript = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const {
@@ -95,12 +95,14 @@ const DebateRoomPage = () => {
     argumentMap: aiArgumentMap,
     interimText,
     isConnected: deepgramConnected,
+    micError,
+    connectionError,
   } = useDeepgramTranscription({
     debateId: id || "",
     currentSpeakerSide: currentSideForTranscript?.label || "",
     currentSubtopic: currentSubtopicForTranscript?.title || "",
     sides: sides.map((s) => s.label),
-    isActive: debate?.status === "live" && (userRole === "speaker" || userRole === "facilitator"),
+    isActive: debate?.status === "live" && userRole !== "spectator",
   });
 
   // Request media permissions at session start for non-spectators
@@ -584,6 +586,20 @@ const DebateRoomPage = () => {
           )}
         </div>
       </header>
+
+      {/* Mic/Connection error banners */}
+      {micError && (
+        <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2.5 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
+          <span className="text-xs text-destructive font-body">{micError}</span>
+        </div>
+      )}
+      {connectionError && !micError && (
+        <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2.5 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
+          <span className="text-xs text-destructive font-body">{connectionError}</span>
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* Draft views */}
