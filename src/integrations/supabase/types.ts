@@ -90,24 +90,33 @@ export type Database = {
           created_at: string
           debate_id: string
           id: string
+          invite_token: string | null
+          invited_email: string | null
           invited_user_id: string
           invited_username: string
+          side_id: string | null
           status: string
         }
         Insert: {
           created_at?: string
           debate_id: string
           id?: string
+          invite_token?: string | null
+          invited_email?: string | null
           invited_user_id: string
           invited_username: string
+          side_id?: string | null
           status?: string
         }
         Update: {
           created_at?: string
           debate_id?: string
           id?: string
+          invite_token?: string | null
+          invited_email?: string | null
           invited_user_id?: string
           invited_username?: string
+          side_id?: string | null
           status?: string
         }
         Relationships: [
@@ -116,6 +125,13 @@ export type Database = {
             columns: ["debate_id"]
             isOneToOne: false
             referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debate_invitations_side_id_fkey"
+            columns: ["side_id"]
+            isOneToOne: false
+            referencedRelation: "debate_sides"
             referencedColumns: ["id"]
           },
         ]
