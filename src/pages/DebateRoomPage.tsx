@@ -13,6 +13,8 @@ import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechI
 import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
+import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
+import LiveArgumentMapAI from "@/components/debate/LiveArgumentMapAI";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
@@ -84,6 +86,22 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
   const prevTimerRunningRef = useRef(false);
+
+  // Deepgram transcription
+  const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
+  const currentSideForTranscript = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
+  const {
+    transcriptEntries,
+    argumentMap: aiArgumentMap,
+    interimText,
+    isConnected: deepgramConnected,
+  } = useDeepgramTranscription({
+    debateId: id || "",
+    currentSpeakerSide: currentSideForTranscript?.label || "",
+    currentSubtopic: currentSubtopicForTranscript?.title || "",
+    sides: sides.map((s) => s.label),
+    isActive: debate?.status === "live" && (userRole === "speaker" || userRole === "facilitator"),
+  });
 
   // Request media permissions at session start for non-spectators
   useEffect(() => {
@@ -618,6 +636,9 @@ const DebateRoomPage = () => {
             timerRunning={timerRunning}
             aiMessage={aiMessage}
             aiLoading={aiLoading}
+            aiArgumentMap={aiArgumentMap}
+            deepgramConnected={deepgramConnected}
+            interimText={interimText}
             onToggleTimer={() => setTimerRunning(!timerRunning)}
             onResetTimer={() => setTimeLeft(parseTimeToSeconds(debate.time_per_turn))}
             onExtendTime={handleExtendTime}
@@ -647,6 +668,9 @@ const DebateRoomPage = () => {
             currentSide={currentSide}
             isPublisher={isCreator}
             timerRunning={timerRunning}
+            aiArgumentMap={aiArgumentMap}
+            deepgramConnected={deepgramConnected}
+            interimText={interimText}
             onArgumentTextChange={setArgumentText}
             onSetRecording={setIsRecording}
             onSubmit={submitArgument}
@@ -680,6 +704,48 @@ const DebateRoomPage = () => {
               />
             )}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+              {/* AI Argument Map & Transcript Section */}
+              {(aiArgumentMap.length > 0 || transcriptEntries.length > 0) && (
+                <div className="mb-8 space-y-6">
+                  {aiArgumentMap.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-display font-semibold text-primary mb-3 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                          <ChevronRight className="w-3 h-3 text-primary" />
+                        </span>
+                        AI Argument Map
+                      </h3>
+                      <div className="bg-card border border-border rounded-xl p-4">
+                        <LiveArgumentMapAI entries={aiArgumentMap} sides={sides} />
+                      </div>
+                    </div>
+                  )}
+                  {transcriptEntries.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-display font-semibold text-primary mb-3 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                          <ChevronRight className="w-3 h-3 text-primary" />
+                        </span>
+                        Full Transcript
+                      </h3>
+                      <div className="bg-card border border-border rounded-xl p-4 max-h-96 overflow-y-auto space-y-1">
+                        {transcriptEntries.filter(e => e.is_final).map((entry, i) => (
+                          <div key={i} className="text-xs font-body">
+                            <span className="text-muted-foreground font-mono text-[10px]">
+                              {new Date(entry.timestamp).toLocaleTimeString()}
+                            </span>
+                            {" "}
+                            <span className="font-semibold text-primary">{entry.speaker_side}:</span>
+                            {" "}
+                            <span className="text-foreground">{entry.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {subtopics.map((st) => {
                 const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
                 if (stArgs.length === 0) return null;

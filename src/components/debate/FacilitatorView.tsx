@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor } from "lucide-react";
+import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
+import LiveArgumentMapAI from "./LiveArgumentMapAI";
+import type { ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
 
 interface Side { id: string; label: string; sort_order: number; }
 interface Subtopic { id: string; title: string; sort_order: number; }
@@ -33,6 +35,9 @@ interface FacilitatorViewProps {
   timerRunning: boolean;
   aiMessage: string;
   aiLoading: boolean;
+  aiArgumentMap?: ArgumentMapEntry[];
+  deepgramConnected?: boolean;
+  interimText?: string;
   onToggleTimer: () => void;
   onResetTimer: () => void;
   onExtendTime: () => void;
@@ -43,6 +48,7 @@ interface FacilitatorViewProps {
 const FacilitatorView = ({
   debateId, debate, sides, subtopics, arguments: args, participants,
   timeLeft, timerRunning, aiMessage, aiLoading,
+  aiArgumentMap = [], deepgramConnected, interimText,
   onToggleTimer, onResetTimer, onExtendTime, onSkipTurn, onNextTurn,
 }: FacilitatorViewProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -250,12 +256,28 @@ const FacilitatorView = ({
       {sidebarOpen && (
         <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
           <div className="p-4 border-b border-border">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Live Argument Map
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                AI Argument Map
+              </h3>
+              {deepgramConnected && (
+                <span className="flex items-center gap-1 text-[9px] text-primary font-semibold">
+                  <Radio className="w-2.5 h-2.5 animate-pulse" /> Live
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            <LiveArgumentMap arguments={mapArgs} />
+            {aiArgumentMap.length > 0 ? (
+              <LiveArgumentMapAI entries={aiArgumentMap} sides={sides} />
+            ) : (
+              <LiveArgumentMap arguments={mapArgs} />
+            )}
+            {interimText && (
+              <div className="mt-2 text-[10px] text-muted-foreground italic font-body px-2 py-1 bg-muted/50 rounded">
+                🎙 {interimText}
+              </div>
+            )}
           </div>
         </aside>
       )}
