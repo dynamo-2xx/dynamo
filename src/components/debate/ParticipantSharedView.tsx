@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, Send, SkipForward, ChevronDown,
   Users, Columns2, Pause, Play, Plus, ChevronRight,
+  Video, VideoOff,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
@@ -68,7 +69,7 @@ const ParticipantSharedView = ({
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
-  // Camera state management — auto-request on mount
+  // Camera state management
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const [localCameraOn, setLocalCameraOn] = useState(false);
@@ -86,12 +87,13 @@ const ParticipantSharedView = ({
         localStreamRef.current = stream;
         setLocalCameraOn(true);
       } catch {
-        // Camera denied — main box will show chat only
+        // Camera denied
       }
     })();
     return () => {
       cancelled = true;
       localStreamRef.current?.getTracks().forEach(t => t.stop());
+      localStreamRef.current = null;
     };
   }, [isSpeaker]);
 
@@ -101,6 +103,25 @@ const ParticipantSharedView = ({
       localVideoRef.current.srcObject = localStreamRef.current;
     }
   }, [localCameraOn]);
+
+  // Toggle camera on/off
+  const toggleCamera = async () => {
+    if (localCameraOn) {
+      // Turn off
+      localStreamRef.current?.getTracks().forEach(t => t.stop());
+      localStreamRef.current = null;
+      setLocalCameraOn(false);
+    } else {
+      // Turn on
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        localStreamRef.current = stream;
+        setLocalCameraOn(true);
+      } catch {
+        // Camera denied
+      }
+    }
+  };
 
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const activeSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
@@ -157,8 +178,21 @@ const ParticipantSharedView = ({
             Turn {(debate.current_turn ?? 0) + 1}/{debate.turns_per_subtopic}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <DebateTimer timeLeft={timeLeft} size="md" />
+          {isSpeaker && (
+            <button
+              onClick={toggleCamera}
+              className={`p-2 rounded-lg transition-colors ${
+                localCameraOn
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+              title={localCameraOn ? "Turn camera off" : "Turn camera on"}
+            >
+              {localCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+            </button>
+          )}
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
             className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
