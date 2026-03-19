@@ -122,24 +122,10 @@ const JoinDebatePage = () => {
     navigate(`/debate/${debateId}`, { replace: true });
   };
 
-  const handleJoinAsAudience = async () => {
-    if (!debateId || !user || joining) return;
-    setJoining(true);
-
-    const { error } = await supabase.from("debate_participants").insert({
-      debate_id: debateId,
-      user_id: user.id,
-      participant_role: "spectator",
-    });
-
-    if (error) {
-      toast.error("Failed to join debate.");
-      setJoining(false);
-      return;
-    }
-
-    toast.success("Joined as audience member!");
-    navigate(`/debate/${debateId}`, { replace: true });
+  const handleJoinAsAudience = () => {
+    if (!debateId) return;
+    // Audience view doesn't require auth — route directly
+    navigate(`/debate/${debateId}/audience`, { replace: true });
   };
 
   if (!showPicker) {

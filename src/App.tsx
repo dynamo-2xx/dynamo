@@ -18,6 +18,8 @@ import JoinDebatePage from "./pages/JoinDebatePage";
 import NotificationsPage from "./pages/NotificationsPage";
 import DebatePreviewPage from "./pages/DebatePreviewPage";
 import NotFound from "./pages/NotFound";
+import ProjectorPage from "./pages/ProjectorPage";
+import AudiencePage from "./pages/AudiencePage";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +38,8 @@ const App = () => (
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />
               <Route path="/debate/:id" element={<ProtectedRoute><DebateRoomPage /></ProtectedRoute>} />
+              <Route path="/debate/:id/projector" element={<ProjectorPage />} />
+              <Route path="/debate/:id/audience" element={<AudiencePage />} />
               <Route path="/join/:code" element={<JoinDebatePage />} />
               <Route path="/preview/:token" element={<DebatePreviewPage />} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
