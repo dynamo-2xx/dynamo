@@ -93,7 +93,6 @@ const DebateRoomPage = () => {
   const currentSideForTranscript = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const {
     transcriptEntries,
-    argumentMap: aiArgumentMap,
     interimText,
     isConnected: deepgramConnected,
     micError,
