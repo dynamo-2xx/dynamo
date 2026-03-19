@@ -528,7 +528,7 @@ const DebateRoomPage = () => {
                 Share
               </button>
               {showShare && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-card border border-border rounded-xl p-4 shadow-lg z-50">
+                <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-xl p-4 shadow-lg z-50">
                   <p className="text-xs text-muted-foreground mb-2 font-body">Share this link to invite speakers:</p>
                   <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2">
                     <code className="text-xs text-foreground flex-1 truncate">
@@ -541,6 +541,25 @@ const DebateRoomPage = () => {
                   <p className="text-[10px] text-muted-foreground mt-2 font-body">
                     Join code: <span className="font-mono font-bold text-foreground">{debate.join_code}</span>
                   </p>
+                  <div className="border-t border-border mt-3 pt-3">
+                    <p className="text-xs text-muted-foreground mb-2 font-body">Audience / Projector links:</p>
+                    <div className="space-y-1.5">
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/debate/${id}/audience`); toast.success("Audience link copied!"); }}
+                        className="w-full text-left flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2 hover:bg-secondary/70 transition-colors"
+                      >
+                        <code className="text-[10px] text-foreground flex-1 truncate">/debate/{id?.slice(0,8)}…/audience</code>
+                        <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => { window.open(`/debate/${id}/projector`, '_blank'); }}
+                        className="w-full text-left flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-2 hover:bg-secondary/70 transition-colors"
+                      >
+                        <code className="text-[10px] text-foreground flex-1 truncate">/debate/{id?.slice(0,8)}…/projector</code>
+                        <span className="text-[10px] text-primary font-semibold">Open ↗</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
