@@ -695,54 +695,7 @@ const DebateRoomPage = () => {
           </div>
         )}
 
-        {/* Right sidebar — visible in all live views */}
-        {isLive && (
-          <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
-            <div className="border-b border-border p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 font-body">
-                <Users className="w-3.5 h-3.5 inline mr-1" /> Participants ({participants.length})
-              </h3>
-              <div className="space-y-2">
-                {sides.map((side) => (
-                  <div key={side.id}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1 text-primary">
-                      {side.label}
-                    </p>
-                    {participants.filter((p) => p.side_id === side.id).map((p) => (
-                      <div key={p.id} className="text-xs text-foreground flex items-center gap-1.5 font-body">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                        {p.user_id === user?.id ? "You" : p.user_id.slice(0, 8)}
-                        <span className="text-[9px] text-muted-foreground ml-1">({p.participant_role})</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-4 flex-1 overflow-y-auto">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 font-body">
-                <MessageSquare className="w-3.5 h-3.5 inline mr-1" /> Subtopics
-              </h3>
-              <div className="space-y-2">
-                {subtopics.map((st, i) => {
-                  const isCurrent = i === (debate?.current_subtopic_index ?? 0);
-                  const isDone = i < (debate?.current_subtopic_index ?? 0);
-                  const argCount = arguments_.filter((a) => a.subtopic_id === st.id).length;
-                  return (
-                    <div key={st.id} className={`rounded-lg px-3 py-2 text-xs transition-colors ${
-                      isCurrent ? "bg-primary/10 border border-primary/30 text-primary" :
-                      isDone ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground"
-                    }`}>
-                      <p className="font-medium font-display">{i + 1}. {st.title}</p>
-                      {argCount > 0 && <p className="text-[10px] mt-0.5 opacity-75 font-body">{argCount} argument{argCount !== 1 ? "s" : ""}</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </aside>
-        )}
+        {/* Sidebar is now integrated into ParticipantSharedView */}
       </div>
     </div>
   );
