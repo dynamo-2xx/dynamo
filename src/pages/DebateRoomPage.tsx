@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Users, Share2, Copy, Check, MessageSquare, ChevronRight
+  Play, Share2, Copy, Check, ChevronRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +32,7 @@ interface DebateData {
   edit_window_ends_at: string | null;
   ended_at: string | null;
   join_code: string | null;
+  turn_started_at: string | null;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
@@ -145,7 +146,15 @@ const DebateRoomPage = () => {
         setUserRole("spectator");
       }
 
-      setTimeLeft(parseTimeToSeconds(d.time_per_turn));
+      // Compute synced timer from turn_started_at
+      if (d.turn_started_at && d.status === "live") {
+        const elapsed = Math.floor((Date.now() - new Date(d.turn_started_at).getTime()) / 1000);
+        const remaining = Math.max(0, parseTimeToSeconds(d.time_per_turn) - elapsed);
+        setTimeLeft(remaining);
+        if (remaining > 0) setTimerRunning(true);
+      } else {
+        setTimeLeft(parseTimeToSeconds(d.time_per_turn));
+      }
       setLoading(false);
     };
     loadDebate();
@@ -163,7 +172,16 @@ const DebateRoomPage = () => {
         setArguments((prev) => prev.map((a) => a.id === (payload.new as Argument).id ? (payload.new as Argument) : a));
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debates", filter: `id=eq.${id}` }, (payload) => {
-        setDebate(payload.new as unknown as DebateData);
+        const updated = payload.new as unknown as DebateData;
+        setDebate(updated);
+        // Sync timer from turn_started_at
+        if (updated.turn_started_at && updated.status === "live") {
+          const elapsed = Math.floor((Date.now() - new Date(updated.turn_started_at).getTime()) / 1000);
+          const remaining = Math.max(0, parseTimeToSeconds(updated.time_per_turn) - elapsed);
+          setTimeLeft(remaining);
+          if (remaining > 0) setTimerRunning(true);
+          else setTimerRunning(false);
+        }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
         if (payload.eventType === "INSERT") {
@@ -288,8 +306,9 @@ const DebateRoomPage = () => {
   const startDebate = async () => {
     if (!debate || !id) return;
     setAiLoading(true);
+    const now = new Date().toISOString();
     await supabase.from("debates").update({
-      status: "live", started_at: new Date().toISOString(),
+      status: "live", started_at: now, turn_started_at: now,
       current_subtopic_index: 0, current_turn: 0, current_speaker_side_id: sides[0]?.id,
     }).eq("id", id);
 
@@ -339,8 +358,9 @@ const DebateRoomPage = () => {
       }
     }
 
+    const turnNow = new Date().toISOString();
     await supabase.from("debates").update({
-      current_subtopic_index: nextSubIdx, current_turn: nextTurn, current_speaker_side_id: sides[nextSideIdx]?.id,
+      current_subtopic_index: nextSubIdx, current_turn: nextTurn, current_speaker_side_id: sides[nextSideIdx]?.id, turn_started_at: turnNow,
     }).eq("id", id);
 
     setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
@@ -675,54 +695,7 @@ const DebateRoomPage = () => {
           </div>
         )}
 
-        {/* Right sidebar — visible in all live views */}
-        {isLive && (
-          <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
-            <div className="border-b border-border p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 font-body">
-                <Users className="w-3.5 h-3.5 inline mr-1" /> Participants ({participants.length})
-              </h3>
-              <div className="space-y-2">
-                {sides.map((side) => (
-                  <div key={side.id}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1 text-primary">
-                      {side.label}
-                    </p>
-                    {participants.filter((p) => p.side_id === side.id).map((p) => (
-                      <div key={p.id} className="text-xs text-foreground flex items-center gap-1.5 font-body">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                        {p.user_id === user?.id ? "You" : p.user_id.slice(0, 8)}
-                        <span className="text-[9px] text-muted-foreground ml-1">({p.participant_role})</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-4 flex-1 overflow-y-auto">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 font-body">
-                <MessageSquare className="w-3.5 h-3.5 inline mr-1" /> Subtopics
-              </h3>
-              <div className="space-y-2">
-                {subtopics.map((st, i) => {
-                  const isCurrent = i === (debate?.current_subtopic_index ?? 0);
-                  const isDone = i < (debate?.current_subtopic_index ?? 0);
-                  const argCount = arguments_.filter((a) => a.subtopic_id === st.id).length;
-                  return (
-                    <div key={st.id} className={`rounded-lg px-3 py-2 text-xs transition-colors ${
-                      isCurrent ? "bg-primary/10 border border-primary/30 text-primary" :
-                      isDone ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground"
-                    }`}>
-                      <p className="font-medium font-display">{i + 1}. {st.title}</p>
-                      {argCount > 0 && <p className="text-[10px] mt-0.5 opacity-75 font-body">{argCount} argument{argCount !== 1 ? "s" : ""}</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </aside>
-        )}
+        {/* Sidebar is now integrated into ParticipantSharedView */}
       </div>
     </div>
   );

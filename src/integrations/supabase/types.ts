@@ -308,6 +308,7 @@ export type Database = {
           time_per_turn: string
           topic: string
           topic_category: string | null
+          turn_started_at: string | null
           turns_per_subtopic: number
           updated_at: string
         }
@@ -334,6 +335,7 @@ export type Database = {
           time_per_turn?: string
           topic: string
           topic_category?: string | null
+          turn_started_at?: string | null
           turns_per_subtopic?: number
           updated_at?: string
         }
@@ -360,6 +362,7 @@ export type Database = {
           time_per_turn?: string
           topic?: string
           topic_category?: string | null
+          turn_started_at?: string | null
           turns_per_subtopic?: number
           updated_at?: string
         }
