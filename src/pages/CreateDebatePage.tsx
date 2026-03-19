@@ -153,27 +153,50 @@ const CreateDebatePage = () => {
         side_id: sides?.[0]?.id ?? null,
       });
 
-      // 5. Send invitations
+      // 5. Send invitations (usernames and emails)
       if (invitedUsernames.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("user_id, display_name")
-          .in("display_name", invitedUsernames);
+        const usernameInvites = invitedUsernames.filter((u) => !isEmail(u));
+        const emailInvites = invitedUsernames.filter((u) => isEmail(u));
 
-        if (profiles && profiles.length > 0) {
-          const invitations = profiles.map((p) => ({
-            debate_id: dbDebate.id,
-            invited_user_id: p.user_id,
-            invited_username: p.display_name || "",
-          }));
-          await supabase.from("debate_invitations").insert(invitations);
-          toast.success(`${profiles.length} invitation${profiles.length !== 1 ? "s" : ""} sent`);
+        if (usernameInvites.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, display_name")
+            .in("display_name", usernameInvites);
+
+          if (profiles && profiles.length > 0) {
+            const invitations = profiles.map((p) => ({
+              debate_id: dbDebate.id,
+              invited_user_id: p.user_id,
+              invited_username: p.display_name || "",
+            }));
+            await supabase.from("debate_invitations").insert(invitations);
+            toast.success(`${profiles.length} invitation${profiles.length !== 1 ? "s" : ""} sent`);
+          }
+
+          const foundNames = (profiles || []).map((p) => p.display_name);
+          const notFound = usernameInvites.filter((u) => !foundNames.includes(u));
+          if (notFound.length > 0) {
+            toast.warning(`Users not found: ${notFound.join(", ")}`);
+          }
         }
 
-        const foundNames = (profiles || []).map((p) => p.display_name);
-        const notFound = invitedUsernames.filter((u) => !foundNames.includes(u));
-        if (notFound.length > 0) {
-          toast.warning(`Users not found: ${notFound.join(", ")}`);
+        if (emailInvites.length > 0) {
+          for (const invEmail of emailInvites) {
+            const { data: inv } = await supabase.from("debate_invitations").insert({
+              debate_id: dbDebate.id,
+              invited_user_id: user.id,
+              invited_username: invEmail,
+              invited_email: invEmail,
+            }).select("id").single();
+
+            if (inv) {
+              supabase.functions.invoke("send-invite-email", {
+                body: { invitation_id: inv.id },
+              }).catch((err) => console.error("Email send error:", err));
+            }
+          }
+          toast.success(`${emailInvites.length} email invitation${emailInvites.length !== 1 ? "s" : ""} queued`);
         }
       }
 
