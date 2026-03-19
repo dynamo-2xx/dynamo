@@ -684,7 +684,7 @@ const DebateRoomPage = () => {
             currentSide={currentSide}
             isPublisher={isCreator}
             timerRunning={timerRunning}
-            aiArgumentMap={aiArgumentMap}
+            transcriptEntries={transcriptEntries}
             deepgramConnected={deepgramConnected}
             interimText={interimText}
             onArgumentTextChange={setArgumentText}
