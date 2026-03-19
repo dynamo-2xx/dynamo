@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor } from "lucide-react";
+import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
+import LiveArgumentMapAI from "./LiveArgumentMapAI";
+import type { ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
 
 interface Side { id: string; label: string; sort_order: number; }
 interface Subtopic { id: string; title: string; sort_order: number; }
