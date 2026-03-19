@@ -263,9 +263,26 @@ const DebateRoomPage = () => {
   const canSpeak = isSpeaker && isMyTurn && isLive;
   const micEnabled = canSpeak;
 
+  const advancingRef = useRef(false);
+
+  // Fetch with retry + exponential backoff for 429s
+  const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3): Promise<Response> => {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const response = await fetch(url, options);
+      if (response.status === 429 && attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 8000) + Math.random() * 500;
+        console.warn(`AI rate limited (429), retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      return response;
+    }
+    throw new Error("Max retries exceeded");
+  };
+
   // SSE stream helper
   const streamAI = async (action: string, payload: Record<string, unknown>) => {
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-facilitator`,
       {
         method: "POST",
