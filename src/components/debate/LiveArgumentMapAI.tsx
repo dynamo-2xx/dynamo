@@ -4,6 +4,7 @@ import type { ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
 
 interface LiveArgumentMapAIProps {
   entries: ArgumentMapEntry[];
+  sides: { label: string; sort_order: number }[];
   compact?: boolean;
 }
 
@@ -28,15 +29,22 @@ const typeLabel = (type: string) => {
   }
 };
 
-const LiveArgumentMapAI = ({ entries, compact = false }: LiveArgumentMapAIProps) => {
+const LiveArgumentMapAI = ({ entries, sides, compact = false }: LiveArgumentMapAIProps) => {
   if (entries.length === 0) {
     return (
       <div className={`flex items-center justify-center gap-2 ${compact ? "py-3" : "py-6"} text-muted-foreground`}>
         <Zap className="w-3.5 h-3.5" />
-        <span className={compact ? "text-[10px]" : "text-xs"}>AI analyzing speech…</span>
+        <span className={compact ? "text-[10px]" : "text-xs"} style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          AI analyzing speech…
+        </span>
       </div>
     );
   }
+
+  const getSideOrder = (speakerSide: string): number => {
+    const side = sides.find((s) => s.label.toLowerCase() === speakerSide.toLowerCase());
+    return side?.sort_order ?? 0;
+  };
 
   // Build threaded structure
   const rootEntries = entries.filter((e) => e.parent_index === undefined || e.parent_index === null);
@@ -51,7 +59,7 @@ const LiveArgumentMapAI = ({ entries, compact = false }: LiveArgumentMapAIProps)
 
   const renderEntry = (entry: ArgumentMapEntry, depth: number, globalIndex: number) => {
     const children = childrenByParent.get(globalIndex) || [];
-    const isSide1 = entry.speaker_side?.toLowerCase().includes(sides1Check(entries));
+    const sideOrder = getSideOrder(entry.speaker_side);
 
     return (
       <motion.div
@@ -65,15 +73,15 @@ const LiveArgumentMapAI = ({ entries, compact = false }: LiveArgumentMapAIProps)
           className={`rounded-lg border-l-[3px] px-2.5 py-1.5 ${
             compact ? "text-[10px]" : "text-[11px]"
           } ${
-            isSide1
+            sideOrder === 0
               ? "border-l-[hsl(var(--side-1))] bg-[hsl(var(--side-1)/0.08)]"
               : "border-l-[hsl(var(--side-2))] bg-[hsl(var(--side-2)/0.08)]"
           }`}
         >
           <div className="flex items-center gap-1.5 mb-0.5">
             <span className={`font-semibold text-[9px] uppercase tracking-wider ${
-              isSide1 ? "text-[hsl(var(--side-1))]" : "text-[hsl(var(--side-2))]"
-            }`}>
+              sideOrder === 0 ? "text-[hsl(var(--side-1))]" : "text-[hsl(var(--side-2))]"
+            }`} style={{ fontFamily: "'DM Sans', sans-serif" }}>
               {entry.speaker_side}
             </span>
             {entry.type !== "claim" && (
@@ -82,9 +90,11 @@ const LiveArgumentMapAI = ({ entries, compact = false }: LiveArgumentMapAIProps)
               </span>
             )}
           </div>
-          <p className="text-foreground leading-relaxed break-words whitespace-pre-wrap">{entry.content}</p>
+          <p className="text-foreground leading-relaxed break-words whitespace-pre-wrap" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            {entry.content}
+          </p>
           {entry.quote && (
-            <p className="mt-1 text-[9px] italic text-muted-foreground border-l-2 border-muted pl-2">
+            <p className="mt-1 text-[9px] italic text-muted-foreground border-l-2 border-muted pl-2" style={{ fontFamily: "Georgia, serif" }}>
               "{entry.quote}"
             </p>
           )}
@@ -112,11 +122,5 @@ const LiveArgumentMapAI = ({ entries, compact = false }: LiveArgumentMapAIProps)
     </div>
   );
 };
-
-// Helper: determine which side is "side 1" from entries
-function sides1Check(entries: ArgumentMapEntry[]): string {
-  // Return first side encountered - simple heuristic
-  return entries[0]?.speaker_side?.toLowerCase().slice(0, 3) || "";
-}
 
 export default LiveArgumentMapAI;
