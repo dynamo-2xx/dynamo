@@ -334,6 +334,28 @@ const ParticipantSharedView = ({
             </div>
           </div>
 
+          {/* AI Argument Map */}
+          {aiArgumentMap.length > 0 && (
+            <div className="border-b border-border p-3 shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-body">
+                  AI Argument Map
+                </h3>
+                {deepgramConnected && (
+                  <span className="flex items-center gap-1 text-[9px] text-primary font-semibold">
+                    <Radio className="w-2.5 h-2.5 animate-pulse" /> Live
+                  </span>
+                )}
+              </div>
+              <LiveArgumentMapAI entries={aiArgumentMap} sides={sides} compact />
+              {interimText && (
+                <div className="mt-1.5 text-[10px] text-muted-foreground italic font-body px-2 py-1 bg-muted/50 rounded">
+                  🎙 {interimText}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Subtopics with argument dropdowns — this is where argument history lives */}
           <div className="flex-1 overflow-y-auto p-3">
             <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 font-body">
@@ -343,6 +365,7 @@ const ParticipantSharedView = ({
               {subtopics.map((st, i) => {
                 const isCurrent = i === (debate.current_subtopic_index ?? 0);
                 const stArgs = argsBySubtopic(st.id);
+                const subtopicAiEntries = aiArgumentMap.filter((e) => e.subtopic === st.title);
                 return (
                   <Collapsible key={st.id} defaultOpen={isCurrent}>
                     <CollapsibleTrigger className={`flex items-center gap-1.5 w-full rounded-lg px-2.5 py-1.5 text-xs font-display font-medium transition-colors text-left ${
@@ -352,13 +375,18 @@ const ParticipantSharedView = ({
                     }`}>
                       <ChevronDown className="w-3 h-3 shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
                       <span className="truncate">{i + 1}. {st.title}</span>
-                      {stArgs.length > 0 && (
-                        <span className="ml-auto text-[9px] bg-muted rounded-full px-1.5 py-0.5">{stArgs.length}</span>
+                      {(stArgs.length > 0 || subtopicAiEntries.length > 0) && (
+                        <span className="ml-auto text-[9px] bg-muted rounded-full px-1.5 py-0.5">
+                          {stArgs.length + subtopicAiEntries.length}
+                        </span>
                       )}
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="pl-5 py-1 space-y-1">
-                        {stArgs.length === 0 ? (
+                        {subtopicAiEntries.length > 0 && (
+                          <LiveArgumentMapAI entries={subtopicAiEntries} sides={sides} compact />
+                        )}
+                        {stArgs.length === 0 && subtopicAiEntries.length === 0 ? (
                           <p className="text-[10px] text-muted-foreground italic font-body">No arguments yet</p>
                         ) : (
                           stArgs.map((a) => (
