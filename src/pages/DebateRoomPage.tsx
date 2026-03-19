@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight, AlertCircle
+  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,8 @@ import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
-import LiveArgumentMapAI from "@/components/debate/LiveArgumentMapAI";
+import TranscriptCard from "@/components/debate/TranscriptCard";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
