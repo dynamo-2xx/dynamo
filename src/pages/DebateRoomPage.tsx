@@ -306,8 +306,9 @@ const DebateRoomPage = () => {
   const startDebate = async () => {
     if (!debate || !id) return;
     setAiLoading(true);
+    const now = new Date().toISOString();
     await supabase.from("debates").update({
-      status: "live", started_at: new Date().toISOString(),
+      status: "live", started_at: now, turn_started_at: now,
       current_subtopic_index: 0, current_turn: 0, current_speaker_side_id: sides[0]?.id,
     }).eq("id", id);
 
