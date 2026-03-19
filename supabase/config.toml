@@ -1,1 +1,13 @@
 project_id = "jizhbglplkymmjgxnkts"
+
+[functions.ai-facilitator]
+verify_jwt = false
+
+[functions.send-invite-email]
+verify_jwt = false
+
+[functions.deepgram-token]
+verify_jwt = false
+
+[functions.analyze-transcript]
+verify_jwt = false
