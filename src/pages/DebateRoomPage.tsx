@@ -716,10 +716,7 @@ const DebateRoomPage = () => {
                         AI Argument Map
                       </h3>
                       <div className="bg-card border border-border rounded-xl p-4">
-                        {(() => {
-                          const LiveArgumentMapAI = require("@/components/debate/LiveArgumentMapAI").default;
-                          return <LiveArgumentMapAI entries={aiArgumentMap} sides={sides} />;
-                        })()}
+                        <LiveArgumentMapAI entries={aiArgumentMap} sides={sides} />
                       </div>
                     </div>
                   )}
