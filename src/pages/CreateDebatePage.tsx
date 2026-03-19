@@ -352,7 +352,7 @@ const CreateDebatePage = () => {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") { e.preventDefault(); addInvite(); }
                       }}
-                      placeholder="Enter a username and press Enter"
+                      placeholder="Username or email address"
                       className="flex-1 bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
                     />
                     <button
