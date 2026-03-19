@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Play, Pause, SkipForward, Clock, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio } from "lucide-react";
+import { Play, Pause, SkipForward, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
-import LiveArgumentMapAI from "./LiveArgumentMapAI";
-import type { ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
+import TranscriptCard from "./TranscriptCard";
+import type { TranscriptEntry, ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
 
 interface Side { id: string; label: string; sort_order: number; }
 interface Subtopic { id: string; title: string; sort_order: number; }
@@ -35,7 +35,7 @@ interface FacilitatorViewProps {
   timerRunning: boolean;
   aiMessage: string;
   aiLoading: boolean;
-  aiArgumentMap?: ArgumentMapEntry[];
+  transcriptEntries?: TranscriptEntry[];
   deepgramConnected?: boolean;
   interimText?: string;
   onToggleTimer: () => void;
@@ -48,7 +48,7 @@ interface FacilitatorViewProps {
 const FacilitatorView = ({
   debateId, debate, sides, subtopics, arguments: args, participants,
   timeLeft, timerRunning, aiMessage, aiLoading,
-  aiArgumentMap = [], deepgramConnected, interimText,
+  transcriptEntries = [], deepgramConnected, interimText,
   onToggleTimer, onResetTimer, onExtendTime, onSkipTurn, onNextTurn,
 }: FacilitatorViewProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -56,35 +56,32 @@ const FacilitatorView = ({
   const currentSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
   const currentSubtopicArgs = args.filter((a) => a.subtopic_id === currentSubtopic?.id);
 
-  // Find current speaker
   const currentSpeakers = participants.filter(
     (p) => p.side_id === currentSide?.id && p.participant_role === "speaker"
   );
 
-  // Map arguments for LiveArgumentMap
   const mapArgs = currentSubtopicArgs.map((a) => {
     const participant = participants.find((p) => p.id === a.participant_id);
     const side = sides.find((s) => s.id === participant?.side_id);
     return {
-      id: a.id,
-      content: a.content,
-      argumentType: a.argument_type,
-      sideLabel: side?.label || "Unknown",
-      sideOrder: side?.sort_order ?? 0,
-      participantId: a.participant_id,
-      parentArgumentId: a.parent_argument_id,
-      createdAt: a.created_at,
-      isEdited: a.is_edited,
+      id: a.id, content: a.content, argumentType: a.argument_type,
+      sideLabel: side?.label || "Unknown", sideOrder: side?.sort_order ?? 0,
+      participantId: a.participant_id, parentArgumentId: a.parent_argument_id,
+      createdAt: a.created_at, isEdited: a.is_edited,
     };
   });
 
-  // Turn queue
   const turnQueue = sides.map((side, idx) => {
     const sideIdx = sides.findIndex((s) => s.id === debate.current_speaker_side_id);
     const isActive = side.id === debate.current_speaker_side_id;
     const isNext = (sideIdx + 1) % sides.length === idx;
     return { ...side, isActive, isNext };
   });
+
+  const getSideOrder = (sideLabel: string): number => {
+    const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
+    return side?.sort_order ?? 0;
+  };
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -94,12 +91,8 @@ const FacilitatorView = ({
         <div className="border-b border-border bg-card px-6 py-5">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground font-body mb-1">
-                Current Speaker
-              </p>
-              <h2 className="text-3xl font-display font-bold text-foreground">
-                {currentSide?.label}
-              </h2>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground font-body mb-1">Current Speaker</p>
+              <h2 className="text-3xl font-display font-bold text-foreground">{currentSide?.label}</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {currentSpeakers.length} speaker{currentSpeakers.length !== 1 ? "s" : ""} · Side {(currentSide?.sort_order ?? 0) + 1}
               </p>
@@ -110,40 +103,29 @@ const FacilitatorView = ({
                 className="flex items-center gap-1.5 bg-secondary text-secondary-foreground px-3 py-2 rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors"
                 title="Open Projector Mode"
               >
-                <Monitor className="w-4 h-4" />
-                Projector
+                <Monitor className="w-4 h-4" /> Projector
               </button>
               <DebateTimer timeLeft={timeLeft} size="lg" />
             </div>
           </div>
 
-          {/* Subtopic + turn info */}
           <div className="mt-4 flex items-center gap-4">
             <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-1.5">
               <ChevronRight className="w-3.5 h-3.5 text-primary" />
-              <span className="text-sm font-display font-semibold text-primary">
-                {currentSubtopic?.title}
-              </span>
+              <span className="text-sm font-display font-semibold text-primary">{currentSubtopic?.title}</span>
             </div>
             <span className="text-xs text-muted-foreground">
-              Subtopic {(debate.current_subtopic_index ?? 0) + 1}/{subtopics.length}
-              {" · "}
-              Turn {(debate.current_turn ?? 0) + 1}/{debate.turns_per_subtopic}
+              Subtopic {(debate.current_subtopic_index ?? 0) + 1}/{subtopics.length} · Turn {(debate.current_turn ?? 0) + 1}/{debate.turns_per_subtopic}
             </span>
           </div>
 
-          {/* Turn queue */}
           <div className="mt-3 flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Queue:</span>
             {turnQueue.map((side) => (
               <span
                 key={side.id}
                 className={`text-xs px-2 py-0.5 rounded-full font-semibold transition-all ${
-                  side.isActive
-                    ? "bg-primary text-primary-foreground"
-                    : side.isNext
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted text-muted-foreground"
+                  side.isActive ? "bg-primary text-primary-foreground" : side.isNext ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
                 }`}
               >
                 {side.label}
@@ -152,7 +134,7 @@ const FacilitatorView = ({
           </div>
         </div>
 
-        {/* AI facilitator message */}
+        {/* AI message */}
         <AnimatePresence>
           {aiMessage && (
             <motion.div
@@ -174,29 +156,18 @@ const FacilitatorView = ({
           )}
         </AnimatePresence>
 
-        {/* Controls bar */}
+        {/* Controls */}
         <div className="border-b border-border bg-card/50 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button
-              onClick={onToggleTimer}
-              className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
+            <button onClick={onToggleTimer} className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
               {timerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               {timerRunning ? "Pause" : "Resume"}
             </button>
-            <button
-              onClick={onExtendTime}
-              className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Extend Time
+            <button onClick={onExtendTime} className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
+              <Plus className="w-4 h-4" /> Extend Time
             </button>
-            <button
-              onClick={onSkipTurn}
-              className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
-              <SkipForward className="w-4 h-4" />
-              Skip Turn
+            <button onClick={onSkipTurn} className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
+              <SkipForward className="w-4 h-4" /> Skip Turn
             </button>
           </div>
           <button
@@ -204,11 +175,7 @@ const FacilitatorView = ({
             disabled={aiLoading}
             className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {aiLoading ? "Processing…" : (
-              <>
-                <SkipForward className="w-4 h-4" /> Next Turn
-              </>
-            )}
+            {aiLoading ? "Processing…" : <><SkipForward className="w-4 h-4" /> Next Turn</>}
           </button>
         </div>
 
@@ -247,18 +214,18 @@ const FacilitatorView = ({
       <button
         onClick={() => setSidebarOpen((prev) => !prev)}
         className="hidden lg:flex items-center justify-center w-8 border-l border-border bg-card/50 hover:bg-accent transition-colors shrink-0"
-        aria-label={sidebarOpen ? "Collapse argument map" : "Expand argument map"}
+        aria-label={sidebarOpen ? "Collapse panel" : "Expand panel"}
       >
         {sidebarOpen ? <PanelRightClose className="w-4 h-4 text-muted-foreground" /> : <PanelRightOpen className="w-4 h-4 text-muted-foreground" />}
       </button>
 
-      {/* Right sidebar — argument map panel */}
+      {/* Right sidebar — live transcript */}
       {sidebarOpen && (
         <aside className="hidden lg:flex flex-col w-80 border-l border-border bg-card/50">
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                AI Argument Map
+                Live Transcript
               </h3>
               {deepgramConnected && (
                 <span className="flex items-center gap-1 text-[9px] text-primary font-semibold">
@@ -267,12 +234,26 @@ const FacilitatorView = ({
               )}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {aiArgumentMap.length > 0 ? (
-              <LiveArgumentMapAI entries={aiArgumentMap} sides={sides} />
-            ) : (
-              <LiveArgumentMap arguments={mapArgs} />
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {transcriptEntries.filter(e => e.is_final).length === 0 && !interimText && (
+              <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
+                <Zap className="w-3.5 h-3.5" />
+                <span className="text-[10px]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                  Waiting for speech…
+                </span>
+              </div>
             )}
+            {transcriptEntries.filter(e => e.is_final).map((entry) => (
+              <TranscriptCard
+                key={entry.id}
+                speakerSide={entry.speaker_side}
+                sideOrder={getSideOrder(entry.speaker_side)}
+                text={entry.text}
+                aiSummary={entry.ai_summary}
+                timestamp={entry.timestamp}
+                compact
+              />
+            ))}
             {interimText && (
               <div className="mt-2 text-[10px] text-muted-foreground italic font-body px-2 py-1 bg-muted/50 rounded">
                 🎙 {interimText}
