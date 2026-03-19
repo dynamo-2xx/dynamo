@@ -38,6 +38,8 @@ export function useDeepgramTranscription({
   const [argumentMap, setArgumentMap] = useState<ArgumentMapEntry[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [interimText, setInterimText] = useState("");
+  const [micError, setMicError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -89,7 +91,6 @@ export function useDeepgramTranscription({
 
         setArgumentMap((prev) => {
           const updated = [...prev, ...newEntries];
-          // Save to database
           supabase
             .from("debate_transcripts" as any)
             .upsert({
@@ -108,20 +109,35 @@ export function useDeepgramTranscription({
 
   const connect = useCallback(async () => {
     if (wsRef.current) return;
+    setMicError(null);
+    setConnectionError(null);
 
     try {
+      // Get microphone access first
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
+        });
+      } catch (err: any) {
+        const msg = err.name === "NotAllowedError"
+          ? "Microphone access denied. Please allow microphone in your browser settings for transcription and argument mapping to work."
+          : "Could not access microphone. Transcription will not function.";
+        setMicError(msg);
+        console.error("Mic permission error:", err);
+        return;
+      }
+      mediaStreamRef.current = stream;
+
       // Get Deepgram token
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke("deepgram-token");
       if (tokenError || !tokenData?.key) {
+        setConnectionError("Failed to initialize transcription service. Please try refreshing.");
         console.error("Failed to get Deepgram token:", tokenError);
+        stream.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
         return;
       }
-
-      // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
-      });
-      mediaStreamRef.current = stream;
 
       // Create WebSocket to Deepgram
       const ws = new WebSocket(
@@ -131,8 +147,8 @@ export function useDeepgramTranscription({
 
       ws.onopen = () => {
         setIsConnected(true);
+        setConnectionError(null);
 
-        // Set up audio processing
         const audioContext = new AudioContext({ sampleRate: 16000 });
         audioContextRef.current = audioContext;
         const source = audioContext.createMediaStreamSource(stream);
@@ -172,7 +188,6 @@ export function useDeepgramTranscription({
             if (data.is_final) {
               setTranscriptEntries((prev) => {
                 const updated = [...prev, { ...entry, is_final: true }];
-                // Save transcript entries to DB
                 supabase
                   .from("debate_transcripts" as any)
                   .upsert({
@@ -185,10 +200,7 @@ export function useDeepgramTranscription({
               });
               setInterimText("");
 
-              // Buffer for AI analysis
               transcriptBufferRef.current += " " + transcript;
-
-              // Debounce analysis: analyze after 3 seconds of no new finals
               clearTimeout(analyzeTimeoutRef.current);
               analyzeTimeoutRef.current = setTimeout(analyzeBuffer, 3000);
             } else {
@@ -207,16 +219,17 @@ export function useDeepgramTranscription({
       ws.onerror = (err) => {
         console.error("Deepgram WebSocket error:", err);
         setIsConnected(false);
+        setConnectionError("Transcription connection failed. Real-time transcription is unavailable.");
       };
 
       wsRef.current = ws;
     } catch (err) {
       console.error("Failed to connect to Deepgram:", err);
+      setConnectionError("Failed to start transcription. Please try refreshing.");
     }
   }, [debateId, analyzeBuffer]);
 
   const disconnect = useCallback(() => {
-    // Flush any remaining transcript buffer
     if (transcriptBufferRef.current.trim()) {
       analyzeBuffer();
     }
@@ -288,6 +301,8 @@ export function useDeepgramTranscription({
     argumentMap,
     interimText,
     isConnected,
+    micError,
+    connectionError,
     connect,
     disconnect,
   };
