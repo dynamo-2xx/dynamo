@@ -1,0 +1,1 @@
+ALTER TABLE public.debates ADD COLUMN IF NOT EXISTS turn_started_at timestamp with time zone;
