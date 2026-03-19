@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Zap, Mic, Send, SkipForward, ChevronRight, ChevronDown,
-  PanelRightOpen, PanelRightClose, Users, Columns2,
+  Zap, Mic, Send, SkipForward, ChevronDown,
+  Users, Columns2, Pause, Play, Plus, ChevronRight,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
-import MediaPermissions from "./MediaPermissions";
 import SpeechInput, { type SpeechInputHandle } from "./SpeechInput";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
@@ -46,10 +45,16 @@ interface ParticipantSharedViewProps {
   submitting: boolean;
   speechRef: RefObject<SpeechInputHandle | null>;
   currentSide: Side | undefined;
+  isPublisher?: boolean;
+  timerRunning?: boolean;
   onArgumentTextChange: (text: string) => void;
   onSetRecording: (val: boolean) => void;
   onSubmit: () => void;
   onEndTurnEarly: () => void;
+  onToggleTimer?: () => void;
+  onExtendTime?: () => void;
+  onSkipTurn?: () => void;
+  onNextSubtopic?: () => void;
 }
 
 const ParticipantSharedView = ({
@@ -57,12 +62,45 @@ const ParticipantSharedView = ({
   timeLeft, aiMessage,
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
+  isPublisher, timerRunning,
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
+  onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
-  const [cameraOn, setCameraOn] = useState(false); // local camera state
-  // We don't have remote camera state without WebRTC, so treat as off
+
+  // Camera state management — auto-request on mount
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const [localCameraOn, setLocalCameraOn] = useState(false);
+  // No WebRTC yet, so remote camera is always off
   const remoteCameraOn = false;
+
+  // Auto-request camera on mount for speakers
+  useEffect(() => {
+    if (!isSpeaker) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        localStreamRef.current = stream;
+        setLocalCameraOn(true);
+      } catch {
+        // Camera denied — main box will show chat only
+      }
+    })();
+    return () => {
+      cancelled = true;
+      localStreamRef.current?.getTracks().forEach(t => t.stop());
+    };
+  }, [isSpeaker]);
+
+  // Attach stream to video element
+  useEffect(() => {
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [localCameraOn]);
 
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const activeSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
@@ -97,14 +135,15 @@ const ParticipantSharedView = ({
       };
     });
 
-  // Determine main box content based on camera states
-  const bothOff = !cameraOn && !remoteCameraOn;
-  const bothOn = cameraOn && remoteCameraOn;
-  const onlyLocalOn = cameraOn && !remoteCameraOn;
+  // Camera logic
+  const bothOff = !localCameraOn && !remoteCameraOn;
+  const bothOn = localCameraOn && remoteCameraOn;
+  const onlyLocalOn = localCameraOn && !remoteCameraOn;
+  const onlyRemoteOn = !localCameraOn && remoteCameraOn;
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
-      {/* Top bar: Speaker + Timer */}
+      {/* Top bar */}
       <div className="border-b border-border bg-card px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div>
@@ -130,6 +169,40 @@ const ParticipantSharedView = ({
         </div>
       </div>
 
+      {/* Publisher facilitator controls */}
+      {isPublisher && (
+        <div className="border-b border-border bg-card/50 px-4 py-2 flex items-center gap-2 shrink-0">
+          <button
+            onClick={onToggleTimer}
+            className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+          >
+            {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            {timerRunning ? "Pause" : "Resume"}
+          </button>
+          <button
+            onClick={onExtendTime}
+            className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Extend
+          </button>
+          <button
+            onClick={onSkipTurn}
+            className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+          >
+            <SkipForward className="w-3.5 h-3.5" />
+            Skip Turn
+          </button>
+          <button
+            onClick={onNextSubtopic}
+            className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+            Next Subtopic
+          </button>
+        </div>
+      )}
+
       {/* AI message */}
       <AnimatePresence>
         {aiMessage && (
@@ -154,37 +227,46 @@ const ParticipantSharedView = ({
 
       {/* Main content area: main box + sidebar */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Main box — fixed size, does not grow */}
+        {/* Main box — fixed size, does not grow with content */}
         <div className={`flex flex-col overflow-hidden transition-all ${sidebarExpanded ? "w-1/2" : "flex-1"}`}>
           {bothOff && (
             <MessengerChat messages={chatMessages} />
           )}
           {bothOn && (
             <div className="flex-1 flex">
-              <div className="flex-1 bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                Side 1 Camera Feed
+              <div className="flex-1 bg-muted flex items-center justify-center relative overflow-hidden">
+                <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                <span className="absolute bottom-2 left-2 bg-background/70 text-foreground text-[10px] px-1.5 py-0.5 rounded font-body">You</span>
               </div>
               <div className="flex-1 bg-muted flex items-center justify-center text-muted-foreground text-xs border-l border-border">
-                Side 2 Camera Feed
+                Remote Camera Feed
               </div>
             </div>
           )}
           {onlyLocalOn && (
             <div className="flex-1 flex">
-              <div className="flex-1 bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                Your Camera Feed
+              <div className="flex-1 bg-muted relative overflow-hidden">
+                <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                <span className="absolute bottom-2 left-2 bg-background/70 text-foreground text-[10px] px-1.5 py-0.5 rounded font-body">You</span>
               </div>
               <div className="flex-1 flex flex-col overflow-hidden border-l border-border">
                 <MessengerChat messages={chatMessages} />
               </div>
             </div>
           )}
-          {!bothOff && !bothOn && !onlyLocalOn && (
-            <MessengerChat messages={chatMessages} />
+          {onlyRemoteOn && (
+            <div className="flex-1 flex">
+              <div className="flex-1 bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                Remote Camera Feed
+              </div>
+              <div className="flex-1 flex flex-col overflow-hidden border-l border-border">
+                <MessengerChat messages={chatMessages} />
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Sidebar */}
+        {/* Sidebar — split view button controls this only */}
         <aside className={`border-l border-border bg-card/50 flex flex-col overflow-hidden shrink-0 transition-all ${
           sidebarExpanded ? "w-1/2" : "w-72"
         }`}>
@@ -212,7 +294,7 @@ const ParticipantSharedView = ({
             </div>
           </div>
 
-          {/* Subtopics with argument dropdowns */}
+          {/* Subtopics with argument dropdowns — this is where argument history lives */}
           <div className="flex-1 overflow-y-auto p-3">
             <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 font-body">
               Subtopics & Arguments
@@ -242,13 +324,15 @@ const ParticipantSharedView = ({
                           stArgs.map((a) => (
                             <div
                               key={a.id}
-                              className={`text-[11px] rounded px-2 py-1 border-l-2 font-body ${
+                              className={`text-[11px] rounded-lg px-3 py-2 border-l-4 font-body break-words whitespace-pre-wrap ${
                                 a.sideOrder === 0
-                                  ? "border-l-[hsl(var(--side-1))] bg-[hsl(var(--side-1)/0.05)]"
-                                  : "border-l-[hsl(var(--side-2))] bg-[hsl(var(--side-2)/0.05)]"
+                                  ? "border-l-[hsl(var(--side-1))] bg-[hsl(var(--side-1)/0.08)]"
+                                  : "border-l-[hsl(var(--side-2))] bg-[hsl(var(--side-2)/0.08)]"
                               }`}
                             >
-                              <span className="font-semibold text-[10px]">{a.sideLabel}: </span>
+                              <span className={`font-semibold text-[10px] ${
+                                a.sideOrder === 0 ? "text-[hsl(var(--side-1))]" : "text-[hsl(var(--side-2))]"
+                              }`}>{a.sideLabel}: </span>
                               <span className="text-foreground">{a.content}</span>
                             </div>
                           ))
@@ -273,15 +357,6 @@ const ParticipantSharedView = ({
             </span>
           </div>
           <div className="flex items-end gap-3 max-w-3xl mx-auto">
-            {userId && (
-              <MediaPermissions
-                role="speaker"
-                isMicEnabled={micEnabled}
-                userId={userId}
-                isActivelySpeaking={isRecording}
-                variant="inline"
-              />
-            )}
             <div className="flex-1 flex items-end gap-2">
               <SpeechInput
                 ref={speechRef}

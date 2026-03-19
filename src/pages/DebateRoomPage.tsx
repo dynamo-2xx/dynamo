@@ -83,8 +83,6 @@ const DebateRoomPage = () => {
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
-  const [autoAdvancePending, setAutoAdvancePending] = useState(false);
-  const autoAdvanceRef = useRef<ReturnType<typeof setTimeout>>();
   const prevTimerRunningRef = useRef(false);
 
   // Request media permissions at session start for non-spectators
@@ -207,38 +205,15 @@ const DebateRoomPage = () => {
     return () => clearInterval(timerRef.current);
   }, [timerRunning, timeLeft]);
 
-  // Auto-advance detection: when timer stops at 0 for AI-facilitated debates (Issue 3)
+  // Auto-advance: when timer hits 0 during a live debate, advance immediately
   useEffect(() => {
     if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live") {
-      const isAiFacilitated = debate.facilitator_type === "ai" || !debate.facilitator_user_id;
-      if (isAiFacilitated && !autoAdvancePending) {
-        setAutoAdvancePending(true);
+      if (!advancingRef.current) {
+        advanceTurn();
       }
     }
     prevTimerRunningRef.current = timerRunning;
   }, [timerRunning, timeLeft, debate]);
-
-  // Auto-advance with notification (Issue 3)
-  useEffect(() => {
-    if (!autoAdvancePending) return;
-    toast.info("This turn has ended — extend it?", {
-      duration: 5000,
-      action: {
-        label: "Extend +1 min",
-        onClick: () => {
-          setAutoAdvancePending(false);
-          clearTimeout(autoAdvanceRef.current);
-          setTimeLeft((t) => t + 60);
-          setTimerRunning(true);
-        },
-      },
-    });
-    autoAdvanceRef.current = setTimeout(() => {
-      setAutoAdvancePending(false);
-      advanceTurn();
-    }, 5000);
-    return () => clearTimeout(autoAdvanceRef.current);
-  }, [autoAdvancePending]);
 
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
@@ -467,12 +442,34 @@ const DebateRoomPage = () => {
     advanceTurn();
   };
 
-  // Issue 4: End turn early
+  const handleNextSubtopic = async () => {
+    if (!debate || !id || advancingRef.current) return;
+    advancingRef.current = true;
+    try {
+      let nextSubIdx = debate.current_subtopic_index + 1;
+      if (nextSubIdx >= subtopics.length) {
+        const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+        await supabase.from("debates").update({
+          status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
+        }).eq("id", id);
+        return;
+      }
+      const turnNow = new Date().toISOString();
+      await supabase.from("debates").update({
+        current_subtopic_index: nextSubIdx, current_turn: 0,
+        current_speaker_side_id: sides[0]?.id, turn_started_at: turnNow,
+      }).eq("id", id);
+      setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
+      setTimerRunning(true);
+    } finally {
+      advancingRef.current = false;
+    }
+  };
+
+  // End turn early — available to all speakers
   const endTurnEarly = () => {
     setTimerRunning(false);
     setTimeLeft(0);
-    setAutoAdvancePending(false);
-    clearTimeout(autoAdvanceRef.current);
     advanceTurn();
   };
 
@@ -628,10 +625,16 @@ const DebateRoomPage = () => {
             submitting={submitting}
             speechRef={speechRef}
             currentSide={currentSide}
+            isPublisher={isCreator}
+            timerRunning={timerRunning}
             onArgumentTextChange={setArgumentText}
             onSetRecording={setIsRecording}
             onSubmit={submitArgument}
             onEndTurnEarly={endTurnEarly}
+            onToggleTimer={() => setTimerRunning(!timerRunning)}
+            onExtendTime={handleExtendTime}
+            onSkipTurn={handleSkipTurn}
+            onNextSubtopic={handleNextSubtopic}
           />
         )}
 
