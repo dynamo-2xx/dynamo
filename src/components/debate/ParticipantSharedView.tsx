@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, Send, SkipForward, ChevronDown,
   Users, Columns2, Pause, Play, Plus, ChevronRight,
-  Video, VideoOff,
+  Video, VideoOff, Radio,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
 import SpeechInput, { type SpeechInputHandle } from "./SpeechInput";
+import LiveArgumentMapAI from "./LiveArgumentMapAI";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
+import type { ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
 
 interface Side { id: string; label: string; sort_order: number; }
 interface Subtopic { id: string; title: string; sort_order: number; }
