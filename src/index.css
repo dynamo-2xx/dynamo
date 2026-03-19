@@ -37,6 +37,11 @@
 
     --radius: 0.5rem;
 
+    --side-1: 0 72% 51%;
+    --side-1-foreground: 0 0% 100%;
+    --side-2: 217 91% 50%;
+    --side-2-foreground: 0 0% 100%;
+
     --sidebar-background: 271 77% 12%;
     --sidebar-foreground: 38 27% 94%;
     --sidebar-primary: 38 27% 94%;
