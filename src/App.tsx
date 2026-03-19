@@ -15,6 +15,8 @@ import AuthPage from "./pages/AuthPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DebateRoomPage from "./pages/DebateRoomPage";
 import JoinDebatePage from "./pages/JoinDebatePage";
+import NotificationsPage from "./pages/NotificationsPage";
+import DebatePreviewPage from "./pages/DebatePreviewPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
