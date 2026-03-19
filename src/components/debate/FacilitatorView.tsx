@@ -35,6 +35,9 @@ interface FacilitatorViewProps {
   timerRunning: boolean;
   aiMessage: string;
   aiLoading: boolean;
+  aiArgumentMap?: ArgumentMapEntry[];
+  deepgramConnected?: boolean;
+  interimText?: string;
   onToggleTimer: () => void;
   onResetTimer: () => void;
   onExtendTime: () => void;
