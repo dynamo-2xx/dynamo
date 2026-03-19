@@ -83,19 +83,21 @@ const CreateDebatePage = () => {
   };
 
   const addInvite = () => {
-    const username = inviteInput.trim();
-    if (!username) return;
-    if (invitedUsernames.includes(username)) {
+    const value = inviteInput.trim();
+    if (!value) return;
+    if (invitedUsernames.includes(value)) {
       toast.error("Already added");
       return;
     }
-    setInvitedUsernames((prev) => [...prev, username]);
+    setInvitedUsernames((prev) => [...prev, value]);
     setInviteInput("");
   };
 
-  const removeInvite = (username: string) => {
-    setInvitedUsernames((prev) => prev.filter((u) => u !== username));
+  const removeInvite = (value: string) => {
+    setInvitedUsernames((prev) => prev.filter((u) => u !== value));
   };
+
+  const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
   const handleCreateDebate = async () => {
     if (!debate || !user) return;
