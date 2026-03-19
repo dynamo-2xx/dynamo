@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, Send, SkipForward, ChevronDown,
@@ -8,10 +8,10 @@ import {
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
 import SpeechInput, { type SpeechInputHandle } from "./SpeechInput";
-import LiveArgumentMapAI from "./LiveArgumentMapAI";
+import TranscriptCard from "./TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
-import type { ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
+import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
 
 interface Side { id: string; label: string; sort_order: number; }
 interface Subtopic { id: string; title: string; sort_order: number; }
@@ -50,7 +50,7 @@ interface ParticipantSharedViewProps {
   currentSide: Side | undefined;
   isPublisher?: boolean;
   timerRunning?: boolean;
-  aiArgumentMap?: ArgumentMapEntry[];
+  transcriptEntries?: TranscriptEntry[];
   deepgramConnected?: boolean;
   interimText?: string;
   onArgumentTextChange: (text: string) => void;
@@ -69,7 +69,7 @@ const ParticipantSharedView = ({
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
   isPublisher, timerRunning,
-  aiArgumentMap = [], deepgramConnected, interimText,
+  transcriptEntries = [], deepgramConnected, interimText,
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
   onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
 }: ParticipantSharedViewProps) => {
@@ -79,10 +79,8 @@ const ParticipantSharedView = ({
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const [localCameraOn, setLocalCameraOn] = useState(false);
-  // No WebRTC yet, so remote camera is always off
   const remoteCameraOn = false;
 
-  // Auto-request camera on mount for speakers
   useEffect(() => {
     if (!isSpeaker) return;
     let cancelled = false;
@@ -92,9 +90,7 @@ const ParticipantSharedView = ({
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         localStreamRef.current = stream;
         setLocalCameraOn(true);
-      } catch {
-        // Camera denied
-      }
+      } catch {}
     })();
     return () => {
       cancelled = true;
@@ -103,36 +99,29 @@ const ParticipantSharedView = ({
     };
   }, [isSpeaker]);
 
-  // Attach stream to video element
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
     }
   }, [localCameraOn]);
 
-  // Toggle camera on/off
   const toggleCamera = async () => {
     if (localCameraOn) {
-      // Turn off
       localStreamRef.current?.getTracks().forEach(t => t.stop());
       localStreamRef.current = null;
       setLocalCameraOn(false);
     } else {
-      // Turn on
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         localStreamRef.current = stream;
         setLocalCameraOn(true);
-      } catch {
-        // Camera denied
-      }
+      } catch {}
     }
   };
 
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const activeSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
 
-  // Build chat messages for current subtopic
   const currentSubtopicArgs = args.filter((a) => a.subtopic_id === currentSubtopic?.id);
   const chatMessages = currentSubtopicArgs.map((a) => {
     const p = participants.find((p) => p.id === a.participant_id);
@@ -147,22 +136,11 @@ const ParticipantSharedView = ({
     };
   });
 
-  // Build arguments per subtopic for sidebar
-  const argsBySubtopic = (subtopicId: string) =>
-    args.filter((a) => a.subtopic_id === subtopicId).map((a) => {
-      const p = participants.find((p) => p.id === a.participant_id);
-      const side = sides.find((s) => s.id === p?.side_id);
-      return {
-        id: a.id,
-        content: a.content,
-        sideLabel: side?.label || "Unknown",
-        sideOrder: side?.sort_order ?? 0,
-        createdAt: a.created_at,
-        isEdited: a.is_edited,
-      };
-    });
+  const getSideOrder = (sideLabel: string): number => {
+    const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
+    return side?.sort_order ?? 0;
+  };
 
-  // Camera logic
   const bothOff = !localCameraOn && !remoteCameraOn;
   const bothOn = localCameraOn && remoteCameraOn;
   const onlyLocalOn = localCameraOn && !remoteCameraOn;
@@ -212,33 +190,18 @@ const ParticipantSharedView = ({
       {/* Publisher facilitator controls */}
       {isPublisher && (
         <div className="border-b border-border bg-card/50 px-4 py-2 flex items-center gap-2 shrink-0">
-          <button
-            onClick={onToggleTimer}
-            className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-          >
+          <button onClick={onToggleTimer} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
             {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
             {timerRunning ? "Pause" : "Resume"}
           </button>
-          <button
-            onClick={onExtendTime}
-            className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Extend
+          <button onClick={onExtendTime} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Extend
           </button>
-          <button
-            onClick={onSkipTurn}
-            className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-          >
-            <SkipForward className="w-3.5 h-3.5" />
-            Skip Turn
+          <button onClick={onSkipTurn} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
+            <SkipForward className="w-3.5 h-3.5" /> Skip Turn
           </button>
-          <button
-            onClick={onNextSubtopic}
-            className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-            Next Subtopic
+          <button onClick={onNextSubtopic} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors">
+            <ChevronRight className="w-3.5 h-3.5" /> Next Subtopic
           </button>
         </div>
       )}
@@ -267,11 +230,9 @@ const ParticipantSharedView = ({
 
       {/* Main content area: main box + sidebar */}
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Main box — fixed size, does not grow with content */}
+        {/* Main box */}
         <div className={`flex flex-col overflow-hidden transition-all ${sidebarExpanded ? "w-1/2" : "flex-1"}`}>
-          {bothOff && (
-            <MessengerChat messages={chatMessages} />
-          )}
+          {bothOff && <MessengerChat messages={chatMessages} />}
           {bothOn && (
             <div className="flex-1 flex">
               <div className="flex-1 bg-muted flex items-center justify-center relative overflow-hidden">
@@ -306,7 +267,7 @@ const ParticipantSharedView = ({
           )}
         </div>
 
-        {/* Sidebar — split view button controls this only */}
+        {/* Sidebar — live transcript */}
         <aside className={`border-l border-border bg-card/50 flex flex-col overflow-hidden shrink-0 transition-all ${
           sidebarExpanded ? "w-1/2" : "w-72"
         }`}>
@@ -334,83 +295,46 @@ const ParticipantSharedView = ({
             </div>
           </div>
 
-          {/* AI Argument Map */}
-          {aiArgumentMap.length > 0 && (
-            <div className="border-b border-border p-3 shrink-0">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-body">
-                  AI Argument Map
-                </h3>
-                {deepgramConnected && (
-                  <span className="flex items-center gap-1 text-[9px] text-primary font-semibold">
-                    <Radio className="w-2.5 h-2.5 animate-pulse" /> Live
-                  </span>
-                )}
-              </div>
-              <LiveArgumentMapAI entries={aiArgumentMap} sides={sides} compact />
-              {interimText && (
-                <div className="mt-1.5 text-[10px] text-muted-foreground italic font-body px-2 py-1 bg-muted/50 rounded">
-                  🎙 {interimText}
-                </div>
+          {/* Live Transcript header */}
+          <div className="border-b border-border p-3 shrink-0">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-body">
+                Live Transcript
+              </h3>
+              {deepgramConnected && (
+                <span className="flex items-center gap-1 text-[9px] text-primary font-semibold">
+                  <Radio className="w-2.5 h-2.5 animate-pulse" /> Live
+                </span>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Subtopics with argument dropdowns — this is where argument history lives */}
-          <div className="flex-1 overflow-y-auto p-3">
-            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 font-body">
-              Subtopics & Arguments
-            </h3>
-            <div className="space-y-1">
-              {subtopics.map((st, i) => {
-                const isCurrent = i === (debate.current_subtopic_index ?? 0);
-                const stArgs = argsBySubtopic(st.id);
-                const subtopicAiEntries = aiArgumentMap.filter((e) => e.subtopic === st.title);
-                return (
-                  <Collapsible key={st.id} defaultOpen={isCurrent}>
-                    <CollapsibleTrigger className={`flex items-center gap-1.5 w-full rounded-lg px-2.5 py-1.5 text-xs font-display font-medium transition-colors text-left ${
-                      isCurrent
-                        ? "bg-primary/10 text-primary border border-primary/30"
-                        : "text-muted-foreground hover:bg-secondary/50"
-                    }`}>
-                      <ChevronDown className="w-3 h-3 shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
-                      <span className="truncate">{i + 1}. {st.title}</span>
-                      {(stArgs.length > 0 || subtopicAiEntries.length > 0) && (
-                        <span className="ml-auto text-[9px] bg-muted rounded-full px-1.5 py-0.5">
-                          {stArgs.length + subtopicAiEntries.length}
-                        </span>
-                      )}
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="pl-5 py-1 space-y-1">
-                        {subtopicAiEntries.length > 0 && (
-                          <LiveArgumentMapAI entries={subtopicAiEntries} sides={sides} compact />
-                        )}
-                        {stArgs.length === 0 && subtopicAiEntries.length === 0 ? (
-                          <p className="text-[10px] text-muted-foreground italic font-body">No arguments yet</p>
-                        ) : (
-                          stArgs.map((a) => (
-                            <div
-                              key={a.id}
-                              className={`text-[11px] rounded-lg px-3 py-2 border-l-4 font-body break-words whitespace-pre-wrap ${
-                                a.sideOrder === 0
-                                  ? "border-l-[hsl(var(--side-1))] bg-[hsl(var(--side-1)/0.08)]"
-                                  : "border-l-[hsl(var(--side-2))] bg-[hsl(var(--side-2)/0.08)]"
-                              }`}
-                            >
-                              <span className={`font-semibold text-[10px] ${
-                                a.sideOrder === 0 ? "text-[hsl(var(--side-1))]" : "text-[hsl(var(--side-2))]"
-                              }`}>{a.sideLabel}: </span>
-                              <span className="text-foreground">{a.content}</span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
-            </div>
+          {/* Transcript entries */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {transcriptEntries.filter(e => e.is_final).length === 0 && !interimText && (
+              <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
+                <Zap className="w-3.5 h-3.5" />
+                <span className="text-[10px]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                  Waiting for speech…
+                </span>
+              </div>
+            )}
+            {transcriptEntries.filter(e => e.is_final).map((entry) => (
+              <TranscriptCard
+                key={entry.id}
+                speakerSide={entry.speaker_side}
+                sideOrder={getSideOrder(entry.speaker_side)}
+                text={entry.text}
+                aiSummary={entry.ai_summary}
+                timestamp={entry.timestamp}
+                compact
+              />
+            ))}
+            {interimText && (
+              <div className="text-[10px] text-muted-foreground italic font-body px-2 py-1 bg-muted/50 rounded">
+                🎙 {interimText}
+              </div>
+            )}
           </div>
         </aside>
       </div>

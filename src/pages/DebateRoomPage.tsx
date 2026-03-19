@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight, AlertCircle
+  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,8 @@ import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
-import LiveArgumentMapAI from "@/components/debate/LiveArgumentMapAI";
+import TranscriptCard from "@/components/debate/TranscriptCard";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
@@ -92,7 +93,6 @@ const DebateRoomPage = () => {
   const currentSideForTranscript = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const {
     transcriptEntries,
-    argumentMap: aiArgumentMap,
     interimText,
     isConnected: deepgramConnected,
     micError,
@@ -652,7 +652,7 @@ const DebateRoomPage = () => {
             timerRunning={timerRunning}
             aiMessage={aiMessage}
             aiLoading={aiLoading}
-            aiArgumentMap={aiArgumentMap}
+            transcriptEntries={transcriptEntries}
             deepgramConnected={deepgramConnected}
             interimText={interimText}
             onToggleTimer={() => setTimerRunning(!timerRunning)}
@@ -684,7 +684,7 @@ const DebateRoomPage = () => {
             currentSide={currentSide}
             isPublisher={isCreator}
             timerRunning={timerRunning}
-            aiArgumentMap={aiArgumentMap}
+            transcriptEntries={transcriptEntries}
             deepgramConnected={deepgramConnected}
             interimText={interimText}
             onArgumentTextChange={setArgumentText}
@@ -720,90 +720,61 @@ const DebateRoomPage = () => {
               />
             )}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-              {/* AI Argument Map & Transcript Section */}
-              {(aiArgumentMap.length > 0 || transcriptEntries.length > 0) && (
-                <div className="mb-8 space-y-6">
-                  {aiArgumentMap.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-display font-semibold text-primary mb-3 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-                          <ChevronRight className="w-3 h-3 text-primary" />
-                        </span>
-                        AI Argument Map
-                      </h3>
-                      <div className="bg-card border border-border rounded-xl p-4">
-                        <LiveArgumentMapAI entries={aiArgumentMap} sides={sides} />
-                      </div>
-                    </div>
-                  )}
-                  {transcriptEntries.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-display font-semibold text-primary mb-3 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-                          <ChevronRight className="w-3 h-3 text-primary" />
-                        </span>
-                        Full Transcript
-                      </h3>
-                      <div className="bg-card border border-border rounded-xl p-4 max-h-96 overflow-y-auto space-y-1">
-                        {transcriptEntries.filter(e => e.is_final).map((entry, i) => (
-                          <div key={i} className="text-xs font-body">
-                            <span className="text-muted-foreground font-mono text-[10px]">
-                              {new Date(entry.timestamp).toLocaleTimeString()}
-                            </span>
-                            {" "}
-                            <span className="font-semibold text-primary">{entry.speaker_side}:</span>
-                            {" "}
-                            <span className="text-foreground">{entry.text}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {subtopics.map((st) => {
+              {subtopics.map((st, stIdx) => {
+                const stTranscripts = transcriptEntries.filter(e => e.is_final && e.subtopic === st.title);
                 const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
-                if (stArgs.length === 0) return null;
+                const hasContent = stTranscripts.length > 0 || stArgs.length > 0;
+
+                const getSideOrder = (sideLabel: string): number => {
+                  const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
+                  return side?.sort_order ?? 0;
+                };
+
                 return (
-                  <div key={st.id} className="mb-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <ChevronRight className="w-4 h-4 text-primary" />
-                      <h3 className="text-sm font-display font-semibold text-primary">{st.title}</h3>
-                    </div>
-                    <div className="space-y-2 pl-6">
-                      {stArgs.map((arg) => {
-                        const participant = participants.find((p) => p.id === arg.participant_id);
-                        const side = sides.find((s) => s.id === participant?.side_id);
-                        const isLeft = side?.sort_order === 0;
-                        const isInEditWindow = debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now();
-                        const canEditThis = isInEditWindow && participant?.user_id === user?.id;
-                        return (
-                          <EditableArgument
-                            key={arg.id}
-                            id={arg.id}
-                            content={arg.content}
-                            originalContent={arg.original_content}
-                            isEdited={arg.is_edited}
-                            argumentType={arg.argument_type}
-                            sideLabel={side?.label || "Unknown"}
-                            sideOrder={side?.sort_order ?? 0}
-                            isLeft={!!isLeft}
-                            canEdit={!!canEditThis}
-                            onUpdate={(argId, newContent) => {
-                              setArguments((prev) =>
-                                prev.map((a) =>
-                                  a.id === argId
-                                    ? { ...a, content: newContent, is_edited: true, original_content: a.original_content || a.content, edited_at: new Date().toISOString() }
-                                    : a
-                                )
-                              );
-                            }}
+                  <Collapsible key={st.id} defaultOpen={stIdx === 0}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-5 py-4 text-left hover:bg-accent/50 transition-colors">
+                      <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                      <h3 className="text-sm font-display font-semibold text-foreground flex-1">
+                        {stIdx + 1}. {st.title}
+                      </h3>
+                      {hasContent && (
+                        <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
+                          {stTranscripts.length + stArgs.length}
+                        </span>
+                      )}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="px-5 py-3 space-y-2">
+                        {/* Transcript cards */}
+                        {stTranscripts.map((entry) => (
+                          <TranscriptCard
+                            key={entry.id}
+                            speakerSide={entry.speaker_side}
+                            sideOrder={getSideOrder(entry.speaker_side)}
+                            text={entry.text}
+                            aiSummary={entry.ai_summary}
+                            timestamp={entry.timestamp}
                           />
-                        );
-                      })}
-                    </div>
-                  </div>
+                        ))}
+                        {/* Submitted arguments as transcript-style cards */}
+                        {stArgs.map((arg) => {
+                          const participant = participants.find((p) => p.id === arg.participant_id);
+                          const side = sides.find((s) => s.id === participant?.side_id);
+                          return (
+                            <TranscriptCard
+                              key={arg.id}
+                              speakerSide={side?.label || "Unknown"}
+                              sideOrder={side?.sort_order ?? 0}
+                              text={arg.content}
+                            />
+                          );
+                        })}
+                        {!hasContent && (
+                          <p className="text-xs text-muted-foreground italic font-body py-2">No statements recorded</p>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 );
               })}
               <div className="text-center py-8">

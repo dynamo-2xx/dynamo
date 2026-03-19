@@ -2,10 +2,13 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TranscriptEntry {
+  id: string;
   speaker_side: string;
   text: string;
+  subtopic: string;
   timestamp: number;
   is_final: boolean;
+  ai_summary?: string;
 }
 
 export interface ArgumentMapEntry {
@@ -45,39 +48,76 @@ export function useDeepgramTranscription({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const transcriptBufferRef = useRef("");
-  const analyzeTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const currentSideRef = useRef(currentSpeakerSide);
   const currentSubtopicRef = useRef(currentSubtopic);
   const argumentMapRef = useRef<ArgumentMapEntry[]>([]);
+
+  // Accumulate finals into a single statement until UtteranceEnd
+  const statementBufferRef = useRef("");
+  const statementSideRef = useRef(currentSpeakerSide);
+  const statementSubtopicRef = useRef(currentSubtopic);
 
   // Keep refs in sync
   useEffect(() => { currentSideRef.current = currentSpeakerSide; }, [currentSpeakerSide]);
   useEffect(() => { currentSubtopicRef.current = currentSubtopic; }, [currentSubtopic]);
   useEffect(() => { argumentMapRef.current = argumentMap; }, [argumentMap]);
 
-  const analyzeBuffer = useCallback(async () => {
-    const buffer = transcriptBufferRef.current.trim();
-    if (!buffer || buffer.length < 20) return;
+  // Flush accumulated statement buffer into a TranscriptEntry
+  const flushStatement = useCallback(() => {
+    const text = statementBufferRef.current.trim();
+    if (!text) return;
 
-    transcriptBufferRef.current = "";
+    const entry: TranscriptEntry = {
+      id: `stmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      speaker_side: statementSideRef.current,
+      text,
+      subtopic: statementSubtopicRef.current,
+      timestamp: Date.now(),
+      is_final: true,
+    };
 
+    statementBufferRef.current = "";
+
+    setTranscriptEntries((prev) => {
+      const updated = [...prev, entry];
+      supabase
+        .from("debate_transcripts" as any)
+        .upsert({
+          debate_id: debateId,
+          transcript_entries: updated,
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: "debate_id" })
+        .then(() => {});
+      return updated;
+    });
+
+    // Generate AI summary for this statement
+    generateSummary(entry.id, text);
+
+    // Also feed to argument analysis
+    analyzeChunk(text);
+  }, [debateId]);
+
+  // Generate AI summary for a single statement
+  const generateSummary = useCallback(async (entryId: string, text: string) => {
+    if (text.length < 20) return;
     try {
       const { data, error } = await supabase.functions.invoke("analyze-transcript", {
         body: {
-          transcriptChunk: buffer,
+          transcriptChunk: text,
           existingMap: argumentMapRef.current,
           sides,
           currentSubtopic: currentSubtopicRef.current,
         },
       });
 
-      if (error) {
-        console.error("Analyze transcript error:", error);
-        return;
-      }
+      if (!error && data?.entries?.length > 0) {
+        const summary = data.entries.map((e: any) => e.content).join(" ");
+        setTranscriptEntries((prev) =>
+          prev.map((e) => e.id === entryId ? { ...e, ai_summary: summary } : e)
+        );
 
-      if (data?.entries?.length > 0) {
+        // Also add to argument map
         const newEntries: ArgumentMapEntry[] = data.entries.map((e: any, i: number) => ({
           id: `${Date.now()}-${i}`,
           type: e.type,
@@ -103,9 +143,13 @@ export function useDeepgramTranscription({
         });
       }
     } catch (err) {
-      console.error("Failed to analyze transcript:", err);
+      console.error("Failed to generate summary:", err);
     }
   }, [debateId, sides]);
+
+  const analyzeChunk = useCallback(async (_text: string) => {
+    // Analysis is now handled inside generateSummary
+  }, []);
 
   const connect = useCallback(async () => {
     if (wsRef.current) return;
@@ -113,7 +157,6 @@ export function useDeepgramTranscription({
     setConnectionError(null);
 
     try {
-      // Get microphone access first
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -129,7 +172,6 @@ export function useDeepgramTranscription({
       }
       mediaStreamRef.current = stream;
 
-      // Get Deepgram token
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke("deepgram-token");
       if (tokenError || !tokenData?.key) {
         setConnectionError("Failed to initialize transcription service. Please try refreshing.");
@@ -139,9 +181,9 @@ export function useDeepgramTranscription({
         return;
       }
 
-      // Create WebSocket to Deepgram
+      // Increased endpointing (3s) and utterance_end_ms (5s) so pauses don't split statements
       const ws = new WebSocket(
-        `wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true&interim_results=true&utterance_end_ms=1000&vad_events=true&encoding=linear16&sample_rate=16000`,
+        `wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true&interim_results=true&endpointing=3000&utterance_end_ms=5000&vad_events=true&encoding=linear16&sample_rate=16000`,
         ["token", tokenData.key]
       );
 
@@ -174,35 +216,27 @@ export function useDeepgramTranscription({
         try {
           const data = JSON.parse(event.data);
 
+          // UtteranceEnd event: flush accumulated statement
+          if (data.type === "UtteranceEnd") {
+            flushStatement();
+            setInterimText("");
+            return;
+          }
+
           if (data.type === "Results" && data.channel?.alternatives?.[0]) {
             const transcript = data.channel.alternatives[0].transcript;
             if (!transcript) return;
 
-            const entry: TranscriptEntry = {
-              speaker_side: currentSideRef.current,
-              text: transcript,
-              timestamp: Date.now(),
-              is_final: data.is_final,
-            };
-
             if (data.is_final) {
-              setTranscriptEntries((prev) => {
-                const updated = [...prev, { ...entry, is_final: true }];
-                supabase
-                  .from("debate_transcripts" as any)
-                  .upsert({
-                    debate_id: debateId,
-                    transcript_entries: updated,
-                    updated_at: new Date().toISOString(),
-                  } as any, { onConflict: "debate_id" })
-                  .then(() => {});
-                return updated;
-              });
+              // If speaker side changed, flush previous statement first
+              if (statementBufferRef.current && statementSideRef.current !== currentSideRef.current) {
+                flushStatement();
+              }
+              // Accumulate into current statement — strictly attributed to the CURRENT speaker side
+              statementSideRef.current = currentSideRef.current;
+              statementSubtopicRef.current = currentSubtopicRef.current;
+              statementBufferRef.current += (statementBufferRef.current ? " " : "") + transcript;
               setInterimText("");
-
-              transcriptBufferRef.current += " " + transcript;
-              clearTimeout(analyzeTimeoutRef.current);
-              analyzeTimeoutRef.current = setTimeout(analyzeBuffer, 3000);
             } else {
               setInterimText(transcript);
             }
@@ -227,13 +261,13 @@ export function useDeepgramTranscription({
       console.error("Failed to connect to Deepgram:", err);
       setConnectionError("Failed to start transcription. Please try refreshing.");
     }
-  }, [debateId, analyzeBuffer]);
+  }, [debateId, flushStatement]);
 
   const disconnect = useCallback(() => {
-    if (transcriptBufferRef.current.trim()) {
-      analyzeBuffer();
+    // Flush any remaining statement
+    if (statementBufferRef.current.trim()) {
+      flushStatement();
     }
-    clearTimeout(analyzeTimeoutRef.current);
 
     if (wsRef.current) {
       wsRef.current.close();
@@ -247,7 +281,7 @@ export function useDeepgramTranscription({
     mediaStreamRef.current = null;
     setIsConnected(false);
     setInterimText("");
-  }, [analyzeBuffer]);
+  }, [flushStatement]);
 
   // Auto-connect/disconnect based on isActive
   useEffect(() => {
@@ -277,7 +311,7 @@ export function useDeepgramTranscription({
     loadExisting();
   }, [debateId]);
 
-  // Subscribe to realtime updates for argument map from other participants
+  // Subscribe to realtime updates
   useEffect(() => {
     const channel = supabase
       .channel(`transcript-${debateId}`)
@@ -288,6 +322,9 @@ export function useDeepgramTranscription({
           const d = payload.new as any;
           if (d?.argument_map?.length) {
             setArgumentMap(d.argument_map);
+          }
+          if (d?.transcript_entries?.length) {
+            setTranscriptEntries(d.transcript_entries);
           }
         }
       )
