@@ -178,8 +178,21 @@ const ParticipantSharedView = ({
             Turn {(debate.current_turn ?? 0) + 1}/{debate.turns_per_subtopic}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <DebateTimer timeLeft={timeLeft} size="md" />
+          {isSpeaker && (
+            <button
+              onClick={toggleCamera}
+              className={`p-2 rounded-lg transition-colors ${
+                localCameraOn
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+              title={localCameraOn ? "Turn camera off" : "Turn camera on"}
+            >
+              {localCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+            </button>
+          )}
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
             className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
