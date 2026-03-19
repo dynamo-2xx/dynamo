@@ -146,7 +146,15 @@ const DebateRoomPage = () => {
         setUserRole("spectator");
       }
 
-      setTimeLeft(parseTimeToSeconds(d.time_per_turn));
+      // Compute synced timer from turn_started_at
+      if (d.turn_started_at && d.status === "live") {
+        const elapsed = Math.floor((Date.now() - new Date(d.turn_started_at).getTime()) / 1000);
+        const remaining = Math.max(0, parseTimeToSeconds(d.time_per_turn) - elapsed);
+        setTimeLeft(remaining);
+        if (remaining > 0) setTimerRunning(true);
+      } else {
+        setTimeLeft(parseTimeToSeconds(d.time_per_turn));
+      }
       setLoading(false);
     };
     loadDebate();
