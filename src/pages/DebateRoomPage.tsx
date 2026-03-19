@@ -444,12 +444,34 @@ const DebateRoomPage = () => {
     advanceTurn();
   };
 
-  // Issue 4: End turn early
+  const handleNextSubtopic = async () => {
+    if (!debate || !id || advancingRef.current) return;
+    advancingRef.current = true;
+    try {
+      let nextSubIdx = debate.current_subtopic_index + 1;
+      if (nextSubIdx >= subtopics.length) {
+        const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+        await supabase.from("debates").update({
+          status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
+        }).eq("id", id);
+        return;
+      }
+      const turnNow = new Date().toISOString();
+      await supabase.from("debates").update({
+        current_subtopic_index: nextSubIdx, current_turn: 0,
+        current_speaker_side_id: sides[0]?.id, turn_started_at: turnNow,
+      }).eq("id", id);
+      setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
+      setTimerRunning(true);
+    } finally {
+      advancingRef.current = false;
+    }
+  };
+
+  // End turn early — available to all speakers
   const endTurnEarly = () => {
     setTimerRunning(false);
     setTimeLeft(0);
-    setAutoAdvancePending(false);
-    clearTimeout(autoAdvanceRef.current);
     advanceTurn();
   };
 
