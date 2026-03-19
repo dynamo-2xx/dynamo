@@ -652,7 +652,7 @@ const DebateRoomPage = () => {
             timerRunning={timerRunning}
             aiMessage={aiMessage}
             aiLoading={aiLoading}
-            aiArgumentMap={aiArgumentMap}
+            transcriptEntries={transcriptEntries}
             deepgramConnected={deepgramConnected}
             interimText={interimText}
             onToggleTimer={() => setTimerRunning(!timerRunning)}
