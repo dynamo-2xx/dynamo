@@ -69,6 +69,7 @@ const ParticipantSharedView = ({
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
   isPublisher, timerRunning,
+  aiArgumentMap = [], deepgramConnected, interimText,
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
   onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
 }: ParticipantSharedViewProps) => {
