@@ -13,6 +13,7 @@ import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechI
 import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
+import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
