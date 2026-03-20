@@ -8,13 +8,18 @@ interface TranscriptCardProps {
   aiSummary?: string;
   timestamp?: number;
   compact?: boolean;
+  autoFlip?: boolean;
 }
 
-const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, compact = false }: TranscriptCardProps) => {
+const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, compact = false, autoFlip = false }: TranscriptCardProps) => {
   const [expanded, setExpanded] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const [needsClamp, setNeedsClamp] = useState(false);
+  const [autoFlipped, setAutoFlipped] = useState(false);
   const textRef = useRef<HTMLParagraphElement>(null);
+  const summaryRef = useRef<HTMLParagraphElement>(null);
+  const [needsSummaryClamp, setNeedsSummaryClamp] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   useEffect(() => {
     if (textRef.current) {
@@ -22,6 +27,22 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
       setNeedsClamp(textRef.current.scrollHeight > lineHeight * 4.2);
     }
   }, [text]);
+
+  // Measure summary clamp
+  useEffect(() => {
+    if (summaryRef.current && aiSummary) {
+      const lineHeight = parseFloat(getComputedStyle(summaryRef.current).lineHeight) || 16;
+      setNeedsSummaryClamp(summaryRef.current.scrollHeight > lineHeight * 4.2);
+    }
+  }, [aiSummary, flipped]);
+
+  // Auto-flip to AI summary when it becomes available
+  useEffect(() => {
+    if (autoFlip && aiSummary && !autoFlipped) {
+      setFlipped(true);
+      setAutoFlipped(true);
+    }
+  }, [aiSummary, autoFlip, autoFlipped]);
 
   const handleDoubleClick = () => {
     if (aiSummary) setFlipped((f) => !f);
@@ -32,7 +53,7 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
 
   return (
     <div
-      className="perspective-[800px] cursor-default select-text"
+      className="cursor-default select-text"
       onDoubleClick={handleDoubleClick}
       style={{ perspective: "800px" }}
     >
@@ -89,7 +110,7 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
         {/* Back: AI summary */}
         {aiSummary && (
           <div
-            className={`rounded-lg border-l-[3px] px-3 py-2 absolute inset-0 ${compact ? "text-[11px]" : "text-xs"}`}
+            className={`rounded-lg border-l-[3px] px-3 py-2 absolute inset-0 overflow-auto ${compact ? "text-[11px]" : "text-xs"}`}
             style={{
               borderLeftColor: sideColor,
               backgroundColor: sideBg,
@@ -107,11 +128,23 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
               <span className="text-[8px] text-muted-foreground ml-auto italic">double-click for transcript</span>
             </div>
             <p
-              className="text-foreground leading-relaxed break-words whitespace-pre-wrap italic"
+              ref={summaryRef}
+              className={`text-foreground leading-relaxed break-words whitespace-pre-wrap italic ${
+                !summaryExpanded && needsSummaryClamp ? "line-clamp-4" : ""
+              }`}
               style={{ fontFamily: "'DM Sans', sans-serif" }}
             >
               {aiSummary}
             </p>
+            {needsSummaryClamp && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setSummaryExpanded(!summaryExpanded); }}
+                className="text-[10px] text-primary font-medium mt-0.5 hover:underline"
+                style={{ fontFamily: "'DM Sans', sans-serif" }}
+              >
+                {summaryExpanded ? "See less" : "See more"}
+              </button>
+            )}
           </div>
         )}
       </motion.div>

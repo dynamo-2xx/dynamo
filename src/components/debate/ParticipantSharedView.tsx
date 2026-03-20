@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, Send, SkipForward, ChevronDown,
   Users, Columns2, Pause, Play, Plus, ChevronRight,
-  Video, VideoOff, Radio,
+  Video, VideoOff,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
@@ -75,30 +75,14 @@ const ParticipantSharedView = ({
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
-  // Camera state management
+  // Camera state — independently toggleable per participant
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const [localCameraOn, setLocalCameraOn] = useState(false);
-  const remoteCameraOn = false;
+  // Remote camera would be managed via WebRTC in a real implementation
+  const [remoteCameraOn] = useState(false);
 
-  useEffect(() => {
-    if (!isSpeaker) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
-        localStreamRef.current = stream;
-        setLocalCameraOn(true);
-      } catch {}
-    })();
-    return () => {
-      cancelled = true;
-      localStreamRef.current?.getTracks().forEach(t => t.stop());
-      localStreamRef.current = null;
-    };
-  }, [isSpeaker]);
-
+  // Don't auto-start camera — it's independently toggleable
   useEffect(() => {
     if (localVideoRef.current && localStreamRef.current) {
       localVideoRef.current.srcObject = localStreamRef.current;
@@ -118,6 +102,14 @@ const ParticipantSharedView = ({
       } catch {}
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      localStreamRef.current?.getTracks().forEach(t => t.stop());
+      localStreamRef.current = null;
+    };
+  }, []);
 
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const activeSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
@@ -139,6 +131,50 @@ const ParticipantSharedView = ({
   const getSideOrder = (sideLabel: string): number => {
     const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
     return side?.sort_order ?? 0;
+  };
+
+  // Merge transcript entries + submitted arguments into unified argument map items per subtopic
+  const getSubtopicItems = (subtopic: Subtopic) => {
+    const stTranscripts = transcriptEntries.filter(e => e.is_final && e.subtopic === subtopic.title);
+    const stArgs = args.filter((a) => a.subtopic_id === subtopic.id);
+
+    // Combine into a unified list sorted by time
+    const items: Array<{
+      id: string;
+      type: "transcript" | "argument";
+      speakerSide: string;
+      sideOrder: number;
+      text: string;
+      aiSummary?: string;
+      timestamp: number;
+    }> = [];
+
+    stTranscripts.forEach(entry => {
+      items.push({
+        id: entry.id,
+        type: "transcript",
+        speakerSide: entry.speaker_side,
+        sideOrder: getSideOrder(entry.speaker_side),
+        text: entry.text,
+        aiSummary: entry.ai_summary,
+        timestamp: entry.timestamp,
+      });
+    });
+
+    stArgs.forEach(arg => {
+      const participant = participants.find(p => p.id === arg.participant_id);
+      const side = sides.find(s => s.id === participant?.side_id);
+      items.push({
+        id: `arg-${arg.id}`,
+        type: "argument",
+        speakerSide: side?.label || "Unknown",
+        sideOrder: side?.sort_order ?? 0,
+        text: arg.content,
+        timestamp: new Date(arg.created_at).getTime(),
+      });
+    });
+
+    return items.sort((a, b) => a.timestamp - b.timestamp);
   };
 
   const bothOff = !localCameraOn && !remoteCameraOn;
@@ -164,6 +200,7 @@ const ParticipantSharedView = ({
         </div>
         <div className="flex items-center gap-2">
           <DebateTimer timeLeft={timeLeft} size="md" />
+          {/* Camera toggle — always available for participants */}
           {isSpeaker && (
             <button
               onClick={toggleCamera}
@@ -230,7 +267,7 @@ const ParticipantSharedView = ({
 
       {/* Main content area: main box + sidebar */}
       <div className="flex-1 flex overflow-hidden min-h-0 min-w-0">
-        {/* Main box */}
+        {/* Main box — fixed size, camera rules */}
         <div className={`flex flex-col overflow-hidden transition-all ${sidebarExpanded ? "w-1/2" : "flex-1"}`}>
           {bothOff && <MessengerChat messages={chatMessages} />}
           {bothOn && (
@@ -267,7 +304,7 @@ const ParticipantSharedView = ({
           )}
         </div>
 
-        {/* Sidebar — live transcript */}
+        {/* Sidebar — argument map organized by subtopic dropdowns */}
         <aside className={`border-l border-border bg-card/50 flex flex-col overflow-hidden shrink-0 transition-all ${
           sidebarExpanded ? "w-1/2" : "w-72"
         }`}>
@@ -295,74 +332,83 @@ const ParticipantSharedView = ({
             </div>
           </div>
 
-          {/* Live Transcript header */}
+          {/* Argument Map header */}
           <div className="border-b border-border p-3 shrink-0">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-body">
-                Live Transcript
-              </h3>
-              {deepgramConnected && (
-                <span className="flex items-center gap-1 text-[9px] text-primary font-semibold">
-                  <Radio className="w-2.5 h-2.5 animate-pulse" /> Live
-                </span>
-              )}
-            </div>
+            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-body">
+              Argument Map
+            </h3>
           </div>
 
-          {/* Transcript entries */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {transcriptEntries.filter(e => e.is_final).length === 0 && !interimText && (
-              <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
-                <Zap className="w-3.5 h-3.5" />
-                <span className="text-[10px]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                  Waiting for speech…
-                </span>
-              </div>
-            )}
-            {transcriptEntries.filter(e => e.is_final).map((entry) => (
-              <TranscriptCard
-                key={entry.id}
-                speakerSide={entry.speaker_side}
-                sideOrder={getSideOrder(entry.speaker_side)}
-                text={entry.text}
-                aiSummary={entry.ai_summary}
-                timestamp={entry.timestamp}
-                compact
-              />
-            ))}
-            {interimText && (
-              <div className="text-[10px] text-muted-foreground italic font-body px-2 py-1 bg-muted/50 rounded">
-                🎙 {interimText}
-              </div>
-            )}
+          {/* Subtopic dropdowns with argument map cards */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {subtopics.map((st, stIdx) => {
+              const items = getSubtopicItems(st);
+              const isCurrent = stIdx === (debate.current_subtopic_index ?? 0);
+
+              return (
+                <Collapsible key={st.id} defaultOpen={isCurrent}>
+                  <CollapsibleTrigger className="flex items-center gap-1.5 w-full rounded-lg px-2.5 py-2 text-left hover:bg-accent/50 transition-colors">
+                    <ChevronDown className="w-3 h-3 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider flex-1 ${
+                      isCurrent ? "text-primary" : "text-muted-foreground"
+                    }`}>
+                      {st.title}
+                    </span>
+                    {items.length > 0 && (
+                      <span className="text-[9px] bg-muted rounded-full px-1.5 py-0.5 text-muted-foreground">
+                        {items.length}
+                      </span>
+                    )}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="pl-2 pr-1 pb-2 space-y-1.5">
+                      {items.map((item) => (
+                        <TranscriptCard
+                          key={item.id}
+                          speakerSide={item.speakerSide}
+                          sideOrder={item.sideOrder}
+                          text={item.text}
+                          aiSummary={item.aiSummary}
+                          timestamp={item.timestamp}
+                          compact
+                          autoFlip
+                        />
+                      ))}
+                      {items.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground italic font-body py-2 px-2">
+                          No statements yet
+                        </p>
+                      )}
+                      {/* Interim text for current subtopic */}
+                      {isCurrent && interimText && (
+                        <div className="text-[10px] text-muted-foreground italic font-body px-2 py-1 bg-muted/50 rounded">
+                          🎙 {interimText}
+                        </div>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </div>
         </aside>
       </div>
 
-      {/* Fixed input area at bottom */}
+      {/* Fixed input area at bottom — text input only (mic goes directly to argument map via Deepgram) */}
       {canSpeak && (
         <div className="border-t border-border bg-card px-4 py-3 shrink-0">
           <div className="flex items-center gap-2 mb-2">
             <Mic className="w-4 h-4 text-primary" />
             <span className="text-xs text-primary font-medium font-body">
-              It's your turn — speak or type your argument
+              It's your turn — speech is transcribed automatically · type below to submit text
             </span>
           </div>
           <div className="flex items-end gap-3 max-w-3xl mx-auto">
             <div className="flex-1 flex items-end gap-2">
-              <SpeechInput
-                ref={speechRef}
-                isEnabled={canSpeak}
-                onTranscript={(text) => {
-                  onArgumentTextChange(text);
-                  onSetRecording(true);
-                }}
-                onFinalTranscript={(text) => onArgumentTextChange(text)}
-              />
               <textarea
                 value={argumentText}
                 onChange={(e) => onArgumentTextChange(e.target.value)}
-                placeholder="Speak into your mic or type here…"
+                placeholder="Type your argument here…"
                 rows={2}
                 className="flex-1 bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none font-body"
                 onKeyDown={(e) => {
