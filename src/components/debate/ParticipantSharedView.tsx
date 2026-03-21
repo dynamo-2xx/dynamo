@@ -271,7 +271,7 @@ const ParticipantSharedView = ({
         <div className="w-[80%] flex flex-col min-h-0 overflow-hidden">
           {/* Both cameras off → show live thread */}
           {bothOff && (
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 flex flex-col min-h-0">
               <MessengerChat messages={chatMessages} />
             </div>
           )}
