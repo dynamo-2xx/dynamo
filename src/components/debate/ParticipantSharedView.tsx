@@ -183,7 +183,7 @@ const ParticipantSharedView = ({
   const onlyRemoteOn = !localCameraOn && remoteCameraOn;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Top bar */}
       <div className="border-b border-border bg-card px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -266,9 +266,9 @@ const ParticipantSharedView = ({
       </AnimatePresence>
 
       {/* Main content area: main box + sidebar */}
-      <div className="flex-1 flex overflow-hidden min-h-0 min-w-0">
+      <div className="flex-1 flex overflow-hidden min-h-0 w-full">
         {/* Main box — 80% width */}
-        <div className="w-[80%] flex flex-col overflow-y-auto overflow-x-hidden min-h-0 h-full">
+        <div className="w-[80%] flex flex-col overflow-y-auto overflow-x-hidden min-h-0">
           {bothOff && <MessengerChat messages={chatMessages} />}
           {bothOn && (
             <div className="flex-1 flex">
