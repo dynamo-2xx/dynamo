@@ -267,8 +267,8 @@ const ParticipantSharedView = ({
 
       {/* Main content area: main box + sidebar */}
       <div className="flex-1 flex overflow-hidden min-h-0 min-w-0">
-        {/* Main box — fixed size, camera rules */}
-        <div className={`flex flex-col overflow-hidden transition-all ${sidebarExpanded ? "w-1/2" : "flex-1"}`}>
+        {/* Main box — 80% width */}
+        <div className="w-[80%] flex flex-col overflow-y-auto overflow-x-hidden min-h-0">
           {bothOff && <MessengerChat messages={chatMessages} />}
           {bothOn && (
             <div className="flex-1 flex">
@@ -305,9 +305,7 @@ const ParticipantSharedView = ({
         </div>
 
         {/* Sidebar — argument map organized by subtopic dropdowns */}
-        <aside className={`border-l border-border bg-card/50 flex flex-col overflow-hidden shrink-0 transition-all ${
-          sidebarExpanded ? "w-1/2" : "w-72"
-        }`}>
+        <aside className="w-[20%] border-l border-border bg-card/50 flex flex-col overflow-hidden min-h-0">
           {/* Participants */}
           <div className="border-b border-border p-3 shrink-0">
             <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 font-body">
