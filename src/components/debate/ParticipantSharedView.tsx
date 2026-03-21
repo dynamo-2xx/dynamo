@@ -267,8 +267,8 @@ const ParticipantSharedView = ({
 
       {/* Main content area: main box + sidebar */}
       <div className="flex-1 flex overflow-hidden min-h-0 min-w-0">
-        {/* Main box — fixed size, camera rules */}
-        <div className={`flex flex-col overflow-hidden transition-all ${sidebarExpanded ? "w-1/2" : "flex-1"}`}>
+        {/* Main box — 80% width */}
+        <div className="w-[80%] flex flex-col overflow-y-auto overflow-x-hidden min-h-0">
           {bothOff && <MessengerChat messages={chatMessages} />}
           {bothOn && (
             <div className="flex-1 flex">
