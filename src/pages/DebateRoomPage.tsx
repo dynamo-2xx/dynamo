@@ -504,7 +504,7 @@ const DebateRoomPage = () => {
   if (!debate) return null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen w-full bg-background flex flex-col overflow-hidden">
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
