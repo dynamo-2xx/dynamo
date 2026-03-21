@@ -266,9 +266,9 @@ const ParticipantSharedView = ({
       </AnimatePresence>
 
       {/* Main content area: main box + sidebar */}
-      <div className="flex-1 flex overflow-hidden min-h-0 min-w-0">
+      <div className="flex-1 flex overflow-hidden min-h-0 w-full">
         {/* Main box — 80% width */}
-        <div className="w-[80%] flex flex-col overflow-y-auto overflow-x-hidden min-h-0 h-full">
+        <div className="w-[80%] flex flex-col overflow-y-auto overflow-x-hidden min-h-0">
           {bothOff && <MessengerChat messages={chatMessages} />}
           {bothOn && (
             <div className="flex-1 flex">
