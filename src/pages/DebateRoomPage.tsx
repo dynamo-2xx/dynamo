@@ -601,7 +601,7 @@ const DebateRoomPage = () => {
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden w-full min-w-0">
         {/* Draft views */}
         {isDraft && (
           <div className="flex-1 flex items-center justify-center">
