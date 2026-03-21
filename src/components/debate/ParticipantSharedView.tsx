@@ -336,7 +336,7 @@ const ParticipantSharedView = ({
           </div>
 
           {/* Subtopic dropdowns with argument map cards */}
-          <div className="flex-1 p-2 space-y-1 overflow-hidden">
+          <div className="flex-1 p-2 space-y-1 overflow-y-auto min-h-0">
             {subtopics.map((st, stIdx) => {
               const items = getSubtopicItems(st);
               const isCurrent = stIdx === (debate.current_subtopic_index ?? 0);
