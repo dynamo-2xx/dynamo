@@ -60,9 +60,9 @@ const MessengerChat = ({ messages }: MessengerChatProps) => {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-hidden relative"
+      className="flex-1 overflow-y-auto relative"
     >
-      <div ref={innerRef} className="absolute inset-0 flex flex-col justify-end px-4 py-3 gap-2">
+      <div ref={innerRef} className="flex flex-col justify-end min-h-full px-4 py-3 gap-2">
         <AnimatePresence initial={false}>
           {visible.map((msg) => {
             const isSide1 = msg.sideOrder === 0;
