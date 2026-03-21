@@ -268,11 +268,17 @@ const ParticipantSharedView = ({
       {/* Main content area: main box + sidebar */}
       <div className="flex-1 flex overflow-hidden min-h-0 w-full">
         {/* Main box — 80% width */}
-        <div className="w-[80%] flex flex-col overflow-y-auto overflow-x-hidden min-h-0">
-          {bothOff && <MessengerChat messages={chatMessages} />}
+        <div className="w-[80%] flex flex-col min-h-0 overflow-hidden">
+          {/* Both cameras off → show live thread */}
+          {bothOff && (
+            <div className="flex-1 overflow-y-auto">
+              <MessengerChat messages={chatMessages} />
+            </div>
+          )}
+          {/* Both cameras on → split 50/50 */}
           {bothOn && (
-            <div className="flex-1 flex">
-              <div className="flex-1 bg-muted flex items-center justify-center relative overflow-hidden">
+            <div className="flex-1 flex min-h-0">
+              <div className="flex-1 bg-muted relative overflow-hidden">
                 <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                 <span className="absolute bottom-2 left-2 bg-background/70 text-foreground text-[10px] px-1.5 py-0.5 rounded font-body">You</span>
               </div>
@@ -281,25 +287,17 @@ const ParticipantSharedView = ({
               </div>
             </div>
           )}
+          {/* Only local camera on → fullscreen local feed */}
           {onlyLocalOn && (
-            <div className="flex-1 flex">
-              <div className="flex-1 bg-muted relative overflow-hidden">
-                <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                <span className="absolute bottom-2 left-2 bg-background/70 text-foreground text-[10px] px-1.5 py-0.5 rounded font-body">You</span>
-              </div>
-              <div className="flex-1 flex flex-col overflow-hidden border-l border-border">
-                <MessengerChat messages={chatMessages} />
-              </div>
+            <div className="flex-1 bg-muted relative overflow-hidden min-h-0">
+              <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              <span className="absolute bottom-2 left-2 bg-background/70 text-foreground text-[10px] px-1.5 py-0.5 rounded font-body">You</span>
             </div>
           )}
+          {/* Only remote camera on → fullscreen remote feed */}
           {onlyRemoteOn && (
-            <div className="flex-1 flex">
-              <div className="flex-1 bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                Remote Camera Feed
-              </div>
-              <div className="flex-1 flex flex-col overflow-hidden border-l border-border">
-                <MessengerChat messages={chatMessages} />
-              </div>
+            <div className="flex-1 bg-muted flex items-center justify-center text-muted-foreground text-xs min-h-0">
+              Remote Camera Feed
             </div>
           )}
         </div>
