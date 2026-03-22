@@ -30,6 +30,27 @@ interface UseDeepgramTranscriptionProps {
   isActive: boolean;
 }
 
+const mergeTranscriptEntries = (
+  current: TranscriptEntry[],
+  incoming: TranscriptEntry[]
+): TranscriptEntry[] => {
+  const merged = new Map<string, TranscriptEntry>();
+
+  current.forEach((entry) => merged.set(entry.id, entry));
+  incoming.forEach((entry) => {
+    const existing = merged.get(entry.id);
+    merged.set(entry.id, existing
+      ? {
+          ...existing,
+          ...entry,
+          ai_summary: entry.ai_summary ?? existing.ai_summary,
+        }
+      : entry);
+  });
+
+  return Array.from(merged.values()).sort((a, b) => a.timestamp - b.timestamp);
+};
+
 export function useDeepgramTranscription({
   debateId,
   currentSpeakerSide,
@@ -62,6 +83,26 @@ export function useDeepgramTranscription({
   useEffect(() => { currentSubtopicRef.current = currentSubtopic; }, [currentSubtopic]);
   useEffect(() => { argumentMapRef.current = argumentMap; }, [argumentMap]);
 
+  const persistTranscriptEntries = useCallback((entries: TranscriptEntry[]) => {
+    return supabase
+      .from("debate_transcripts" as any)
+      .upsert({
+        debate_id: debateId,
+        transcript_entries: entries,
+        updated_at: new Date().toISOString(),
+      } as any, { onConflict: "debate_id" });
+  }, [debateId]);
+
+  const persistArgumentMap = useCallback((entries: ArgumentMapEntry[]) => {
+    return supabase
+      .from("debate_transcripts" as any)
+      .upsert({
+        debate_id: debateId,
+        argument_map: entries,
+        updated_at: new Date().toISOString(),
+      } as any, { onConflict: "debate_id" });
+  }, [debateId]);
+
   // Flush accumulated statement buffer into a TranscriptEntry
   const flushStatement = useCallback(() => {
     const text = statementBufferRef.current.trim();
@@ -80,41 +121,49 @@ export function useDeepgramTranscription({
 
     setTranscriptEntries((prev) => {
       const updated = [...prev, entry];
-      supabase
-        .from("debate_transcripts" as any)
-        .upsert({
-          debate_id: debateId,
-          transcript_entries: updated,
-          updated_at: new Date().toISOString(),
-        } as any, { onConflict: "debate_id" })
-        .then(() => {});
+      persistTranscriptEntries(updated).then(() => {});
       return updated;
     });
 
     // Generate AI summary for this statement
-    generateSummary(entry.id, text);
+    generateSummary(entry.id, text, entry.speaker_side);
 
     // Also feed to argument analysis
     analyzeChunk(text);
-  }, [debateId]);
+  }, [generateSummary, analyzeChunk, persistTranscriptEntries]);
 
   // Generate AI summary for a single statement
-  const generateSummary = useCallback(async (entryId: string, text: string) => {
-    if (text.length < 20) return;
+  const generateSummary = useCallback(async (entryId: string, text: string, speakerSide: string) => {
+    if (!text.trim()) return;
+
     try {
       const { data, error } = await supabase.functions.invoke("analyze-transcript", {
         body: {
           transcriptChunk: text,
           existingMap: argumentMapRef.current,
           sides,
+          speakerSide,
           currentSubtopic: currentSubtopicRef.current,
         },
       });
 
-      if (!error && data?.entries?.length > 0) {
-        const summary = data.entries.map((e: any) => e.content).join(" ");
+      if (!error) {
+        const summary = typeof data?.summary === "string"
+          ? data.summary.trim()
+          : data?.entries?.map((e: any) => e.content).join(" ").trim();
+
+        if (summary) {
+          setTranscriptEntries((prev) => {
+            const updated = prev.map((e) => e.id === entryId ? { ...e, ai_summary: summary } : e);
+            persistTranscriptEntries(updated).then(() => {});
+            return updated;
+          });
+        }
+
+        if (!data?.entries?.length) return;
+
         setTranscriptEntries((prev) =>
-          prev.map((e) => e.id === entryId ? { ...e, ai_summary: summary } : e)
+          prev.map((e) => e.id === entryId ? { ...e, ai_summary: summary || e.ai_summary } : e)
         );
 
         // Also add to argument map
@@ -131,21 +180,14 @@ export function useDeepgramTranscription({
 
         setArgumentMap((prev) => {
           const updated = [...prev, ...newEntries];
-          supabase
-            .from("debate_transcripts" as any)
-            .upsert({
-              debate_id: debateId,
-              argument_map: updated,
-              updated_at: new Date().toISOString(),
-            } as any, { onConflict: "debate_id" })
-            .then(() => {});
+          persistArgumentMap(updated).then(() => {});
           return updated;
         });
       }
     } catch (err) {
       console.error("Failed to generate summary:", err);
     }
-  }, [debateId, sides]);
+  }, [persistArgumentMap, persistTranscriptEntries, sides]);
 
   const analyzeChunk = useCallback(async (_text: string) => {
     // Analysis is now handled inside generateSummary
@@ -320,11 +362,11 @@ export function useDeepgramTranscription({
         { event: "*", schema: "public", table: "debate_transcripts", filter: `debate_id=eq.${debateId}` },
         (payload) => {
           const d = payload.new as any;
-          if (d?.argument_map?.length) {
+          if (Array.isArray(d?.argument_map)) {
             setArgumentMap(d.argument_map);
           }
-          if (d?.transcript_entries?.length) {
-            setTranscriptEntries(d.transcript_entries);
+          if (Array.isArray(d?.transcript_entries)) {
+            setTranscriptEntries((prev) => mergeTranscriptEntries(prev, d.transcript_entries));
           }
         }
       )
@@ -348,20 +390,13 @@ export function useDeepgramTranscription({
 
     setTranscriptEntries((prev) => {
       const updated = [...prev, entry];
-      supabase
-        .from("debate_transcripts" as any)
-        .upsert({
-          debate_id: debateId,
-          transcript_entries: updated,
-          updated_at: new Date().toISOString(),
-        } as any, { onConflict: "debate_id" })
-        .then(() => {});
+      persistTranscriptEntries(updated).then(() => {});
       return updated;
     });
 
     // Generate AI summary for this text entry
-    generateSummary(entry.id, text.trim());
-  }, [debateId, generateSummary]);
+    generateSummary(entry.id, text.trim(), side);
+  }, [generateSummary, persistTranscriptEntries]);
 
   return {
     transcriptEntries,
