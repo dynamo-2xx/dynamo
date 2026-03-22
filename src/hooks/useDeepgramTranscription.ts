@@ -333,6 +333,36 @@ export function useDeepgramTranscription({
     return () => { supabase.removeChannel(channel); };
   }, [debateId]);
 
+  // Add a text-submitted argument as a transcript entry with AI summarization
+  const addTextEntry = useCallback((text: string, side: string, subtopic: string) => {
+    if (!text.trim()) return;
+
+    const entry: TranscriptEntry = {
+      id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      speaker_side: side,
+      text: text.trim(),
+      subtopic,
+      timestamp: Date.now(),
+      is_final: true,
+    };
+
+    setTranscriptEntries((prev) => {
+      const updated = [...prev, entry];
+      supabase
+        .from("debate_transcripts" as any)
+        .upsert({
+          debate_id: debateId,
+          transcript_entries: updated,
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: "debate_id" })
+        .then(() => {});
+      return updated;
+    });
+
+    // Generate AI summary for this text entry
+    generateSummary(entry.id, text.trim());
+  }, [debateId, generateSummary]);
+
   return {
     transcriptEntries,
     argumentMap,
@@ -342,5 +372,6 @@ export function useDeepgramTranscription({
     connectionError,
     connect,
     disconnect,
+    addTextEntry,
   };
 }

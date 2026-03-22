@@ -97,6 +97,7 @@ const DebateRoomPage = () => {
     isConnected: deepgramConnected,
     micError,
     connectionError,
+    addTextEntry,
   } = useDeepgramTranscription({
     debateId: id || "",
     currentSpeakerSide: currentSideForTranscript?.label || "",
@@ -412,9 +413,12 @@ const DebateRoomPage = () => {
     if (error) {
       toast.error("Failed to submit argument");
     } else {
+      const submittedText = argumentText.trim();
       setArgumentText("");
+      // Add as transcript entry for AI summarization (same pipeline as speech)
+      addTextEntry(submittedText, currentSide?.label || "", currentSubtopic?.title || "");
       supabase.functions.invoke("ai-facilitator", {
-        body: { action: "argument_map", payload: { content: argumentText.trim(), side: currentSide?.label } },
+        body: { action: "argument_map", payload: { content: submittedText, side: currentSide?.label } },
       });
     }
     setSubmitting(false);
@@ -756,19 +760,24 @@ const DebateRoomPage = () => {
                             timestamp={entry.timestamp}
                           />
                         ))}
-                        {/* Submitted arguments as transcript-style cards */}
-                        {stArgs.map((arg) => {
-                          const participant = participants.find((p) => p.id === arg.participant_id);
-                          const side = sides.find((s) => s.id === participant?.side_id);
-                          return (
-                            <TranscriptCard
-                              key={arg.id}
-                              speakerSide={side?.label || "Unknown"}
-                              sideOrder={side?.sort_order ?? 0}
-                              text={arg.content}
-                            />
-                          );
-                        })}
+                        {/* Submitted arguments (skip those with matching transcript entries) */}
+                        {(() => {
+                          const transcriptTexts = new Set(stTranscripts.map(t => t.text.trim().toLowerCase()));
+                          return stArgs
+                            .filter(arg => !transcriptTexts.has(arg.content.trim().toLowerCase()))
+                            .map((arg) => {
+                              const participant = participants.find((p) => p.id === arg.participant_id);
+                              const side = sides.find((s) => s.id === participant?.side_id);
+                              return (
+                                <TranscriptCard
+                                  key={arg.id}
+                                  speakerSide={side?.label || "Unknown"}
+                                  sideOrder={side?.sort_order ?? 0}
+                                  text={arg.content}
+                                />
+                              );
+                            });
+                        })()}
                         {!hasContent && (
                           <p className="text-xs text-muted-foreground italic font-body py-2">No statements recorded</p>
                         )}
