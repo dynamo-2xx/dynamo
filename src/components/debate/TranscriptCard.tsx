@@ -18,8 +18,11 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
   const [autoFlipped, setAutoFlipped] = useState(false);
   const textRef = useRef<HTMLParagraphElement>(null);
   const summaryRef = useRef<HTMLParagraphElement>(null);
+  const frontRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
   const [needsSummaryClamp, setNeedsSummaryClamp] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [cardMinHeight, setCardMinHeight] = useState<number>();
 
   useEffect(() => {
     if (textRef.current) {
@@ -35,6 +38,13 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
       setNeedsSummaryClamp(summaryRef.current.scrollHeight > lineHeight * 4.2);
     }
   }, [aiSummary, flipped]);
+
+  useEffect(() => {
+    const frontHeight = frontRef.current?.offsetHeight ?? 0;
+    const backHeight = backRef.current?.offsetHeight ?? 0;
+    const nextHeight = Math.max(frontHeight, backHeight);
+    if (nextHeight > 0) setCardMinHeight(nextHeight);
+  }, [aiSummary, expanded, summaryExpanded, compact, flipped, needsClamp, needsSummaryClamp]);
 
   // Auto-flip to AI summary when it becomes available
   useEffect(() => {
@@ -55,15 +65,16 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
     <div
       className="cursor-default select-text"
       onDoubleClick={handleDoubleClick}
-      style={{ perspective: "800px" }}
+      style={{ perspective: "800px", minHeight: cardMinHeight }}
     >
       <motion.div
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
-        style={{ transformStyle: "preserve-3d", position: "relative" }}
+        style={{ transformStyle: "preserve-3d", position: "relative", minHeight: cardMinHeight }}
       >
         {/* Front: transcript */}
         <div
+          ref={frontRef}
           className={`rounded-lg border-l-[3px] px-3 py-2 ${compact ? "text-[11px]" : "text-xs"}`}
           style={{
             borderLeftColor: sideColor,
@@ -110,6 +121,7 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
         {/* Back: AI summary */}
         {aiSummary && (
           <div
+            ref={backRef}
             className={`rounded-lg border-l-[3px] px-3 py-2 absolute inset-0 overflow-auto ${compact ? "text-[11px]" : "text-xs"}`}
             style={{
               borderLeftColor: sideColor,
