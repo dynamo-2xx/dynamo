@@ -97,6 +97,7 @@ const DebateRoomPage = () => {
     isConnected: deepgramConnected,
     micError,
     connectionError,
+    addTextEntry,
   } = useDeepgramTranscription({
     debateId: id || "",
     currentSpeakerSide: currentSideForTranscript?.label || "",
