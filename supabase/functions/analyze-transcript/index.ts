@@ -13,7 +13,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { transcriptChunk, existingMap, sides, currentSubtopic } = await req.json();
+    const { transcriptChunk, existingMap, sides, currentSubtopic, speakerSide } = await req.json();
 
     const systemPrompt = `You are an AI debate analyst. Analyze the latest transcript chunk from a live debate and identify structured argument entries.
 
@@ -26,12 +26,15 @@ For each distinct argument or point made, classify it as one of:
 
 Rules:
 - Each entry must have: type, speaker_side, content (concise summary), and optionally quote (exact words), parent_id (ID of argument being countered)
+- Also produce a short overall summary of the transcript chunk for the back side of the card
 - If a speaker responds to an existing argument, thread it as a counter by referencing the parent argument's index
 - Be concise but capture the substance
-- Return entries as a JSON array using the extract_arguments tool`;
+- Preserve the provided speaker side unless the chunk clearly contains multiple speakers
+- Return the result using the extract_arguments tool`;
 
     const userPrompt = `Current subtopic: "${currentSubtopic}"
 Sides: ${sides.join(" vs ")}
+Expected speaker side: ${speakerSide || "Unknown"}
 
 Existing argument map entries (for threading counters):
 ${JSON.stringify(existingMap || [], null, 2)}
@@ -76,8 +79,12 @@ Extract all arguments, quotes, stakes, and counter-arguments from this chunk.`;
                       required: ["type", "speaker_side", "content"],
                     },
                   },
+                  summary: {
+                    type: "string",
+                    description: "A concise summary of the key arguments, quotes, or stakes in this chunk for the back side of the transcript card",
+                  },
                 },
-                required: ["entries"],
+                required: ["entries", "summary"],
                 additionalProperties: false,
               },
             },

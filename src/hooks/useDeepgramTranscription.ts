@@ -103,35 +103,6 @@ export function useDeepgramTranscription({
       } as any, { onConflict: "debate_id" });
   }, [debateId]);
 
-  // Flush accumulated statement buffer into a TranscriptEntry
-  const flushStatement = useCallback(() => {
-    const text = statementBufferRef.current.trim();
-    if (!text) return;
-
-    const entry: TranscriptEntry = {
-      id: `stmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      speaker_side: statementSideRef.current,
-      text,
-      subtopic: statementSubtopicRef.current,
-      timestamp: Date.now(),
-      is_final: true,
-    };
-
-    statementBufferRef.current = "";
-
-    setTranscriptEntries((prev) => {
-      const updated = [...prev, entry];
-      persistTranscriptEntries(updated).then(() => {});
-      return updated;
-    });
-
-    // Generate AI summary for this statement
-    generateSummary(entry.id, text, entry.speaker_side);
-
-    // Also feed to argument analysis
-    analyzeChunk(text);
-  }, [generateSummary, analyzeChunk, persistTranscriptEntries]);
-
   // Generate AI summary for a single statement
   const generateSummary = useCallback(async (entryId: string, text: string, speakerSide: string) => {
     if (!text.trim()) return;
@@ -162,10 +133,6 @@ export function useDeepgramTranscription({
 
         if (!data?.entries?.length) return;
 
-        setTranscriptEntries((prev) =>
-          prev.map((e) => e.id === entryId ? { ...e, ai_summary: summary || e.ai_summary } : e)
-        );
-
         // Also add to argument map
         const newEntries: ArgumentMapEntry[] = data.entries.map((e: any, i: number) => ({
           id: `${Date.now()}-${i}`,
@@ -192,6 +159,32 @@ export function useDeepgramTranscription({
   const analyzeChunk = useCallback(async (_text: string) => {
     // Analysis is now handled inside generateSummary
   }, []);
+
+  // Flush accumulated statement buffer into a TranscriptEntry
+  const flushStatement = useCallback(() => {
+    const text = statementBufferRef.current.trim();
+    if (!text) return;
+
+    const entry: TranscriptEntry = {
+      id: `stmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      speaker_side: statementSideRef.current,
+      text,
+      subtopic: statementSubtopicRef.current,
+      timestamp: Date.now(),
+      is_final: true,
+    };
+
+    statementBufferRef.current = "";
+
+    setTranscriptEntries((prev) => {
+      const updated = [...prev, entry];
+      persistTranscriptEntries(updated).then(() => {});
+      return updated;
+    });
+
+    generateSummary(entry.id, text, entry.speaker_side);
+    analyzeChunk(text);
+  }, [analyzeChunk, generateSummary, persistTranscriptEntries]);
 
   const connect = useCallback(async () => {
     if (wsRef.current) return;
