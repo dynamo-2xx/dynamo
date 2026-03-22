@@ -161,7 +161,11 @@ const ParticipantSharedView = ({
       });
     });
 
+    // Only add submitted arguments that DON'T already have a matching transcript entry
+    // (text submissions create both an argument row and a transcript entry for AI summarization)
+    const transcriptTexts = new Set(stTranscripts.map(t => t.text.trim().toLowerCase()));
     stArgs.forEach(arg => {
+      if (transcriptTexts.has(arg.content.trim().toLowerCase())) return; // skip duplicate
       const participant = participants.find(p => p.id === arg.participant_id);
       const side = sides.find(s => s.id === participant?.side_id);
       items.push({

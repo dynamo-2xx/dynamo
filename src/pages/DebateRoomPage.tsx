@@ -413,9 +413,12 @@ const DebateRoomPage = () => {
     if (error) {
       toast.error("Failed to submit argument");
     } else {
+      const submittedText = argumentText.trim();
       setArgumentText("");
+      // Add as transcript entry for AI summarization (same pipeline as speech)
+      addTextEntry(submittedText, currentSide?.label || "", currentSubtopic?.title || "");
       supabase.functions.invoke("ai-facilitator", {
-        body: { action: "argument_map", payload: { content: argumentText.trim(), side: currentSide?.label } },
+        body: { action: "argument_map", payload: { content: submittedText, side: currentSide?.label } },
       });
     }
     setSubmitting(false);
