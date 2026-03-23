@@ -104,7 +104,7 @@ const DebateRoomPage = () => {
     currentSpeakerSide: currentSideForTranscript?.label || "",
     currentSubtopic: currentSubtopicForTranscript?.title || "",
     sides: sides.map((s) => s.label),
-    isActive: debate?.status === "live" && userRole !== "spectator",
+    isActive: debate?.status === "live" && userRole !== "spectator" && deepgramActive,
   });
 
   // Request media permissions at session start for non-spectators
