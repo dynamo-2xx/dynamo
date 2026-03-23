@@ -206,26 +206,12 @@ const ParticipantSharedView = ({
         </div>
         <div className="flex items-center gap-2">
           <DebateTimer timeLeft={timeLeft} size="md" />
-          {/* Camera toggle — always available for participants */}
-          {isSpeaker && (
-            <button
-              onClick={toggleCamera}
-              className={`p-2 rounded-lg transition-colors ${
-                localCameraOn
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
-              title={localCameraOn ? "Turn camera off" : "Turn camera on"}
-            >
-              {localCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </button>
-          )}
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
             className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar (split view)"}
+            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
           >
-            <Columns2 className="w-4 h-4" />
+            {sidebarExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
       </div>
