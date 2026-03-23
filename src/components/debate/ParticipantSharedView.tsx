@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Zap, Mic, Send, SkipForward, ChevronDown,
-  Users, Columns2, Pause, Play, Plus, ChevronRight,
-  Video, VideoOff,
+  Zap, Mic, MicOff, Send, SkipForward, ChevronDown,
+  Users, Pause, Play, Plus, ChevronRight,
+  Video, VideoOff, Maximize2, Minimize2,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
