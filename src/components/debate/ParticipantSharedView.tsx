@@ -295,7 +295,7 @@ const ParticipantSharedView = ({
         </div>
 
         {/* Sidebar — argument map organized by subtopic dropdowns */}
-        <aside className="w-[20%] border-l border-border bg-card/50 flex flex-col min-h-0 overflow-hidden">
+        <aside className={`border-l border-border bg-card/50 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ${sidebarExpanded ? "w-[40%]" : "w-[20%]"}`}>
           {/* Participants */}
           <div className="border-b border-border p-3 shrink-0">
             <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 font-body">
