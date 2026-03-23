@@ -259,8 +259,8 @@ const ParticipantSharedView = ({
 
       {/* Main content area: main box + sidebar */}
       <div className="flex-1 flex overflow-hidden min-h-0 w-full">
-        {/* Main box — 80% width */}
-        <div className="w-[80%] flex flex-col min-h-0 overflow-hidden">
+        {/* Main box */}
+        <div className={`flex flex-col min-h-0 overflow-hidden transition-all duration-300 ${sidebarExpanded ? "w-[60%]" : "w-[80%]"}`}>
           {/* Both cameras off → show live thread */}
           {bothOff && (
             <div className="flex-1 flex flex-col min-h-0">
