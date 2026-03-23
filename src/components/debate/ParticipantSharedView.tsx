@@ -385,13 +385,34 @@ const ParticipantSharedView = ({
       {/* Fixed input area at bottom — text input only (mic goes directly to argument map via Deepgram) */}
       {canSpeak && (
         <div className="border-t border-border bg-card px-4 py-3 shrink-0">
-          <div className="flex items-center gap-2 mb-2">
-            <Mic className="w-4 h-4 text-primary" />
-            <span className="text-xs text-primary font-medium font-body">
-              It's your turn — speech is transcribed automatically · type below to submit text
-            </span>
-          </div>
           <div className="flex items-end gap-3 max-w-3xl mx-auto">
+            {/* Camera toggle */}
+            {isSpeaker && (
+              <button
+                onClick={toggleCamera}
+                className={`p-3 rounded-lg transition-colors shrink-0 ${
+                  localCameraOn
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                }`}
+                title={localCameraOn ? "Turn camera off" : "Turn camera on"}
+              >
+                {localCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+              </button>
+            )}
+            {/* Mic / Deepgram toggle */}
+            <button
+              onClick={onToggleDeepgram}
+              className={`p-3 rounded-lg transition-colors shrink-0 ${
+                deepgramActive
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90 animate-pulse"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+              title={deepgramActive ? "Stop live transcription" : "Start live transcription"}
+            >
+              {deepgramActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+            </button>
+            {/* Text input */}
             <div className="flex-1 flex items-end gap-2">
               <textarea
                 value={argumentText}
