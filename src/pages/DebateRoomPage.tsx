@@ -78,6 +78,7 @@ const DebateRoomPage = () => {
   const [argumentText, setArgumentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [deepgramActive, setDeepgramActive] = useState(false);
   const speechRef = useRef<SpeechInputHandle>(null);
 
   const [aiMessage, setAiMessage] = useState("");
