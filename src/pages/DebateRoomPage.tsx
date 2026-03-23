@@ -78,6 +78,7 @@ const DebateRoomPage = () => {
   const [argumentText, setArgumentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [deepgramActive, setDeepgramActive] = useState(false);
   const speechRef = useRef<SpeechInputHandle>(null);
 
   const [aiMessage, setAiMessage] = useState("");
@@ -103,7 +104,7 @@ const DebateRoomPage = () => {
     currentSpeakerSide: currentSideForTranscript?.label || "",
     currentSubtopic: currentSubtopicForTranscript?.title || "",
     sides: sides.map((s) => s.label),
-    isActive: debate?.status === "live" && userRole !== "spectator",
+    isActive: debate?.status === "live" && userRole !== "spectator" && deepgramActive,
   });
 
   // Request media permissions at session start for non-spectators
@@ -690,11 +691,13 @@ const DebateRoomPage = () => {
             timerRunning={timerRunning}
             transcriptEntries={transcriptEntries}
             deepgramConnected={deepgramConnected}
+            deepgramActive={deepgramActive}
             interimText={interimText}
             onArgumentTextChange={setArgumentText}
             onSetRecording={setIsRecording}
             onSubmit={submitArgument}
             onEndTurnEarly={endTurnEarly}
+            onToggleDeepgram={() => setDeepgramActive(prev => !prev)}
             onToggleTimer={() => setTimerRunning(!timerRunning)}
             onExtendTime={handleExtendTime}
             onSkipTurn={handleSkipTurn}

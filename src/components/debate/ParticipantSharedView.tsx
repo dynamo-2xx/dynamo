@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Zap, Mic, Send, SkipForward, ChevronDown,
-  Users, Columns2, Pause, Play, Plus, ChevronRight,
-  Video, VideoOff,
+  Zap, Mic, MicOff, Send, SkipForward, ChevronDown,
+  Users, Pause, Play, Plus, ChevronRight,
+  Video, VideoOff, Maximize2, Minimize2,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
@@ -52,11 +52,13 @@ interface ParticipantSharedViewProps {
   timerRunning?: boolean;
   transcriptEntries?: TranscriptEntry[];
   deepgramConnected?: boolean;
+  deepgramActive?: boolean;
   interimText?: string;
   onArgumentTextChange: (text: string) => void;
   onSetRecording: (val: boolean) => void;
   onSubmit: () => void;
   onEndTurnEarly: () => void;
+  onToggleDeepgram?: () => void;
   onToggleTimer?: () => void;
   onExtendTime?: () => void;
   onSkipTurn?: () => void;
@@ -69,9 +71,9 @@ const ParticipantSharedView = ({
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
   isPublisher, timerRunning,
-  transcriptEntries = [], deepgramConnected, interimText,
+  transcriptEntries = [], deepgramConnected, deepgramActive, interimText,
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
-  onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
+  onToggleDeepgram, onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
@@ -204,26 +206,12 @@ const ParticipantSharedView = ({
         </div>
         <div className="flex items-center gap-2">
           <DebateTimer timeLeft={timeLeft} size="md" />
-          {/* Camera toggle — always available for participants */}
-          {isSpeaker && (
-            <button
-              onClick={toggleCamera}
-              className={`p-2 rounded-lg transition-colors ${
-                localCameraOn
-                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
-              title={localCameraOn ? "Turn camera off" : "Turn camera on"}
-            >
-              {localCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </button>
-          )}
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
             className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar (split view)"}
+            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
           >
-            <Columns2 className="w-4 h-4" />
+            {sidebarExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
       </div>
@@ -271,8 +259,8 @@ const ParticipantSharedView = ({
 
       {/* Main content area: main box + sidebar */}
       <div className="flex-1 flex overflow-hidden min-h-0 w-full">
-        {/* Main box — 80% width */}
-        <div className="w-[80%] flex flex-col min-h-0 overflow-hidden">
+        {/* Main box */}
+        <div className={`flex flex-col min-h-0 overflow-hidden transition-all duration-300 ${sidebarExpanded ? "w-[60%]" : "w-[80%]"}`}>
           {/* Both cameras off → show live thread */}
           {bothOff && (
             <div className="flex-1 flex flex-col min-h-0">
@@ -307,7 +295,7 @@ const ParticipantSharedView = ({
         </div>
 
         {/* Sidebar — argument map organized by subtopic dropdowns */}
-        <aside className="w-[20%] border-l border-border bg-card/50 flex flex-col min-h-0 overflow-hidden">
+        <aside className={`border-l border-border bg-card/50 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ${sidebarExpanded ? "w-[40%]" : "w-[20%]"}`}>
           {/* Participants */}
           <div className="border-b border-border p-3 shrink-0">
             <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 font-body">
@@ -397,13 +385,34 @@ const ParticipantSharedView = ({
       {/* Fixed input area at bottom — text input only (mic goes directly to argument map via Deepgram) */}
       {canSpeak && (
         <div className="border-t border-border bg-card px-4 py-3 shrink-0">
-          <div className="flex items-center gap-2 mb-2">
-            <Mic className="w-4 h-4 text-primary" />
-            <span className="text-xs text-primary font-medium font-body">
-              It's your turn — speech is transcribed automatically · type below to submit text
-            </span>
-          </div>
           <div className="flex items-end gap-3 max-w-3xl mx-auto">
+            {/* Camera toggle */}
+            {isSpeaker && (
+              <button
+                onClick={toggleCamera}
+                className={`p-3 rounded-lg transition-colors shrink-0 ${
+                  localCameraOn
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                }`}
+                title={localCameraOn ? "Turn camera off" : "Turn camera on"}
+              >
+                {localCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+              </button>
+            )}
+            {/* Mic / Deepgram toggle */}
+            <button
+              onClick={onToggleDeepgram}
+              className={`p-3 rounded-lg transition-colors shrink-0 ${
+                deepgramActive
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90 animate-pulse"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+              title={deepgramActive ? "Stop live transcription" : "Start live transcription"}
+            >
+              {deepgramActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+            </button>
+            {/* Text input */}
             <div className="flex-1 flex items-end gap-2">
               <textarea
                 value={argumentText}
