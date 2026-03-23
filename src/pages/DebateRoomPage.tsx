@@ -691,11 +691,13 @@ const DebateRoomPage = () => {
             timerRunning={timerRunning}
             transcriptEntries={transcriptEntries}
             deepgramConnected={deepgramConnected}
+            deepgramActive={deepgramActive}
             interimText={interimText}
             onArgumentTextChange={setArgumentText}
             onSetRecording={setIsRecording}
             onSubmit={submitArgument}
             onEndTurnEarly={endTurnEarly}
+            onToggleDeepgram={() => setDeepgramActive(prev => !prev)}
             onToggleTimer={() => setTimerRunning(!timerRunning)}
             onExtendTime={handleExtendTime}
             onSkipTurn={handleSkipTurn}
