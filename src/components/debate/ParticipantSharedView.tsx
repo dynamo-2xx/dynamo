@@ -52,11 +52,13 @@ interface ParticipantSharedViewProps {
   timerRunning?: boolean;
   transcriptEntries?: TranscriptEntry[];
   deepgramConnected?: boolean;
+  deepgramActive?: boolean;
   interimText?: string;
   onArgumentTextChange: (text: string) => void;
   onSetRecording: (val: boolean) => void;
   onSubmit: () => void;
   onEndTurnEarly: () => void;
+  onToggleDeepgram?: () => void;
   onToggleTimer?: () => void;
   onExtendTime?: () => void;
   onSkipTurn?: () => void;
