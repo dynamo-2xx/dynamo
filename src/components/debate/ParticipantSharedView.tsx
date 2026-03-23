@@ -71,9 +71,9 @@ const ParticipantSharedView = ({
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
   isPublisher, timerRunning,
-  transcriptEntries = [], deepgramConnected, interimText,
+  transcriptEntries = [], deepgramConnected, deepgramActive, interimText,
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
-  onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
+  onToggleDeepgram, onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
