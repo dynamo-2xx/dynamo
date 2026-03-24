@@ -13,6 +13,8 @@ import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechI
 import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
+import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay";
+import RoundSummaryCard from "@/components/debate/RoundSummaryCard";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
