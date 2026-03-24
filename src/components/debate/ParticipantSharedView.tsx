@@ -354,6 +354,15 @@ const ParticipantSharedView = ({
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="pl-2 pr-1 pb-2 space-y-1.5">
+                      {/* Round summary pinned at top if available */}
+                      {roundSummary && !isCurrent && (
+                        <RoundSummaryCard
+                          summary={roundSummary.summary}
+                          keyArguments={roundSummary.key_arguments}
+                          subtopicTitle={st.title}
+                          compact
+                        />
+                      )}
                       {items.map((item) => (
                         <TranscriptCard
                           key={item.id}
