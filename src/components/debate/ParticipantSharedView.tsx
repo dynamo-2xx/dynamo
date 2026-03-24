@@ -64,6 +64,7 @@ interface ParticipantSharedViewProps {
   onExtendTime?: () => void;
   onSkipTurn?: () => void;
   onNextSubtopic?: () => void;
+  roundSummaries?: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>;
 }
 
 const ParticipantSharedView = ({
