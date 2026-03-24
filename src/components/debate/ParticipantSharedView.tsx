@@ -9,6 +9,7 @@ import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
 import SpeechInput, { type SpeechInputHandle } from "./SpeechInput";
 import TranscriptCard from "./TranscriptCard";
+import RoundSummaryCard from "./RoundSummaryCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
@@ -63,6 +64,7 @@ interface ParticipantSharedViewProps {
   onExtendTime?: () => void;
   onSkipTurn?: () => void;
   onNextSubtopic?: () => void;
+  roundSummaries?: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>;
 }
 
 const ParticipantSharedView = ({
@@ -74,6 +76,7 @@ const ParticipantSharedView = ({
   transcriptEntries = [], deepgramConnected, deepgramActive, interimText,
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
   onToggleDeepgram, onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
+  roundSummaries = {},
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
@@ -332,6 +335,7 @@ const ParticipantSharedView = ({
             {subtopics.map((st, stIdx) => {
               const items = getSubtopicItems(st);
               const isCurrent = stIdx === (debate.current_subtopic_index ?? 0);
+              const roundSummary = roundSummaries[st.id];
 
               return (
                 <Collapsible key={st.id} defaultOpen={isCurrent}>
@@ -350,6 +354,15 @@ const ParticipantSharedView = ({
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="pl-2 pr-1 pb-2 space-y-1.5">
+                      {/* Round summary pinned at top if available */}
+                      {roundSummary && !isCurrent && (
+                        <RoundSummaryCard
+                          summary={roundSummary.summary}
+                          keyArguments={roundSummary.key_arguments}
+                          subtopicTitle={st.title}
+                          compact
+                        />
+                      )}
                       {items.map((item) => (
                         <TranscriptCard
                           key={item.id}

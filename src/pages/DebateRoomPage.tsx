@@ -13,6 +13,8 @@ import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechI
 import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
+import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay";
+import RoundSummaryCard from "@/components/debate/RoundSummaryCard";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -88,6 +90,8 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
   const prevTimerRunningRef = useRef(false);
+  const [showCompletionOverlay, setShowCompletionOverlay] = useState(false);
+  const [roundSummaries, setRoundSummaries] = useState<Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>>({});
 
   // Deepgram transcription — activate for all non-spectators as soon as debate is live
   const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
@@ -176,6 +180,28 @@ const DebateRoomPage = () => {
         setTimeLeft(parseTimeToSeconds(d.time_per_turn));
       }
       setLoading(false);
+
+      // Load round summaries for completed or live debates
+      const { data: summariesData } = await supabase
+        .from("round_summaries")
+        .select("*")
+        .eq("debate_id", id);
+      if (summariesData) {
+        const map: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }> = {};
+        summariesData.forEach((rs: any) => {
+          map[rs.subtopic_id] = {
+            summary: rs.summary,
+            key_arguments: (rs.key_arguments as any[]) || [],
+          };
+        });
+        setRoundSummaries(map);
+      }
+
+      // Show completion overlay if debate just completed (within last 30s)
+      if (d.status === "completed" && d.ended_at) {
+        const endedAgo = Date.now() - new Date(d.ended_at).getTime();
+        if (endedAgo < 30000) setShowCompletionOverlay(true);
+      }
     };
     loadDebate();
   }, [id, user, navigate]);
@@ -351,21 +377,32 @@ const DebateRoomPage = () => {
       if (nextSideIdx === 0) nextTurn += 1;
 
       if (nextTurn >= debate.turns_per_subtopic) {
+        // Generate round summary for the completing subtopic (fire-and-forget for non-publisher)
+        const completingSubtopic = subtopics[debate.current_subtopic_index];
+        if (completingSubtopic && isCreator) {
+          generateRoundSummary(completingSubtopic.id, completingSubtopic.title);
+        }
+
         nextSubIdx += 1;
         nextTurn = 0;
         nextSideIdx = 0;
 
         if (nextSubIdx >= subtopics.length) {
+          // Persist transcripts before marking complete
+          await persistTranscripts();
+
           const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
           await supabase.from("debates").update({
             status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
           }).eq("id", id);
 
+          setShowCompletionOverlay(true);
+
           setAiLoading(true);
           try {
             const summaries = subtopics.map((st) => ({
               subtopic: st.title,
-              summary: arguments_.filter((a) => a.subtopic_id === st.id).map((a) => a.content).join(" | "),
+              summary: roundSummaries[st.id]?.summary || arguments_.filter((a) => a.subtopic_id === st.id).map((a) => a.content).join(" | "),
             }));
             await streamAI("closing_synthesis", { topic: debate.topic, roundSummaries: summaries });
           } catch {}
@@ -458,6 +495,95 @@ const DebateRoomPage = () => {
     }
   };
 
+  // Generate AI round summary for a completed subtopic
+  const generateRoundSummary = async (subtopicId: string, subtopicTitle: string) => {
+    if (!debate || !id) return;
+    try {
+      const stArgs = arguments_.filter((a) => a.subtopic_id === subtopicId);
+      if (stArgs.length === 0) return;
+
+      const argsPayload = stArgs.map((a) => {
+        const p = participants.find((p) => p.id === a.participant_id);
+        const side = sides.find((s) => s.id === p?.side_id);
+        return { side: side?.label || "Unknown", content: a.content, type: a.argument_type };
+      });
+
+      const response = await fetchWithRetry(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-facilitator`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            action: "round_summary",
+            payload: { topic: debate.topic, subtopic: subtopicTitle, arguments: argsPayload },
+          }),
+        }
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.summary) {
+        // Save to DB
+        await supabase.from("round_summaries").insert({
+          debate_id: id,
+          subtopic_id: subtopicId,
+          summary: data.summary,
+          key_arguments: data.key_arguments || [],
+        });
+        // Update local state
+        setRoundSummaries((prev) => ({
+          ...prev,
+          [subtopicId]: { summary: data.summary, key_arguments: data.key_arguments || [] },
+        }));
+      }
+    } catch (err) {
+      console.warn("Failed to generate round summary:", err);
+    }
+  };
+
+  // Persist transcript entries to debate_transcripts table
+  const persistTranscripts = async () => {
+    if (!id || transcriptEntries.length === 0) return;
+    try {
+      // Fetch existing to merge
+      const { data: existing } = await supabase
+        .from("debate_transcripts")
+        .select("*")
+        .eq("debate_id", id)
+        .single();
+
+      const serializedEntries = transcriptEntries.map((e) => ({
+        id: e.id,
+        text: e.text,
+        speaker_side: e.speaker_side,
+        subtopic: e.subtopic,
+        timestamp: e.timestamp,
+        is_final: e.is_final,
+        ai_summary: e.ai_summary,
+      }));
+
+      if (existing) {
+        // Merge: keep existing entries, add new ones by ID
+        const existingEntries = (existing.transcript_entries as any[]) || [];
+        const existingIds = new Set(existingEntries.map((e: any) => e.id));
+        const merged = [...existingEntries, ...serializedEntries.filter((e) => !existingIds.has(e.id))];
+        await supabase
+          .from("debate_transcripts")
+          .update({ transcript_entries: merged, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("debate_transcripts").insert({
+          debate_id: id,
+          transcript_entries: serializedEntries,
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to persist transcripts:", err);
+    }
+  };
+
   const handleExtendTime = () => {
     setTimeLeft((t) => t + 60);
     toast.info("Extended by 1 minute");
@@ -471,12 +597,20 @@ const DebateRoomPage = () => {
     if (!debate || !id || advancingRef.current) return;
     advancingRef.current = true;
     try {
+      // Generate round summary for completing subtopic
+      const completingSubtopic = subtopics[debate.current_subtopic_index];
+      if (completingSubtopic && isCreator) {
+        generateRoundSummary(completingSubtopic.id, completingSubtopic.title);
+      }
+
       let nextSubIdx = debate.current_subtopic_index + 1;
       if (nextSubIdx >= subtopics.length) {
+        await persistTranscripts();
         const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
         await supabase.from("debates").update({
           status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
         }).eq("id", id);
+        setShowCompletionOverlay(true);
         return;
       }
       const turnNow = new Date().toISOString();
@@ -702,6 +836,7 @@ const DebateRoomPage = () => {
             onExtendTime={handleExtendTime}
             onSkipTurn={handleSkipTurn}
             onNextSubtopic={handleNextSubtopic}
+            roundSummaries={roundSummaries}
           />
         )}
 
@@ -719,18 +854,47 @@ const DebateRoomPage = () => {
 
         {/* Completed view */}
         {isCompleted && (
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col relative">
+            {/* Completion overlay */}
+            {showCompletionOverlay && (
+              <DebateCompletionOverlay
+                topic={debate.topic}
+                subtopicCount={subtopics.length}
+                argumentCount={arguments_.length}
+                editWindowEndsAt={debate.edit_window_ends_at}
+                debateId={id!}
+                onDismiss={() => setShowCompletionOverlay(false)}
+              />
+            )}
+
             {debate.edit_window_ends_at && (
               <EditWindowBanner
                 editWindowEndsAt={debate.edit_window_ends_at}
                 isParticipant={!!myParticipant}
               />
             )}
+
+            {/* AI closing synthesis */}
+            {aiMessage && (
+              <div className="border-b border-primary/20 bg-primary/5 px-6 py-4 shrink-0">
+                <div className="flex items-start gap-3 max-w-3xl mx-auto">
+                  <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-primary mb-0.5 font-display">d. — Closing Synthesis</p>
+                    <p className="text-xs text-foreground leading-relaxed font-body">{aiMessage}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
               {subtopics.map((st, stIdx) => {
                 const stTranscripts = transcriptEntries.filter(e => e.is_final && e.subtopic === st.title);
                 const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
                 const hasContent = stTranscripts.length > 0 || stArgs.length > 0;
+                const roundSummary = roundSummaries[st.id];
 
                 const getSideOrder = (sideLabel: string): number => {
                   const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
@@ -744,6 +908,11 @@ const DebateRoomPage = () => {
                       <h3 className="text-sm font-display font-semibold text-foreground flex-1">
                         {stIdx + 1}. {st.title}
                       </h3>
+                      {roundSummary && (
+                        <span className="text-[9px] bg-primary/10 text-primary rounded-full px-2 py-0.5 font-semibold">
+                          Summarized
+                        </span>
+                      )}
                       {hasContent && (
                         <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
                           {stTranscripts.length + stArgs.length}
@@ -752,6 +921,14 @@ const DebateRoomPage = () => {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="px-5 py-3 space-y-2">
+                        {/* Round summary pinned at top */}
+                        {roundSummary && (
+                          <RoundSummaryCard
+                            summary={roundSummary.summary}
+                            keyArguments={roundSummary.key_arguments}
+                            subtopicTitle={st.title}
+                          />
+                        )}
                         {/* Transcript cards */}
                         {stTranscripts.map((entry) => (
                           <TranscriptCard
@@ -781,7 +958,7 @@ const DebateRoomPage = () => {
                               );
                             });
                         })()}
-                        {!hasContent && (
+                        {!hasContent && !roundSummary && (
                           <p className="text-xs text-muted-foreground italic font-body py-2">No statements recorded</p>
                         )}
                       </div>
