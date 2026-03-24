@@ -335,6 +335,7 @@ const ParticipantSharedView = ({
             {subtopics.map((st, stIdx) => {
               const items = getSubtopicItems(st);
               const isCurrent = stIdx === (debate.current_subtopic_index ?? 0);
+              const roundSummary = roundSummaries[st.id];
 
               return (
                 <Collapsible key={st.id} defaultOpen={isCurrent}>
