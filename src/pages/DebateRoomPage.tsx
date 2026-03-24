@@ -377,21 +377,32 @@ const DebateRoomPage = () => {
       if (nextSideIdx === 0) nextTurn += 1;
 
       if (nextTurn >= debate.turns_per_subtopic) {
+        // Generate round summary for the completing subtopic (fire-and-forget for non-publisher)
+        const completingSubtopic = subtopics[debate.current_subtopic_index];
+        if (completingSubtopic && isCreator) {
+          generateRoundSummary(completingSubtopic.id, completingSubtopic.title);
+        }
+
         nextSubIdx += 1;
         nextTurn = 0;
         nextSideIdx = 0;
 
         if (nextSubIdx >= subtopics.length) {
+          // Persist transcripts before marking complete
+          await persistTranscripts();
+
           const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
           await supabase.from("debates").update({
             status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
           }).eq("id", id);
 
+          setShowCompletionOverlay(true);
+
           setAiLoading(true);
           try {
             const summaries = subtopics.map((st) => ({
               subtopic: st.title,
-              summary: arguments_.filter((a) => a.subtopic_id === st.id).map((a) => a.content).join(" | "),
+              summary: roundSummaries[st.id]?.summary || arguments_.filter((a) => a.subtopic_id === st.id).map((a) => a.content).join(" | "),
             }));
             await streamAI("closing_synthesis", { topic: debate.topic, roundSummaries: summaries });
           } catch {}
