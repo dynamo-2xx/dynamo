@@ -9,6 +9,7 @@ import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
 import SpeechInput, { type SpeechInputHandle } from "./SpeechInput";
 import TranscriptCard from "./TranscriptCard";
+import RoundSummaryCard from "./RoundSummaryCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
