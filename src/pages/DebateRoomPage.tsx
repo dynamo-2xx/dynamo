@@ -853,18 +853,47 @@ const DebateRoomPage = () => {
 
         {/* Completed view */}
         {isCompleted && (
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col relative">
+            {/* Completion overlay */}
+            {showCompletionOverlay && (
+              <DebateCompletionOverlay
+                topic={debate.topic}
+                subtopicCount={subtopics.length}
+                argumentCount={arguments_.length}
+                editWindowEndsAt={debate.edit_window_ends_at}
+                debateId={id!}
+                onDismiss={() => setShowCompletionOverlay(false)}
+              />
+            )}
+
             {debate.edit_window_ends_at && (
               <EditWindowBanner
                 editWindowEndsAt={debate.edit_window_ends_at}
                 isParticipant={!!myParticipant}
               />
             )}
+
+            {/* AI closing synthesis */}
+            {aiMessage && (
+              <div className="border-b border-primary/20 bg-primary/5 px-6 py-4 shrink-0">
+                <div className="flex items-start gap-3 max-w-3xl mx-auto">
+                  <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-primary mb-0.5 font-display">d. — Closing Synthesis</p>
+                    <p className="text-xs text-foreground leading-relaxed font-body">{aiMessage}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
               {subtopics.map((st, stIdx) => {
                 const stTranscripts = transcriptEntries.filter(e => e.is_final && e.subtopic === st.title);
                 const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
                 const hasContent = stTranscripts.length > 0 || stArgs.length > 0;
+                const roundSummary = roundSummaries[st.id];
 
                 const getSideOrder = (sideLabel: string): number => {
                   const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
@@ -878,6 +907,11 @@ const DebateRoomPage = () => {
                       <h3 className="text-sm font-display font-semibold text-foreground flex-1">
                         {stIdx + 1}. {st.title}
                       </h3>
+                      {roundSummary && (
+                        <span className="text-[9px] bg-primary/10 text-primary rounded-full px-2 py-0.5 font-semibold">
+                          Summarized
+                        </span>
+                      )}
                       {hasContent && (
                         <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
                           {stTranscripts.length + stArgs.length}
@@ -886,6 +920,14 @@ const DebateRoomPage = () => {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="px-5 py-3 space-y-2">
+                        {/* Round summary pinned at top */}
+                        {roundSummary && (
+                          <RoundSummaryCard
+                            summary={roundSummary.summary}
+                            keyArguments={roundSummary.key_arguments}
+                            subtopicTitle={st.title}
+                          />
+                        )}
                         {/* Transcript cards */}
                         {stTranscripts.map((entry) => (
                           <TranscriptCard
@@ -915,7 +957,7 @@ const DebateRoomPage = () => {
                               );
                             });
                         })()}
-                        {!hasContent && (
+                        {!hasContent && !roundSummary && (
                           <p className="text-xs text-muted-foreground italic font-body py-2">No statements recorded</p>
                         )}
                       </div>
