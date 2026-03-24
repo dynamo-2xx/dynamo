@@ -495,6 +495,95 @@ const DebateRoomPage = () => {
     }
   };
 
+  // Generate AI round summary for a completed subtopic
+  const generateRoundSummary = async (subtopicId: string, subtopicTitle: string) => {
+    if (!debate || !id) return;
+    try {
+      const stArgs = arguments_.filter((a) => a.subtopic_id === subtopicId);
+      if (stArgs.length === 0) return;
+
+      const argsPayload = stArgs.map((a) => {
+        const p = participants.find((p) => p.id === a.participant_id);
+        const side = sides.find((s) => s.id === p?.side_id);
+        return { side: side?.label || "Unknown", content: a.content, type: a.argument_type };
+      });
+
+      const response = await fetchWithRetry(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-facilitator`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            action: "round_summary",
+            payload: { topic: debate.topic, subtopic: subtopicTitle, arguments: argsPayload },
+          }),
+        }
+      );
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.summary) {
+        // Save to DB
+        await supabase.from("round_summaries").insert({
+          debate_id: id,
+          subtopic_id: subtopicId,
+          summary: data.summary,
+          key_arguments: data.key_arguments || [],
+        });
+        // Update local state
+        setRoundSummaries((prev) => ({
+          ...prev,
+          [subtopicId]: { summary: data.summary, key_arguments: data.key_arguments || [] },
+        }));
+      }
+    } catch (err) {
+      console.warn("Failed to generate round summary:", err);
+    }
+  };
+
+  // Persist transcript entries to debate_transcripts table
+  const persistTranscripts = async () => {
+    if (!id || transcriptEntries.length === 0) return;
+    try {
+      // Fetch existing to merge
+      const { data: existing } = await supabase
+        .from("debate_transcripts")
+        .select("*")
+        .eq("debate_id", id)
+        .single();
+
+      const serializedEntries = transcriptEntries.map((e) => ({
+        id: e.id,
+        text: e.text,
+        speaker_side: e.speaker_side,
+        subtopic: e.subtopic,
+        timestamp: e.timestamp,
+        is_final: e.is_final,
+        ai_summary: e.ai_summary,
+      }));
+
+      if (existing) {
+        // Merge: keep existing entries, add new ones by ID
+        const existingEntries = (existing.transcript_entries as any[]) || [];
+        const existingIds = new Set(existingEntries.map((e: any) => e.id));
+        const merged = [...existingEntries, ...serializedEntries.filter((e) => !existingIds.has(e.id))];
+        await supabase
+          .from("debate_transcripts")
+          .update({ transcript_entries: merged, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("debate_transcripts").insert({
+          debate_id: id,
+          transcript_entries: serializedEntries,
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to persist transcripts:", err);
+    }
+  };
+
   const handleExtendTime = () => {
     setTimeLeft((t) => t + 60);
     toast.info("Extended by 1 minute");
@@ -508,12 +597,20 @@ const DebateRoomPage = () => {
     if (!debate || !id || advancingRef.current) return;
     advancingRef.current = true;
     try {
+      // Generate round summary for completing subtopic
+      const completingSubtopic = subtopics[debate.current_subtopic_index];
+      if (completingSubtopic && isCreator) {
+        generateRoundSummary(completingSubtopic.id, completingSubtopic.title);
+      }
+
       let nextSubIdx = debate.current_subtopic_index + 1;
       if (nextSubIdx >= subtopics.length) {
+        await persistTranscripts();
         const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
         await supabase.from("debates").update({
           status: "completed", ended_at: new Date().toISOString(), edit_window_ends_at: editWindowEnd,
         }).eq("id", id);
+        setShowCompletionOverlay(true);
         return;
       }
       const turnNow = new Date().toISOString();
