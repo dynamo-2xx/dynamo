@@ -836,6 +836,7 @@ const DebateRoomPage = () => {
             onExtendTime={handleExtendTime}
             onSkipTurn={handleSkipTurn}
             onNextSubtopic={handleNextSubtopic}
+            roundSummaries={roundSummaries}
           />
         )}
 
