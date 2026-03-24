@@ -180,6 +180,28 @@ const DebateRoomPage = () => {
         setTimeLeft(parseTimeToSeconds(d.time_per_turn));
       }
       setLoading(false);
+
+      // Load round summaries for completed or live debates
+      const { data: summariesData } = await supabase
+        .from("round_summaries")
+        .select("*")
+        .eq("debate_id", id);
+      if (summariesData) {
+        const map: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }> = {};
+        summariesData.forEach((rs: any) => {
+          map[rs.subtopic_id] = {
+            summary: rs.summary,
+            key_arguments: (rs.key_arguments as any[]) || [],
+          };
+        });
+        setRoundSummaries(map);
+      }
+
+      // Show completion overlay if debate just completed (within last 30s)
+      if (d.status === "completed" && d.ended_at) {
+        const endedAgo = Date.now() - new Date(d.ended_at).getTime();
+        if (endedAgo < 30000) setShowCompletionOverlay(true);
+      }
     };
     loadDebate();
   }, [id, user, navigate]);
