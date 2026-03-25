@@ -218,14 +218,14 @@ const CreateDebatePage = () => {
             <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
               <div className="text-center mb-10">
                 <h2 className="text-3xl font-display font-bold mb-3 md:text-3xl">What's on your mind?</h2>
-                <p className="text-muted-foreground">Type your topic and AI will structure the conversation.</p>
+                <p className="text-muted-foreground">Your voice. Your power.</p>
               </div>
               <div className="relative">
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="What do you want to debate?"
-                  className="w-full bg-card border border-border rounded-xl p-6 text-lg font-display text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors min-h-[140px]"
+                  placeholder="Type your topic and AI will structure the conversation."
+                  className="w-full bg-card border border-border rounded-xl p-6 font-display text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors min-h-[140px] text-base"
                   autoFocus
                 />
                 <button
