@@ -58,6 +58,15 @@ const ProfilePage = () => {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </Link>
 
+          <Link
+            to="/notifications"
+            className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-5 py-4 text-sm font-medium hover:bg-secondary transition-colors mb-6"
+          >
+            <Bell className="w-4 h-4 text-muted-foreground" />
+            <span className="flex-1">Inbox</span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+
           <button
             onClick={handleSignOut}
             className="w-full flex items-center justify-center gap-2 border border-destructive/30 text-destructive rounded-lg py-3 text-sm font-semibold hover:bg-destructive/10 transition-colors"
