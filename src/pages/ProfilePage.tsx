@@ -49,23 +49,24 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          <Link
-            to="/my-debates"
-            className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-5 py-4 text-sm font-medium hover:bg-secondary transition-colors mb-6"
-          >
-            <MessageSquare className="w-4 h-4 text-muted-foreground" />
-            <span className="flex-1">My Debates</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
-
-          <Link
-            to="/notifications"
-            className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-5 py-4 text-sm font-medium hover:bg-secondary transition-colors mb-6"
-          >
-            <Bell className="w-4 h-4 text-muted-foreground" />
-            <span className="flex-1">Inbox</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
+          <div className="bg-card border border-border rounded-xl divide-y divide-border mb-6">
+            <Link
+              to="/my-debates"
+              className="flex items-center gap-3 px-5 py-4 text-sm font-medium hover:bg-secondary transition-colors"
+            >
+              <MessageSquare className="w-4 h-4 text-muted-foreground" />
+              <span className="flex-1">My Debates</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
+            <Link
+              to="/notifications"
+              className="flex items-center gap-3 px-5 py-4 text-sm font-medium hover:bg-secondary transition-colors"
+            >
+              <Bell className="w-4 h-4 text-muted-foreground" />
+              <span className="flex-1">Inbox</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
+          </div>
 
           <button
             onClick={handleSignOut}
