@@ -17,6 +17,7 @@ interface GeneratedDebate {
 }
 
 const TAGLINES = [
+  "People to the Power!",
   "Your voice. Your power.",
   "Debate with purpose.",
   "Shape the conversation.",
