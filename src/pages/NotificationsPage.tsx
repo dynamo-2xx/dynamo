@@ -7,7 +7,7 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check, X, MessageSquare } from "lucide-react";
+import { Check, X, MessageSquare, ArrowLeft } from "lucide-react";
 
 interface Invitation {
   id: string;
@@ -168,7 +168,12 @@ const NotificationsPage = () => {
   return (
     <AppLayout>
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-display font-bold mb-6">Notifications</h1>
+        <div className="flex items-center gap-3 mb-6">
+          <Link to="/profile" className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="text-2xl font-display font-bold">Notifications</h1>
+        </div>
 
         {loading ? (
           <p className="text-muted-foreground text-sm font-body">Loading…</p>
