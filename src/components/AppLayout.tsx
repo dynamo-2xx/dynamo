@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
-import { Home, Compass, PlusCircle, User } from "lucide-react";
+import { Home, Compass, PlusCircle, User, PanelLeftClose, PanelLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
@@ -14,11 +14,17 @@ const navItems = [
 
 const AppLayout = ({ children }: {children: ReactNode;}) => {
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r border-border bg-card p-6 gap-2 fixed h-full">
+      <aside
+        className={cn(
+          "hidden md:flex flex-col border-r border-border bg-card p-6 gap-2 fixed h-full transition-all duration-300 z-30",
+          sidebarOpen ? "w-64" : "w-0 p-0 overflow-hidden border-r-0"
+        )}
+      >
         <div className="mb-8 flex items-center gap-3">
           <img src={logoSmiley} alt="d. logo" className="w-10 h-10 dark:invert" />
           <div>
@@ -34,7 +40,7 @@ const AppLayout = ({ children }: {children: ReactNode;}) => {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
                   active ?
                   "bg-primary/10 text-primary" :
                   "text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -48,18 +54,36 @@ const AppLayout = ({ children }: {children: ReactNode;}) => {
         </nav>
         <div className="flex items-center justify-between mb-2">
           <ThemeToggle />
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            title="Close sidebar"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
         </div>
         <RouterNavLink
           to="/create"
-          className="flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity">
+          className="flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity whitespace-nowrap">
           
           <PlusCircle className="w-4 h-4" />
           Start a Debate
         </RouterNavLink>
       </aside>
 
+      {/* Reopen button when sidebar is closed */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="hidden md:flex fixed top-4 left-4 z-40 p-2 rounded-lg bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          title="Open sidebar"
+        >
+          <PanelLeft className="w-5 h-5" />
+        </button>
+      )}
+
       {/* Main content */}
-      <main className="flex-1 md:ml-64 pb-20 md:pb-0">
+      <main className={cn("flex-1 pb-20 md:pb-0 transition-all duration-300", sidebarOpen ? "md:ml-64" : "md:ml-0")}>
         {children}
       </main>
 
