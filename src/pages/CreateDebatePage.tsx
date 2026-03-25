@@ -217,7 +217,7 @@ const CreateDebatePage = () => {
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
               <div className="text-center mb-10">
-                <h2 className="text-3xl md:text-4xl font-display font-bold mb-3">Start a Debate</h2>
+                <h2 className="text-3xl font-display font-bold mb-3 md:text-3xl">What would you like to talk about?</h2>
                 <p className="text-muted-foreground">Type your topic and AI will structure the conversation.</p>
               </div>
               <div className="relative">
