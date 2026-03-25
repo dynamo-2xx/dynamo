@@ -234,7 +234,7 @@ const CreateDebatePage = () => {
                   className="absolute bottom-4 right-4 flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
                 >
                   <Sparkles className="w-4 h-4" />
-                  Generate Debate
+                  Create
                 </button>
               </div>
             </motion.div>
