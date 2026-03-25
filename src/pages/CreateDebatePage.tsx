@@ -224,7 +224,7 @@ const CreateDebatePage = () => {
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Type your topic and dynamo will structure the conversation."
+                  placeholder="Type your topic and let dynamo structure the conversation."
                   className="w-full bg-card border border-border rounded-xl p-6 font-display text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors min-h-[140px] text-base"
                   autoFocus
                 />
