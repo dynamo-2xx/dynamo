@@ -8,7 +8,7 @@ import logoSmiley from "@/assets/logo-smiley.png";
 const navItems = [
 { to: "/", icon: Home, label: "Home" },
 { to: "/explore", icon: Compass, label: "Explore" },
-{ to: "/create", icon: PlusCircle, label: "Debate" },
+{ to: "/create", icon: PlusCircle, label: "Create" },
 { to: "/my-debates", icon: MessageSquare, label: "My Debates" },
 { to: "/notifications", icon: Bell, label: "Inbox" },
 { to: "/profile", icon: User, label: "Profile" }];
