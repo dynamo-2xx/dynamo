@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight } from "lucide-react";
+import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, FileEdit, ChevronRight } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
@@ -56,6 +56,14 @@ const ProfilePage = () => {
             >
               <MessageSquare className="w-4 h-4 text-muted-foreground" />
               <span className="flex-1">My Debates</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
+            <Link
+              to="/my-debates?tab=drafts"
+              className="flex items-center gap-3 px-5 py-4 text-sm font-medium hover:bg-secondary transition-colors"
+            >
+              <FileEdit className="w-4 h-4 text-muted-foreground" />
+              <span className="flex-1">My Drafts</span>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </Link>
             <Link
