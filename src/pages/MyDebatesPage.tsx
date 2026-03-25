@@ -94,9 +94,7 @@ const MyDebatesPage = () => {
             <Link to="/profile" className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h2 className="text-3xl font-display font-bold">
-              {activeTab === "drafts" ? "My Drafts" : "My Debates"}
-            </h2>
+            <h2 className="text-3xl font-display font-bold">My Agenda</h2>
           </div>
 
           {/* Tabs */}
