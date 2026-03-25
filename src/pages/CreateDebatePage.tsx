@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
@@ -15,6 +15,14 @@ interface GeneratedDebate {
   turnsPerSubtopic: number;
   timePerTurn: string;
 }
+
+const TAGLINES = [
+  "Your voice. Your power.",
+  "Debate with purpose.",
+  "Shape the conversation.",
+  "Ideas worth defending.",
+  "Speak up. Stand out.",
+];
 
 const TIME_OPTIONS = ["30s", "1 min", "2 min", "3 min", "5 min"];
 
