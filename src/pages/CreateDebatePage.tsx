@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail } from "lucide-react";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -269,9 +269,15 @@ const CreateDebatePage = () => {
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="space-y-2">
+                  <Reorder.Group
+                    axis="y"
+                    values={debate.subtopics}
+                    onReorder={(newOrder) => setDebate({ ...debate, subtopics: newOrder })}
+                    className="space-y-2"
+                  >
                     {debate.subtopics.map((st, i) => (
-                      <div key={i} className="flex items-center gap-2">
+                      <Reorder.Item key={st || `subtopic-${i}`} value={st} className="flex items-center gap-2">
+                        <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
                         <span className="text-xs text-muted-foreground w-5">{i + 1}.</span>
                         <input
                           value={st}
@@ -283,9 +289,9 @@ const CreateDebatePage = () => {
                             <X className="w-3.5 h-3.5" />
                           </button>
                         )}
-                      </div>
+                      </Reorder.Item>
                     ))}
-                  </div>
+                  </Reorder.Group>
                 </div>
 
                 {/* Sides */}
