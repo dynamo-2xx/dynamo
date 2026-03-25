@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -68,7 +69,12 @@ const MyDebatesPage = () => {
     <AppLayout>
       <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-3xl font-display font-bold mb-6">My Debates</h2>
+          <div className="flex items-center gap-3 mb-6">
+            <Link to="/profile" className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <h2 className="text-3xl font-display font-bold">My Debates</h2>
+          </div>
           {loading ? (
             <p className="text-muted-foreground text-center py-12 animate-pulse">Loading…</p>
           ) : debates.length === 0 ? (
