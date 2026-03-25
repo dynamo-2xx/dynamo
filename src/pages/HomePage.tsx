@@ -65,8 +65,8 @@ const HomePage = () => {
             <PlusCircle className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <p className="font-semibold text-sm group-hover:text-primary transition-colors">Start a new debate</p>
-            <p className="text-xs text-muted-foreground">Type a topic and let d. structure the conversation</p>
+            <p className="font-semibold text-sm group-hover:text-primary transition-colors">Create</p>
+            <p className="text-xs text-muted-foreground">Type a topic and let dynamo structure the conversation</p>
           </div>
         </Link>
 
