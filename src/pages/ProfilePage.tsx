@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { User, Shield, Globe, Lock, LogOut, MessageSquare, ChevronRight } from "lucide-react";
+import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
