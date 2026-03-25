@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
-import { User, Shield, Globe, Lock, LogOut } from "lucide-react";
+import { User, Shield, Globe, Lock, LogOut, MessageSquare, ChevronRight } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const roleLabels = { personal: "Personal", education: "Education", community: "Community" } as const;
 
@@ -48,6 +48,15 @@ const ProfilePage = () => {
               <span>Location: <span className="text-foreground font-medium">{profile?.location || "Not set"}</span></span>
             </div>
           </div>
+
+          <Link
+            to="/my-debates"
+            className="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-5 py-4 text-sm font-medium hover:bg-secondary transition-colors mb-6"
+          >
+            <MessageSquare className="w-4 h-4 text-muted-foreground" />
+            <span className="flex-1">My Debates</span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
 
           <button
             onClick={handleSignOut}
