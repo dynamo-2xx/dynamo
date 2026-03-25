@@ -36,6 +36,14 @@ const CreateDebatePage = () => {
   const [saving, setSaving] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [invitedUsernames, setInvitedUsernames] = useState<string[]>([]);
+  const [taglineIndex, setTaglineIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTaglineIndex((prev) => (prev + 1) % TAGLINES.length);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
