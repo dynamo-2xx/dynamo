@@ -234,7 +234,20 @@ const CreateDebatePage = () => {
             <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
               <div className="text-center mb-10">
                 <h2 className="text-3xl font-display font-bold mb-3 md:text-3xl">What's on your mind?</h2>
-                <p className="text-muted-foreground">Your voice. Your power.</p>
+                <div className="h-6 relative overflow-hidden">
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={taglineIndex}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.4 }}
+                      className="text-muted-foreground absolute inset-0 text-center"
+                    >
+                      {TAGLINES[taglineIndex]}
+                    </motion.p>
+                  </AnimatePresence>
+                </div>
               </div>
               <div className="relative">
                 <textarea
