@@ -251,6 +251,14 @@ const DebateRoomPage = () => {
           setPrepPhaseRole(null);
           setPrepStartedAt(null);
           setSelectedPrepDuration(null);
+          // Clear prep flags on DB
+          supabase.from("debates").update({
+            prep_phase_active: false,
+            prep_phase_started_at: null,
+            prep_duration_seconds: null,
+            prep_side1_ready: false,
+            prep_side2_ready: false,
+          } as any).eq("id", id);
           advanceTurn();
         }
       })
