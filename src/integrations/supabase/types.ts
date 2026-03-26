@@ -439,6 +439,8 @@ export type Database = {
           ended_at: string | null
           id: string
           mode: string
+          share_token: string | null
+          speaker_names: Json
           status: string
           subtopics: Json
           summaries: Json
@@ -451,6 +453,8 @@ export type Database = {
           ended_at?: string | null
           id?: string
           mode?: string
+          share_token?: string | null
+          speaker_names?: Json
           status?: string
           subtopics?: Json
           summaries?: Json
@@ -463,6 +467,8 @@ export type Database = {
           ended_at?: string | null
           id?: string
           mode?: string
+          share_token?: string | null
+          speaker_names?: Json
           status?: string
           subtopics?: Json
           summaries?: Json
