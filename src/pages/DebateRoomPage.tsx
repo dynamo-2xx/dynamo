@@ -366,9 +366,17 @@ const DebateRoomPage = () => {
     setPrepPhaseRole(null);
     setPrepStartedAt(null);
     setSelectedPrepDuration(null);
+    // Clear prep phase on DB
+    if (debate && isCreator) {
+      supabase.from("debates").update({
+        prep_phase_active: false,
+        prep_phase_started_at: null,
+        prep_duration_seconds: null,
+      } as any).eq("id", debate.id);
+    }
     // Advance the turn
     advanceTurn();
-  }, []);
+  }, [debate, isCreator]);
 
   // Fetch with retry + exponential backoff for 429s
   const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3): Promise<Response> => {
