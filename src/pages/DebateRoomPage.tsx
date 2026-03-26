@@ -44,6 +44,8 @@ interface DebateData {
   prep_phase_active: boolean;
   prep_phase_started_at: string | null;
   prep_duration_seconds: number | null;
+  prep_side1_ready: boolean;
+  prep_side2_ready: boolean;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
@@ -238,6 +240,18 @@ const DebateRoomPage = () => {
           setTimeLeft(remaining);
           if (remaining > 0) setTimerRunning(true);
           else setTimerRunning(false);
+        }
+        // Sync prep phase from other participant
+        if (updated.prep_phase_active && !prepPhaseRole) {
+          // The other side started prep — we need to enter prep too
+          enterPrepPhaseFromRealtime(updated);
+        }
+        // Both sides ready → advance
+        if (updated.prep_side1_ready && updated.prep_side2_ready && prepPhaseRole) {
+          setPrepPhaseRole(null);
+          setPrepStartedAt(null);
+          setSelectedPrepDuration(null);
+          advanceTurn();
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
