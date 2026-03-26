@@ -30,6 +30,7 @@ Rules:
 - If a speaker responds to an existing argument, thread it as a counter by referencing the parent argument's index
 - Be concise but capture the substance
 - Preserve the provided speaker side unless the chunk clearly contains multiple speakers
+- CRITICAL: If the transcript chunk contains NO substantive arguments, claims, counter-arguments, stakes, evidence, or notable quotes worth analyzing — for example greetings, filler, off-topic chatter, pleasantries, or trivial remarks — you MUST return an empty entries array and an empty string for summary. Do NOT describe the absence of content. Do NOT generate a summary that says there was nothing to summarize.
 - Return the result using the extract_arguments tool`;
 
     const userPrompt = `Current subtopic: "${currentSubtopic}"

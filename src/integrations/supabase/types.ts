@@ -337,6 +337,11 @@ export type Database = {
           is_verified: boolean
           join_code: string | null
           location: string | null
+          prep_duration_seconds: number | null
+          prep_phase_active: boolean
+          prep_phase_started_at: string | null
+          prep_time_max: string
+          prep_time_min: string
           scheduled_at: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["debate_status"]
@@ -364,6 +369,11 @@ export type Database = {
           is_verified?: boolean
           join_code?: string | null
           location?: string | null
+          prep_duration_seconds?: number | null
+          prep_phase_active?: boolean
+          prep_phase_started_at?: string | null
+          prep_time_max?: string
+          prep_time_min?: string
           scheduled_at?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["debate_status"]
@@ -391,6 +401,11 @@ export type Database = {
           is_verified?: boolean
           join_code?: string | null
           location?: string | null
+          prep_duration_seconds?: number | null
+          prep_phase_active?: boolean
+          prep_phase_started_at?: string | null
+          prep_time_max?: string
+          prep_time_min?: string
           scheduled_at?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["debate_status"]

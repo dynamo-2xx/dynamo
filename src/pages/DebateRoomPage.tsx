@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle
@@ -15,6 +15,7 @@ import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
 import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay";
 import RoundSummaryCard from "@/components/debate/RoundSummaryCard";
+import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -38,6 +39,11 @@ interface DebateData {
   ended_at: string | null;
   join_code: string | null;
   turn_started_at: string | null;
+  prep_time_min: string;
+  prep_time_max: string;
+  prep_phase_active: boolean;
+  prep_phase_started_at: string | null;
+  prep_duration_seconds: number | null;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
@@ -92,6 +98,11 @@ const DebateRoomPage = () => {
   const prevTimerRunningRef = useRef(false);
   const [showCompletionOverlay, setShowCompletionOverlay] = useState(false);
   const [roundSummaries, setRoundSummaries] = useState<Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>>({});
+  const [prepPhaseRole, setPrepPhaseRole] = useState<"incoming" | "outgoing" | null>(null);
+  const [prepStartedAt, setPrepStartedAt] = useState<number | null>(null);
+  const [selectedPrepDuration, setSelectedPrepDuration] = useState<number | null>(null);
+  const [lastTurnTranscript, setLastTurnTranscript] = useState<string>("");
+  const [lastTurnSummary, setLastTurnSummary] = useState<string>("");
 
   // Deepgram transcription — activate for all non-spectators as soon as debate is live
   const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
@@ -253,15 +264,15 @@ const DebateRoomPage = () => {
     return () => clearInterval(timerRef.current);
   }, [timerRunning, timeLeft]);
 
-  // Auto-advance: when timer hits 0 during a live debate, advance immediately
+  // Auto-advance: when timer hits 0 during a live debate, enter prep phase
   useEffect(() => {
     if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live") {
-      if (!advancingRef.current) {
-        advanceTurn();
+      if (!advancingRef.current && !prepPhaseRole) {
+        enterPrepPhase();
       }
     }
     prevTimerRunningRef.current = timerRunning;
-  }, [timerRunning, timeLeft, debate]);
+  }, [timerRunning, timeLeft, debate, prepPhaseRole]);
 
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
@@ -283,10 +294,89 @@ const DebateRoomPage = () => {
   const isCompleted = debate?.status === "completed";
   const isDraft = debate?.status === "draft";
   const isLive = debate?.status === "live";
-  const canSpeak = isSpeaker && isMyTurn && isLive;
+  const canSpeak = isSpeaker && isMyTurn && isLive && !prepPhaseRole;
   const micEnabled = canSpeak;
 
   const advancingRef = useRef(false);
+
+  // Enter preparation phase between turns
+  const enterPrepPhase = useCallback(() => {
+    if (!debate || !myParticipant) return;
+    // Determine role: if I was the speaker whose turn just ended, I'm "outgoing"
+    const wasMyTurn = activeSpeakerParticipant?.user_id === user?.id;
+
+    // Capture the last transcript/summary for the outgoing speaker to review
+    if (wasMyTurn) {
+      const myEntries = transcriptEntries
+        .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+        .sort((a, b) => b.timestamp - a.timestamp);
+      const lastEntry = myEntries[0];
+      setLastTurnTranscript(lastEntry?.text || "");
+      setLastTurnSummary(lastEntry?.ai_summary || "");
+    }
+
+    setPrepPhaseRole(wasMyTurn ? "outgoing" : "incoming");
+    setPrepStartedAt(Date.now());
+
+    // Set prep phase active on debate record
+    if (isCreator) {
+      supabase.from("debates").update({
+        prep_phase_active: true,
+        prep_phase_started_at: new Date().toISOString(),
+      } as any).eq("id", debate.id);
+    }
+  }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic, isCreator]);
+
+  const handlePrepTimeSelected = useCallback((seconds: number) => {
+    setSelectedPrepDuration(seconds);
+    if (debate && isCreator) {
+      supabase.from("debates").update({
+        prep_duration_seconds: seconds,
+      } as any).eq("id", debate.id);
+    }
+  }, [debate, isCreator]);
+
+  const handleSummaryEdited = useCallback((newSummary: string) => {
+    // Update the transcript entry's AI summary
+    const myEntries = transcriptEntries
+      .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+      .sort((a, b) => b.timestamp - a.timestamp);
+    const lastEntry = myEntries[0];
+    if (lastEntry) {
+      // The hook manages state — we update via persist
+      supabase.from("debate_transcripts" as any)
+        .select("*")
+        .eq("debate_id", debate?.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            const entries = ((data as any).transcript_entries as any[]) || [];
+            const updated = entries.map((e: any) =>
+              e.id === lastEntry.id ? { ...e, ai_summary: newSummary } : e
+            );
+            supabase.from("debate_transcripts" as any)
+              .update({ transcript_entries: updated, updated_at: new Date().toISOString() } as any)
+              .eq("id", (data as any).id);
+          }
+        });
+    }
+  }, [transcriptEntries, currentSubtopic, debate?.id]);
+
+  const handlePrepReady = useCallback(() => {
+    setPrepPhaseRole(null);
+    setPrepStartedAt(null);
+    setSelectedPrepDuration(null);
+    // Clear prep phase on DB
+    if (debate && isCreator) {
+      supabase.from("debates").update({
+        prep_phase_active: false,
+        prep_phase_started_at: null,
+        prep_duration_seconds: null,
+      } as any).eq("id", debate.id);
+    }
+    // Advance the turn
+    advanceTurn();
+  }, [debate, isCreator]);
 
   // Fetch with retry + exponential backoff for 429s
   const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3): Promise<Response> => {
@@ -629,7 +719,7 @@ const DebateRoomPage = () => {
   const endTurnEarly = () => {
     setTimerRunning(false);
     setTimeLeft(0);
-    advanceTurn();
+    enterPrepPhase();
   };
 
   if (loading) {
@@ -803,41 +893,59 @@ const DebateRoomPage = () => {
         )}
 
         {isLive && (isSpeaker || (isFacilitator && facilitatorSpeaking)) && (
-          <ParticipantSharedView
-            debate={debate}
-            sides={sides}
-            subtopics={subtopics}
-            arguments={arguments_}
-            participants={participants}
-            timeLeft={timeLeft}
-            aiMessage={aiMessage}
-            canSpeak={canSpeak}
-            isMyTurn={!!isMyTurn}
-            isSpeaker={isSpeaker}
-            userId={user?.id}
-            micEnabled={micEnabled}
-            isRecording={isRecording}
-            argumentText={argumentText}
-            submitting={submitting}
-            speechRef={speechRef}
-            currentSide={currentSide}
-            isPublisher={isCreator}
-            timerRunning={timerRunning}
-            transcriptEntries={transcriptEntries}
-            deepgramConnected={deepgramConnected}
-            deepgramActive={deepgramActive}
-            interimText={interimText}
-            onArgumentTextChange={setArgumentText}
-            onSetRecording={setIsRecording}
-            onSubmit={submitArgument}
-            onEndTurnEarly={endTurnEarly}
-            onToggleDeepgram={() => setDeepgramActive(prev => !prev)}
-            onToggleTimer={() => setTimerRunning(!timerRunning)}
-            onExtendTime={handleExtendTime}
-            onSkipTurn={handleSkipTurn}
-            onNextSubtopic={handleNextSubtopic}
-            roundSummaries={roundSummaries}
-          />
+          <div className="flex-1 flex overflow-hidden w-full min-w-0 relative">
+            <ParticipantSharedView
+              debate={debate}
+              sides={sides}
+              subtopics={subtopics}
+              arguments={arguments_}
+              participants={participants}
+              timeLeft={timeLeft}
+              aiMessage={aiMessage}
+              canSpeak={canSpeak}
+              isMyTurn={!!isMyTurn}
+              isSpeaker={isSpeaker}
+              userId={user?.id}
+              micEnabled={micEnabled}
+              isRecording={isRecording}
+              argumentText={argumentText}
+              submitting={submitting}
+              speechRef={speechRef}
+              currentSide={currentSide}
+              isPublisher={isCreator}
+              timerRunning={timerRunning}
+              transcriptEntries={transcriptEntries}
+              deepgramConnected={deepgramConnected}
+              deepgramActive={deepgramActive}
+              interimText={interimText}
+              onArgumentTextChange={setArgumentText}
+              onSetRecording={setIsRecording}
+              onSubmit={submitArgument}
+              onEndTurnEarly={endTurnEarly}
+              onToggleDeepgram={() => setDeepgramActive(prev => !prev)}
+              onToggleTimer={() => setTimerRunning(!timerRunning)}
+              onExtendTime={handleExtendTime}
+              onSkipTurn={handleSkipTurn}
+              onNextSubtopic={handleNextSubtopic}
+              roundSummaries={roundSummaries}
+            />
+            {/* Prep phase overlay */}
+            {prepPhaseRole && (
+              <PrepPhaseOverlay
+                role={prepPhaseRole}
+                prepTimeMin={parseTimeToSeconds(debate.prep_time_min || "15s")}
+                prepTimeMax={parseTimeToSeconds(debate.prep_time_max || "60s")}
+                lastTranscript={lastTurnTranscript}
+                lastAiSummary={lastTurnSummary}
+                speakerSideLabel={currentSide?.label || ""}
+                onPrepTimeSelected={handlePrepTimeSelected}
+                onSummaryEdited={handleSummaryEdited}
+                onReady={handlePrepReady}
+                prepStartedAt={prepStartedAt || undefined}
+                selectedPrepDuration={selectedPrepDuration || undefined}
+              />
+            )}
+          </div>
         )}
 
         {isLive && isSpectator && (
