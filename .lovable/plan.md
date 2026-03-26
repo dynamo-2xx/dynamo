@@ -1,93 +1,37 @@
 
 
-# Live Conversation Tool
+# Fix: Speaker Diarization Not Splitting Speakers Properly
 
-A new tool under the Create tab that records conversations, transcribes with speaker diarization, generates AI summaries on demand, and auto-identifies subtopics to organize the transcript.
+## Problem
 
-## User Specifications
+The current logic only checks the **first word's** speaker ID (`alt.words?.[0]?.speaker`) and uses that for the entire final segment. If Deepgram returns a segment where multiple speakers talk, or if the speaker label on the first word is unreliable, everything gets clumped under one speaker.
 
-- **Persistence**: Saved to database
-- **Speaker labels**: Auto-detected via Deepgram diarization (Speaker 1, Speaker 2, etc.)
-- **Summaries**: On-demand button (can be pressed multiple times); auto-generated at end if never requested
-- **Audio capture**: Both single-device (room mic) and multi-device (each on their own device)
-- **Subtopics**: AI identifies and generates subtopics from the conversation; transcript entries are visually grouped under subtopic headers in the UI (like the debate sidebar)
+Additionally, the statement buffer only flushes on speaker change or `UtteranceEnd` — with a 5-second `utterance_end_ms`, long stretches of multi-speaker audio get accumulated into one entry.
 
-## Database
+## Solution
 
-### New table: `live_sessions`
+Two changes in `src/hooks/useLiveTranscription.ts`:
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| created_by | uuid | references auth.users |
-| title | text | nullable |
-| mode | text | 'single_device' or 'multi_device' |
-| status | text | 'recording' or 'ended' |
-| transcript_entries | jsonb | entries with `speaker_id` + `subtopic` fields |
-| summaries | jsonb | array of summaries generated at different points |
-| subtopics | jsonb | array of AI-identified subtopic labels |
-| created_at | timestamptz | |
-| ended_at | timestamptz | nullable |
+### 1. Split final segments by speaker within the word array
 
-RLS: creator can CRUD their own sessions.
+Instead of assigning one speaker per final segment, iterate through `alt.words` and split the transcript whenever the `speaker` field changes mid-segment. This creates separate transcript entries for each speaker within a single Deepgram result.
+
+```text
+Before: "Hello how are you I'm fine thanks" → one entry, Speaker 1
+After:  "Hello how are you" → Speaker 1, "I'm fine thanks" → Speaker 2
+```
+
+### 2. Reduce endpointing and utterance end timing
+
+Lower `endpointing` from 3000ms to 1000ms and `utterance_end_ms` from 5000ms to 2000ms. This forces Deepgram to finalize segments more frequently, giving diarization more granular data to work with and reducing the window for speaker clumping.
+
+### 3. Use `multichannel=true` for multi-device mode (future)
+
+For multi-device sessions where each participant has their own mic, each audio stream could be sent on a separate channel. This isn't needed for the immediate fix but is worth noting for future multi-device improvements.
 
 ## File Changes
 
-### 1. Migration SQL
-- Create `live_sessions` table with RLS policies
-
-### 2. `src/App.tsx`
-- Add routes `/live/new` and `/live/:id` → `LiveSessionPage`
-
-### 3. `src/pages/CreateDebatePage.tsx`
-- Add a "Live" button below the prompt textarea that navigates to `/live/new`
-
-### 4. `src/pages/LiveSessionPage.tsx` (new)
-- **Setup screen**: Choose mode (single-device / multi-device), optional title
-- **Recording screen**:
-  - Mic toggle, live interim text display
-  - Speaker-labeled transcript entries grouped under AI-generated subtopic headers
-  - "Generate Summary" button (on-demand, repeatable)
-  - Summary panel showing latest summary
-  - "End Session" button (auto-generates summary if none were ever requested)
-- **Post-session view**: Final transcript grouped by subtopics + all summaries
-
-### 5. `src/hooks/useLiveTranscription.ts` (new)
-- Fork of `useDeepgramTranscription.ts` adapted for Live mode:
-  - Enable `diarize=true` in Deepgram WebSocket URL
-  - Read `speaker` field from Deepgram results → label as Speaker 1, Speaker 2, etc.
-  - Persist to `live_sessions` table
-  - Expose `generateSummary()` as a callable function for on-demand use
-  - When generating a summary, the AI also identifies/updates subtopics from the conversation so far; each transcript entry gets tagged with its subtopic
-
-### 6. `supabase/functions/analyze-transcript/index.ts`
-- Add a `mode` parameter. When `mode === 'live_conversation'`:
-  - Use a conversation-focused prompt (not debate-style argument extraction)
-  - Return a plain summary identifying speakers and key points
-  - Also return an array of identified subtopics and map each transcript segment to a subtopic
-  - This enables the UI to group entries under subtopic headers
-
-## UI Layout (Recording Screen)
-
-```text
-┌──────────────────────────────────┐
-│  Live: [title]            [End]  │
-│──────────────────────────────────│
-│  ── Topic: Budget Planning ──    │
-│  Speaker 1: "We need to..."     │
-│        Speaker 2: "I agree..."  │
-│  ── Topic: Staffing ──          │
-│  Speaker 1: "Hiring is..."      │
-│        Speaker 3: "The team..." │
-│                                  │
-│  [interim text...]               │
-│──────────────────────────────────│
-│  🎤 Recording   [📝 Summary]   │
-│──────────────────────────────────│
-│  Summary Panel (collapsible)     │
-│  Latest summary text here...     │
-└──────────────────────────────────┘
-```
-
-Speaker alignment: odd speakers left, even speakers right (same pattern as debates).
+| File | Change |
+|------|--------|
+| `src/hooks/useLiveTranscription.ts` | Parse `alt.words` array to split by speaker within each final segment; reduce endpointing to 1000ms and utterance_end_ms to 2000ms |
 
