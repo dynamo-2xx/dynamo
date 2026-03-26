@@ -86,16 +86,17 @@ const MessengerChat = ({ messages }: MessengerChatProps) => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: "hidden" }}
                   transition={{ duration: 0.25 }}
+                  className={`flex ${isSide1 ? "justify-start" : "justify-end"}`}
                 >
                   <div
-                    className={`w-full rounded-lg px-4 py-3 text-sm font-body border-l-4 ${
+                    className={`max-w-[75%] rounded-lg px-4 py-3 text-sm font-body ${
                       isSide1
-                        ? "border-l-[hsl(var(--side-1))] bg-[hsl(var(--side-1)/0.08)]"
-                        : "border-l-[hsl(var(--side-2))] bg-[hsl(var(--side-2)/0.08)]"
+                        ? "border-l-4 border-l-[hsl(var(--side-1))] bg-[hsl(var(--side-1)/0.08)]"
+                        : "border-r-4 border-r-[hsl(var(--side-2))] bg-[hsl(var(--side-2)/0.08)]"
                     }`}
                   >
                     <p className={`text-[10px] font-semibold mb-1 ${
-                      isSide1 ? "text-[hsl(var(--side-1))]" : "text-[hsl(var(--side-2))]"
+                      isSide1 ? "text-[hsl(var(--side-1))]" : "text-[hsl(var(--side-2))] text-right"
                     }`}>
                       {msg.sideLabel}
                       {msg.isEdited && " · edited"}

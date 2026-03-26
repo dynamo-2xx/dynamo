@@ -61,23 +61,25 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
   const sideColor = sideOrder === 0 ? "hsl(var(--side-1))" : "hsl(var(--side-2))";
   const sideBg = sideOrder === 0 ? "hsl(var(--side-1) / 0.08)" : "hsl(var(--side-2) / 0.08)";
 
+  const isRight = sideOrder !== 0;
+
   return (
     <div
-      className="cursor-default select-text"
+      className={`cursor-default select-text flex ${isRight ? "justify-end" : "justify-start"}`}
       onDoubleClick={handleDoubleClick}
       style={{ perspective: "800px", minHeight: cardMinHeight }}
     >
       <motion.div
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
-        style={{ transformStyle: "preserve-3d", position: "relative", minHeight: cardMinHeight }}
+        style={{ transformStyle: "preserve-3d", position: "relative", minHeight: cardMinHeight, width: "85%" }}
       >
         {/* Front: transcript */}
         <div
           ref={frontRef}
-          className={`rounded-lg border-l-[3px] px-3 py-2 ${compact ? "text-[11px]" : "text-xs"}`}
+          className={`rounded-lg px-3 py-2 ${compact ? "text-[11px]" : "text-xs"} ${isRight ? "border-r-[3px]" : "border-l-[3px]"}`}
           style={{
-            borderLeftColor: sideColor,
+            ...(isRight ? { borderRightColor: sideColor } : { borderLeftColor: sideColor }),
             backgroundColor: sideBg,
             backfaceVisibility: "hidden",
           }}
@@ -122,9 +124,9 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
         {aiSummary && (
           <div
             ref={backRef}
-            className={`rounded-lg border-l-[3px] px-3 py-2 absolute inset-0 overflow-auto ${compact ? "text-[11px]" : "text-xs"}`}
+            className={`rounded-lg px-3 py-2 absolute inset-0 overflow-auto ${compact ? "text-[11px]" : "text-xs"} ${isRight ? "border-r-[3px]" : "border-l-[3px]"}`}
             style={{
-              borderLeftColor: sideColor,
+              ...(isRight ? { borderRightColor: sideColor } : { borderLeftColor: sideColor }),
               backgroundColor: sideBg,
               backfaceVisibility: "hidden",
               transform: "rotateY(180deg)",

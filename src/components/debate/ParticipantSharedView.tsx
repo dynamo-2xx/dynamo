@@ -183,7 +183,8 @@ const ParticipantSharedView = ({
       });
     });
 
-    return items.sort((a, b) => a.timestamp - b.timestamp);
+    // Only show items that have an AI summary in the live sidebar
+    return items.filter(item => item.aiSummary && item.aiSummary.trim().length > 0).sort((a, b) => a.timestamp - b.timestamp);
   };
 
   const bothOff = !localCameraOn && !remoteCameraOn;
@@ -272,7 +273,7 @@ const ParticipantSharedView = ({
           )}
           {/* Both cameras on → split 50/50 */}
           {bothOn && (
-            <div className="flex-1 flex min-h-0">
+            <div className="flex-1 flex min-h-0 relative">
               <div className="flex-1 bg-muted relative overflow-hidden">
                 <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                 <span className="absolute bottom-2 left-2 bg-background/70 text-foreground text-[10px] px-1.5 py-0.5 rounded font-body">You</span>
@@ -280,6 +281,11 @@ const ParticipantSharedView = ({
               <div className="flex-1 bg-muted flex items-center justify-center text-muted-foreground text-xs border-l border-border">
                 Remote Camera Feed
               </div>
+              {interimText && (
+                <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm px-4 py-2 text-center z-10">
+                  <p className="text-sm text-foreground font-body leading-relaxed">{interimText}</p>
+                </div>
+              )}
             </div>
           )}
           {/* Only local camera on → fullscreen local feed */}
@@ -287,12 +293,22 @@ const ParticipantSharedView = ({
             <div className="flex-1 bg-muted relative overflow-hidden min-h-0">
               <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
               <span className="absolute bottom-2 left-2 bg-background/70 text-foreground text-[10px] px-1.5 py-0.5 rounded font-body">You</span>
+              {interimText && (
+                <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm px-4 py-2 text-center">
+                  <p className="text-sm text-foreground font-body leading-relaxed">{interimText}</p>
+                </div>
+              )}
             </div>
           )}
           {/* Only remote camera on → fullscreen remote feed */}
           {onlyRemoteOn && (
-            <div className="flex-1 bg-muted flex items-center justify-center text-muted-foreground text-xs min-h-0">
+            <div className="flex-1 bg-muted relative flex items-center justify-center text-muted-foreground text-xs min-h-0">
               Remote Camera Feed
+              {interimText && (
+                <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm px-4 py-2 text-center">
+                  <p className="text-sm text-foreground font-body leading-relaxed">{interimText}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
