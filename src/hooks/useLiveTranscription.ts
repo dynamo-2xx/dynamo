@@ -6,9 +6,11 @@ export interface LiveTranscriptEntry {
   speaker_id: number; // from Deepgram diarization (0, 1, 2...)
   speaker_label: string; // "Speaker 1", "Speaker 2", etc.
   text: string;
+  words?: { word: string; speaker: number }[];
   subtopic?: string;
   timestamp: number;
   is_final: boolean;
+  uncertain?: boolean;
 }
 
 export interface LiveSummary {
@@ -58,21 +60,29 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       .eq("id", sessionId);
   }, [sessionId]);
 
+  // Track words for split functionality
+  const statementWordsRef = useRef<{ word: string; speaker: number }[]>([]);
+
   const flushStatement = useCallback(() => {
     const text = statementBufferRef.current.trim();
     if (!text) return;
 
     const speakerId = statementSpeakerRef.current;
+    const words = [...statementWordsRef.current];
+    const hasSpeakerInfo = words.some(w => w.speaker !== undefined);
     const entry: LiveTranscriptEntry = {
       id: `live-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       speaker_id: speakerId,
       speaker_label: `Speaker ${speakerId + 1}`,
       text,
+      words,
       timestamp: Date.now(),
       is_final: true,
+      uncertain: !hasSpeakerInfo,
     };
 
     statementBufferRef.current = "";
+    statementWordsRef.current = [];
 
     setTranscriptEntries((prev) => {
       const updated = [...prev, entry];
@@ -128,6 +138,12 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
         processor.onaudioprocess = (e) => {
           if (ws.readyState === WebSocket.OPEN) {
             const inputData = e.inputBuffer.getChannelData(0);
+            // Audio energy gate — skip silent frames to improve diarization
+            let sum = 0;
+            for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
+            const rms = Math.sqrt(sum / inputData.length);
+            if (rms < 0.008) return; // skip near-silent frames
+
             const pcm16 = new Int16Array(inputData.length);
             for (let i = 0; i < inputData.length; i++) {
               pcm16[i] = Math.max(-32768, Math.min(32767, Math.round(inputData[i] * 32767)));
@@ -185,7 +201,9 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
                     currentSpeaker = wordSpeaker;
                     currentWords = [];
                   }
-                  currentWords.push(word.punctuated_word || word.word);
+                  const w = word.punctuated_word || word.word;
+                  currentWords.push(w);
+                  statementWordsRef.current.push({ word: w, speaker: wordSpeaker });
                 }
 
                 // Handle remaining words
@@ -298,8 +316,8 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   const endSession = useCallback(async () => {
     disconnect();
 
-    // Auto-generate summary if never requested
-    if (!hasSummarizedRef.current && transcriptEntriesRef.current.length > 0) {
+    // Always auto-generate a final summary on end
+    if (transcriptEntriesRef.current.length > 0) {
       await generateSummary();
     }
 

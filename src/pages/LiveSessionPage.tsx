@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Square, FileText, ChevronDown, ChevronUp, Radio } from "lucide-react";
+import { Mic, Square, FileText, ChevronDown, ChevronUp, Radio } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
+import SessionRecordView from "@/components/live/SessionRecordView";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
@@ -21,6 +22,8 @@ const LiveSessionPage = () => {
   const [mode, setMode] = useState<"single_device" | "multi_device">("single_device");
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<string>("recording");
+  const [sessionData, setSessionData] = useState<any>(null);
+  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -53,6 +56,8 @@ const LiveSessionPage = () => {
         setTitle(d.title || "");
         setMode(d.mode || "single_device");
         setSessionStatus(d.status);
+        setSessionData(d);
+        setSpeakerNames(d.speaker_names || {});
         if (d.status === "ended") {
           setPhase("ended");
         } else {
@@ -97,34 +102,41 @@ const LiveSessionPage = () => {
   const handleEndSession = useCallback(async () => {
     await endSession();
     setSessionStatus("ended");
+    // Reload session data for the record view
+    if (sessionId) {
+      const { data } = await supabase
+        .from("live_sessions" as any)
+        .select("*")
+        .eq("id", sessionId)
+        .single();
+      if (data) setSessionData(data);
+    }
     setPhase("ended");
-  }, [endSession]);
-
-  // Group entries by subtopic
-  const groupedEntries = (() => {
-    const groups: Record<string, LiveTranscriptEntry[]> = {};
-    const unassigned: LiveTranscriptEntry[] = [];
-
-    transcriptEntries.forEach((e) => {
-      if (e.subtopic) {
-        if (!groups[e.subtopic]) groups[e.subtopic] = [];
-        groups[e.subtopic].push(e);
-      } else {
-        unassigned.push(e);
-      }
-    });
-
-    // Order subtopics by their first appearance
-    const orderedSubtopics = subtopics.filter((s) => groups[s]);
-    // Add any subtopics from entries not in the subtopics list
-    Object.keys(groups).forEach((s) => {
-      if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
-    });
-
-    return { groups, unassigned, orderedSubtopics };
-  })();
+  }, [endSession, sessionId]);
 
   const latestSummary = summaries.length > 0 ? summaries[summaries.length - 1] : null;
+
+  // ── ENDED → Full record page ──
+  if (phase === "ended") {
+    const sd = sessionData || {};
+    return (
+      <AppLayout>
+        <SessionRecordView
+          sessionId={sessionId || ""}
+          title={sd.title || title || "Live Session"}
+          createdAt={sd.created_at || new Date().toISOString()}
+          endedAt={sd.ended_at}
+          transcriptEntries={transcriptEntries.length > 0 ? transcriptEntries : (sd.transcript_entries || [])}
+          summaries={summaries.length > 0 ? summaries : (sd.summaries || [])}
+          subtopics={subtopics.length > 0 ? subtopics : (sd.subtopics || [])}
+          speakerNames={speakerNames}
+          shareToken={sd.share_token || null}
+          onEntriesUpdate={() => {}}
+          onSpeakerNamesUpdate={setSpeakerNames}
+        />
+      </AppLayout>
+    );
+  }
 
   // ── SETUP SCREEN ──
   if (phase === "setup") {
@@ -190,37 +202,28 @@ const LiveSessionPage = () => {
     );
   }
 
-  // ── RECORDING / ENDED SCREEN ──
+  // ── RECORDING SCREEN ──
   return (
     <AppLayout>
       <div className="flex flex-col h-[calc(100vh-4rem)] max-w-3xl mx-auto w-full">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            {phase === "recording" && (
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
-                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                Recording
-              </span>
-            )}
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
+              <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+              Recording
+            </span>
             <h1 className="font-display font-bold text-lg truncate">
               {title || "Live Session"}
             </h1>
           </div>
-          {phase === "recording" && (
-            <button
-              onClick={handleEndSession}
-              className="flex items-center gap-1.5 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-            >
-              <Square className="w-3.5 h-3.5" />
-              End
-            </button>
-          )}
-          {phase === "ended" && (
-            <span className="text-xs font-semibold text-muted-foreground bg-secondary px-3 py-1.5 rounded-full">
-              Session Ended
-            </span>
-          )}
+          <button
+            onClick={handleEndSession}
+            className="flex items-center gap-1.5 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            <Square className="w-3.5 h-3.5" />
+            End
+          </button>
         </div>
 
         {/* Transcript Area */}
@@ -236,35 +239,17 @@ const LiveSessionPage = () => {
             </div>
           )}
 
-          {/* Grouped by subtopic */}
-          {groupedEntries.orderedSubtopics.map((topic) => (
-            <div key={topic} className="mb-3">
-              <div className="flex items-center gap-2 py-2">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">
-                  {topic}
-                </span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-              {groupedEntries.groups[topic].map((entry) => (
-                <TranscriptBubble key={entry.id} entry={entry} />
-              ))}
-            </div>
+          {transcriptEntries.map((entry) => (
+            <TranscriptBubble key={entry.id} entry={entry} speakerNames={speakerNames} />
           ))}
 
-          {/* Unassigned entries */}
-          {groupedEntries.unassigned.map((entry) => (
-            <TranscriptBubble key={entry.id} entry={entry} />
-          ))}
-
-          {/* Interim text */}
           {interimText && (
             <div className="text-sm text-muted-foreground italic px-3 py-1.5">
               {interimText}...
             </div>
           )}
 
-          {transcriptEntries.length === 0 && !interimText && phase === "recording" && (
+          {transcriptEntries.length === 0 && !interimText && (
             <div className="text-center text-muted-foreground text-sm py-12">
               {isConnected ? "Listening... Start speaking." : "Connecting to microphone..."}
             </div>
@@ -273,7 +258,6 @@ const LiveSessionPage = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-border px-4 py-3 shrink-0 space-y-2">
-          {/* Summary toggle + generate button */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {isConnected && (
@@ -303,7 +287,6 @@ const LiveSessionPage = () => {
             </div>
           </div>
 
-          {/* Summary panel */}
           <AnimatePresence>
             {summaryOpen && latestSummary && (
               <motion.div
@@ -330,29 +313,22 @@ const LiveSessionPage = () => {
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* All summaries in ended view */}
-          {phase === "ended" && summaries.length > 1 && (
-            <div className="space-y-2 mt-2">
-              <p className="text-xs text-muted-foreground font-semibold">All Summaries</p>
-              {summaries.map((s, i) => (
-                <div key={s.id} className="bg-card border border-border rounded-lg p-3">
-                  <p className="text-[10px] text-muted-foreground mb-1">Summary #{i + 1}</p>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{s.text}</p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </AppLayout>
   );
 };
 
-// ── Transcript Bubble ──
-const TranscriptBubble = ({ entry }: { entry: LiveTranscriptEntry }) => {
-  // Odd speakers (1, 3...) left-aligned, even speakers (2, 4...) right-aligned
+// Simple bubble for recording view (no edit tools)
+const TranscriptBubble = ({
+  entry,
+  speakerNames,
+}: {
+  entry: LiveTranscriptEntry;
+  speakerNames: Record<string, string>;
+}) => {
   const isLeft = entry.speaker_id % 2 === 0;
+  const name = speakerNames[String(entry.speaker_id)] || entry.speaker_label;
 
   return (
     <div className={`flex ${isLeft ? "justify-start" : "justify-end"} mb-1.5`}>
@@ -364,7 +340,7 @@ const TranscriptBubble = ({ entry }: { entry: LiveTranscriptEntry }) => {
         }`}
       >
         <span className="text-[10px] font-semibold text-muted-foreground block mb-0.5">
-          {entry.speaker_label}
+          {name}
         </span>
         <span>{entry.text}</span>
       </div>

@@ -16,12 +16,21 @@ interface DebateRow {
   participants_count?: number;
 }
 
+interface LiveSessionRow {
+  id: string;
+  title: string | null;
+  status: string;
+  created_at: string;
+}
+
 const MyDebatesPage = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") === "drafts" ? "drafts" : "debates";
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam === "drafts" ? "drafts" : tabParam === "live" ? "live" : "debates";
   const [debates, setDebates] = useState<DebateRow[]>([]);
   const [drafts, setDrafts] = useState<DebateRow[]>([]);
+  const [liveSessions, setLiveSessions] = useState<LiveSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -69,21 +78,32 @@ const MyDebatesPage = () => {
         .order("created_at", { ascending: false });
 
       setDrafts((myDrafts || []) as DebateRow[]);
+
+      // Live sessions
+      const { data: sessions } = await supabase
+        .from("live_sessions" as any)
+        .select("id, title, status, created_at")
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false });
+
+      setLiveSessions(((sessions as any) || []) as LiveSessionRow[]);
       setLoading(false);
     };
     load();
   }, [user]);
 
   const statusColor = (s: string) => {
-    if (s === "live") return "bg-green-500/20 text-green-400";
-    if (s === "completed") return "bg-primary/20 text-primary";
+    if (s === "live" || s === "recording") return "bg-green-500/20 text-green-400";
+    if (s === "completed" || s === "ended") return "bg-primary/20 text-primary";
     if (s === "draft") return "bg-muted text-muted-foreground";
     return "bg-secondary text-muted-foreground";
   };
 
-  const currentList = activeTab === "drafts" ? drafts : debates;
+  const currentList = activeTab === "drafts" ? drafts : activeTab === "live" ? [] : debates;
   const emptyMessage = activeTab === "drafts"
     ? "You have no unpublished drafts."
+    : activeTab === "live"
+    ? "You have no live session records yet."
     : "You haven't participated in any debates yet.";
 
   return (
@@ -121,10 +141,49 @@ const MyDebatesPage = () => {
             >
               Drafts
             </button>
+            <button
+              onClick={() => setSearchParams({ tab: "live" })}
+              className={cn(
+                "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors",
+                activeTab === "live"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Live
+            </button>
           </div>
 
           {loading ? (
             <p className="text-muted-foreground text-center py-12 animate-pulse">Loading…</p>
+          ) : activeTab === "live" ? (
+            liveSessions.length === 0 ? (
+              <p className="text-muted-foreground text-center py-12">{emptyMessage}</p>
+            ) : (
+              <div className="grid gap-3">
+                {liveSessions.map((s) => (
+                  <Link
+                    key={s.id}
+                    to={`/live/${s.id}`}
+                    className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-colors block"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-display font-semibold text-foreground text-sm">
+                          {s.title || "Untitled Session"}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(s.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor(s.status)}`}>
+                        {s.status === "recording" ? "Recording" : "Ended"}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )
           ) : currentList.length === 0 ? (
             <p className="text-muted-foreground text-center py-12">{emptyMessage}</p>
           ) : (
