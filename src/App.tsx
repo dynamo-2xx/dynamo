@@ -21,6 +21,7 @@ import NotFound from "./pages/NotFound";
 import ProjectorPage from "./pages/ProjectorPage";
 import AudiencePage from "./pages/AudiencePage";
 import LiveSessionPage from "./pages/LiveSessionPage";
+import SharedLiveSessionPage from "./pages/SharedLiveSessionPage";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/preview/:token" element={<DebatePreviewPage />} />
               <Route path="/live/new" element={<ProtectedRoute><LiveSessionPage /></ProtectedRoute>} />
               <Route path="/live/:id" element={<ProtectedRoute><LiveSessionPage /></ProtectedRoute>} />
+              <Route path="/live/shared/:token" element={<SharedLiveSessionPage />} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
               <Route path="/my-debates" element={<ProtectedRoute><MyDebatesPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
