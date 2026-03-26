@@ -1,37 +1,98 @@
 
 
-# Fix: Speaker Diarization Not Splitting Speakers Properly
+# Live Session: Complete Feature Plan
 
-## Problem
+## Scope
 
-The current logic only checks the **first word's** speaker ID (`alt.words?.[0]?.speaker`) and uses that for the entire final segment. If Deepgram returns a segment where multiple speakers talk, or if the speaker label on the first word is unreliable, everything gets clumped under one speaker.
+Building on the existing Live session infrastructure, this plan adds:
 
-Additionally, the statement buffer only flushes on speaker change or `UtteranceEnd` — with a 5-second `utterance_end_ms`, long stretches of multi-speaker audio get accumulated into one entry.
+1. **Speaker accuracy improvements** — audio energy gate, uncertain entry marking
+2. **Speaker renaming** — users assign real names to generic speaker labels
+3. **Post-session record page** — full transcript + summaries + speaker correction tools
+4. **Auto-summary on end** — always generate a final summary when session ends
+5. **"Live" tab in My Agenda** — browse past sessions
+6. **Sharing** — generate a share link for completed records
 
-## Solution
-
-Two changes in `src/hooks/useLiveTranscription.ts`:
-
-### 1. Split final segments by speaker within the word array
-
-Instead of assigning one speaker per final segment, iterate through `alt.words` and split the transcript whenever the `speaker` field changes mid-segment. This creates separate transcript entries for each speaker within a single Deepgram result.
+## Architecture
 
 ```text
-Before: "Hello how are you I'm fine thanks" → one entry, Speaker 1
-After:  "Hello how are you" → Speaker 1, "I'm fine thanks" → Speaker 2
+┌─────────────────────────────────────────┐
+│ My Agenda (MyDebatesPage)               │
+│ [Debates] [Drafts] [Live]              │
+│                                         │
+│  Session Title       Mar 26  ● Ended   │
+│  Team Standup        Mar 25  ● Ended   │
+└─────────────────────────────────────────┘
+         │ click
+         ▼
+┌─────────────────────────────────────────┐
+│ Post-Session Record (/live/:id)         │
+│                                         │
+│  Title · Date · Duration                │
+│  [Share] [Back to My Agenda]            │
+│                                         │
+│  ── Summaries ──                        │
+│  Summary cards with subtopic tags       │
+│                                         │
+│  ── Transcript ──                       │
+│  Grouped by subtopic                    │
+│  Speaker bubbles (tap to edit/split/    │
+│  merge) with rename capability          │
+└─────────────────────────────────────────┘
 ```
 
-### 2. Reduce endpointing and utterance end timing
+## Detailed Changes
 
-Lower `endpointing` from 3000ms to 1000ms and `utterance_end_ms` from 5000ms to 2000ms. This forces Deepgram to finalize segments more frequently, giving diarization more granular data to work with and reducing the window for speaker clumping.
+### 1. Database Migration
 
-### 3. Use `multichannel=true` for multi-device mode (future)
+Add a `share_token` column to `live_sessions` and an RLS policy for public viewing by token:
 
-For multi-device sessions where each participant has their own mic, each audio stream could be sent on a separate channel. This isn't needed for the immediate fix but is worth noting for future multi-device improvements.
+```sql
+ALTER TABLE public.live_sessions 
+  ADD COLUMN share_token text UNIQUE DEFAULT NULL,
+  ADD COLUMN speaker_names jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+-- Allow anyone to view a session via share token
+CREATE POLICY "Anyone can view shared live sessions"
+  ON public.live_sessions FOR SELECT TO anon
+  USING (share_token IS NOT NULL);
+```
+
+`speaker_names` stores a map like `{"0": "Alex", "1": "Jordan"}` so renamed labels persist.
+
+### 2. `useLiveTranscription.ts` — Audio energy gate
+
+Add RMS check before sending PCM frames to Deepgram. Only send when energy exceeds threshold (~0.01). Mark entries as `uncertain: true` when word-level speaker data is missing.
+
+On session end (`endSession`), auto-generate a summary by calling `generateSummary()` before updating status to "ended".
+
+### 3. `LiveSessionPage.tsx` — Post-session record page
+
+When `phase === "ended"`, replace the current minimal view with a full record page:
+- **Header**: title, date, duration, share button, "Back to My Agenda" link
+- **Summaries section**: all summary cards with subtopic tags
+- **Transcript section**: grouped by subtopic, left/right speaker bubbles
+- **Speaker correction tools**:
+  - Tap speaker label to rename (updates `speaker_names` in DB)
+  - Split button to divide a bubble at a word boundary
+  - Merge button to combine adjacent uncertain entries
+- **Share button**: generates a `share_token`, copies link to clipboard
+
+### 4. `MyDebatesPage.tsx` — Add "Live" tab
+
+Add a third tab that queries `live_sessions` where `created_by = user.id`, ordered by `created_at desc`. Cards show title, date, status badge. Click navigates to `/live/:id`.
+
+### 5. Sharing route
+
+Add a public route `/live/shared/:token` that loads a read-only version of the record page using the share token (no auth required).
 
 ## File Changes
 
 | File | Change |
 |------|--------|
-| `src/hooks/useLiveTranscription.ts` | Parse `alt.words` array to split by speaker within each final segment; reduce endpointing to 1000ms and utterance_end_ms to 2000ms |
+| Migration SQL | Add `share_token`, `speaker_names` columns + anon SELECT policy |
+| `src/hooks/useLiveTranscription.ts` | Audio energy gate; uncertain marking; auto-summary on end |
+| `src/pages/LiveSessionPage.tsx` | Full post-session record page with rename, split, merge, share |
+| `src/pages/MyDebatesPage.tsx` | Add "Live" tab querying `live_sessions` |
+| `src/App.tsx` | Add `/live/shared/:token` route |
 
