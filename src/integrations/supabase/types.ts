@@ -340,6 +340,8 @@ export type Database = {
           prep_duration_seconds: number | null
           prep_phase_active: boolean
           prep_phase_started_at: string | null
+          prep_side1_ready: boolean
+          prep_side2_ready: boolean
           prep_time_max: string
           prep_time_min: string
           scheduled_at: string | null
@@ -372,6 +374,8 @@ export type Database = {
           prep_duration_seconds?: number | null
           prep_phase_active?: boolean
           prep_phase_started_at?: string | null
+          prep_side1_ready?: boolean
+          prep_side2_ready?: boolean
           prep_time_max?: string
           prep_time_min?: string
           scheduled_at?: string | null
@@ -404,6 +408,8 @@ export type Database = {
           prep_duration_seconds?: number | null
           prep_phase_active?: boolean
           prep_phase_started_at?: string | null
+          prep_side1_ready?: boolean
+          prep_side2_ready?: boolean
           prep_time_max?: string
           prep_time_min?: string
           scheduled_at?: string | null

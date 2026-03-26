@@ -44,6 +44,8 @@ interface DebateData {
   prep_phase_active: boolean;
   prep_phase_started_at: string | null;
   prep_duration_seconds: number | null;
+  prep_side1_ready: boolean;
+  prep_side2_ready: boolean;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
@@ -239,6 +241,26 @@ const DebateRoomPage = () => {
           if (remaining > 0) setTimerRunning(true);
           else setTimerRunning(false);
         }
+        // Sync prep phase from other participant
+        if (updated.prep_phase_active && !prepPhaseRole) {
+          // The other side started prep — we need to enter prep too
+          enterPrepPhaseFromRealtime(updated);
+        }
+        // Both sides ready → advance
+        if (updated.prep_side1_ready && updated.prep_side2_ready && prepPhaseRole) {
+          setPrepPhaseRole(null);
+          setPrepStartedAt(null);
+          setSelectedPrepDuration(null);
+          // Clear prep flags on DB
+          supabase.from("debates").update({
+            prep_phase_active: false,
+            prep_phase_started_at: null,
+            prep_duration_seconds: null,
+            prep_side1_ready: false,
+            prep_side2_ready: false,
+          } as any).eq("id", id);
+          advanceTurn();
+        }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
         if (payload.eventType === "INSERT") {
@@ -299,13 +321,18 @@ const DebateRoomPage = () => {
 
   const advancingRef = useRef(false);
 
-  // Enter preparation phase between turns
+  // Determine which side index (0 or 1) the current user is on
+  const getMySideIndex = useCallback((): 0 | 1 => {
+    if (!myParticipant || sides.length < 2) return 0;
+    const sortedSides = [...sides].sort((a, b) => a.sort_order - b.sort_order);
+    return myParticipant.side_id === sortedSides[0]?.id ? 0 : 1;
+  }, [myParticipant, sides]);
+
+  // Enter preparation phase between turns (called by the side that triggered it)
   const enterPrepPhase = useCallback(() => {
     if (!debate || !myParticipant) return;
-    // Determine role: if I was the speaker whose turn just ended, I'm "outgoing"
     const wasMyTurn = activeSpeakerParticipant?.user_id === user?.id;
 
-    // Capture the last transcript/summary for the outgoing speaker to review
     if (wasMyTurn) {
       const myEntries = transcriptEntries
         .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
@@ -318,14 +345,36 @@ const DebateRoomPage = () => {
     setPrepPhaseRole(wasMyTurn ? "outgoing" : "incoming");
     setPrepStartedAt(Date.now());
 
-    // Set prep phase active on debate record
-    if (isCreator) {
-      supabase.from("debates").update({
-        prep_phase_active: true,
-        prep_phase_started_at: new Date().toISOString(),
-      } as any).eq("id", debate.id);
+    // Write prep phase to DB so both sides sync
+    supabase.from("debates").update({
+      prep_phase_active: true,
+      prep_phase_started_at: new Date().toISOString(),
+      prep_side1_ready: false,
+      prep_side2_ready: false,
+    } as any).eq("id", debate.id);
+  }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
+
+  // Called via realtime when the OTHER side triggered prep phase
+  const enterPrepPhaseFromRealtime = useCallback((updated: DebateData) => {
+    if (!myParticipant || prepPhaseRole) return;
+    // If prep is active and we haven't entered yet, determine our role
+    const wasMyTurn = activeSpeakerParticipant?.user_id === user?.id;
+
+    if (wasMyTurn) {
+      const myEntries = transcriptEntries
+        .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+        .sort((a, b) => b.timestamp - a.timestamp);
+      const lastEntry = myEntries[0];
+      setLastTurnTranscript(lastEntry?.text || "");
+      setLastTurnSummary(lastEntry?.ai_summary || "");
     }
-  }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic, isCreator]);
+
+    setPrepPhaseRole(wasMyTurn ? "outgoing" : "incoming");
+    const serverStartedAt = updated.prep_phase_started_at
+      ? new Date(updated.prep_phase_started_at).getTime()
+      : Date.now();
+    setPrepStartedAt(serverStartedAt);
+  }, [myParticipant, prepPhaseRole, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
 
   const handlePrepTimeSelected = useCallback((seconds: number) => {
     setSelectedPrepDuration(seconds);
@@ -363,20 +412,15 @@ const DebateRoomPage = () => {
   }, [transcriptEntries, currentSubtopic, debate?.id]);
 
   const handlePrepReady = useCallback(() => {
-    setPrepPhaseRole(null);
-    setPrepStartedAt(null);
-    setSelectedPrepDuration(null);
-    // Clear prep phase on DB
-    if (debate && isCreator) {
-      supabase.from("debates").update({
-        prep_phase_active: false,
-        prep_phase_started_at: null,
-        prep_duration_seconds: null,
-      } as any).eq("id", debate.id);
-    }
-    // Advance the turn
-    advanceTurn();
-  }, [debate, isCreator]);
+    if (!debate) return;
+    // Set MY side's ready flag
+    const sideIdx = getMySideIndex();
+    const updatePayload = sideIdx === 0
+      ? { prep_side1_ready: true }
+      : { prep_side2_ready: true };
+    supabase.from("debates").update(updatePayload as any).eq("id", debate.id);
+    // Don't clear local state yet — wait for both sides via realtime
+  }, [debate, getMySideIndex]);
 
   // Fetch with retry + exponential backoff for 429s
   const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3): Promise<Response> => {

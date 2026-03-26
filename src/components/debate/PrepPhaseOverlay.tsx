@@ -1,19 +1,20 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, Edit3, Check } from "lucide-react";
+import { Clock, Edit3, Check, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface PrepPhaseOverlayProps {
   role: "incoming" | "outgoing";
-  prepTimeMin: number; // seconds
-  prepTimeMax: number; // seconds
+  prepTimeMin: number;
+  prepTimeMax: number;
   lastTranscript?: string;
   lastAiSummary?: string;
   speakerSideLabel: string;
   onPrepTimeSelected?: (seconds: number) => void;
   onSummaryEdited?: (newSummary: string) => void;
   onReady?: () => void;
-  prepStartedAt?: number; // timestamp ms
-  selectedPrepDuration?: number; // seconds (from incoming speaker)
+  prepStartedAt?: number;
+  selectedPrepDuration?: number;
 }
 
 function parseTimeLabel(seconds: number): string {
@@ -43,13 +44,13 @@ const PrepPhaseOverlay = ({
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [editedSummary, setEditedSummary] = useState(lastAiSummary || "");
   const [summarySubmitted, setSummarySubmitted] = useState(false);
+  const [markedReady, setMarkedReady] = useState(false);
 
   const availableOptions = PREP_OPTIONS.filter(t => t >= prepTimeMin && t <= prepTimeMax);
 
   // Countdown timer for both roles
   useEffect(() => {
     if (!prepStartedAt) return;
-
     const duration = role === "outgoing" ? prepTimeMax : (selectedPrepDuration || selectedTime);
     if (!duration) return;
 
@@ -59,12 +60,15 @@ const PrepPhaseOverlay = ({
       setTimeRemaining(remaining);
       if (remaining === 0) {
         clearInterval(interval);
-        onReady?.();
+        if (!markedReady) {
+          setMarkedReady(true);
+          onReady?.();
+        }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [prepStartedAt, role, prepTimeMax, selectedPrepDuration, selectedTime, onReady]);
+  }, [prepStartedAt, role, prepTimeMax, selectedPrepDuration, selectedTime, onReady, markedReady]);
 
   const handleSelectTime = (seconds: number) => {
     setSelectedTime(seconds);
@@ -76,11 +80,36 @@ const PrepPhaseOverlay = ({
     setSummarySubmitted(true);
   };
 
+  const handleReady = () => {
+    if (markedReady) return;
+    setMarkedReady(true);
+    onReady?.();
+  };
+
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
+
+  const ReadyButton = () => (
+    <Button
+      onClick={handleReady}
+      disabled={markedReady}
+      className="mt-4 gap-2"
+      size="lg"
+    >
+      {markedReady ? (
+        <>
+          <Check className="w-4 h-4" /> Waiting for other side…
+        </>
+      ) : (
+        <>
+          <ArrowRight className="w-4 h-4" /> I'm Ready
+        </>
+      )}
+    </Button>
+  );
 
   return (
     <motion.div
@@ -132,6 +161,7 @@ const PrepPhaseOverlay = ({
             <p className="text-sm text-muted-foreground font-body">
               Prepare your arguments for when it's your turn.
             </p>
+            <ReadyButton />
           </motion.div>
         )}
 
@@ -198,6 +228,10 @@ const PrepPhaseOverlay = ({
                   No AI summary was generated for this input.
                 </p>
               )}
+            </div>
+
+            <div className="text-center">
+              <ReadyButton />
             </div>
           </motion.div>
         )}
