@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -276,6 +276,13 @@ const CreateDebatePage = () => {
                   Create
                 </button>
               </div>
+              <button
+                onClick={() => navigate("/live/new")}
+                className="mt-3 w-full flex items-center justify-center gap-2 bg-card border border-border text-foreground px-5 py-3 rounded-xl font-semibold text-sm hover:border-primary/40 transition-colors"
+              >
+                <Mic className="w-4 h-4 text-primary" />
+                Live
+              </button>
             </motion.div>
           )}
 

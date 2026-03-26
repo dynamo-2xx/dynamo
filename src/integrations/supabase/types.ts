@@ -432,6 +432,45 @@ export type Database = {
           },
         ]
       }
+      live_sessions: {
+        Row: {
+          created_at: string
+          created_by: string
+          ended_at: string | null
+          id: string
+          mode: string
+          status: string
+          subtopics: Json
+          summaries: Json
+          title: string | null
+          transcript_entries: Json
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          ended_at?: string | null
+          id?: string
+          mode?: string
+          status?: string
+          subtopics?: Json
+          summaries?: Json
+          title?: string | null
+          transcript_entries?: Json
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          ended_at?: string | null
+          id?: string
+          mode?: string
+          status?: string
+          subtopics?: Json
+          summaries?: Json
+          title?: string | null
+          transcript_entries?: Json
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           affiliation: string | null
