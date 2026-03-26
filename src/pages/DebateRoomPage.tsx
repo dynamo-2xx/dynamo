@@ -38,6 +38,11 @@ interface DebateData {
   ended_at: string | null;
   join_code: string | null;
   turn_started_at: string | null;
+  prep_time_min: string;
+  prep_time_max: string;
+  prep_phase_active: boolean;
+  prep_phase_started_at: string | null;
+  prep_duration_seconds: number | null;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
