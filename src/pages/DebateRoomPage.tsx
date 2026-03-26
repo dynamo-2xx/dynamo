@@ -98,6 +98,11 @@ const DebateRoomPage = () => {
   const prevTimerRunningRef = useRef(false);
   const [showCompletionOverlay, setShowCompletionOverlay] = useState(false);
   const [roundSummaries, setRoundSummaries] = useState<Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>>({});
+  const [prepPhaseRole, setPrepPhaseRole] = useState<"incoming" | "outgoing" | null>(null);
+  const [prepStartedAt, setPrepStartedAt] = useState<number | null>(null);
+  const [selectedPrepDuration, setSelectedPrepDuration] = useState<number | null>(null);
+  const [lastTurnTranscript, setLastTurnTranscript] = useState<string>("");
+  const [lastTurnSummary, setLastTurnSummary] = useState<string>("");
 
   // Deepgram transcription — activate for all non-spectators as soon as debate is live
   const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
