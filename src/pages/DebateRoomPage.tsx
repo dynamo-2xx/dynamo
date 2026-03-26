@@ -294,10 +294,81 @@ const DebateRoomPage = () => {
   const isCompleted = debate?.status === "completed";
   const isDraft = debate?.status === "draft";
   const isLive = debate?.status === "live";
-  const canSpeak = isSpeaker && isMyTurn && isLive;
+  const canSpeak = isSpeaker && isMyTurn && isLive && !prepPhaseRole;
   const micEnabled = canSpeak;
 
   const advancingRef = useRef(false);
+
+  // Enter preparation phase between turns
+  const enterPrepPhase = useCallback(() => {
+    if (!debate || !myParticipant) return;
+    // Determine role: if I was the speaker whose turn just ended, I'm "outgoing"
+    const wasMyTurn = activeSpeakerParticipant?.user_id === user?.id;
+
+    // Capture the last transcript/summary for the outgoing speaker to review
+    if (wasMyTurn) {
+      const myEntries = transcriptEntries
+        .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+        .sort((a, b) => b.timestamp - a.timestamp);
+      const lastEntry = myEntries[0];
+      setLastTurnTranscript(lastEntry?.text || "");
+      setLastTurnSummary(lastEntry?.ai_summary || "");
+    }
+
+    setPrepPhaseRole(wasMyTurn ? "outgoing" : "incoming");
+    setPrepStartedAt(Date.now());
+
+    // Set prep phase active on debate record
+    if (isCreator) {
+      supabase.from("debates").update({
+        prep_phase_active: true,
+        prep_phase_started_at: new Date().toISOString(),
+      } as any).eq("id", debate.id);
+    }
+  }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic, isCreator]);
+
+  const handlePrepTimeSelected = useCallback((seconds: number) => {
+    setSelectedPrepDuration(seconds);
+    if (debate && isCreator) {
+      supabase.from("debates").update({
+        prep_duration_seconds: seconds,
+      } as any).eq("id", debate.id);
+    }
+  }, [debate, isCreator]);
+
+  const handleSummaryEdited = useCallback((newSummary: string) => {
+    // Update the transcript entry's AI summary
+    const myEntries = transcriptEntries
+      .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+      .sort((a, b) => b.timestamp - a.timestamp);
+    const lastEntry = myEntries[0];
+    if (lastEntry) {
+      // The hook manages state — we update via persist
+      supabase.from("debate_transcripts" as any)
+        .select("*")
+        .eq("debate_id", debate?.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            const entries = ((data as any).transcript_entries as any[]) || [];
+            const updated = entries.map((e: any) =>
+              e.id === lastEntry.id ? { ...e, ai_summary: newSummary } : e
+            );
+            supabase.from("debate_transcripts" as any)
+              .update({ transcript_entries: updated, updated_at: new Date().toISOString() } as any)
+              .eq("id", (data as any).id);
+          }
+        });
+    }
+  }, [transcriptEntries, currentSubtopic, debate?.id]);
+
+  const handlePrepReady = useCallback(() => {
+    setPrepPhaseRole(null);
+    setPrepStartedAt(null);
+    setSelectedPrepDuration(null);
+    // Advance the turn
+    advanceTurn();
+  }, []);
 
   // Fetch with retry + exponential backoff for 429s
   const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 3): Promise<Response> => {
