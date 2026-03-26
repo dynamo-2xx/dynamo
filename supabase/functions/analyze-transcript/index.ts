@@ -13,8 +13,108 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { transcriptChunk, existingMap, sides, currentSubtopic, speakerSide } = await req.json();
+    const { transcriptChunk, existingMap, sides, currentSubtopic, speakerSide, mode, fullTranscript } = await req.json();
 
+    // Live conversation mode — summarize + identify subtopics
+    if (mode === "live_conversation") {
+      const systemPrompt = `You are an AI conversation analyst. Analyze the provided transcript from a live conversation with multiple speakers (labeled Speaker 1, Speaker 2, etc.).
+
+Your job:
+1. Generate a comprehensive summary of the key points, decisions, questions, and notable statements made so far.
+2. Identify distinct subtopics/themes discussed in the conversation.
+3. For each transcript entry, assign it to one of the identified subtopics.
+
+Rules:
+- Be concise but capture substance
+- Identify speakers by their labels (Speaker 1, Speaker 2, etc.)
+- If the conversation has no substantive content worth summarizing (greetings, filler, etc.), return an empty summary and empty subtopics
+- Return the result using the analyze_conversation tool`;
+
+      const userPrompt = `Transcript entries:
+${JSON.stringify(fullTranscript || [], null, 2)}
+
+Analyze this conversation: identify subtopics, assign each entry to a subtopic, and generate a comprehensive summary.`;
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "analyze_conversation",
+                description: "Analyze a live conversation transcript",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    summary: {
+                      type: "string",
+                      description: "Comprehensive summary of the conversation so far",
+                    },
+                    subtopics: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "List of distinct subtopic/theme labels identified in the conversation",
+                    },
+                    entry_subtopic_map: {
+                      type: "object",
+                      description: "Map of transcript entry IDs to their assigned subtopic label",
+                      additionalProperties: { type: "string" },
+                    },
+                  },
+                  required: ["summary", "subtopics", "entry_subtopic_map"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          ],
+          tool_choice: { type: "function", function: { name: "analyze_conversation" } },
+        }),
+      });
+
+      if (!response.ok) {
+        const status = response.status;
+        if (status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (status === 402) {
+          return new Response(JSON.stringify({ error: "AI usage limit reached" }), {
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const t = await response.text();
+        console.error("AI gateway error:", status, t);
+        throw new Error("AI gateway error");
+      }
+
+      const data = await response.json();
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      if (toolCall) {
+        const result = JSON.parse(toolCall.function.arguments);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ summary: "", subtopics: [], entry_subtopic_map: {} }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Default debate mode
     const systemPrompt = `You are an AI debate analyst. Analyze the latest transcript chunk from a live debate and identify structured argument entries.
 
 For each distinct argument or point made, classify it as one of:
