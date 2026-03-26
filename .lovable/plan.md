@@ -1,46 +1,51 @@
 
 
-# Debate Room: Sidebar Filtering, Directional Messages, and Live Subtitles
+# Fix: Simultaneous Prep Windows with Manual Exit
 
-## Three Changes
+## Problem
+1. The prep overlay only appears for the debate creator's side — the invitee never sees their prep window because `enterPrepPhase` role assignment and `prepStartedAt` are only set locally without syncing via realtime to the other participant.
+2. `handlePrepReady` immediately calls `advanceTurn()` when ONE side finishes — the debate should only continue when BOTH sides have exited.
+3. There's no "I'm Ready" button to exit early; users must wait for the timer.
 
-### 1. Sidebar: Only show items with AI summaries
+## Solution
 
-**Current**: The sidebar argument map shows all transcript entries and arguments, regardless of whether they have an AI summary.
+### 1. Database: Track per-side readiness
+Add two columns to `debates` via migration:
+- `prep_side1_ready` (boolean, default false)
+- `prep_side2_ready` (boolean, default false)
 
-**Change**: Filter `getSubtopicItems()` in `ParticipantSharedView.tsx` to only include items that have a non-empty `aiSummary`. Unsummarized transcripts are still persisted in `debate_transcripts` for the post-debate archive but won't appear in the live sidebar.
+Reset both to `false` when entering prep phase; set the relevant one to `true` when a participant clicks "I'm Ready" or their timer expires.
 
-**File**: `src/components/debate/ParticipantSharedView.tsx` — update `getSubtopicItems()` to filter out items without `aiSummary`.
+### 2. `PrepPhaseOverlay.tsx` — Add "I'm Ready" button
+- Add a prominent "I'm Ready" button on both the incoming (after selecting time + during countdown) and outgoing (review) views.
+- Clicking it calls `onReady()` immediately, regardless of remaining time.
+- The button replaces the auto-advance on timer expiry — `onReady` is called either by button click or timer reaching zero, whichever comes first.
 
----
+### 3. `DebateRoomPage.tsx` — Sync both sides via realtime
+**Entering prep phase:**
+- Both participants detect the turn ending and set their local `prepPhaseRole`.
+- The turn-ending participant writes `prep_phase_active = true`, `prep_side1_ready = false`, `prep_side2_ready = false` to the DB.
+- The other participant picks up `prep_phase_active = true` via the existing realtime subscription and enters prep phase locally if they haven't already.
 
-### 2. Main box + sidebar: Left/right alignment by speaker side
+**Marking ready:**
+- `handlePrepReady` no longer calls `advanceTurn()` directly. Instead, it sets `prep_side1_ready` or `prep_side2_ready` to `true` on the debate record (based on which side the user is on).
+- A realtime listener watches for changes: when BOTH `prep_side1_ready` AND `prep_side2_ready` are `true`, THEN clear the prep phase and call `advanceTurn()`.
 
-**Current**: All messages in `MessengerChat` (main box) and `TranscriptCard` (sidebar) stack uniformly with a left border.
+**Flow:**
+```text
+Turn ends
+  → Both sides enter prep phase (synced via DB flag)
+  → Incoming speaker: picks time, prepares, clicks "I'm Ready" or timer expires
+  → Outgoing speaker: reviews summary, clicks "I'm Ready" or timer expires
+  → Each side sets their ready flag in DB
+  → When both flags are true → clear prep phase → advance turn
+```
 
-**Change**:
-- **`MessengerChat.tsx`**: Side 1 (sort_order 0) messages align left, side 2 messages align right. Use `flex justify-start` / `justify-end`, constrain bubble width to ~75%, and move the colored border to match (left for side 1, right for side 2).
-- **`TranscriptCard.tsx`**: Same directional treatment — side 1 cards get `border-l`, side 2 cards get `border-r` and right-align text header.
-
-**Files**: `src/components/debate/MessengerChat.tsx`, `src/components/debate/TranscriptCard.tsx`
-
----
-
-### 3. Live transcription as subtitles over camera feed
-
-**Current**: Interim transcription text (`interimText`) only appears at the bottom of the sidebar's current subtopic section.
-
-**Change**: When any camera is on (local or remote), overlay the live `interimText` at the bottom of the camera feed as a subtitle bar — a semi-transparent dark strip with white text, positioned absolutely at the bottom of the video container.
-
-**File**: `src/components/debate/ParticipantSharedView.tsx` — add a subtitle overlay inside the camera view sections (`onlyLocalOn`, `onlyRemoteOn`, `bothOn`). Also show the most recent final transcript line briefly before it fades, for continuity.
-
----
-
-## Summary of File Changes
+## Files to Change
 
 | File | Change |
 |------|--------|
-| `ParticipantSharedView.tsx` | Filter sidebar to AI-summarized items only; add subtitle overlay on camera feeds |
-| `MessengerChat.tsx` | Left/right bubble alignment based on `sideOrder` |
-| `TranscriptCard.tsx` | Left/right border + alignment based on `sideOrder` |
+| Migration SQL | Add `prep_side1_ready`, `prep_side2_ready` to `debates` |
+| `PrepPhaseOverlay.tsx` | Add "I'm Ready" button to both incoming and outgoing views |
+| `DebateRoomPage.tsx` | Sync prep phase via realtime; track per-side readiness; only advance when both ready |
 
