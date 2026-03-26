@@ -264,15 +264,15 @@ const DebateRoomPage = () => {
     return () => clearInterval(timerRef.current);
   }, [timerRunning, timeLeft]);
 
-  // Auto-advance: when timer hits 0 during a live debate, advance immediately
+  // Auto-advance: when timer hits 0 during a live debate, enter prep phase
   useEffect(() => {
     if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live") {
-      if (!advancingRef.current) {
-        advanceTurn();
+      if (!advancingRef.current && !prepPhaseRole) {
+        enterPrepPhase();
       }
     }
     prevTimerRunningRef.current = timerRunning;
-  }, [timerRunning, timeLeft, debate]);
+  }, [timerRunning, timeLeft, debate, prepPhaseRole]);
 
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
