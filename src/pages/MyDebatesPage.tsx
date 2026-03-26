@@ -86,7 +86,7 @@ const MyDebatesPage = () => {
         .eq("created_by", user.id)
         .order("created_at", { ascending: false });
 
-      setLiveSessions((sessions || []) as LiveSessionRow[]);
+      setLiveSessions(((sessions as any) || []) as LiveSessionRow[]);
       setLoading(false);
     };
     load();
