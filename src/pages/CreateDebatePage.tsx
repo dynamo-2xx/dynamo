@@ -14,6 +14,8 @@ interface GeneratedDebate {
   sides: string[];
   turnsPerSubtopic: number;
   timePerTurn: string;
+  prepTimeMin: string;
+  prepTimeMax: string;
 }
 
 const TAGLINES = [
@@ -26,6 +28,7 @@ const TAGLINES = [
 ];
 
 const TIME_OPTIONS = ["30s", "1 min", "2 min", "3 min", "5 min"];
+const PREP_TIME_OPTIONS = ["15s", "30s", "45s", "1 min", "1.5 min", "2 min", "3 min"];
 
 const CreateDebatePage = () => {
   const { user } = useAuth();
@@ -64,6 +67,8 @@ const CreateDebatePage = () => {
         sides: data.sides,
         turnsPerSubtopic: data.turns_per_subtopic,
         timePerTurn: data.time_per_turn,
+        prepTimeMin: "15s",
+        prepTimeMax: "60s",
       });
       setStep(3);
     } catch (err) {
@@ -74,6 +79,8 @@ const CreateDebatePage = () => {
         sides: ["For", "Against"],
         turnsPerSubtopic: 2,
         timePerTurn: "2 min",
+        prepTimeMin: "15s",
+        prepTimeMax: "60s",
       });
       setStep(3);
       toast.error("AI generation had an issue — using a default structure. You can edit everything.");
@@ -130,9 +137,11 @@ const CreateDebatePage = () => {
           is_public: isPublic,
           turns_per_subtopic: debate.turnsPerSubtopic,
           time_per_turn: debate.timePerTurn,
+          prep_time_min: debate.prepTimeMin,
+          prep_time_max: debate.prepTimeMax,
           facilitator_type: "ai",
           status: "draft",
-        })
+        } as any)
         .select()
         .single();
 
@@ -375,6 +384,38 @@ const CreateDebatePage = () => {
                   </div>
                 </div>
 
+                {/* Preparation Time Range */}
+                <div className="bg-card border border-border rounded-xl p-5">
+                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">
+                    <Clock className="w-3.5 h-3.5 inline mr-1" />
+                    Preparation Time Between Turns
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1.5 font-body">Minimum</p>
+                      <select
+                        value={debate.prepTimeMin}
+                        onChange={(e) => setDebate({ ...debate, prepTimeMin: e.target.value })}
+                        className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                      >
+                        {PREP_TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-1.5 font-body">Maximum</p>
+                      <select
+                        value={debate.prepTimeMax}
+                        onChange={(e) => setDebate({ ...debate, prepTimeMax: e.target.value })}
+                        className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                      >
+                        {PREP_TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2 font-body">
+                    Between turns, speakers can choose preparation time within this range.
+                  </p>
+                </div>
                 {/* Invite Users (optional) */}
                 <div className="bg-card border border-border rounded-xl p-5">
                   <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">
