@@ -711,7 +711,7 @@ const DebateRoomPage = () => {
   const endTurnEarly = () => {
     setTimerRunning(false);
     setTimeLeft(0);
-    advanceTurn();
+    enterPrepPhase();
   };
 
   if (loading) {
@@ -885,41 +885,59 @@ const DebateRoomPage = () => {
         )}
 
         {isLive && (isSpeaker || (isFacilitator && facilitatorSpeaking)) && (
-          <ParticipantSharedView
-            debate={debate}
-            sides={sides}
-            subtopics={subtopics}
-            arguments={arguments_}
-            participants={participants}
-            timeLeft={timeLeft}
-            aiMessage={aiMessage}
-            canSpeak={canSpeak}
-            isMyTurn={!!isMyTurn}
-            isSpeaker={isSpeaker}
-            userId={user?.id}
-            micEnabled={micEnabled}
-            isRecording={isRecording}
-            argumentText={argumentText}
-            submitting={submitting}
-            speechRef={speechRef}
-            currentSide={currentSide}
-            isPublisher={isCreator}
-            timerRunning={timerRunning}
-            transcriptEntries={transcriptEntries}
-            deepgramConnected={deepgramConnected}
-            deepgramActive={deepgramActive}
-            interimText={interimText}
-            onArgumentTextChange={setArgumentText}
-            onSetRecording={setIsRecording}
-            onSubmit={submitArgument}
-            onEndTurnEarly={endTurnEarly}
-            onToggleDeepgram={() => setDeepgramActive(prev => !prev)}
-            onToggleTimer={() => setTimerRunning(!timerRunning)}
-            onExtendTime={handleExtendTime}
-            onSkipTurn={handleSkipTurn}
-            onNextSubtopic={handleNextSubtopic}
-            roundSummaries={roundSummaries}
-          />
+          <div className="flex-1 flex overflow-hidden w-full min-w-0 relative">
+            <ParticipantSharedView
+              debate={debate}
+              sides={sides}
+              subtopics={subtopics}
+              arguments={arguments_}
+              participants={participants}
+              timeLeft={timeLeft}
+              aiMessage={aiMessage}
+              canSpeak={canSpeak}
+              isMyTurn={!!isMyTurn}
+              isSpeaker={isSpeaker}
+              userId={user?.id}
+              micEnabled={micEnabled}
+              isRecording={isRecording}
+              argumentText={argumentText}
+              submitting={submitting}
+              speechRef={speechRef}
+              currentSide={currentSide}
+              isPublisher={isCreator}
+              timerRunning={timerRunning}
+              transcriptEntries={transcriptEntries}
+              deepgramConnected={deepgramConnected}
+              deepgramActive={deepgramActive}
+              interimText={interimText}
+              onArgumentTextChange={setArgumentText}
+              onSetRecording={setIsRecording}
+              onSubmit={submitArgument}
+              onEndTurnEarly={endTurnEarly}
+              onToggleDeepgram={() => setDeepgramActive(prev => !prev)}
+              onToggleTimer={() => setTimerRunning(!timerRunning)}
+              onExtendTime={handleExtendTime}
+              onSkipTurn={handleSkipTurn}
+              onNextSubtopic={handleNextSubtopic}
+              roundSummaries={roundSummaries}
+            />
+            {/* Prep phase overlay */}
+            {prepPhaseRole && (
+              <PrepPhaseOverlay
+                role={prepPhaseRole}
+                prepTimeMin={parseTimeToSeconds(debate.prep_time_min || "15s")}
+                prepTimeMax={parseTimeToSeconds(debate.prep_time_max || "60s")}
+                lastTranscript={lastTurnTranscript}
+                lastAiSummary={lastTurnSummary}
+                speakerSideLabel={currentSide?.label || ""}
+                onPrepTimeSelected={handlePrepTimeSelected}
+                onSummaryEdited={handleSummaryEdited}
+                onReady={handlePrepReady}
+                prepStartedAt={prepStartedAt || undefined}
+                selectedPrepDuration={selectedPrepDuration || undefined}
+              />
+            )}
+          </div>
         )}
 
         {isLive && isSpectator && (
