@@ -42,7 +42,7 @@ const CreateDebatePage = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       setTaglineIndex((prev) => (prev + 1) % TAGLINES.length);
-    }, 10000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
