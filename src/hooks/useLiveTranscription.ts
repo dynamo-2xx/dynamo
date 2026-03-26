@@ -111,7 +111,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
       // Enable diarization for speaker detection
       const ws = new WebSocket(
-        `wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true&interim_results=true&diarize=true&endpointing=3000&utterance_end_ms=5000&vad_events=true&encoding=linear16&sample_rate=16000`,
+        `wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true&interim_results=true&diarize=true&endpointing=1000&utterance_end_ms=2000&vad_events=true&encoding=linear16&sample_rate=16000`,
         ["token", tokenData.key]
       );
 
@@ -155,16 +155,48 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
             const transcript = alt.transcript;
             if (!transcript) return;
 
-            // Get speaker from diarization (use first word's speaker)
-            const speaker = alt.words?.[0]?.speaker ?? 0;
-
             if (data.is_final) {
-              // If speaker changed, flush previous statement first
-              if (statementBufferRef.current && statementSpeakerRef.current !== speaker) {
-                flushStatement();
+              // Split words by speaker changes within this segment
+              const words = alt.words || [];
+              if (words.length === 0) {
+                // No word-level data, treat as single speaker
+                const speaker = 0;
+                if (statementBufferRef.current && statementSpeakerRef.current !== speaker) {
+                  flushStatement();
+                }
+                statementSpeakerRef.current = speaker;
+                statementBufferRef.current += (statementBufferRef.current ? " " : "") + transcript;
+              } else {
+                // Group consecutive words by speaker
+                let currentSpeaker = words[0].speaker ?? 0;
+                let currentWords: string[] = [];
+
+                for (const word of words) {
+                  const wordSpeaker = word.speaker ?? 0;
+                  if (wordSpeaker !== currentSpeaker) {
+                    // Flush buffer if different speaker, then flush this group
+                    if (statementBufferRef.current && statementSpeakerRef.current !== currentSpeaker) {
+                      flushStatement();
+                    }
+                    statementSpeakerRef.current = currentSpeaker;
+                    statementBufferRef.current += (statementBufferRef.current ? " " : "") + currentWords.join(" ");
+                    flushStatement();
+
+                    currentSpeaker = wordSpeaker;
+                    currentWords = [];
+                  }
+                  currentWords.push(word.punctuated_word || word.word);
+                }
+
+                // Handle remaining words
+                if (currentWords.length > 0) {
+                  if (statementBufferRef.current && statementSpeakerRef.current !== currentSpeaker) {
+                    flushStatement();
+                  }
+                  statementSpeakerRef.current = currentSpeaker;
+                  statementBufferRef.current += (statementBufferRef.current ? " " : "") + currentWords.join(" ");
+                }
               }
-              statementSpeakerRef.current = speaker;
-              statementBufferRef.current += (statementBufferRef.current ? " " : "") + transcript;
               setInterimText("");
             } else {
               setInterimText(transcript);
