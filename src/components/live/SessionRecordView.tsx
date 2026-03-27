@@ -244,7 +244,7 @@ const SessionRecordView = ({
 
           {groupedData.orderedSubtopics.map((topic, idx) => {
             const entries = groupedData.entryGroups[topic] || [];
-            const topicSummaries = groupedData.summaryBySubtopic[topic] || [];
+            const topicSummary = subtopicSummaryMap[topic];
 
             return (
               <Collapsible key={topic} defaultOpen={idx === 0}>
@@ -253,7 +253,7 @@ const SessionRecordView = ({
                   <h3 className="text-sm font-display font-semibold text-foreground flex-1">
                     {idx + 1}. {topic}
                   </h3>
-                  {topicSummaries.length > 0 && (
+                  {topicSummary && (
                     <span className="text-[9px] bg-primary/10 text-primary rounded-full px-2 py-0.5 font-semibold">
                       Summarized
                     </span>
@@ -267,21 +267,21 @@ const SessionRecordView = ({
                 <CollapsibleContent>
                   <div className="px-5 py-3 space-y-2">
                     {/* Subtopic summary pinned at top */}
-                    {topicSummaries.map((s, si) => (
-                      <div key={s.id} className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
+                    {topicSummary && (
+                      <div className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
                         <div className="flex items-center gap-2 px-3 py-2 border-b border-primary/10">
                           <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                             <Zap className="w-3 h-3 text-primary" />
                           </div>
                           <span className="text-[10px] font-semibold uppercase tracking-widest text-primary font-display">
-                            {topicSummaries.length > 1 ? `Summary ${si + 1}` : "Summary"}
+                            Summary
                           </span>
                         </div>
                         <div className="px-3 py-2">
-                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{s.text}</p>
+                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{topicSummary}</p>
                         </div>
                       </div>
-                    ))}
+                    )}
 
                     {/* Transcript bubbles */}
                     {entries.map((entry) => (
