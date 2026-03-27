@@ -106,6 +106,8 @@ const DebateRoomPage = () => {
   const [selectedPrepDuration, setSelectedPrepDuration] = useState<number | null>(null);
   const [lastTurnTranscript, setLastTurnTranscript] = useState<string>("");
   const [lastTurnSummary, setLastTurnSummary] = useState<string>("");
+  const [notebookContent, setNotebookContent] = useState<string>("");
+  const [notebookOpen, setNotebookOpen] = useState(false);
 
   // Deepgram transcription — activate for all non-spectators as soon as debate is live
   const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
