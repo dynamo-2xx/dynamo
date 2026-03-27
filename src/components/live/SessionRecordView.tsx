@@ -136,15 +136,6 @@ const SessionRecordView = ({
     setIsSharing(false);
   }, [currentShareToken, sessionId]);
 
-  // Build overall summary — prefer dedicated overall_summary from AI
-  const overallSummary = useMemo(() => {
-    if (summaries.length === 0) return null;
-    // Use the latest summary's overall_summary field if available
-    const latest = summaries[summaries.length - 1];
-    if (latest.overall_summary) return latest.overall_summary;
-    if (latest.text) return latest.text;
-    return summaries.map(s => s.text).filter(Boolean).join("\n\n") || null;
-  }, [summaries]);
 
   // Get subtopic-specific summaries from the latest analysis
   const subtopicSummaryMap = useMemo(() => {
@@ -208,24 +199,6 @@ const SessionRecordView = ({
           )}
         </div>
 
-        {/* Overall Summary */}
-        {overallSummary && (
-          <div className="mb-8">
-            <div className="border border-primary/20 bg-primary/5 rounded-xl overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/10">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                  <Zap className="w-3.5 h-3.5 text-primary" />
-                </div>
-                <span className="text-xs font-semibold uppercase tracking-widest text-primary font-display">
-                  Overall Summary
-                </span>
-              </div>
-              <div className="px-4 py-3">
-                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{overallSummary}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Subtopic sections — summaries only */}
         {groupedData.orderedSubtopics.length > 0 && (
