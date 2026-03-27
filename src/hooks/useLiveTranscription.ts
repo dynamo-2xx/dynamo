@@ -16,7 +16,6 @@ export interface LiveTranscriptEntry {
 export interface LiveSummary {
   id: string;
   text: string;
-  overall_summary?: string;
   subtopic_summaries?: Record<string, string>;
   created_at: number;
   subtopics: string[];
@@ -278,17 +277,15 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       });
 
       if (!error && data) {
-        const overallText = data.overall_summary || data.summary || "";
         const summary: LiveSummary = {
           id: `summary-${Date.now()}`,
-          text: overallText,
-          overall_summary: overallText,
+          text: "",
           subtopic_summaries: data.subtopic_summaries || {},
           created_at: Date.now(),
           subtopics: data.subtopics || [],
         };
 
-        if (summary.text) {
+        if (summary.subtopics.length > 0 || Object.keys(summary.subtopic_summaries || {}).length > 0) {
           setSummaries((prev) => {
             const updated = [...prev, summary];
             persistSession({ summaries: updated });
