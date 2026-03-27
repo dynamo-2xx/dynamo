@@ -296,7 +296,7 @@ const SessionRecordView = ({
                       />
                     ))}
 
-                    {entries.length === 0 && topicSummaries.length === 0 && (
+                    {entries.length === 0 && !topicSummary && (
                       <p className="text-xs text-muted-foreground italic py-2">No statements recorded</p>
                     )}
                   </div>
