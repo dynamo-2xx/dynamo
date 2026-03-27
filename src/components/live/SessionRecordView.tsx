@@ -227,90 +227,73 @@ const SessionRecordView = ({
           </div>
         )}
 
-        {/* Subtopic sections — collapsible */}
-        <div className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            Transcript
-          </h2>
+        {/* Subtopic sections — summaries only */}
+        {groupedData.orderedSubtopics.length > 0 && (
+          <div className="space-y-3 mb-8">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Topics
+            </h2>
 
-          {groupedData.orderedSubtopics.map((topic, idx) => {
-            const entries = groupedData.entryGroups[topic] || [];
-            const topicSummary = subtopicSummaryMap[topic];
+            {groupedData.orderedSubtopics.map((topic, idx) => {
+              const topicSummary = subtopicSummaryMap[topic];
+              const entryCount = (groupedData.entryGroups[topic] || []).length;
 
-            return (
-              <Collapsible key={topic} defaultOpen={idx === 0}>
-                <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-5 py-4 text-left hover:bg-accent/50 transition-colors">
-                  <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
-                  <h3 className="text-sm font-display font-semibold text-foreground flex-1">
-                    {idx + 1}. {topic}
-                  </h3>
-                  {topicSummary && (
-                    <span className="text-[9px] bg-primary/10 text-primary rounded-full px-2 py-0.5 font-semibold">
-                      Summarized
-                    </span>
-                  )}
-                  {entries.length > 0 && (
-                    <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
-                      {entries.length}
-                    </span>
-                  )}
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="px-5 py-3 space-y-2">
-                    {/* Subtopic summary pinned at top */}
-                    {topicSummary && (
-                      <div className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
-                        <div className="flex items-center gap-2 px-3 py-2 border-b border-primary/10">
-                          <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                            <Zap className="w-3 h-3 text-primary" />
+              return (
+                <Collapsible key={topic} defaultOpen>
+                  <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-5 py-4 text-left hover:bg-accent/50 transition-colors">
+                    <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                    <h3 className="text-sm font-display font-semibold text-foreground flex-1">
+                      {idx + 1}. {topic}
+                    </h3>
+                    {entryCount > 0 && (
+                      <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
+                        {entryCount} statements
+                      </span>
+                    )}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-5 py-3">
+                      {topicSummary ? (
+                        <div className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
+                          <div className="flex items-center gap-2 px-3 py-2 border-b border-primary/10">
+                            <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                              <Zap className="w-3 h-3 text-primary" />
+                            </div>
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-primary font-display">
+                              Summary
+                            </span>
                           </div>
-                          <span className="text-[10px] font-semibold uppercase tracking-widest text-primary font-display">
-                            Summary
-                          </span>
+                          <div className="px-3 py-2">
+                            <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{topicSummary}</p>
+                          </div>
                         </div>
-                        <div className="px-3 py-2">
-                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{topicSummary}</p>
-                        </div>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic py-2">No summary available for this topic.</p>
+                      )}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+          </div>
+        )}
 
-                    {/* Transcript bubbles */}
-                    {entries.map((entry) => (
-                      <SpeakerBubble
-                        key={entry.id}
-                        entry={entry}
-                        speakerName={getSpeakerName(entry.speaker_id)}
-                        readOnly={readOnly}
-                        onRenameSpeaker={(name) => handleRenameSpeaker(entry.speaker_id, name)}
-                        onSplit={(splitIdx) => handleSplitEntry(entry.id, splitIdx)}
-                        onMerge={() => handleMergeEntry(entry.id)}
-                      />
-                    ))}
-
-                    {entries.length === 0 && !topicSummary && (
-                      <p className="text-xs text-muted-foreground italic py-2">No statements recorded</p>
-                    )}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
-
-          {/* Unassigned entries (no subtopic) */}
-          {groupedData.unassigned.length > 0 && (
-            <Collapsible defaultOpen={groupedData.orderedSubtopics.length === 0}>
+        {/* Full Transcript — collapsible */}
+        {transcriptEntries.length > 0 && (
+          <div className="space-y-3">
+            <Collapsible>
               <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-5 py-4 text-left hover:bg-accent/50 transition-colors">
                 <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
                 <h3 className="text-sm font-display font-semibold text-foreground flex-1">
-                  General
+                  Full Transcript
                 </h3>
                 <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
-                  {groupedData.unassigned.length}
+                  {transcriptEntries.length} entries
                 </span>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="px-5 py-3 space-y-2">
-                  {groupedData.unassigned.map((entry) => (
+                  {transcriptEntries.map((entry) => (
                     <SpeakerBubble
                       key={entry.id}
                       entry={entry}
@@ -324,12 +307,12 @@ const SessionRecordView = ({
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          )}
+          </div>
+        )}
 
-          {transcriptEntries.length === 0 && (
-            <p className="text-muted-foreground text-center py-8 text-sm">No transcript entries recorded.</p>
-          )}
-        </div>
+        {transcriptEntries.length === 0 && summaries.length === 0 && (
+          <p className="text-muted-foreground text-center py-8 text-sm">No transcript entries recorded.</p>
+        )}
       </motion.div>
     </div>
   );
