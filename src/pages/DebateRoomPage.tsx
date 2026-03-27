@@ -990,8 +990,41 @@ const DebateRoomPage = () => {
                 onReady={handlePrepReady}
                 prepStartedAt={prepStartedAt || undefined}
                 selectedPrepDuration={selectedPrepDuration || undefined}
+                allTranscriptEntries={transcriptEntries}
+                subtopics={subtopics.map(st => ({ id: st.id, title: st.title }))}
+                sides={sides.map(s => ({ id: s.id, label: s.label }))}
+                isSummaryBeingEdited={
+                  debate.prep_phase_active && prepPhaseRole === "incoming" &&
+                  !(getMySideIndex() === 0 ? debate.prep_side2_ready : debate.prep_side1_ready)
+                }
+                notebookValue={notebookContent}
+                onNotebookChange={setNotebookContent}
               />
             )}
+            {/* Notebook button — visible during live debate when not in prep */}
+            {!prepPhaseRole && isSpeaker && (
+              <button
+                onClick={() => setNotebookOpen(true)}
+                className="absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full bg-card border border-border shadow-md flex items-center justify-center hover:bg-accent transition-colors"
+                title="My Notes"
+              >
+                <NotebookPen className="w-4 h-4 text-foreground" />
+              </button>
+            )}
+            {/* Notebook Sheet */}
+            <Sheet open={notebookOpen} onOpenChange={setNotebookOpen}>
+              <SheetContent side="right" className="w-[340px] sm:w-[400px] flex flex-col">
+                <SheetHeader>
+                  <SheetTitle className="font-display">My Notes</SheetTitle>
+                </SheetHeader>
+                <textarea
+                  value={notebookContent}
+                  onChange={(e) => setNotebookContent(e.target.value)}
+                  placeholder="Your preparation notes appear here…"
+                  className="flex-1 mt-4 w-full bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground font-body resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                />
+              </SheetContent>
+            </Sheet>
           </div>
         )}
 
