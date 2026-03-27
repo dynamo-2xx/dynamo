@@ -353,33 +353,4 @@ const LiveSessionPage = () => {
   );
 };
 
-// Simple bubble for recording view (no edit tools)
-const TranscriptBubble = ({
-  entry,
-  speakerNames,
-}: {
-  entry: LiveTranscriptEntry;
-  speakerNames: Record<string, string>;
-}) => {
-  const isLeft = entry.speaker_id % 2 === 0;
-  const name = speakerNames[String(entry.speaker_id)] || entry.speaker_label;
-
-  return (
-    <div className={`flex ${isLeft ? "justify-start" : "justify-end"} mb-1.5`}>
-      <div
-        className={`max-w-[80%] rounded-xl px-3.5 py-2 text-sm ${
-          isLeft
-            ? "bg-secondary text-foreground rounded-bl-sm"
-            : "bg-primary/10 text-foreground rounded-br-sm"
-        }`}
-      >
-        <span className="text-[10px] font-semibold text-muted-foreground block mb-0.5">
-          {name}
-        </span>
-        <span>{entry.text}</span>
-      </div>
-    </div>
-  );
-};
-
 export default LiveSessionPage;

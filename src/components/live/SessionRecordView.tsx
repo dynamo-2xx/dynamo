@@ -167,25 +167,16 @@ const SessionRecordView = ({
       }
     });
 
-    // Summaries mapped by subtopic
-    const summaryBySubtopic: Record<string, LiveSummary[]> = {};
-    summaries.forEach((s) => {
-      s.subtopics.forEach((st) => {
-        if (!summaryBySubtopic[st]) summaryBySubtopic[st] = [];
-        summaryBySubtopic[st].push(s);
-      });
-    });
-
-    // Build ordered subtopic list
-    const orderedSubtopics = subtopics.filter(s => entryGroups[s] || summaryBySubtopic[s]);
+    // Build ordered subtopic list from subtopics array + any entry subtopics + subtopicSummaryMap keys
+    const orderedSubtopics = [...subtopics];
     Object.keys(entryGroups).forEach(s => {
       if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
     });
-    Object.keys(summaryBySubtopic).forEach(s => {
+    Object.keys(subtopicSummaryMap).forEach(s => {
       if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
     });
 
-    return { entryGroups, unassigned, summaryBySubtopic, orderedSubtopics };
+    return { entryGroups, unassigned, orderedSubtopics };
   }, [transcriptEntries, summaries, subtopics]);
 
   return (
