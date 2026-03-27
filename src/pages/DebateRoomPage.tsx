@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap
+  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap, NotebookPen
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
@@ -105,6 +106,8 @@ const DebateRoomPage = () => {
   const [selectedPrepDuration, setSelectedPrepDuration] = useState<number | null>(null);
   const [lastTurnTranscript, setLastTurnTranscript] = useState<string>("");
   const [lastTurnSummary, setLastTurnSummary] = useState<string>("");
+  const [notebookContent, setNotebookContent] = useState<string>("");
+  const [notebookOpen, setNotebookOpen] = useState(false);
 
   // Deepgram transcription — activate for all non-spectators as soon as debate is live
   const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
@@ -987,8 +990,41 @@ const DebateRoomPage = () => {
                 onReady={handlePrepReady}
                 prepStartedAt={prepStartedAt || undefined}
                 selectedPrepDuration={selectedPrepDuration || undefined}
+                allTranscriptEntries={transcriptEntries}
+                subtopics={subtopics.map(st => ({ id: st.id, title: st.title }))}
+                sides={sides.map(s => ({ id: s.id, label: s.label }))}
+                isSummaryBeingEdited={
+                  debate.prep_phase_active && prepPhaseRole === "incoming" &&
+                  !(getMySideIndex() === 0 ? debate.prep_side2_ready : debate.prep_side1_ready)
+                }
+                notebookValue={notebookContent}
+                onNotebookChange={setNotebookContent}
               />
             )}
+            {/* Notebook button — visible during live debate when not in prep */}
+            {!prepPhaseRole && isSpeaker && (
+              <button
+                onClick={() => setNotebookOpen(true)}
+                className="absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full bg-card border border-border shadow-md flex items-center justify-center hover:bg-accent transition-colors"
+                title="My Notes"
+              >
+                <NotebookPen className="w-4 h-4 text-foreground" />
+              </button>
+            )}
+            {/* Notebook Sheet */}
+            <Sheet open={notebookOpen} onOpenChange={setNotebookOpen}>
+              <SheetContent side="right" className="w-[340px] sm:w-[400px] flex flex-col">
+                <SheetHeader>
+                  <SheetTitle className="font-display">My Notes</SheetTitle>
+                </SheetHeader>
+                <textarea
+                  value={notebookContent}
+                  onChange={(e) => setNotebookContent(e.target.value)}
+                  placeholder="Your preparation notes appear here…"
+                  className="flex-1 mt-4 w-full bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground font-body resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                />
+              </SheetContent>
+            </Sheet>
           </div>
         )}
 

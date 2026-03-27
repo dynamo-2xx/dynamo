@@ -1,7 +1,17 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, Edit3, Check, ArrowRight } from "lucide-react";
+import { Clock, Edit3, Check, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+interface TranscriptEntry {
+  id: string;
+  text: string;
+  speaker_side: string;
+  subtopic: string;
+  timestamp: number;
+  is_final: boolean;
+  ai_summary?: string;
+}
 
 interface PrepPhaseOverlayProps {
   role: "incoming" | "outgoing";
@@ -15,6 +25,13 @@ interface PrepPhaseOverlayProps {
   onReady?: () => void;
   prepStartedAt?: number;
   selectedPrepDuration?: number;
+  // New props for 3-column incoming prep
+  allTranscriptEntries?: TranscriptEntry[];
+  subtopics?: Array<{ id: string; title: string }>;
+  sides?: Array<{ id: string; label: string }>;
+  isSummaryBeingEdited?: boolean;
+  notebookValue?: string;
+  onNotebookChange?: (val: string) => void;
 }
 
 function parseTimeLabel(seconds: number): string {
@@ -39,12 +56,22 @@ const PrepPhaseOverlay = ({
   onReady,
   prepStartedAt,
   selectedPrepDuration,
+  allTranscriptEntries = [],
+  subtopics = [],
+  sides = [],
+  isSummaryBeingEdited,
+  notebookValue,
+  onNotebookChange,
 }: PrepPhaseOverlayProps) => {
   const [selectedTime, setSelectedTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [editedSummary, setEditedSummary] = useState(lastAiSummary || "");
   const [summarySubmitted, setSummarySubmitted] = useState(false);
   const [markedReady, setMarkedReady] = useState(false);
+  const [localNotes, setLocalNotes] = useState("");
+
+  const notesValue = notebookValue !== undefined ? notebookValue : localNotes;
+  const setNotesValue = onNotebookChange || setLocalNotes;
 
   const availableOptions = PREP_OPTIONS.filter(t => t >= prepTimeMin && t <= prepTimeMax);
 
@@ -91,6 +118,12 @@ const PrepPhaseOverlay = ({
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
+  // Group transcript entries by subtopic
+  const entriesBySubtopic = subtopics.map(st => ({
+    subtopic: st,
+    entries: allTranscriptEntries.filter(e => e.is_final && e.subtopic === st.title),
+  })).filter(g => g.entries.length > 0);
+
   const readyButtonJsx = (
     <Button
       onClick={handleReady}
@@ -117,7 +150,7 @@ const PrepPhaseOverlay = ({
       exit={{ opacity: 0 }}
       className="absolute inset-0 z-30 bg-background/95 backdrop-blur-sm flex items-center justify-center overflow-y-auto py-6"
     >
-      <div className={`w-full mx-4 ${role === "outgoing" ? "max-w-4xl" : "max-w-lg"}`}>
+      <div className={`w-full mx-4 ${role === "outgoing" || (role === "incoming" && selectedTime) ? "max-w-6xl" : "max-w-lg"}`}>
         {/* INCOMING: Time selection */}
         {role === "incoming" && !selectedTime && (
           <motion.div
@@ -146,23 +179,121 @@ const PrepPhaseOverlay = ({
           </motion.div>
         )}
 
-        {/* INCOMING: Countdown */}
-        {role === "incoming" && selectedTime && timeRemaining !== null && (
+        {/* INCOMING: 3-column prep workspace */}
+        {role === "incoming" && selectedTime && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-center"
+            className="space-y-4"
           >
-            <h2 className="text-lg font-display font-bold text-foreground mb-2">
-              Preparation Time
-            </h2>
-            <div className="text-5xl font-display font-bold text-primary mb-4">
-              {formatTime(timeRemaining)}
+            {/* Header + Timer */}
+            <div className="text-center">
+              <h2 className="text-lg font-display font-bold text-foreground mb-1">
+                Preparation Time
+              </h2>
+              {timeRemaining !== null && (
+                <div className="text-4xl font-display font-bold text-primary mb-1">
+                  {formatTime(timeRemaining)}
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground font-body">
+                Review the debate and prepare your arguments.
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground font-body">
-              Prepare your arguments for when it's your turn.
-            </p>
-            {readyButtonJsx}
+
+            {/* 3-column grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Column 1: Transcripts */}
+              <div className="bg-card border border-border rounded-xl p-4 max-h-[55vh] overflow-y-auto">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                  Transcripts
+                </p>
+                {entriesBySubtopic.length > 0 ? (
+                  <div className="space-y-3">
+                    {entriesBySubtopic.map(({ subtopic, entries }) => (
+                      <div key={subtopic.id}>
+                        <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">
+                          {subtopic.title}
+                        </p>
+                        <div className="space-y-1.5">
+                          {entries.map((entry) => (
+                            <div key={entry.id} className="text-xs font-body">
+                              <span className="font-semibold text-foreground">{entry.speaker_side}:</span>{" "}
+                              <span className="text-muted-foreground">{entry.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic font-body">No transcripts yet.</p>
+                )}
+              </div>
+
+              {/* Column 2: Summaries */}
+              <div className="bg-card border border-border rounded-xl p-4 max-h-[55vh] overflow-y-auto">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                  Summaries
+                </p>
+                {entriesBySubtopic.length > 0 ? (
+                  <div className="space-y-3">
+                    {entriesBySubtopic.map(({ subtopic, entries }, groupIdx) => {
+                      const summaries = entries.filter(e => e.ai_summary);
+                      const isLastGroup = groupIdx === entriesBySubtopic.length - 1;
+                      return (
+                        <div key={subtopic.id}>
+                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">
+                            {subtopic.title}
+                          </p>
+                          {summaries.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {summaries.map((entry) => (
+                                <div key={entry.id} className="text-xs font-body">
+                                  <span className="font-semibold text-foreground">{entry.speaker_side}:</span>{" "}
+                                  <span className="text-muted-foreground">{entry.ai_summary}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {isLastGroup && isSummaryBeingEdited && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                              <span className="text-[10px] text-primary font-semibold animate-pulse">
+                                Editing…
+                              </span>
+                            </div>
+                          )}
+                          {summaries.length === 0 && !(isLastGroup && isSummaryBeingEdited) && (
+                            <p className="text-[10px] text-muted-foreground italic">No summaries yet.</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic font-body">No summaries yet.</p>
+                )}
+              </div>
+
+              {/* Column 3: My Notes */}
+              <div className="bg-card border border-border rounded-xl p-4 flex flex-col">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                  My Notes
+                </p>
+                <textarea
+                  value={notesValue}
+                  onChange={(e) => setNotesValue(e.target.value)}
+                  placeholder="Write your preparation notes here…"
+                  className="flex-1 min-h-[200px] w-full bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground font-body resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                />
+              </div>
+            </div>
+
+            {/* Ready button */}
+            <div className="text-center">
+              {readyButtonJsx}
+            </div>
           </motion.div>
         )}
 
