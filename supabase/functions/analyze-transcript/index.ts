@@ -59,14 +59,23 @@ Analyze this conversation: identify subtopics, assign each entry to a subtopic, 
                 parameters: {
                   type: "object",
                   properties: {
+                    overall_summary: {
+                      type: "string",
+                      description: "A comprehensive overall summary synthesizing all key points across the entire conversation",
+                    },
                     summary: {
                       type: "string",
-                      description: "Comprehensive summary of the conversation so far",
+                      description: "Same as overall_summary (for backward compatibility)",
                     },
                     subtopics: {
                       type: "array",
                       items: { type: "string" },
                       description: "List of distinct subtopic/theme labels identified in the conversation",
+                    },
+                    subtopic_summaries: {
+                      type: "object",
+                      description: "Map of subtopic label to a brief summary for that subtopic",
+                      additionalProperties: { type: "string" },
                     },
                     entry_subtopic_map: {
                       type: "object",
