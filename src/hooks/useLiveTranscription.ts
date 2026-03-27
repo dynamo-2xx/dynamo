@@ -278,9 +278,12 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       });
 
       if (!error && data) {
+        const overallText = data.overall_summary || data.summary || "";
         const summary: LiveSummary = {
           id: `summary-${Date.now()}`,
-          text: data.summary || "",
+          text: overallText,
+          overall_summary: overallText,
+          subtopic_summaries: data.subtopic_summaries || {},
           created_at: Date.now(),
           subtopics: data.subtopics || [],
         };
