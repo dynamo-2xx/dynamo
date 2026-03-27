@@ -285,7 +285,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
           subtopics: data.subtopics || [],
         };
 
-        if (summary.text) {
+        if (summary.subtopics.length > 0 || Object.keys(summary.subtopic_summaries || {}).length > 0) {
           setSummaries((prev) => {
             const updated = [...prev, summary];
             persistSession({ summaries: updated });
