@@ -48,7 +48,6 @@ const PrepPhaseOverlay = ({
 
   const availableOptions = PREP_OPTIONS.filter(t => t >= prepTimeMin && t <= prepTimeMax);
 
-  // Countdown timer for both roles
   useEffect(() => {
     if (!prepStartedAt) return;
     const duration = role === "outgoing" ? prepTimeMax : (selectedPrepDuration || selectedTime);
@@ -92,7 +91,7 @@ const PrepPhaseOverlay = ({
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  const ReadyButton = () => (
+  const readyButtonJsx = (
     <Button
       onClick={handleReady}
       disabled={markedReady}
@@ -116,9 +115,10 @@ const PrepPhaseOverlay = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-30 bg-background/95 backdrop-blur-sm flex items-center justify-center"
+      className="absolute inset-0 z-30 bg-background/95 backdrop-blur-sm flex items-center justify-center overflow-y-auto py-6"
     >
-      <div className="max-w-lg w-full mx-4">
+      <div className={`w-full mx-4 ${role === "outgoing" ? "max-w-4xl" : "max-w-lg"}`}>
+        {/* INCOMING: Time selection */}
         {role === "incoming" && !selectedTime && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -146,6 +146,7 @@ const PrepPhaseOverlay = ({
           </motion.div>
         )}
 
+        {/* INCOMING: Countdown */}
         {role === "incoming" && selectedTime && timeRemaining !== null && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -161,16 +162,18 @@ const PrepPhaseOverlay = ({
             <p className="text-sm text-muted-foreground font-body">
               Prepare your arguments for when it's your turn.
             </p>
-            <ReadyButton />
+            {readyButtonJsx}
           </motion.div>
         )}
 
+        {/* OUTGOING: Side-by-side review */}
         {role === "outgoing" && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-4"
           >
+            {/* Header */}
             <div className="text-center">
               <Edit3 className="w-8 h-8 text-primary mx-auto mb-3" />
               <h2 className="text-lg font-display font-bold text-foreground mb-1">
@@ -186,52 +189,62 @@ const PrepPhaseOverlay = ({
               )}
             </div>
 
-            {lastTranscript && (
-              <div className="bg-card border border-border rounded-xl p-4">
+            {/* Two-column grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Left: Transcript */}
+              <div className="bg-card border border-border rounded-xl p-4 max-h-[50vh] overflow-y-auto">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
                   Your Transcript
                 </p>
-                <p className="text-sm text-foreground font-body leading-relaxed">
-                  {lastTranscript}
-                </p>
-              </div>
-            )}
-
-            <div className="bg-card border border-border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  AI Summary
-                </p>
-                {summarySubmitted && (
-                  <span className="text-[10px] text-primary font-semibold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Saved
-                  </span>
+                {lastTranscript ? (
+                  <p className="text-sm text-foreground font-body leading-relaxed whitespace-pre-wrap">
+                    {lastTranscript}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic font-body">
+                    No transcript available.
+                  </p>
                 )}
               </div>
-              {lastAiSummary ? (
-                <>
-                  <textarea
-                    value={editedSummary}
-                    onChange={(e) => setEditedSummary(e.target.value)}
-                    className="w-full bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground font-body resize-none focus:outline-none focus:ring-1 focus:ring-primary/50 min-h-[80px]"
-                  />
-                  <button
-                    onClick={handleSubmitSummary}
-                    disabled={summarySubmitted}
-                    className="mt-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 font-body"
-                  >
-                    {summarySubmitted ? "Summary Saved" : "Save Changes"}
-                  </button>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground italic font-body">
-                  No AI summary was generated for this input.
-                </p>
-              )}
+
+              {/* Right: AI Summary */}
+              <div className="bg-card border border-border rounded-xl p-4 max-h-[50vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    AI Summary
+                  </p>
+                  {summarySubmitted && (
+                    <span className="text-[10px] text-primary font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Saved
+                    </span>
+                  )}
+                </div>
+                {lastAiSummary ? (
+                  <>
+                    <textarea
+                      value={editedSummary}
+                      onChange={(e) => setEditedSummary(e.target.value)}
+                      className="w-full bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground font-body resize-none focus:outline-none focus:ring-1 focus:ring-primary/50 min-h-[120px]"
+                    />
+                    <button
+                      onClick={handleSubmitSummary}
+                      disabled={summarySubmitted}
+                      className="mt-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 font-body"
+                    >
+                      {summarySubmitted ? "Summary Saved" : "Save Changes"}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic font-body">
+                    No AI summary was generated for this input.
+                  </p>
+                )}
+              </div>
             </div>
 
+            {/* Ready button always visible below */}
             <div className="text-center">
-              <ReadyButton />
+              {readyButtonJsx}
             </div>
           </motion.div>
         )}
