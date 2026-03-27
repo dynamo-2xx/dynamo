@@ -1,10 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Share2, Check, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Share2, Check, ChevronDown, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { LiveTranscriptEntry, LiveSummary } from "@/hooks/useLiveTranscription";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import SpeakerBubble from "./SpeakerBubble";
 
 interface SessionRecordViewProps {
@@ -68,20 +69,14 @@ const SessionRecordView = ({
     const secondSpeaker = secondWords[0]?.speaker ?? entry.speaker_id;
 
     const entry1: LiveTranscriptEntry = {
-      ...entry,
-      id: `${entry.id}-a`,
-      text: firstWords.map(w => w.word).join(" "),
-      words: firstWords,
-      speaker_id: firstSpeaker,
-      speaker_label: getSpeakerName(firstSpeaker),
+      ...entry, id: `${entry.id}-a`,
+      text: firstWords.map(w => w.word).join(" "), words: firstWords,
+      speaker_id: firstSpeaker, speaker_label: getSpeakerName(firstSpeaker),
     };
     const entry2: LiveTranscriptEntry = {
-      ...entry,
-      id: `${entry.id}-b`,
-      text: secondWords.map(w => w.word).join(" "),
-      words: secondWords,
-      speaker_id: secondSpeaker,
-      speaker_label: getSpeakerName(secondSpeaker),
+      ...entry, id: `${entry.id}-b`,
+      text: secondWords.map(w => w.word).join(" "), words: secondWords,
+      speaker_id: secondSpeaker, speaker_label: getSpeakerName(secondSpeaker),
       uncertain: false,
     };
 
@@ -141,24 +136,48 @@ const SessionRecordView = ({
     setIsSharing(false);
   }, [currentShareToken, sessionId]);
 
-  // Group entries by subtopic
-  const groupedEntries = (() => {
-    const groups: Record<string, LiveTranscriptEntry[]> = {};
+  // Build overall summary from all summaries combined
+  const overallSummary = useMemo(() => {
+    if (summaries.length === 0) return null;
+    if (summaries.length === 1) return summaries[0].text;
+    // Combine all summaries into one overview
+    return summaries.map((s, i) => s.text).join("\n\n");
+  }, [summaries]);
+
+  // Group entries and summaries by subtopic
+  const groupedData = useMemo(() => {
+    const entryGroups: Record<string, LiveTranscriptEntry[]> = {};
     const unassigned: LiveTranscriptEntry[] = [];
+
     transcriptEntries.forEach((e) => {
       if (e.subtopic) {
-        if (!groups[e.subtopic]) groups[e.subtopic] = [];
-        groups[e.subtopic].push(e);
+        if (!entryGroups[e.subtopic]) entryGroups[e.subtopic] = [];
+        entryGroups[e.subtopic].push(e);
       } else {
         unassigned.push(e);
       }
     });
-    const orderedSubtopics = subtopics.filter(s => groups[s]);
-    Object.keys(groups).forEach(s => {
+
+    // Summaries mapped by subtopic
+    const summaryBySubtopic: Record<string, LiveSummary[]> = {};
+    summaries.forEach((s) => {
+      s.subtopics.forEach((st) => {
+        if (!summaryBySubtopic[st]) summaryBySubtopic[st] = [];
+        summaryBySubtopic[st].push(s);
+      });
+    });
+
+    // Build ordered subtopic list
+    const orderedSubtopics = subtopics.filter(s => entryGroups[s] || summaryBySubtopic[s]);
+    Object.keys(entryGroups).forEach(s => {
       if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
     });
-    return { groups, unassigned, orderedSubtopics };
-  })();
+    Object.keys(summaryBySubtopic).forEach(s => {
+      if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
+    });
+
+    return { entryGroups, unassigned, summaryBySubtopic, orderedSubtopics };
+  }, [transcriptEntries, summaries, subtopics]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
@@ -189,76 +208,123 @@ const SessionRecordView = ({
           )}
         </div>
 
-        {/* Summaries */}
-        {summaries.length > 0 && (
+        {/* Overall Summary */}
+        {overallSummary && (
           <div className="mb-8">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              Summaries
-            </h2>
-            <div className="space-y-3">
-              {summaries.map((s, i) => (
-                <div key={s.id} className="bg-card border border-border rounded-xl p-4">
-                  {summaries.length > 1 && (
-                    <p className="text-[10px] text-muted-foreground mb-1 font-semibold">
-                      Summary #{i + 1}
-                    </p>
-                  )}
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{s.text}</p>
-                  {s.subtopics.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {s.subtopics.map((st) => (
-                        <span key={st} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
-                          {st}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+            <div className="border border-primary/20 bg-primary/5 rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/10">
+                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                  <Zap className="w-3.5 h-3.5 text-primary" />
                 </div>
-              ))}
+                <span className="text-xs font-semibold uppercase tracking-widest text-primary font-display">
+                  Overall Summary
+                </span>
+              </div>
+              <div className="px-4 py-3">
+                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{overallSummary}</p>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Transcript */}
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+        {/* Subtopic sections — collapsible */}
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
             Transcript
           </h2>
 
-          {groupedEntries.orderedSubtopics.map((topic) => (
-            <div key={topic} className="mb-4">
-              <div className="flex items-center gap-2 py-2">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2">
-                  {topic}
-                </span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-              {groupedEntries.groups[topic].map((entry) => (
-                <SpeakerBubble
-                  key={entry.id}
-                  entry={entry}
-                  speakerName={getSpeakerName(entry.speaker_id)}
-                  readOnly={readOnly}
-                  onRenameSpeaker={(name) => handleRenameSpeaker(entry.speaker_id, name)}
-                  onSplit={(splitIdx) => handleSplitEntry(entry.id, splitIdx)}
-                  onMerge={() => handleMergeEntry(entry.id)}
-                />
-              ))}
-            </div>
-          ))}
+          {groupedData.orderedSubtopics.map((topic, idx) => {
+            const entries = groupedData.entryGroups[topic] || [];
+            const topicSummaries = groupedData.summaryBySubtopic[topic] || [];
 
-          {groupedEntries.unassigned.map((entry) => (
-            <SpeakerBubble
-              key={entry.id}
-              entry={entry}
-              speakerName={getSpeakerName(entry.speaker_id)}
-              readOnly={readOnly}
-              onRenameSpeaker={(name) => handleRenameSpeaker(entry.speaker_id, name)}
-              onSplit={(splitIdx) => handleSplitEntry(entry.id, splitIdx)}
-              onMerge={() => handleMergeEntry(entry.id)}
-            />
-          ))}
+            return (
+              <Collapsible key={topic} defaultOpen={idx === 0}>
+                <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-5 py-4 text-left hover:bg-accent/50 transition-colors">
+                  <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                  <h3 className="text-sm font-display font-semibold text-foreground flex-1">
+                    {idx + 1}. {topic}
+                  </h3>
+                  {topicSummaries.length > 0 && (
+                    <span className="text-[9px] bg-primary/10 text-primary rounded-full px-2 py-0.5 font-semibold">
+                      Summarized
+                    </span>
+                  )}
+                  {entries.length > 0 && (
+                    <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
+                      {entries.length}
+                    </span>
+                  )}
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-5 py-3 space-y-2">
+                    {/* Subtopic summary pinned at top */}
+                    {topicSummaries.map((s, si) => (
+                      <div key={s.id} className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
+                        <div className="flex items-center gap-2 px-3 py-2 border-b border-primary/10">
+                          <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <Zap className="w-3 h-3 text-primary" />
+                          </div>
+                          <span className="text-[10px] font-semibold uppercase tracking-widest text-primary font-display">
+                            {topicSummaries.length > 1 ? `Summary ${si + 1}` : "Summary"}
+                          </span>
+                        </div>
+                        <div className="px-3 py-2">
+                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{s.text}</p>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Transcript bubbles */}
+                    {entries.map((entry) => (
+                      <SpeakerBubble
+                        key={entry.id}
+                        entry={entry}
+                        speakerName={getSpeakerName(entry.speaker_id)}
+                        readOnly={readOnly}
+                        onRenameSpeaker={(name) => handleRenameSpeaker(entry.speaker_id, name)}
+                        onSplit={(splitIdx) => handleSplitEntry(entry.id, splitIdx)}
+                        onMerge={() => handleMergeEntry(entry.id)}
+                      />
+                    ))}
+
+                    {entries.length === 0 && topicSummaries.length === 0 && (
+                      <p className="text-xs text-muted-foreground italic py-2">No statements recorded</p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+
+          {/* Unassigned entries (no subtopic) */}
+          {groupedData.unassigned.length > 0 && (
+            <Collapsible defaultOpen={groupedData.orderedSubtopics.length === 0}>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-5 py-4 text-left hover:bg-accent/50 transition-colors">
+                <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                <h3 className="text-sm font-display font-semibold text-foreground flex-1">
+                  General
+                </h3>
+                <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
+                  {groupedData.unassigned.length}
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-5 py-3 space-y-2">
+                  {groupedData.unassigned.map((entry) => (
+                    <SpeakerBubble
+                      key={entry.id}
+                      entry={entry}
+                      speakerName={getSpeakerName(entry.speaker_id)}
+                      readOnly={readOnly}
+                      onRenameSpeaker={(name) => handleRenameSpeaker(entry.speaker_id, name)}
+                      onSplit={(splitIdx) => handleSplitEntry(entry.id, splitIdx)}
+                      onMerge={() => handleMergeEntry(entry.id)}
+                    />
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {transcriptEntries.length === 0 && (
             <p className="text-muted-foreground text-center py-8 text-sm">No transcript entries recorded.</p>

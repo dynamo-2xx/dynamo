@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle
+  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1042,6 +1042,28 @@ const DebateRoomPage = () => {
             )}
 
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+              {/* Overall Summary */}
+              {(() => {
+                const allSummaryTexts = Object.values(roundSummaries).map(rs => rs.summary).filter(Boolean);
+                const overallText = aiMessage || (allSummaryTexts.length > 0 ? allSummaryTexts.join("\n\n") : null);
+                if (!overallText) return null;
+                return (
+                  <div className="border border-primary/20 bg-primary/5 rounded-xl overflow-hidden mb-2">
+                    <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/10">
+                      <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                        <Zap className="w-3.5 h-3.5 text-primary" />
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-widest text-primary font-display">
+                        Overall Summary
+                      </span>
+                    </div>
+                    <div className="px-4 py-3">
+                      <p className="text-sm text-foreground leading-relaxed font-body whitespace-pre-wrap">{overallText}</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {subtopics.map((st, stIdx) => {
                 const stTranscripts = transcriptEntries.filter(e => e.is_final && e.subtopic === st.title);
                 const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
