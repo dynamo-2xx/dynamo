@@ -20,13 +20,14 @@ serve(async (req) => {
       const systemPrompt = `You are an AI conversation analyst. Analyze the provided transcript from a live conversation with multiple speakers (labeled Speaker 1, Speaker 2, etc.).
 
 Your job:
-1. Generate a comprehensive OVERALL SUMMARY that synthesizes all key points, decisions, questions, and notable statements across the entire conversation. This must always be non-empty if there is any substantive content at all.
+1. Generate a comprehensive OVERALL SUMMARY that synthesizes all key points, decisions, questions, and notable statements across the entire conversation. The overall summary MUST represent every speaker's perspective and points of view evenly and fairly — do not favor or weight one speaker's contributions over another. This must always be non-empty if there is any substantive content at all.
 2. Identify distinct subtopics/themes discussed in the conversation. If only one topic was discussed, that's fine — use one subtopic. If no clear subtopics emerge, use "General Discussion" as the subtopic.
-3. For each subtopic, generate a brief subtopic-specific summary.
+3. For each subtopic, generate a subtopic-specific summary that captures the key points discussed under that theme. Each subtopic summary should also reflect all speakers' contributions fairly.
 4. For each transcript entry, assign it to one of the identified subtopics.
 
 Rules:
 - ALWAYS generate a summary if there is any substantive speech content, even if brief
+- The overall summary must be balanced: give equal weight to each speaker's arguments, questions, and positions
 - Be concise but capture substance
 - Identify speakers by their labels (Speaker 1, Speaker 2, etc.)
 - Every transcript entry MUST be assigned to a subtopic (never leave entries unassigned)
