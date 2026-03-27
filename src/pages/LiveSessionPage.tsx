@@ -226,32 +226,66 @@ const LiveSessionPage = () => {
           </button>
         </div>
 
-        {/* Transcript Area */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+        {/* Per-Speaker Textboxes */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {micError && (
-            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3 mb-3">
+            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
               {micError}
             </div>
           )}
           {connectionError && (
-            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3 mb-3">
+            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
               {connectionError}
-            </div>
-          )}
-
-          {transcriptEntries.map((entry) => (
-            <TranscriptBubble key={entry.id} entry={entry} speakerNames={speakerNames} />
-          ))}
-
-          {interimText && (
-            <div className="text-sm text-muted-foreground italic px-3 py-1.5">
-              {interimText}...
             </div>
           )}
 
           {transcriptEntries.length === 0 && !interimText && (
             <div className="text-center text-muted-foreground text-sm py-12">
               {isConnected ? "Listening... Start speaking." : "Connecting to microphone..."}
+            </div>
+          )}
+
+          {/* Group entries by speaker and render a growing textbox per speaker */}
+          {(() => {
+            const speakerIds = Array.from(new Set(transcriptEntries.map(e => e.speaker_id))).sort();
+            if (speakerIds.length === 0 && interimText) {
+              return (
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+                    Speaker 1
+                  </span>
+                  <p className="text-sm text-foreground leading-relaxed italic text-muted-foreground">{interimText}...</p>
+                </div>
+              );
+            }
+            return speakerIds.map(sid => {
+              const name = speakerNames[String(sid)] || `Speaker ${sid + 1}`;
+              const texts = transcriptEntries.filter(e => e.speaker_id === sid).map(e => e.text);
+              const isLeft = sid % 2 === 0;
+              return (
+                <div
+                  key={sid}
+                  className={`rounded-xl border p-4 ${
+                    isLeft
+                      ? "bg-secondary/50 border-border"
+                      : "bg-primary/5 border-primary/20"
+                  }`}
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                    {name}
+                  </span>
+                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                    {texts.join(" ")}
+                  </p>
+                </div>
+              );
+            });
+          })()}
+
+          {/* Interim text indicator */}
+          {interimText && transcriptEntries.length > 0 && (
+            <div className="text-sm text-muted-foreground italic px-3 py-1.5">
+              {interimText}...
             </div>
           )}
         </div>

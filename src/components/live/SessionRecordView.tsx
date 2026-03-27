@@ -136,12 +136,21 @@ const SessionRecordView = ({
     setIsSharing(false);
   }, [currentShareToken, sessionId]);
 
-  // Build overall summary from all summaries combined
+  // Build overall summary — prefer dedicated overall_summary from AI
   const overallSummary = useMemo(() => {
     if (summaries.length === 0) return null;
-    if (summaries.length === 1) return summaries[0].text;
-    // Combine all summaries into one overview
-    return summaries.map((s, i) => s.text).join("\n\n");
+    // Use the latest summary's overall_summary field if available
+    const latest = summaries[summaries.length - 1];
+    if (latest.overall_summary) return latest.overall_summary;
+    if (latest.text) return latest.text;
+    return summaries.map(s => s.text).filter(Boolean).join("\n\n") || null;
+  }, [summaries]);
+
+  // Get subtopic-specific summaries from the latest analysis
+  const subtopicSummaryMap = useMemo(() => {
+    if (summaries.length === 0) return {};
+    const latest = summaries[summaries.length - 1];
+    return latest.subtopic_summaries || {};
   }, [summaries]);
 
   // Group entries and summaries by subtopic
