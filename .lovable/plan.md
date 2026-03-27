@@ -1,98 +1,47 @@
 
 
-# Live Session: Complete Feature Plan
+# Prep Phase Overlay: Side-by-Side Layout + Ready Button Fix
 
-## Scope
+## Current Issues
+1. **Outgoing role**: Transcript and AI Summary are stacked vertically, wasting horizontal space
+2. **Ready button visibility**: May be pushed off-screen on smaller viewports due to vertical stacking
+3. **Incoming role (timer view)**: Already has a Ready button — no layout issue, just confirm it works
 
-Building on the existing Live session infrastructure, this plan adds:
+## Changes — `src/components/debate/PrepPhaseOverlay.tsx`
 
-1. **Speaker accuracy improvements** — audio energy gate, uncertain entry marking
-2. **Speaker renaming** — users assign real names to generic speaker labels
-3. **Post-session record page** — full transcript + summaries + speaker correction tools
-4. **Auto-summary on end** — always generate a final summary when session ends
-5. **"Live" tab in My Agenda** — browse past sessions
-6. **Sharing** — generate a share link for completed records
+### 1. Widen the container
+Change `max-w-lg` to `max-w-4xl` for the outgoing role so the side-by-side layout has room.
 
-## Architecture
+### 2. Side-by-side layout for outgoing role
+Replace the vertical `space-y-4` stack with a two-column grid:
+- **Left column**: Your Transcript (read-only card, scrollable)
+- **Right column**: AI Summary (editable textarea + Save button)
+- Use `grid grid-cols-2 gap-4` with each column taking equal space
+- Both columns get `max-h-[50vh] overflow-y-auto` so content scrolls without pushing the Ready button off-screen
 
+### 3. Header + timer above the grid
+Keep the title ("Review Your Summary"), subtitle, and countdown timer centered above the two-column grid.
+
+### 4. Ready button below the grid
+Place the "I'm Ready" button centered below both columns, always visible. Move `ReadyButton` to be a simple inline JSX block (not a nested component) to avoid React warnings.
+
+### 5. Incoming role — no layout change
+The incoming timer view already shows the Ready button. No changes needed other than the ReadyButton inline fix.
+
+### Layout sketch
 ```text
-┌─────────────────────────────────────────┐
-│ My Agenda (MyDebatesPage)               │
-│ [Debates] [Drafts] [Live]              │
-│                                         │
-│  Session Title       Mar 26  ● Ended   │
-│  Team Standup        Mar 25  ● Ended   │
-└─────────────────────────────────────────┘
-         │ click
-         ▼
-┌─────────────────────────────────────────┐
-│ Post-Session Record (/live/:id)         │
-│                                         │
-│  Title · Date · Duration                │
-│  [Share] [Back to My Agenda]            │
-│                                         │
-│  ── Summaries ──                        │
-│  Summary cards with subtopic tags       │
-│                                         │
-│  ── Transcript ──                       │
-│  Grouped by subtopic                    │
-│  Speaker bubbles (tap to edit/split/    │
-│  merge) with rename capability          │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│        Review Your Summary               │
+│        Edit the AI summary...            │
+│              2:00                         │
+├────────────────────┬─────────────────────┤
+│  YOUR TRANSCRIPT   │  AI SUMMARY         │
+│                    │                      │
+│  (read-only,       │  [editable textarea] │
+│   scrollable)      │  [Save Changes]      │
+│                    │                      │
+├────────────────────┴─────────────────────┤
+│            [ I'm Ready ]                 │
+└──────────────────────────────────────────┘
 ```
-
-## Detailed Changes
-
-### 1. Database Migration
-
-Add a `share_token` column to `live_sessions` and an RLS policy for public viewing by token:
-
-```sql
-ALTER TABLE public.live_sessions 
-  ADD COLUMN share_token text UNIQUE DEFAULT NULL,
-  ADD COLUMN speaker_names jsonb NOT NULL DEFAULT '{}'::jsonb;
-
--- Allow anyone to view a session via share token
-CREATE POLICY "Anyone can view shared live sessions"
-  ON public.live_sessions FOR SELECT TO anon
-  USING (share_token IS NOT NULL);
-```
-
-`speaker_names` stores a map like `{"0": "Alex", "1": "Jordan"}` so renamed labels persist.
-
-### 2. `useLiveTranscription.ts` — Audio energy gate
-
-Add RMS check before sending PCM frames to Deepgram. Only send when energy exceeds threshold (~0.01). Mark entries as `uncertain: true` when word-level speaker data is missing.
-
-On session end (`endSession`), auto-generate a summary by calling `generateSummary()` before updating status to "ended".
-
-### 3. `LiveSessionPage.tsx` — Post-session record page
-
-When `phase === "ended"`, replace the current minimal view with a full record page:
-- **Header**: title, date, duration, share button, "Back to My Agenda" link
-- **Summaries section**: all summary cards with subtopic tags
-- **Transcript section**: grouped by subtopic, left/right speaker bubbles
-- **Speaker correction tools**:
-  - Tap speaker label to rename (updates `speaker_names` in DB)
-  - Split button to divide a bubble at a word boundary
-  - Merge button to combine adjacent uncertain entries
-- **Share button**: generates a `share_token`, copies link to clipboard
-
-### 4. `MyDebatesPage.tsx` — Add "Live" tab
-
-Add a third tab that queries `live_sessions` where `created_by = user.id`, ordered by `created_at desc`. Cards show title, date, status badge. Click navigates to `/live/:id`.
-
-### 5. Sharing route
-
-Add a public route `/live/shared/:token` that loads a read-only version of the record page using the share token (no auth required).
-
-## File Changes
-
-| File | Change |
-|------|--------|
-| Migration SQL | Add `share_token`, `speaker_names` columns + anon SELECT policy |
-| `src/hooks/useLiveTranscription.ts` | Audio energy gate; uncertain marking; auto-summary on end |
-| `src/pages/LiveSessionPage.tsx` | Full post-session record page with rename, split, merge, share |
-| `src/pages/MyDebatesPage.tsx` | Add "Live" tab querying `live_sessions` |
-| `src/App.tsx` | Add `/live/shared/:token` route |
 
