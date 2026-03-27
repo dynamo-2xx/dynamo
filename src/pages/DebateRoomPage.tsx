@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap
+  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap, NotebookPen
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
