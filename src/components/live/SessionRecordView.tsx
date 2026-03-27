@@ -177,7 +177,7 @@ const SessionRecordView = ({
     });
 
     return { entryGroups, unassigned, orderedSubtopics };
-  }, [transcriptEntries, summaries, subtopics]);
+  }, [transcriptEntries, subtopics, subtopicSummaryMap]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
