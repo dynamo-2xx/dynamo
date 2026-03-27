@@ -136,12 +136,21 @@ const SessionRecordView = ({
     setIsSharing(false);
   }, [currentShareToken, sessionId]);
 
-  // Build overall summary from all summaries combined
+  // Build overall summary — prefer dedicated overall_summary from AI
   const overallSummary = useMemo(() => {
     if (summaries.length === 0) return null;
-    if (summaries.length === 1) return summaries[0].text;
-    // Combine all summaries into one overview
-    return summaries.map((s, i) => s.text).join("\n\n");
+    // Use the latest summary's overall_summary field if available
+    const latest = summaries[summaries.length - 1];
+    if (latest.overall_summary) return latest.overall_summary;
+    if (latest.text) return latest.text;
+    return summaries.map(s => s.text).filter(Boolean).join("\n\n") || null;
+  }, [summaries]);
+
+  // Get subtopic-specific summaries from the latest analysis
+  const subtopicSummaryMap = useMemo(() => {
+    if (summaries.length === 0) return {};
+    const latest = summaries[summaries.length - 1];
+    return latest.subtopic_summaries || {};
   }, [summaries]);
 
   // Group entries and summaries by subtopic
@@ -158,26 +167,17 @@ const SessionRecordView = ({
       }
     });
 
-    // Summaries mapped by subtopic
-    const summaryBySubtopic: Record<string, LiveSummary[]> = {};
-    summaries.forEach((s) => {
-      s.subtopics.forEach((st) => {
-        if (!summaryBySubtopic[st]) summaryBySubtopic[st] = [];
-        summaryBySubtopic[st].push(s);
-      });
-    });
-
-    // Build ordered subtopic list
-    const orderedSubtopics = subtopics.filter(s => entryGroups[s] || summaryBySubtopic[s]);
+    // Build ordered subtopic list from subtopics array + any entry subtopics + subtopicSummaryMap keys
+    const orderedSubtopics = [...subtopics];
     Object.keys(entryGroups).forEach(s => {
       if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
     });
-    Object.keys(summaryBySubtopic).forEach(s => {
+    Object.keys(subtopicSummaryMap).forEach(s => {
       if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
     });
 
-    return { entryGroups, unassigned, summaryBySubtopic, orderedSubtopics };
-  }, [transcriptEntries, summaries, subtopics]);
+    return { entryGroups, unassigned, orderedSubtopics };
+  }, [transcriptEntries, subtopics, subtopicSummaryMap]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
@@ -235,7 +235,7 @@ const SessionRecordView = ({
 
           {groupedData.orderedSubtopics.map((topic, idx) => {
             const entries = groupedData.entryGroups[topic] || [];
-            const topicSummaries = groupedData.summaryBySubtopic[topic] || [];
+            const topicSummary = subtopicSummaryMap[topic];
 
             return (
               <Collapsible key={topic} defaultOpen={idx === 0}>
@@ -244,7 +244,7 @@ const SessionRecordView = ({
                   <h3 className="text-sm font-display font-semibold text-foreground flex-1">
                     {idx + 1}. {topic}
                   </h3>
-                  {topicSummaries.length > 0 && (
+                  {topicSummary && (
                     <span className="text-[9px] bg-primary/10 text-primary rounded-full px-2 py-0.5 font-semibold">
                       Summarized
                     </span>
@@ -258,21 +258,21 @@ const SessionRecordView = ({
                 <CollapsibleContent>
                   <div className="px-5 py-3 space-y-2">
                     {/* Subtopic summary pinned at top */}
-                    {topicSummaries.map((s, si) => (
-                      <div key={s.id} className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
+                    {topicSummary && (
+                      <div className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
                         <div className="flex items-center gap-2 px-3 py-2 border-b border-primary/10">
                           <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                             <Zap className="w-3 h-3 text-primary" />
                           </div>
                           <span className="text-[10px] font-semibold uppercase tracking-widest text-primary font-display">
-                            {topicSummaries.length > 1 ? `Summary ${si + 1}` : "Summary"}
+                            Summary
                           </span>
                         </div>
                         <div className="px-3 py-2">
-                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{s.text}</p>
+                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{topicSummary}</p>
                         </div>
                       </div>
-                    ))}
+                    )}
 
                     {/* Transcript bubbles */}
                     {entries.map((entry) => (
@@ -287,7 +287,7 @@ const SessionRecordView = ({
                       />
                     ))}
 
-                    {entries.length === 0 && topicSummaries.length === 0 && (
+                    {entries.length === 0 && !topicSummary && (
                       <p className="text-xs text-muted-foreground italic py-2">No statements recorded</p>
                     )}
                   </div>

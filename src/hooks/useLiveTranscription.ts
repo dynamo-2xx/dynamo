@@ -16,6 +16,8 @@ export interface LiveTranscriptEntry {
 export interface LiveSummary {
   id: string;
   text: string;
+  overall_summary?: string;
+  subtopic_summaries?: Record<string, string>;
   created_at: number;
   subtopics: string[];
 }
@@ -176,12 +178,13 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
               const words = alt.words || [];
               if (words.length === 0) {
                 // No word-level data, treat as single speaker
-                const speaker = 0;
+              const speaker = 0;
                 if (statementBufferRef.current && statementSpeakerRef.current !== speaker) {
                   flushStatement();
                 }
                 statementSpeakerRef.current = speaker;
                 statementBufferRef.current += (statementBufferRef.current ? " " : "") + transcript;
+                flushStatement();
               } else {
                 // Group consecutive words by speaker
                 let currentSpeaker = words[0].speaker ?? 0;
@@ -215,6 +218,8 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
                   statementBufferRef.current += (statementBufferRef.current ? " " : "") + currentWords.join(" ");
                 }
               }
+              // Flush immediately after every final so entries appear in real-time
+              flushStatement();
               setInterimText("");
             } else {
               setInterimText(transcript);
@@ -273,9 +278,12 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       });
 
       if (!error && data) {
+        const overallText = data.overall_summary || data.summary || "";
         const summary: LiveSummary = {
           id: `summary-${Date.now()}`,
-          text: data.summary || "",
+          text: overallText,
+          overall_summary: overallText,
+          subtopic_summaries: data.subtopic_summaries || {},
           created_at: Date.now(),
           subtopics: data.subtopics || [],
         };
@@ -318,7 +326,11 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
     // Always auto-generate a final summary on end
     if (transcriptEntriesRef.current.length > 0) {
-      await generateSummary();
+      try {
+        await generateSummary();
+      } catch (err) {
+        console.error("Failed to auto-generate summary on end:", err);
+      }
     }
 
     if (sessionId) {

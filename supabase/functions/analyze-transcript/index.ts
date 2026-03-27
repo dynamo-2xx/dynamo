@@ -20,14 +20,17 @@ serve(async (req) => {
       const systemPrompt = `You are an AI conversation analyst. Analyze the provided transcript from a live conversation with multiple speakers (labeled Speaker 1, Speaker 2, etc.).
 
 Your job:
-1. Generate a comprehensive summary of the key points, decisions, questions, and notable statements made so far.
-2. Identify distinct subtopics/themes discussed in the conversation.
-3. For each transcript entry, assign it to one of the identified subtopics.
+1. Generate a comprehensive OVERALL SUMMARY that synthesizes all key points, decisions, questions, and notable statements across the entire conversation. This must always be non-empty if there is any substantive content at all.
+2. Identify distinct subtopics/themes discussed in the conversation. If only one topic was discussed, that's fine — use one subtopic. If no clear subtopics emerge, use "General Discussion" as the subtopic.
+3. For each subtopic, generate a brief subtopic-specific summary.
+4. For each transcript entry, assign it to one of the identified subtopics.
 
 Rules:
+- ALWAYS generate a summary if there is any substantive speech content, even if brief
 - Be concise but capture substance
 - Identify speakers by their labels (Speaker 1, Speaker 2, etc.)
-- If the conversation has no substantive content worth summarizing (greetings, filler, etc.), return an empty summary and empty subtopics
+- Every transcript entry MUST be assigned to a subtopic (never leave entries unassigned)
+- Only return empty summary if the transcript is truly empty or contains nothing but greetings/filler
 - Return the result using the analyze_conversation tool`;
 
       const userPrompt = `Transcript entries:
@@ -56,14 +59,23 @@ Analyze this conversation: identify subtopics, assign each entry to a subtopic, 
                 parameters: {
                   type: "object",
                   properties: {
+                    overall_summary: {
+                      type: "string",
+                      description: "A comprehensive overall summary synthesizing all key points across the entire conversation",
+                    },
                     summary: {
                       type: "string",
-                      description: "Comprehensive summary of the conversation so far",
+                      description: "Same as overall_summary (for backward compatibility)",
                     },
                     subtopics: {
                       type: "array",
                       items: { type: "string" },
                       description: "List of distinct subtopic/theme labels identified in the conversation",
+                    },
+                    subtopic_summaries: {
+                      type: "object",
+                      description: "Map of subtopic label to a brief summary for that subtopic",
+                      additionalProperties: { type: "string" },
                     },
                     entry_subtopic_map: {
                       type: "object",
@@ -71,7 +83,7 @@ Analyze this conversation: identify subtopics, assign each entry to a subtopic, 
                       additionalProperties: { type: "string" },
                     },
                   },
-                  required: ["summary", "subtopics", "entry_subtopic_map"],
+                  required: ["overall_summary", "summary", "subtopics", "subtopic_summaries", "entry_subtopic_map"],
                   additionalProperties: false,
                 },
               },
