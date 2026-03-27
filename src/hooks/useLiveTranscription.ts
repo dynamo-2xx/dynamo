@@ -16,6 +16,8 @@ export interface LiveTranscriptEntry {
 export interface LiveSummary {
   id: string;
   text: string;
+  overall_summary?: string;
+  subtopic_summaries?: Record<string, string>;
   created_at: number;
   subtopics: string[];
 }
