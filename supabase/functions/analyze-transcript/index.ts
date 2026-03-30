@@ -49,7 +49,7 @@ Analyze this conversation: identify subtopics, assign each entry to a subtopic, 
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          tools: [
+        tools: [
             {
               type: "function",
               function: {
@@ -63,18 +63,13 @@ Analyze this conversation: identify subtopics, assign each entry to a subtopic, 
                       items: { type: "string" },
                       description: "List of distinct subtopic/theme labels identified in the conversation",
                     },
-                    subtopic_summaries: {
-                      type: "object",
-                      description: "Map of subtopic label to a brief summary for that subtopic",
-                      additionalProperties: { type: "string" },
-                    },
                     entry_subtopic_map: {
                       type: "object",
                       description: "Map of transcript entry IDs to their assigned subtopic label",
                       additionalProperties: { type: "string" },
                     },
                   },
-                  required: ["subtopics", "subtopic_summaries", "entry_subtopic_map"],
+                  required: ["subtopics", "entry_subtopic_map"],
                   additionalProperties: false,
                 },
               },
