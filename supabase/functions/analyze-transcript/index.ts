@@ -107,9 +107,74 @@ Analyze this conversation: identify subtopics, assign each entry to a subtopic, 
         });
       }
 
-      return new Response(JSON.stringify({ summary: "", subtopics: [], entry_subtopic_map: {} }), {
+      return new Response(JSON.stringify({ subtopics: [], entry_subtopic_map: {} }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Per-subtopic summary mode
+    if (mode === "live_summarize_subtopic") {
+      const { subtopic, entries } = await req.json().catch(() => ({ subtopic: "", entries: [] }));
+
+      const sysPrompt = `You are an AI conversation analyst. You will be given transcript entries from a live conversation that all belong to one subtopic. Generate a concise but comprehensive summary that captures the key points discussed under this theme. The summary MUST reflect all speakers' contributions fairly and evenly — do not favor one speaker over another. Identify speakers by their labels (Speaker 1, Speaker 2, etc.). Return the result using the summarize_subtopic tool.`;
+
+      const uPrompt = `Subtopic: "${subtopic}"
+
+Transcript entries for this subtopic:
+${JSON.stringify(entries, null, 2)}
+
+Generate a comprehensive summary for this subtopic.`;
+
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: sysPrompt },
+            { role: "user", content: uPrompt },
+          ],
+          tools: [
+            {
+              type: "function",
+              function: {
+                name: "summarize_subtopic",
+                description: "Return a summary for a single subtopic",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    summary: { type: "string", description: "A concise summary of the subtopic discussion" },
+                  },
+                  required: ["summary"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          ],
+          tool_choice: { type: "function", function: { name: "summarize_subtopic" } },
+        }),
+      });
+
+      if (!resp.ok) {
+        const status = resp.status;
+        if (status === 429) return new Response(JSON.stringify({ error: "Rate limit exceeded" }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (status === 402) return new Response(JSON.stringify({ error: "AI usage limit reached" }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const t = await resp.text();
+        console.error("AI gateway error:", status, t);
+        throw new Error("AI gateway error");
+      }
+
+      const d = await resp.json();
+      const tc = d.choices?.[0]?.message?.tool_calls?.[0];
+      if (tc) {
+        const result = JSON.parse(tc.function.arguments);
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({ summary: "" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Default debate mode
