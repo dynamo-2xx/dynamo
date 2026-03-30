@@ -417,6 +417,39 @@ const DebateRoomPage = () => {
     setTimeLeft(0);
   }, [myParticipant, prepPhaseRole, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
 
+  const completePrepPhaseAndAdvance = useCallback(async () => {
+    if (!id || prepExitRef.current) return;
+
+    prepExitRef.current = true;
+
+    try {
+      const { data, error } = await supabase
+        .from("debates")
+        .update({
+          prep_phase_active: false,
+          prep_phase_started_at: null,
+          prep_duration_seconds: null,
+          prep_side1_ready: false,
+          prep_side2_ready: false,
+        } as any)
+        .eq("id", id)
+        .eq("prep_phase_active", true)
+        .select("id")
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return;
+
+      setPrepPhaseRole(null);
+      setPrepStartedAt(null);
+      setSelectedPrepDuration(null);
+
+      await advanceTurnRef.current();
+    } finally {
+      prepExitRef.current = false;
+    }
+  }, [id]);
+
   const handlePrepTimeSelected = useCallback((seconds: number) => {
     setSelectedPrepDuration(seconds);
     const startedAt = new Date().toISOString();
