@@ -72,12 +72,14 @@ const PrepPhaseOverlay = ({
 
   const notesValue = notebookValue !== undefined ? notebookValue : localNotes;
   const setNotesValue = onNotebookChange || setLocalNotes;
+  const syncedDuration = selectedPrepDuration || selectedTime;
+  const hasPrepTimerStarted = Boolean(prepStartedAt && syncedDuration);
 
   const availableOptions = PREP_OPTIONS.filter(t => t >= prepTimeMin && t <= prepTimeMax);
 
   useEffect(() => {
     if (!prepStartedAt) return;
-    const duration = role === "outgoing" ? prepTimeMax : (selectedPrepDuration || selectedTime);
+    const duration = syncedDuration;
     if (!duration) return;
 
     const interval = setInterval(() => {
@@ -94,7 +96,7 @@ const PrepPhaseOverlay = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [prepStartedAt, role, prepTimeMax, selectedPrepDuration, selectedTime, onReady, markedReady]);
+  }, [prepStartedAt, syncedDuration, onReady, markedReady]);
 
   const handleSelectTime = (seconds: number) => {
     setSelectedTime(seconds);
@@ -197,7 +199,9 @@ const PrepPhaseOverlay = ({
                 </div>
               )}
               <p className="text-sm text-muted-foreground font-body">
-                Review the debate and prepare your arguments.
+                {hasPrepTimerStarted
+                  ? "Review the debate and prepare your arguments."
+                  : "Waiting for the other side to choose the prep time."}
               </p>
             </div>
 
@@ -291,9 +295,11 @@ const PrepPhaseOverlay = ({
             </div>
 
             {/* Ready button */}
-            <div className="text-center">
-              {readyButtonJsx}
-            </div>
+            {hasPrepTimerStarted && (
+              <div className="text-center">
+                {readyButtonJsx}
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -311,7 +317,9 @@ const PrepPhaseOverlay = ({
                 Review Your Summary
               </h2>
               <p className="text-sm text-muted-foreground font-body">
-                Verify and edit the AI-generated summary of your statement.
+                {hasPrepTimerStarted
+                  ? "Verify and edit the AI-generated summary of your statement."
+                  : "Waiting for the other side to choose the prep time."}
               </p>
               {timeRemaining !== null && (
                 <div className="text-2xl font-display font-bold text-primary mt-2">
@@ -374,9 +382,11 @@ const PrepPhaseOverlay = ({
             </div>
 
             {/* Ready button always visible below */}
-            <div className="text-center">
-              {readyButtonJsx}
-            </div>
+            {hasPrepTimerStarted && (
+              <div className="text-center">
+                {readyButtonJsx}
+              </div>
+            )}
           </motion.div>
         )}
       </div>
