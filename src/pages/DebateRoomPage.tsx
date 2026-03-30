@@ -99,6 +99,9 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
   const prevTimeLeftRef = useRef(0);
+  const prepExitRef = useRef(false);
+  const isPrepExpiredRef = useRef<(startedAt?: string | null, durationSeconds?: number | null) => boolean>(() => false);
+  const completePrepPhaseAndAdvanceRef = useRef<() => Promise<void>>(async () => {});
   const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
   const enterPrepPhaseFromRealtimeRef = useRef<(updated: DebateData) => void>(() => {});
   const advanceTurnRef = useRef<() => Promise<void>>(async () => {});
@@ -271,20 +274,11 @@ const DebateRoomPage = () => {
           setSelectedPrepDuration(null);
         }
 
-        // Both sides ready → advance
-        if (updated.prep_side1_ready && updated.prep_side2_ready && prepPhaseRoleRef.current) {
-          setPrepPhaseRole(null);
-          setPrepStartedAt(null);
-          setSelectedPrepDuration(null);
-          // Clear prep flags on DB
-          supabase.from("debates").update({
-            prep_phase_active: false,
-            prep_phase_started_at: null,
-            prep_duration_seconds: null,
-            prep_side1_ready: false,
-            prep_side2_ready: false,
-          } as any).eq("id", id);
-          void advanceTurnRef.current();
+        const bothReady = updated.prep_side1_ready && updated.prep_side2_ready;
+        const prepExpired = isPrepExpiredRef.current(updated.prep_phase_started_at, updated.prep_duration_seconds);
+
+        if ((bothReady || prepExpired) && prepPhaseRoleRef.current && !prepExitRef.current) {
+          void completePrepPhaseAndAdvanceRef.current();
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
@@ -335,6 +329,11 @@ const DebateRoomPage = () => {
   const micEnabled = canSpeak;
 
   const advancingRef = useRef(false);
+
+  const isPrepExpired = useCallback((startedAt?: string | null, durationSeconds?: number | null) => {
+    if (!startedAt || !durationSeconds) return false;
+    return Date.now() >= new Date(startedAt).getTime() + durationSeconds * 1000;
+  }, []);
 
   // Determine which side index (0 or 1) the current user is on
   const getMySideIndex = useCallback((): 0 | 1 => {
@@ -410,6 +409,47 @@ const DebateRoomPage = () => {
     setTimerRunning(false);
     setTimeLeft(0);
   }, [myParticipant, prepPhaseRole, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
+
+  const completePrepPhaseAndAdvance = useCallback(async () => {
+    if (!id || prepExitRef.current) return;
+
+    prepExitRef.current = true;
+
+    try {
+      const { data, error } = await supabase
+        .from("debates")
+        .update({
+          prep_phase_active: false,
+          prep_phase_started_at: null,
+          prep_duration_seconds: null,
+          prep_side1_ready: false,
+          prep_side2_ready: false,
+        } as any)
+        .eq("id", id)
+        .eq("prep_phase_active", true)
+        .select("id")
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return;
+
+      setPrepPhaseRole(null);
+      setPrepStartedAt(null);
+      setSelectedPrepDuration(null);
+
+      await advanceTurnRef.current();
+    } finally {
+      prepExitRef.current = false;
+    }
+  }, [id]);
+
+  useEffect(() => {
+    isPrepExpiredRef.current = isPrepExpired;
+  }, [isPrepExpired]);
+
+  useEffect(() => {
+    completePrepPhaseAndAdvanceRef.current = completePrepPhaseAndAdvance;
+  }, [completePrepPhaseAndAdvance]);
 
   const handlePrepTimeSelected = useCallback((seconds: number) => {
     setSelectedPrepDuration(seconds);
@@ -629,6 +669,23 @@ const DebateRoomPage = () => {
       enterPrepPhaseFromRealtime(debate);
     }
   }, [debate, myParticipant, prepPhaseRole, enterPrepPhaseFromRealtime]);
+
+  useEffect(() => {
+    if (!debate?.prep_phase_active || !prepPhaseRole || !prepStartedAt || !selectedPrepDuration || prepExitRef.current) {
+      return;
+    }
+
+    const maybeCompletePrep = () => {
+      if (Date.now() >= prepStartedAt + selectedPrepDuration * 1000 && !prepExitRef.current) {
+        void completePrepPhaseAndAdvanceRef.current();
+      }
+    };
+
+    maybeCompletePrep();
+    const interval = setInterval(maybeCompletePrep, 500);
+
+    return () => clearInterval(interval);
+  }, [debate?.prep_phase_active, prepPhaseRole, prepStartedAt, selectedPrepDuration]);
 
   const submitArgument = async () => {
     if (!argumentText.trim() || !debate || !myParticipant || !currentSubtopic || submitting) return;
