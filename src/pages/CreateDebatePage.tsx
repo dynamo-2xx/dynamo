@@ -395,29 +395,15 @@ const CreateDebatePage = () => {
                     Preparation Time Between Turns
                   </label>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground mb-1.5 font-body">Minimum</p>
-                      <select
-                        value={debate.prepTimeMin}
-                        onChange={(e) => setDebate({ ...debate, prepTimeMin: e.target.value })}
-                        className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
-                      >
-                        {PREP_TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground mb-1.5 font-body">Maximum</p>
-                      <select
-                        value={debate.prepTimeMax}
-                        onChange={(e) => setDebate({ ...debate, prepTimeMax: e.target.value })}
-                        className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
-                      >
-                        {PREP_TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-                  </div>
+                   <select
+                     value={debate.prepTime}
+                     onChange={(e) => setDebate({ ...debate, prepTime: e.target.value })}
+                     className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                   >
+                     {PREP_TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                   </select>
                   <p className="text-[10px] text-muted-foreground mt-2 font-body">
-                    Between turns, speakers can choose preparation time within this range.
+                     Time given to both sides between turns to review and prepare.
                   </p>
                 </div>
                 {/* Invite Users (optional) */}
