@@ -197,7 +197,12 @@ const DebateRoomPage = () => {
         const elapsed = Math.floor((Date.now() - new Date(d.turn_started_at).getTime()) / 1000);
         const remaining = Math.max(0, parseTimeToSeconds(d.time_per_turn) - elapsed);
         setTimeLeft(remaining);
-        if (remaining > 0) setTimerRunning(true);
+         if (remaining > 0) {
+           setTimerRunning(true);
+         } else if (!d.prep_phase_active) {
+           // Turn already expired — mark timer as "was active" so the auto-trigger fires
+           timerWasActiveRef.current = true;
+         }
       } else {
         setTimeLeft(parseTimeToSeconds(d.time_per_turn));
       }
