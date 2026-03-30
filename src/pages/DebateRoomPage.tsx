@@ -443,6 +443,14 @@ const DebateRoomPage = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    isPrepExpiredRef.current = isPrepExpired;
+  }, [isPrepExpired]);
+
+  useEffect(() => {
+    completePrepPhaseAndAdvanceRef.current = completePrepPhaseAndAdvance;
+  }, [completePrepPhaseAndAdvance]);
+
   const handlePrepTimeSelected = useCallback((seconds: number) => {
     setSelectedPrepDuration(seconds);
     const startedAt = new Date().toISOString();
