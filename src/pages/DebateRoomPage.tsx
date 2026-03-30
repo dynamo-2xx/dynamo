@@ -344,29 +344,35 @@ const DebateRoomPage = () => {
 
   // Enter preparation phase between turns (called by the side that triggered it)
   const enterPrepPhase = useCallback(() => {
-    if (!debate || !myParticipant || debate.prep_phase_active) return;
-    const wasMyTurn = activeSpeakerParticipant?.user_id === user?.id;
+     if (!debate || !myParticipant || debate.prep_phase_active) return;
 
-    if (wasMyTurn) {
-      const myEntries = transcriptEntries
-        .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
-        .sort((a, b) => b.timestamp - a.timestamp);
-      const lastEntry = myEntries[0];
-      setLastTurnTranscript(lastEntry?.text || "");
-      setLastTurnSummary(lastEntry?.ai_summary || "");
-    }
+     // Only the speaker (outgoing side) triggers prep phase
+     const iAmSpeaker = activeSpeakerParticipant?.user_id === user?.id;
+     if (!iAmSpeaker) return;
 
-    setPrepPhaseRole(wasMyTurn ? "outgoing" : "incoming");
-    setPrepStartedAt(null);
-    setSelectedPrepDuration(null);
+     // Gather transcript/summary for outgoing review
+     const myEntries = transcriptEntries
+       .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+       .sort((a, b) => b.timestamp - a.timestamp);
+     const lastEntry = myEntries[0];
+     setLastTurnTranscript(lastEntry?.text || "");
+     setLastTurnSummary(lastEntry?.ai_summary || "");
+
+     // Compute prep duration and start time atomically
+     const prepSeconds = parseTimeToSeconds(debate.prep_time_max || "60s");
+     const startedAt = new Date().toISOString();
+
+     setPrepPhaseRole("outgoing");
+     setPrepStartedAt(new Date(startedAt).getTime());
+     setSelectedPrepDuration(prepSeconds);
     setTimerRunning(false);
     setTimeLeft(0);
 
-    // Write prep phase to DB so both sides sync
+     // Write prep phase to DB atomically — both sides sync from this single write
     supabase.from("debates").update({
       prep_phase_active: true,
-      prep_phase_started_at: null,
-      prep_duration_seconds: null,
+       prep_phase_started_at: startedAt,
+       prep_duration_seconds: prepSeconds,
       prep_side1_ready: false,
       prep_side2_ready: false,
     } as any).eq("id", debate.id);
@@ -388,22 +394,25 @@ const DebateRoomPage = () => {
     prevTimeLeftRef.current = timeLeft;
   }, [timeLeft, debate?.status, debate?.prep_phase_active, prepPhaseRole, enterPrepPhase]);
 
-  // Called via realtime when the OTHER side triggered prep phase
+   // Called via realtime when the speaker (other side) triggered prep phase
   const enterPrepPhaseFromRealtime = useCallback((updated: DebateData) => {
     if (!myParticipant || prepPhaseRole) return;
-    // If prep is active and we haven't entered yet, determine our role
+     // The listener is always the incoming side (non-speaker)
     const wasMyTurn = activeSpeakerParticipant?.user_id === user?.id;
 
     if (wasMyTurn) {
+       // Edge case: if somehow realtime says I was the speaker, set outgoing
       const myEntries = transcriptEntries
         .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
         .sort((a, b) => b.timestamp - a.timestamp);
       const lastEntry = myEntries[0];
       setLastTurnTranscript(lastEntry?.text || "");
       setLastTurnSummary(lastEntry?.ai_summary || "");
+       setPrepPhaseRole("outgoing");
+     } else {
+       setPrepPhaseRole("incoming");
     }
 
-    setPrepPhaseRole(wasMyTurn ? "outgoing" : "incoming");
     setPrepStartedAt(updated.prep_phase_started_at ? new Date(updated.prep_phase_started_at).getTime() : null);
     setSelectedPrepDuration(updated.prep_duration_seconds ?? null);
     setTimerRunning(false);
@@ -444,25 +453,8 @@ const DebateRoomPage = () => {
   }, [id]);
 
   useEffect(() => {
-    isPrepExpiredRef.current = isPrepExpired;
-  }, [isPrepExpired]);
-
-  useEffect(() => {
     completePrepPhaseAndAdvanceRef.current = completePrepPhaseAndAdvance;
   }, [completePrepPhaseAndAdvance]);
-
-  const handlePrepTimeSelected = useCallback((seconds: number) => {
-    setSelectedPrepDuration(seconds);
-    const startedAt = new Date().toISOString();
-    setPrepStartedAt(new Date(startedAt).getTime());
-
-    if (!debate) return;
-
-    supabase.from("debates").update({
-      prep_duration_seconds: seconds,
-      prep_phase_started_at: startedAt,
-    } as any).eq("id", debate.id);
-  }, [debate]);
 
   const handleSummaryEdited = useCallback((newSummary: string) => {
     // Update the transcript entry's AI summary
@@ -659,6 +651,19 @@ const DebateRoomPage = () => {
   useEffect(() => {
     enterPrepPhaseFromRealtimeRef.current = enterPrepPhaseFromRealtime;
   }, [enterPrepPhaseFromRealtime]);
+
+   // Local fallback: poll for prep phase expiry in case realtime is delayed
+   useEffect(() => {
+     if (!prepPhaseRole || !prepStartedAt || !selectedPrepDuration) return;
+     const interval = setInterval(() => {
+       const expired = Date.now() >= prepStartedAt + selectedPrepDuration * 1000;
+       if (expired && !prepExitRef.current) {
+         clearInterval(interval);
+         void completePrepPhaseAndAdvanceRef.current();
+       }
+     }, 1000);
+     return () => clearInterval(interval);
+   }, [prepPhaseRole, prepStartedAt, selectedPrepDuration]);
 
   useEffect(() => {
     advanceTurnRef.current = advanceTurn;
@@ -1096,7 +1101,6 @@ const DebateRoomPage = () => {
                 lastTranscript={lastTurnTranscript}
                 lastAiSummary={lastTurnSummary}
                 speakerSideLabel={currentSide?.label || ""}
-                onPrepTimeSelected={handlePrepTimeSelected}
                 onSummaryEdited={handleSummaryEdited}
                 onReady={handlePrepReady}
                 prepStartedAt={prepStartedAt || undefined}
