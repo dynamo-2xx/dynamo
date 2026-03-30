@@ -119,10 +119,10 @@ Analyze this conversation: identify subtopics, assign each entry to a subtopic, 
 
       const sysPrompt = `You are an AI conversation analyst. You will be given transcript entries from a live conversation that all belong to one subtopic. Generate a concise but comprehensive summary that captures the key points discussed under this theme. The summary MUST reflect all speakers' contributions fairly and evenly — do not favor one speaker over another. Identify speakers by their labels (Speaker 1, Speaker 2, etc.). Return the result using the summarize_subtopic tool.`;
 
-      const uPrompt = `Subtopic: "${subtopic}"
+      const uPrompt = `Subtopic: "${subLabel}"
 
 Transcript entries for this subtopic:
-${JSON.stringify(entries, null, 2)}
+${JSON.stringify(subEntries, null, 2)}
 
 Generate a comprehensive summary for this subtopic.`;
 
