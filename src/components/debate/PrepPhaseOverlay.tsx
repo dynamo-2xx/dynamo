@@ -166,34 +166,6 @@ const PrepPhaseOverlay = ({
       className="absolute inset-0 z-30 bg-background/95 backdrop-blur-sm flex items-center justify-center overflow-y-auto py-6"
     >
       <div className={`w-full mx-4 ${role === "outgoing" || (role === "incoming" && selectedTime) ? "max-w-6xl" : "max-w-lg"}`}>
-        {/* INCOMING: Time selection */}
-        {role === "incoming" && !selectedTime && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
-          >
-            <Clock className="w-10 h-10 text-primary mx-auto mb-4" />
-            <h2 className="text-xl font-display font-bold text-foreground mb-2">
-              Prepare Your Statement
-            </h2>
-            <p className="text-sm text-muted-foreground font-body mb-6">
-              Select how much time you need to prepare your response.
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              {availableOptions.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => handleSelectTime(t)}
-                  className="bg-card border border-border rounded-xl px-6 py-3 text-sm font-semibold text-foreground hover:border-primary hover:bg-primary/5 transition-colors font-body"
-                >
-                  {parseTimeLabel(t)}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
         {/* INCOMING: 3-column prep workspace */}
         {role === "incoming" && selectedTime && (
           <motion.div
