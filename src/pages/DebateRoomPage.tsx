@@ -362,13 +362,15 @@ const DebateRoomPage = () => {
     setTimeLeft(0);
 
      // Write prep phase to DB atomically — both sides sync from this single write
-    supabase.from("debates").update({
+     supabase.from("debates").update({
       prep_phase_active: true,
        prep_phase_started_at: startedAt,
        prep_duration_seconds: prepSeconds,
       prep_side1_ready: false,
       prep_side2_ready: false,
-    } as any).eq("id", debate.id);
+     } as any).eq("id", debate.id).then(({ error }) => {
+       if (error) console.error("Failed to write prep phase to DB:", error);
+     });
   }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
 
   // Auto-trigger prep when the shared turn timer actually reaches 0
@@ -658,32 +660,16 @@ const DebateRoomPage = () => {
      return () => clearInterval(interval);
    }, [prepPhaseRole, prepStartedAt, selectedPrepDuration]);
 
-  useEffect(() => {
-    advanceTurnRef.current = advanceTurn;
-  }, [advanceTurn]);
+   useEffect(() => {
+     advanceTurnRef.current = advanceTurn;
+   }, [advanceTurn]);
 
-  useEffect(() => {
-    if (debate?.prep_phase_active && myParticipant && !prepPhaseRole) {
-      enterPrepPhaseFromRealtime(debate);
-    }
-  }, [debate, myParticipant, prepPhaseRole, enterPrepPhaseFromRealtime]);
-
-  useEffect(() => {
-    if (!debate?.prep_phase_active || !prepPhaseRole || !prepStartedAt || !selectedPrepDuration || prepExitRef.current) {
-      return;
-    }
-
-    const maybeCompletePrep = () => {
-      if (Date.now() >= prepStartedAt + selectedPrepDuration * 1000 && !prepExitRef.current) {
-        void completePrepPhaseAndAdvanceRef.current();
-      }
-    };
-
-    maybeCompletePrep();
-    const interval = setInterval(maybeCompletePrep, 500);
-
-    return () => clearInterval(interval);
-  }, [debate?.prep_phase_active, prepPhaseRole, prepStartedAt, selectedPrepDuration]);
+   // Catch prep phase on initial load or if realtime state update triggers before role is set
+   useEffect(() => {
+     if (debate?.prep_phase_active && myParticipant && !prepPhaseRole) {
+       enterPrepPhaseFromRealtime(debate);
+     }
+   }, [debate, myParticipant, prepPhaseRole, enterPrepPhaseFromRealtime]);
 
   const submitArgument = async () => {
     if (!argumentText.trim() || !debate || !myParticipant || !currentSubtopic || submitting) return;
