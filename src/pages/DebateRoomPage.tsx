@@ -98,7 +98,7 @@ const DebateRoomPage = () => {
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
-  const prevTimerRunningRef = useRef(false);
+  const prevTimeLeftRef = useRef(0);
   const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
   const enterPrepPhaseFromRealtimeRef = useRef<(updated: DebateData) => void>(() => {});
   const advanceTurnRef = useRef<() => Promise<void>>(async () => {});
@@ -311,16 +311,6 @@ const DebateRoomPage = () => {
     return () => clearInterval(timerRef.current);
   }, [timerRunning, timeLeft]);
 
-  // Auto-advance: when timer hits 0 during a live debate, enter prep phase
-  useEffect(() => {
-    if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live" && !debate.prep_phase_active) {
-      if (!advancingRef.current && !prepPhaseRole) {
-        enterPrepPhase();
-      }
-    }
-    prevTimerRunningRef.current = timerRunning;
-  }, [timerRunning, timeLeft, debate, prepPhaseRole]);
-
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const myParticipant = participants.find((p) => p.user_id === user?.id);
@@ -382,6 +372,22 @@ const DebateRoomPage = () => {
       prep_side2_ready: false,
     } as any).eq("id", debate.id);
   }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
+
+  // Auto-trigger prep when the shared turn timer actually reaches 0
+  useEffect(() => {
+    if (
+      prevTimeLeftRef.current > 0 &&
+      timeLeft === 0 &&
+      debate?.status === "live" &&
+      !debate.prep_phase_active &&
+      !advancingRef.current &&
+      !prepPhaseRole
+    ) {
+      enterPrepPhase();
+    }
+
+    prevTimeLeftRef.current = timeLeft;
+  }, [timeLeft, debate?.status, debate?.prep_phase_active, prepPhaseRole, enterPrepPhase]);
 
   // Called via realtime when the OTHER side triggered prep phase
   const enterPrepPhaseFromRealtime = useCallback((updated: DebateData) => {
