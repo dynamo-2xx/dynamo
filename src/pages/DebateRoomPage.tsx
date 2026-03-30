@@ -272,20 +272,11 @@ const DebateRoomPage = () => {
           setSelectedPrepDuration(null);
         }
 
-        // Both sides ready → advance
-        if (updated.prep_side1_ready && updated.prep_side2_ready && prepPhaseRoleRef.current) {
-          setPrepPhaseRole(null);
-          setPrepStartedAt(null);
-          setSelectedPrepDuration(null);
-          // Clear prep flags on DB
-          supabase.from("debates").update({
-            prep_phase_active: false,
-            prep_phase_started_at: null,
-            prep_duration_seconds: null,
-            prep_side1_ready: false,
-            prep_side2_ready: false,
-          } as any).eq("id", id);
-          void advanceTurnRef.current();
+        const bothReady = updated.prep_side1_ready && updated.prep_side2_ready;
+        const prepExpired = isPrepExpired(updated.prep_phase_started_at, updated.prep_duration_seconds);
+
+        if ((bothReady || prepExpired) && prepPhaseRoleRef.current && !prepExitRef.current) {
+          void completePrepPhaseAndAdvance();
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
