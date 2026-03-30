@@ -98,7 +98,7 @@ const DebateRoomPage = () => {
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
-  const prevTimeLeftRef = useRef(0);
+   const turnEndTriggeredRef = useRef(false);
   const prepExitRef = useRef(false);
   const completePrepPhaseAndAdvanceRef = useRef<() => Promise<void>>(async () => {});
   const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
@@ -290,7 +290,7 @@ const DebateRoomPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
-  // Timer
+   // Timer — 1-second countdown driven by local interval
   useEffect(() => {
     if (timerRunning && timeLeft > 0) {
       timerRef.current = setInterval(() => {
@@ -373,21 +373,27 @@ const DebateRoomPage = () => {
      });
   }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
 
-  // Auto-trigger prep when the shared turn timer actually reaches 0
+   // Reset turn-end guard whenever a new turn starts (turn_started_at changes)
+   useEffect(() => {
+     if (debate?.turn_started_at) {
+       turnEndTriggeredRef.current = false;
+     }
+   }, [debate?.turn_started_at]);
+
+   // Auto-trigger prep when the turn timer reaches 0
   useEffect(() => {
     if (
-      prevTimeLeftRef.current > 0 &&
       timeLeft === 0 &&
+       timerRunning === false &&
       debate?.status === "live" &&
       !debate.prep_phase_active &&
-      !advancingRef.current &&
-      !prepPhaseRole
+       !prepPhaseRole &&
+       !turnEndTriggeredRef.current
     ) {
+       turnEndTriggeredRef.current = true;
       enterPrepPhase();
     }
-
-    prevTimeLeftRef.current = timeLeft;
-  }, [timeLeft, debate?.status, debate?.prep_phase_active, prepPhaseRole, enterPrepPhase]);
+   }, [timeLeft, timerRunning, debate?.status, debate?.prep_phase_active, prepPhaseRole, enterPrepPhase]);
 
    // Called via realtime when the speaker (other side) triggered prep phase
   const enterPrepPhaseFromRealtime = useCallback((updated: DebateData) => {
