@@ -1090,7 +1090,7 @@ const DebateRoomPage = () => {
               <PrepPhaseOverlay
                 role={prepPhaseRole}
                 prepTimeMin={parseTimeToSeconds(debate.prep_time_min || "15s")}
-                prepTimeMax={parseTimeToSeconds(debate.prep_time_max || "60s")}
+                 prepTimeMax={parseTimeToSeconds(debate.prep_time_max || "1 min")}
                 lastTranscript={lastTurnTranscript}
                 lastAiSummary={lastTurnSummary}
                 speakerSideLabel={currentSide?.label || ""}

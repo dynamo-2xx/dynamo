@@ -15,8 +15,8 @@ interface TranscriptEntry {
 
 interface PrepPhaseOverlayProps {
   role: "incoming" | "outgoing";
-  prepTimeMin: number;
-  prepTimeMax: number;
+   prepTimeMin?: number;
+   prepTimeMax: number;
   lastTranscript?: string;
   lastAiSummary?: string;
   speakerSideLabel: string;
