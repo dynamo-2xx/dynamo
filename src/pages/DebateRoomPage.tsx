@@ -100,7 +100,6 @@ const DebateRoomPage = () => {
   const [mediaRequested, setMediaRequested] = useState(false);
   const prevTimeLeftRef = useRef(0);
   const prepExitRef = useRef(false);
-  const isPrepExpiredRef = useRef<(startedAt?: string | null, durationSeconds?: number | null) => boolean>(() => false);
   const completePrepPhaseAndAdvanceRef = useRef<() => Promise<void>>(async () => {});
   const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
   const enterPrepPhaseFromRealtimeRef = useRef<(updated: DebateData) => void>(() => {});
@@ -274,10 +273,9 @@ const DebateRoomPage = () => {
           setSelectedPrepDuration(null);
         }
 
-        const bothReady = updated.prep_side1_ready && updated.prep_side2_ready;
-        const prepExpired = isPrepExpiredRef.current(updated.prep_phase_started_at, updated.prep_duration_seconds);
+         const bothReady = updated.prep_side1_ready && updated.prep_side2_ready;
 
-        if ((bothReady || prepExpired) && prepPhaseRoleRef.current && !prepExitRef.current) {
+         if (bothReady && prepPhaseRoleRef.current && !prepExitRef.current) {
           void completePrepPhaseAndAdvanceRef.current();
         }
       })
@@ -330,12 +328,7 @@ const DebateRoomPage = () => {
 
   const advancingRef = useRef(false);
 
-  const isPrepExpired = useCallback((startedAt?: string | null, durationSeconds?: number | null) => {
-    if (!startedAt || !durationSeconds) return false;
-    return Date.now() >= new Date(startedAt).getTime() + durationSeconds * 1000;
-  }, []);
-
-  // Determine which side index (0 or 1) the current user is on
+   // Determine which side index (0 or 1) the current user is on
   const getMySideIndex = useCallback((): 0 | 1 => {
     if (!myParticipant || sides.length < 2) return 0;
     const sortedSides = [...sides].sort((a, b) => a.sort_order - b.sort_order);
