@@ -867,6 +867,7 @@ const DebateRoomPage = () => {
 
   // End turn early — available to all speakers
   const endTurnEarly = () => {
+     turnEndTriggeredRef.current = true;
     setTimerRunning(false);
     setTimeLeft(0);
     enterPrepPhase();
