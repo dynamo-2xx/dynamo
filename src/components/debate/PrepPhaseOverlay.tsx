@@ -50,7 +50,6 @@ const PrepPhaseOverlay = ({
   lastTranscript,
   lastAiSummary,
   speakerSideLabel,
-  onPrepTimeSelected,
    onSummaryEdited,
   onReady,
   prepStartedAt,
