@@ -63,7 +63,7 @@ const PrepPhaseOverlay = ({
   notebookValue,
   onNotebookChange,
 }: PrepPhaseOverlayProps) => {
-  const [selectedTime, setSelectedTime] = useState<number | null>(null);
+  const [selectedTime, setSelectedTime] = useState<number | null>(prepTimeMax);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [editedSummary, setEditedSummary] = useState(lastAiSummary || "");
   const [summarySubmitted, setSummarySubmitted] = useState(false);
@@ -75,7 +75,20 @@ const PrepPhaseOverlay = ({
   const syncedDuration = selectedPrepDuration || selectedTime;
   const hasPrepTimerStarted = Boolean(prepStartedAt && syncedDuration);
 
-  const availableOptions = PREP_OPTIONS.filter(t => t >= prepTimeMin && t <= prepTimeMax);
+
+  useEffect(() => {
+    // Auto-select max prep time on mount
+    if (!selectedTime) {
+      setSelectedTime(prepTimeMax);
+    }
+  }, [prepTimeMax, selectedTime]);
+
+  // Auto-trigger prep time selection for incoming role
+  useEffect(() => {
+    if (role === "incoming" && selectedTime && !selectedPrepDuration) {
+      onPrepTimeSelected?.(selectedTime);
+    }
+  }, [role, selectedTime, selectedPrepDuration, onPrepTimeSelected]);
 
   useEffect(() => {
     if (!prepStartedAt) return;
