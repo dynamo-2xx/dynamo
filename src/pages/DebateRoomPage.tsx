@@ -388,6 +388,7 @@ const DebateRoomPage = () => {
     if (
       timeLeft === 0 &&
        timerRunning === false &&
+       timerWasActiveRef.current &&
       debate?.status === "live" &&
       !debate.prep_phase_active &&
        !prepPhaseRole &&
