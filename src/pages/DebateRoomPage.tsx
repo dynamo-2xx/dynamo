@@ -100,6 +100,8 @@ const DebateRoomPage = () => {
   const [mediaRequested, setMediaRequested] = useState(false);
   const prevTimeLeftRef = useRef(0);
   const prepExitRef = useRef(false);
+  const isPrepExpiredRef = useRef<(startedAt?: string | null, durationSeconds?: number | null) => boolean>(() => false);
+  const completePrepPhaseAndAdvanceRef = useRef<() => Promise<void>>(async () => {});
   const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
   const enterPrepPhaseFromRealtimeRef = useRef<(updated: DebateData) => void>(() => {});
   const advanceTurnRef = useRef<() => Promise<void>>(async () => {});
