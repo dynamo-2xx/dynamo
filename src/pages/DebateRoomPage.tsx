@@ -99,8 +99,9 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
    const turnEndTriggeredRef = useRef(false);
-    const timerWasActiveRef = useRef(false);
-  const prepExitRef = useRef(false);
+     const timerWasActiveRef = useRef(false);
+   const prepExitRef = useRef(false);
+   const lastSyncedTurnStartRef = useRef<string | null>(null);
   const completePrepPhaseAndAdvanceRef = useRef<() => Promise<void>>(async () => {});
   const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
   const enterPrepPhaseFromRealtimeRef = useRef<(updated: DebateData) => void>(() => {});
@@ -193,16 +194,17 @@ const DebateRoomPage = () => {
       }
 
       // Compute synced timer from turn_started_at
-      if (d.turn_started_at && d.status === "live") {
-        const elapsed = Math.floor((Date.now() - new Date(d.turn_started_at).getTime()) / 1000);
-        const remaining = Math.max(0, parseTimeToSeconds(d.time_per_turn) - elapsed);
-        setTimeLeft(remaining);
-         if (remaining > 0) {
-           setTimerRunning(true);
-         } else if (!d.prep_phase_active) {
-           // Turn already expired — mark timer as "was active" so the auto-trigger fires
-           timerWasActiveRef.current = true;
-         }
+       if (d.turn_started_at && d.status === "live") {
+         lastSyncedTurnStartRef.current = d.turn_started_at;
+         const elapsed = Math.floor((Date.now() - new Date(d.turn_started_at).getTime()) / 1000);
+         const remaining = Math.max(0, parseTimeToSeconds(d.time_per_turn) - elapsed);
+         setTimeLeft(remaining);
+          if (remaining > 0) {
+            setTimerRunning(true);
+          } else if (!d.prep_phase_active) {
+            // Turn already expired — mark timer as "was active" so the auto-trigger fires
+            timerWasActiveRef.current = true;
+          }
       } else {
         setTimeLeft(parseTimeToSeconds(d.time_per_turn));
       }
@@ -253,14 +255,15 @@ const DebateRoomPage = () => {
           setTimeLeft(0);
         }
 
-        // Sync timer from turn_started_at
-        if (!updated.prep_phase_active && updated.turn_started_at && updated.status === "live") {
-          const elapsed = Math.floor((Date.now() - new Date(updated.turn_started_at).getTime()) / 1000);
-          const remaining = Math.max(0, parseTimeToSeconds(updated.time_per_turn) - elapsed);
-          setTimeLeft(remaining);
-          if (remaining > 0) setTimerRunning(true);
-          else setTimerRunning(false);
-        }
+        // Sync timer from turn_started_at — only if it actually changed
+         if (!updated.prep_phase_active && updated.turn_started_at && updated.status === "live" && updated.turn_started_at !== lastSyncedTurnStartRef.current) {
+           lastSyncedTurnStartRef.current = updated.turn_started_at;
+           const elapsed = Math.floor((Date.now() - new Date(updated.turn_started_at).getTime()) / 1000);
+           const remaining = Math.max(0, parseTimeToSeconds(updated.time_per_turn) - elapsed);
+           setTimeLeft(remaining);
+           if (remaining > 0) setTimerRunning(true);
+           else setTimerRunning(false);
+         }
         // Sync prep phase from other participant
         if (updated.prep_phase_active) {
           if (!prepPhaseRoleRef.current) {
