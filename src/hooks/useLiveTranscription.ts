@@ -265,6 +265,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
     hasSummarizedRef.current = true;
 
     try {
+      // Pass 1: Classify — get subtopics and entry assignments
       const { data, error } = await supabase.functions.invoke("analyze-transcript", {
         body: {
           mode: "live_conversation",
@@ -276,37 +277,73 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
         },
       });
 
-      if (!error && data) {
-        const summary: LiveSummary = {
-          id: `summary-${Date.now()}`,
-          text: "",
-          subtopic_summaries: data.subtopic_summaries || {},
-          created_at: Date.now(),
-          subtopics: data.subtopics || [],
-        };
+      if (error || !data) {
+        console.error("Pass 1 (classify) failed:", error);
+        return;
+      }
 
-        if (summary.subtopics.length > 0 || Object.keys(summary.subtopic_summaries || {}).length > 0) {
+      const identifiedSubtopics: string[] = data.subtopics || [];
+      const entrySubtopicMap: Record<string, string> = data.entry_subtopic_map || {};
+
+      // Update subtopics
+      if (identifiedSubtopics.length) {
+        setSubtopics(identifiedSubtopics);
+        persistSession({ subtopics: identifiedSubtopics });
+      }
+
+      // Update entry subtopic assignments
+      if (Object.keys(entrySubtopicMap).length) {
+        setTranscriptEntries((prev) => {
+          const updated = prev.map((e) => ({
+            ...e,
+            subtopic: entrySubtopicMap[e.id] || e.subtopic,
+          }));
+          persistSession({ transcript_entries: updated });
+          return updated;
+        });
+      }
+
+      // Pass 2: Summarize each subtopic in parallel
+      if (identifiedSubtopics.length > 0) {
+        const entriesById = new Map(entries.map((e) => [e.id, e]));
+        const subtopicSummaries: Record<string, string> = {};
+
+        const summaryPromises = identifiedSubtopics.map(async (st) => {
+          // Filter entries for this subtopic
+          const stEntries = Object.entries(entrySubtopicMap)
+            .filter(([, topic]) => topic === st)
+            .map(([id]) => entriesById.get(id))
+            .filter(Boolean)
+            .map((e) => ({ speaker: e!.speaker_label, text: e!.text }));
+
+          if (stEntries.length === 0) return;
+
+          try {
+            const { data: sumData, error: sumError } = await supabase.functions.invoke("analyze-transcript", {
+              body: { mode: "live_summarize_subtopic", subtopic: st, entries: stEntries },
+            });
+            if (!sumError && sumData?.summary) {
+              subtopicSummaries[st] = sumData.summary;
+            }
+          } catch (err) {
+            console.error(`Failed to summarize subtopic "${st}":`, err);
+          }
+        });
+
+        await Promise.all(summaryPromises);
+
+        if (Object.keys(subtopicSummaries).length > 0) {
+          const summary: LiveSummary = {
+            id: `summary-${Date.now()}`,
+            text: "",
+            subtopic_summaries: subtopicSummaries,
+            created_at: Date.now(),
+            subtopics: identifiedSubtopics,
+          };
+
           setSummaries((prev) => {
             const updated = [...prev, summary];
             persistSession({ summaries: updated });
-            return updated;
-          });
-        }
-
-        // Update subtopics
-        if (data.subtopics?.length) {
-          setSubtopics(data.subtopics);
-          persistSession({ subtopics: data.subtopics });
-        }
-
-        // Update entry subtopic assignments
-        if (data.entry_subtopic_map) {
-          setTranscriptEntries((prev) => {
-            const updated = prev.map((e) => ({
-              ...e,
-              subtopic: data.entry_subtopic_map[e.id] || e.subtopic,
-            }));
-            persistSession({ transcript_entries: updated });
             return updated;
           });
         }
