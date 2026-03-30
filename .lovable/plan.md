@@ -1,80 +1,57 @@
 
 
-# 3-Column Incoming Prep Workspace + Debate Notebook
+# Fix: Subtopic Summaries Not Generated for Live Sessions
 
-## What gets built
+## Problem
 
-Two connected features in one pass:
+The AI correctly identifies subtopics from the transcript but returns **empty `subtopic_summaries`**. DB evidence confirms this — session `d53813b9` has 7 subtopics but `subtopic_summaries: {}`.
 
-1. **Incoming prep workspace** — after selecting prep time, the incoming user sees a 3-column layout: all previous transcripts | all summaries (with "Editing..." status) | scratch notes
-2. **Notebook button in debate room** — a persistent button during live debate that opens a Sheet with the same scratch notes textarea
+**Root cause**: The entire transcript (325 entries for a 35-min session) is sent to the AI in a single request. The model identifies subtopic labels but fails to produce per-subtopic summaries — likely because generating 5-7 detailed summaries from 325 entries in one tool call exceeds what the model reliably produces.
 
-The notes textarea in prep and the notebook share the same state, so anything written during prep carries into the debate and vice versa.
+## Solution: Two-Pass Summarization
 
-## File changes
+Split the summarization into two steps:
 
-### `src/components/debate/PrepPhaseOverlay.tsx`
+1. **Pass 1 — Classify**: Send the full transcript to the AI. Ask it to identify subtopics and assign each entry to a subtopic (current behavior, works fine). No summaries requested here.
 
-**New props:**
-- `allTranscriptEntries` — full array of transcript entries from the debate
-- `subtopics` — array of `{ id, title }` for grouping
-- `sides` — array of `{ id, label }` for speaker labels
-- `isSummaryBeingEdited?: boolean` — true while outgoing side hasn't finished editing
-- `notebookValue?: string` and `onNotebookChange?: (val: string) => void` — shared ephemeral notes state
+2. **Pass 2 — Summarize per subtopic**: For each identified subtopic, send only the entries assigned to that subtopic and ask for a focused summary. This keeps each request small and focused.
 
-**Incoming countdown section** (lines 149-167) — replace simple timer with:
-- Widen container to `max-w-6xl`
-- Timer centered above a 3-column grid (`grid-cols-1 md:grid-cols-3 gap-4`)
-- **Column 1 — Transcripts**: group `allTranscriptEntries` by subtopic, show speaker label + text, scrollable `max-h-[55vh]`
-- **Column 2 — Summaries**: show AI summaries per entry grouped by subtopic; if `isSummaryBeingEdited`, latest summary shows a pulsing "Editing..." badge that auto-replaces when summary prop updates
-- **Column 3 — My Notes**: `<textarea>` bound to `notebookValue`/`onNotebookChange` (or local fallback state)
-- Ready button below grid
+## Changes
 
-**Outgoing section** — update notes textarea in the prep phase to also use `notebookValue`/`onNotebookChange` if provided (for notebook continuity)
+### 1. Edge function: `supabase/functions/analyze-transcript/index.ts`
 
-### `src/pages/DebateRoomPage.tsx`
+- Add a new mode `"live_summarize_subtopic"` that accepts a subtopic label and a filtered list of entries, and returns a single summary string.
+- Simplify the existing `live_conversation` mode to only return subtopics and entry assignments (remove `subtopic_summaries` from its tool schema since it's not reliably produced).
 
-**New state:**
-- `notebookContent: string` — `useState("")`
-- `notebookOpen: boolean` — `useState(false)`
+### 2. Hook: `src/hooks/useLiveTranscription.ts`
 
-**New imports:** `Sheet`, `SheetContent`, `SheetHeader`, `SheetTitle` from ui/sheet; `NotebookPen` from lucide-react
+- Update `generateSummary()` to:
+  1. Call `analyze-transcript` with `mode: "live_conversation"` to get subtopics + entry mapping
+  2. For each subtopic, call `analyze-transcript` with `mode: "live_summarize_subtopic"` passing only that subtopic's entries
+  3. Collect all per-subtopic summaries into `subtopic_summaries` map
+  4. Save the complete summary object to state and DB
 
-**Pass new props to PrepPhaseOverlay:**
-- `allTranscriptEntries={transcriptEntries}`
-- `subtopics={subtopics}`
-- `sides={sides}`
-- `isSummaryBeingEdited` — derived from whether the other side's prep ready flag is false
-- `notebookValue={notebookContent}` and `onNotebookChange={setNotebookContent}`
+### 3. No UI changes needed
 
-**Notebook button:** Add a small fixed-position `NotebookPen` icon button (bottom-right area, near controls) visible to speakers during live debate. Clicking toggles `notebookOpen`.
+`SessionRecordView` already reads from `subtopic_summaries` correctly — once the data is populated, summaries will appear.
 
-**Notebook Sheet:** Render a `<Sheet>` (side="right") containing a textarea bound to `notebookContent`. Header says "My Notes". Notes are ephemeral — no DB persistence.
+## Technical Details
 
-## Layout sketch — incoming prep (after time selection)
-
-```text
-┌───────────────────────────────────────────────────────┐
-│            Preparation Time       1:30                │
-├──────────────────┬──────────────────┬─────────────────┤
-│  TRANSCRIPTS     │  SUMMARIES       │  MY NOTES       │
-│                  │                  │                  │
-│  [Subtopic 1]    │  [Subtopic 1]    │  [textarea]     │
-│  SpeakerA: ...   │  Summary: ...    │                  │
-│  SpeakerB: ...   │                  │                  │
-│                  │  [Subtopic 2]    │                  │
-│  [Subtopic 2]    │  ⏳ Editing...   │                  │
-│  SpeakerA: ...   │                  │                  │
-│                  │                  │                  │
-│  (scrollable)    │  (scrollable)    │  (grows w/input) │
-├──────────────────┴──────────────────┴─────────────────┤
-│                   [ I'm Ready ]                       │
-└───────────────────────────────────────────────────────┘
+**New edge function mode payload** (`live_summarize_subtopic`):
+```json
+{
+  "mode": "live_summarize_subtopic",
+  "subtopic": "VC Pitch Strategy: Framework and Execution",
+  "entries": [{ "speaker": "Speaker 1", "text": "..." }, ...]
+}
 ```
 
-## Notes
-- All notes are ephemeral (local state only), lost on page refresh
-- No new DB columns or migrations needed
-- `isSummaryBeingEdited` uses existing `prep_sideX_ready` flags already synced via realtime
-- On mobile, columns stack vertically
+**Returns** (via tool call):
+```json
+{ "summary": "Speaker 1 discussed... Speaker 2 argued..." }
+```
+
+**Parallelization**: The per-subtopic summary calls can be made in parallel (`Promise.all`) since they're independent, keeping total latency reasonable even with 5-7 subtopics.
+
+**Model**: Keep `google/gemini-3-flash-preview` — it handles single-subtopic summaries well. The issue was volume per request, not model capability.
 
