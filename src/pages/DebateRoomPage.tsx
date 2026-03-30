@@ -293,6 +293,7 @@ const DebateRoomPage = () => {
    // Timer — 1-second countdown driven by local interval
   useEffect(() => {
     if (timerRunning && timeLeft > 0) {
+      timerWasActiveRef.current = true;
       timerRef.current = setInterval(() => {
         setTimeLeft((t) => {
           if (t <= 1) { setTimerRunning(false); return 0; }
@@ -377,6 +378,7 @@ const DebateRoomPage = () => {
    useEffect(() => {
      if (debate?.turn_started_at) {
        turnEndTriggeredRef.current = false;
+       timerWasActiveRef.current = false;
      }
    }, [debate?.turn_started_at]);
 
