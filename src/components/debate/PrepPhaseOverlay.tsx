@@ -382,11 +382,9 @@ const PrepPhaseOverlay = ({
             </div>
 
             {/* Ready button always visible below */}
-            {hasPrepTimerStarted && (
-              <div className="text-center">
-                {readyButtonJsx}
-              </div>
-            )}
+            <div className="text-center">
+              {readyButtonJsx}
+            </div>
           </motion.div>
         )}
       </div>
