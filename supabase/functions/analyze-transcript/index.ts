@@ -13,7 +13,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { transcriptChunk, existingMap, sides, currentSubtopic, speakerSide, mode, fullTranscript } = await req.json();
+    const { transcriptChunk, existingMap, sides, currentSubtopic, speakerSide, mode, fullTranscript, subtopic, entries } = await req.json();
 
     // Live conversation mode — summarize + identify subtopics
     if (mode === "live_conversation") {
