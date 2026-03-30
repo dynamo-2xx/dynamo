@@ -670,6 +670,23 @@ const DebateRoomPage = () => {
     }
   }, [debate, myParticipant, prepPhaseRole, enterPrepPhaseFromRealtime]);
 
+  useEffect(() => {
+    if (!debate?.prep_phase_active || !prepPhaseRole || !prepStartedAt || !selectedPrepDuration || prepExitRef.current) {
+      return;
+    }
+
+    const maybeCompletePrep = () => {
+      if (Date.now() >= prepStartedAt + selectedPrepDuration * 1000 && !prepExitRef.current) {
+        void completePrepPhaseAndAdvanceRef.current();
+      }
+    };
+
+    maybeCompletePrep();
+    const interval = setInterval(maybeCompletePrep, 500);
+
+    return () => clearInterval(interval);
+  }, [debate?.prep_phase_active, prepPhaseRole, prepStartedAt, selectedPrepDuration]);
+
   const submitArgument = async () => {
     if (!argumentText.trim() || !debate || !myParticipant || !currentSubtopic || submitting) return;
     setSubmitting(true);
