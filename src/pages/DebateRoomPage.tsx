@@ -346,36 +346,36 @@ const DebateRoomPage = () => {
   const enterPrepPhase = useCallback(() => {
      if (!debate || !myParticipant || debate.prep_phase_active) return;
 
-     // Only the speaker (outgoing side) triggers prep phase
      const iAmSpeaker = activeSpeakerParticipant?.user_id === user?.id;
-     if (!iAmSpeaker) return;
 
-     // Gather transcript/summary for outgoing review
-     const myEntries = transcriptEntries
-       .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
-       .sort((a, b) => b.timestamp - a.timestamp);
-     const lastEntry = myEntries[0];
-     setLastTurnTranscript(lastEntry?.text || "");
-     setLastTurnSummary(lastEntry?.ai_summary || "");
+      // Gather transcript/summary if I was the speaker (outgoing)
+      if (iAmSpeaker) {
+        const myEntries = transcriptEntries
+          .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+          .sort((a, b) => b.timestamp - a.timestamp);
+        const lastEntry = myEntries[0];
+        setLastTurnTranscript(lastEntry?.text || "");
+        setLastTurnSummary(lastEntry?.ai_summary || "");
+      }
 
-     // Compute prep duration and start time atomically
+      setPrepPhaseRole(iAmSpeaker ? "outgoing" : "incoming");
+
      const prepSeconds = parseTimeToSeconds(debate.prep_time_max || "60s");
      const startedAt = new Date().toISOString();
 
-     setPrepPhaseRole("outgoing");
      setPrepStartedAt(new Date(startedAt).getTime());
      setSelectedPrepDuration(prepSeconds);
     setTimerRunning(false);
     setTimeLeft(0);
 
-     // Write prep phase to DB atomically — both sides sync from this single write
-     supabase.from("debates").update({
+      // Write prep phase to DB — use idempotent guard so only the first writer wins
+      supabase.from("debates").update({
       prep_phase_active: true,
        prep_phase_started_at: startedAt,
        prep_duration_seconds: prepSeconds,
       prep_side1_ready: false,
       prep_side2_ready: false,
-     } as any).eq("id", debate.id).then(({ error }) => {
+      } as any).eq("id", debate.id).eq("prep_phase_active", false).then(({ error }) => {
        if (error) console.error("Failed to write prep phase to DB:", error);
      });
   }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
