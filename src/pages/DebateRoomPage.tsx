@@ -99,6 +99,9 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
   const prevTimerRunningRef = useRef(false);
+  const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
+  const enterPrepPhaseFromRealtimeRef = useRef<(updated: DebateData) => void>(() => {});
+  const advanceTurnRef = useRef<() => Promise<void>>(async () => {});
   const [showCompletionOverlay, setShowCompletionOverlay] = useState(false);
   const [roundSummaries, setRoundSummaries] = useState<Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>>({});
   const [prepPhaseRole, setPrepPhaseRole] = useState<"incoming" | "outgoing" | null>(null);
@@ -236,8 +239,14 @@ const DebateRoomPage = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "debates", filter: `id=eq.${id}` }, (payload) => {
         const updated = payload.new as unknown as DebateData;
         setDebate(updated);
+
+        if (updated.prep_phase_active) {
+          setTimerRunning(false);
+          setTimeLeft(0);
+        }
+
         // Sync timer from turn_started_at
-        if (updated.turn_started_at && updated.status === "live") {
+        if (!updated.prep_phase_active && updated.turn_started_at && updated.status === "live") {
           const elapsed = Math.floor((Date.now() - new Date(updated.turn_started_at).getTime()) / 1000);
           const remaining = Math.max(0, parseTimeToSeconds(updated.time_per_turn) - elapsed);
           setTimeLeft(remaining);
@@ -245,12 +254,25 @@ const DebateRoomPage = () => {
           else setTimerRunning(false);
         }
         // Sync prep phase from other participant
-        if (updated.prep_phase_active && !prepPhaseRole) {
-          // The other side started prep — we need to enter prep too
-          enterPrepPhaseFromRealtime(updated);
+        if (updated.prep_phase_active) {
+          if (!prepPhaseRoleRef.current) {
+            enterPrepPhaseFromRealtimeRef.current(updated);
+          }
+
+          setSelectedPrepDuration(updated.prep_duration_seconds ?? null);
+          setPrepStartedAt(
+            updated.prep_phase_started_at
+              ? new Date(updated.prep_phase_started_at).getTime()
+              : null,
+          );
+        } else if (prepPhaseRoleRef.current) {
+          setPrepPhaseRole(null);
+          setPrepStartedAt(null);
+          setSelectedPrepDuration(null);
         }
+
         // Both sides ready → advance
-        if (updated.prep_side1_ready && updated.prep_side2_ready && prepPhaseRole) {
+        if (updated.prep_side1_ready && updated.prep_side2_ready && prepPhaseRoleRef.current) {
           setPrepPhaseRole(null);
           setPrepStartedAt(null);
           setSelectedPrepDuration(null);
@@ -262,7 +284,7 @@ const DebateRoomPage = () => {
             prep_side1_ready: false,
             prep_side2_ready: false,
           } as any).eq("id", id);
-          advanceTurn();
+          void advanceTurnRef.current();
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
@@ -291,7 +313,7 @@ const DebateRoomPage = () => {
 
   // Auto-advance: when timer hits 0 during a live debate, enter prep phase
   useEffect(() => {
-    if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live") {
+    if (prevTimerRunningRef.current && !timerRunning && timeLeft === 0 && debate?.status === "live" && !debate.prep_phase_active) {
       if (!advancingRef.current && !prepPhaseRole) {
         enterPrepPhase();
       }
@@ -333,7 +355,7 @@ const DebateRoomPage = () => {
 
   // Enter preparation phase between turns (called by the side that triggered it)
   const enterPrepPhase = useCallback(() => {
-    if (!debate || !myParticipant) return;
+    if (!debate || !myParticipant || debate.prep_phase_active) return;
     const wasMyTurn = activeSpeakerParticipant?.user_id === user?.id;
 
     if (wasMyTurn) {
@@ -346,12 +368,16 @@ const DebateRoomPage = () => {
     }
 
     setPrepPhaseRole(wasMyTurn ? "outgoing" : "incoming");
-    setPrepStartedAt(Date.now());
+    setPrepStartedAt(null);
+    setSelectedPrepDuration(null);
+    setTimerRunning(false);
+    setTimeLeft(0);
 
     // Write prep phase to DB so both sides sync
     supabase.from("debates").update({
       prep_phase_active: true,
-      prep_phase_started_at: new Date().toISOString(),
+      prep_phase_started_at: null,
+      prep_duration_seconds: null,
       prep_side1_ready: false,
       prep_side2_ready: false,
     } as any).eq("id", debate.id);
@@ -373,20 +399,24 @@ const DebateRoomPage = () => {
     }
 
     setPrepPhaseRole(wasMyTurn ? "outgoing" : "incoming");
-    const serverStartedAt = updated.prep_phase_started_at
-      ? new Date(updated.prep_phase_started_at).getTime()
-      : Date.now();
-    setPrepStartedAt(serverStartedAt);
+    setPrepStartedAt(updated.prep_phase_started_at ? new Date(updated.prep_phase_started_at).getTime() : null);
+    setSelectedPrepDuration(updated.prep_duration_seconds ?? null);
+    setTimerRunning(false);
+    setTimeLeft(0);
   }, [myParticipant, prepPhaseRole, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
 
   const handlePrepTimeSelected = useCallback((seconds: number) => {
     setSelectedPrepDuration(seconds);
-    if (debate && isCreator) {
-      supabase.from("debates").update({
-        prep_duration_seconds: seconds,
-      } as any).eq("id", debate.id);
-    }
-  }, [debate, isCreator]);
+    const startedAt = new Date().toISOString();
+    setPrepStartedAt(new Date(startedAt).getTime());
+
+    if (!debate) return;
+
+    supabase.from("debates").update({
+      prep_duration_seconds: seconds,
+      prep_phase_started_at: startedAt,
+    } as any).eq("id", debate.id);
+  }, [debate]);
 
   const handleSummaryEdited = useCallback((newSummary: string) => {
     // Update the transcript entry's AI summary
@@ -575,6 +605,24 @@ const DebateRoomPage = () => {
       advancingRef.current = false;
     }
   };
+
+  useEffect(() => {
+    prepPhaseRoleRef.current = prepPhaseRole;
+  }, [prepPhaseRole]);
+
+  useEffect(() => {
+    enterPrepPhaseFromRealtimeRef.current = enterPrepPhaseFromRealtime;
+  }, [enterPrepPhaseFromRealtime]);
+
+  useEffect(() => {
+    advanceTurnRef.current = advanceTurn;
+  }, [advanceTurn]);
+
+  useEffect(() => {
+    if (debate?.prep_phase_active && myParticipant && !prepPhaseRole) {
+      enterPrepPhaseFromRealtime(debate);
+    }
+  }, [debate, myParticipant, prepPhaseRole, enterPrepPhaseFromRealtime]);
 
   const submitArgument = async () => {
     if (!argumentText.trim() || !debate || !myParticipant || !currentSubtopic || submitting) return;
