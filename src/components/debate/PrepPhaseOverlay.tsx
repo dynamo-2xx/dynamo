@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, Edit3, Check, ArrowRight, Loader2 } from "lucide-react";
+import { Edit3, Check, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface TranscriptEntry {
@@ -42,7 +42,6 @@ function parseTimeLabel(seconds: number): string {
   return `${seconds}s`;
 }
 
-const PREP_OPTIONS = [15, 30, 45, 60, 90, 120, 180];
 
 const PrepPhaseOverlay = ({
   role,
@@ -110,11 +109,6 @@ const PrepPhaseOverlay = ({
 
     return () => clearInterval(interval);
   }, [prepStartedAt, syncedDuration, onReady, markedReady]);
-
-  const handleSelectTime = (seconds: number) => {
-    setSelectedTime(seconds);
-    onPrepTimeSelected?.(seconds);
-  };
 
   const handleSubmitSummary = () => {
     onSummaryEdited?.(editedSummary);
