@@ -394,7 +394,6 @@ const CreateDebatePage = () => {
                     <Clock className="w-3.5 h-3.5 inline mr-1" />
                     Preparation Time Between Turns
                   </label>
-                  <div className="grid grid-cols-2 gap-4">
                    <select
                      value={debate.prepTime}
                      onChange={(e) => setDebate({ ...debate, prepTime: e.target.value })}
@@ -405,7 +404,7 @@ const CreateDebatePage = () => {
                   <p className="text-[10px] text-muted-foreground mt-2 font-body">
                      Time given to both sides between turns to review and prepare.
                   </p>
-                </div>
+                 </div>
                 {/* Invite Users (optional) */}
                 <div className="bg-card border border-border rounded-xl p-5">
                   <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">
