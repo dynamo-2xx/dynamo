@@ -114,7 +114,8 @@ Analyze this conversation: identify subtopics, assign each entry to a subtopic, 
 
     // Per-subtopic summary mode
     if (mode === "live_summarize_subtopic") {
-      const { subtopic, entries } = await req.json().catch(() => ({ subtopic: "", entries: [] }));
+      const subEntries = entries || [];
+      const subLabel = subtopic || "";
 
       const sysPrompt = `You are an AI conversation analyst. You will be given transcript entries from a live conversation that all belong to one subtopic. Generate a concise but comprehensive summary that captures the key points discussed under this theme. The summary MUST reflect all speakers' contributions fairly and evenly — do not favor one speaker over another. Identify speakers by their labels (Speaker 1, Speaker 2, etc.). Return the result using the summarize_subtopic tool.`;
 
