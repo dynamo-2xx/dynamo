@@ -337,6 +337,11 @@ const DebateRoomPage = () => {
 
   const advancingRef = useRef(false);
 
+  const isPrepExpired = useCallback((startedAt?: string | null, durationSeconds?: number | null) => {
+    if (!startedAt || !durationSeconds) return false;
+    return Date.now() >= new Date(startedAt).getTime() + durationSeconds * 1000;
+  }, []);
+
   // Determine which side index (0 or 1) the current user is on
   const getMySideIndex = useCallback((): 0 | 1 => {
     if (!myParticipant || sides.length < 2) return 0;
