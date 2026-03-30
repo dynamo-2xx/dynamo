@@ -98,7 +98,8 @@ const DebateRoomPage = () => {
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
-  const prevTimeLeftRef = useRef(0);
+   const turnEndTriggeredRef = useRef(false);
+    const timerWasActiveRef = useRef(false);
   const prepExitRef = useRef(false);
   const completePrepPhaseAndAdvanceRef = useRef<() => Promise<void>>(async () => {});
   const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
@@ -196,7 +197,12 @@ const DebateRoomPage = () => {
         const elapsed = Math.floor((Date.now() - new Date(d.turn_started_at).getTime()) / 1000);
         const remaining = Math.max(0, parseTimeToSeconds(d.time_per_turn) - elapsed);
         setTimeLeft(remaining);
-        if (remaining > 0) setTimerRunning(true);
+         if (remaining > 0) {
+           setTimerRunning(true);
+         } else if (!d.prep_phase_active) {
+           // Turn already expired — mark timer as "was active" so the auto-trigger fires
+           timerWasActiveRef.current = true;
+         }
       } else {
         setTimeLeft(parseTimeToSeconds(d.time_per_turn));
       }
@@ -290,9 +296,10 @@ const DebateRoomPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
-  // Timer
+   // Timer — 1-second countdown driven by local interval
   useEffect(() => {
     if (timerRunning && timeLeft > 0) {
+      timerWasActiveRef.current = true;
       timerRef.current = setInterval(() => {
         setTimeLeft((t) => {
           if (t <= 1) { setTimerRunning(false); return 0; }
@@ -339,55 +346,63 @@ const DebateRoomPage = () => {
   const enterPrepPhase = useCallback(() => {
      if (!debate || !myParticipant || debate.prep_phase_active) return;
 
-     // Only the speaker (outgoing side) triggers prep phase
      const iAmSpeaker = activeSpeakerParticipant?.user_id === user?.id;
-     if (!iAmSpeaker) return;
 
-     // Gather transcript/summary for outgoing review
-     const myEntries = transcriptEntries
-       .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
-       .sort((a, b) => b.timestamp - a.timestamp);
-     const lastEntry = myEntries[0];
-     setLastTurnTranscript(lastEntry?.text || "");
-     setLastTurnSummary(lastEntry?.ai_summary || "");
+      // Gather transcript/summary if I was the speaker (outgoing)
+      if (iAmSpeaker) {
+        const myEntries = transcriptEntries
+          .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+          .sort((a, b) => b.timestamp - a.timestamp);
+        const lastEntry = myEntries[0];
+        setLastTurnTranscript(lastEntry?.text || "");
+        setLastTurnSummary(lastEntry?.ai_summary || "");
+      }
 
-     // Compute prep duration and start time atomically
+      setPrepPhaseRole(iAmSpeaker ? "outgoing" : "incoming");
+
      const prepSeconds = parseTimeToSeconds(debate.prep_time_max || "60s");
      const startedAt = new Date().toISOString();
 
-     setPrepPhaseRole("outgoing");
      setPrepStartedAt(new Date(startedAt).getTime());
      setSelectedPrepDuration(prepSeconds);
     setTimerRunning(false);
     setTimeLeft(0);
 
-     // Write prep phase to DB atomically — both sides sync from this single write
-     supabase.from("debates").update({
+      // Write prep phase to DB — use idempotent guard so only the first writer wins
+      supabase.from("debates").update({
       prep_phase_active: true,
        prep_phase_started_at: startedAt,
        prep_duration_seconds: prepSeconds,
       prep_side1_ready: false,
       prep_side2_ready: false,
-     } as any).eq("id", debate.id).then(({ error }) => {
+      } as any).eq("id", debate.id).eq("prep_phase_active", false).then(({ error }) => {
        if (error) console.error("Failed to write prep phase to DB:", error);
      });
   }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
 
-  // Auto-trigger prep when the shared turn timer actually reaches 0
+   // Reset turn-end guard whenever a new turn starts (turn_started_at changes)
+   useEffect(() => {
+     if (debate?.turn_started_at) {
+       turnEndTriggeredRef.current = false;
+       timerWasActiveRef.current = false;
+     }
+   }, [debate?.turn_started_at]);
+
+   // Auto-trigger prep when the turn timer reaches 0
   useEffect(() => {
     if (
-      prevTimeLeftRef.current > 0 &&
       timeLeft === 0 &&
+       timerRunning === false &&
+       timerWasActiveRef.current &&
       debate?.status === "live" &&
       !debate.prep_phase_active &&
-      !advancingRef.current &&
-      !prepPhaseRole
+       !prepPhaseRole &&
+       !turnEndTriggeredRef.current
     ) {
+       turnEndTriggeredRef.current = true;
       enterPrepPhase();
     }
-
-    prevTimeLeftRef.current = timeLeft;
-  }, [timeLeft, debate?.status, debate?.prep_phase_active, prepPhaseRole, enterPrepPhase]);
+   }, [timeLeft, timerRunning, debate?.status, debate?.prep_phase_active, prepPhaseRole, enterPrepPhase]);
 
    // Called via realtime when the speaker (other side) triggered prep phase
   const enterPrepPhaseFromRealtime = useCallback((updated: DebateData) => {
@@ -859,6 +874,7 @@ const DebateRoomPage = () => {
 
   // End turn early — available to all speakers
   const endTurnEarly = () => {
+     turnEndTriggeredRef.current = true;
     setTimerRunning(false);
     setTimeLeft(0);
     enterPrepPhase();
