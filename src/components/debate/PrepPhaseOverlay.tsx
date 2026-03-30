@@ -21,7 +21,7 @@ interface PrepPhaseOverlayProps {
   lastAiSummary?: string;
   speakerSideLabel: string;
   onPrepTimeSelected?: (seconds: number) => void;
-  onSummaryEdited?: (newSummary: string) => void;
+   onSummaryEdited?: (newSummary: string) => void;
   onReady?: () => void;
   prepStartedAt?: number;
   selectedPrepDuration?: number;
@@ -50,8 +50,7 @@ const PrepPhaseOverlay = ({
   lastTranscript,
   lastAiSummary,
   speakerSideLabel,
-  onPrepTimeSelected,
-  onSummaryEdited,
+   onSummaryEdited,
   onReady,
   prepStartedAt,
   selectedPrepDuration,
@@ -73,21 +72,6 @@ const PrepPhaseOverlay = ({
   const setNotesValue = onNotebookChange || setLocalNotes;
   const syncedDuration = selectedPrepDuration || selectedTime;
   const hasPrepTimerStarted = Boolean(prepStartedAt && syncedDuration);
-
-
-  useEffect(() => {
-    // Auto-select max prep time on mount
-    if (!selectedTime) {
-      setSelectedTime(prepTimeMax);
-    }
-  }, [prepTimeMax, selectedTime]);
-
-  // Auto-trigger prep time selection for incoming role
-  useEffect(() => {
-    if (role === "incoming" && selectedTime && !selectedPrepDuration) {
-      onPrepTimeSelected?.(selectedTime);
-    }
-  }, [role, selectedTime, selectedPrepDuration, onPrepTimeSelected]);
 
   useEffect(() => {
     if (!prepStartedAt) return;
