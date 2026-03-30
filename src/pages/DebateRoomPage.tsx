@@ -113,6 +113,7 @@ const DebateRoomPage = () => {
   const [selectedPrepDuration, setSelectedPrepDuration] = useState<number | null>(null);
   const [lastTurnTranscript, setLastTurnTranscript] = useState<string>("");
   const [lastTurnSummary, setLastTurnSummary] = useState<string>("");
+  const [prepSpeakerSideLabel, setPrepSpeakerSideLabel] = useState<string>("");
   const [notebookContent, setNotebookContent] = useState<string>("");
   const [notebookOpen, setNotebookOpen] = useState(false);
 
@@ -350,18 +351,18 @@ const DebateRoomPage = () => {
      if (!debate || !myParticipant || debate.prep_phase_active) return;
 
      const iAmSpeaker = activeSpeakerParticipant?.user_id === user?.id;
+     if (!iAmSpeaker) return;
+     const outgoingSideLabel = currentSide?.label || "";
 
-      // Gather transcript/summary if I was the speaker (outgoing)
-      if (iAmSpeaker) {
-        const myEntries = transcriptEntries
-          .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
-          .sort((a, b) => b.timestamp - a.timestamp);
-        const lastEntry = myEntries[0];
-        setLastTurnTranscript(lastEntry?.text || "");
-        setLastTurnSummary(lastEntry?.ai_summary || "");
-      }
+     const myEntries = transcriptEntries
+       .filter((e) => e.is_final && e.subtopic === currentSubtopic?.title && e.speaker_side === outgoingSideLabel)
+       .sort((a, b) => b.timestamp - a.timestamp);
+     const lastEntry = myEntries[0];
 
-      setPrepPhaseRole(iAmSpeaker ? "outgoing" : "incoming");
+     setLastTurnTranscript(lastEntry?.text || "");
+     setLastTurnSummary(lastEntry?.ai_summary || "");
+     setPrepSpeakerSideLabel(outgoingSideLabel);
+     setPrepPhaseRole("outgoing");
 
      const prepSeconds = parseTimeToSeconds(debate.prep_time_max || "60s");
      const startedAt = new Date().toISOString();
@@ -381,7 +382,7 @@ const DebateRoomPage = () => {
       } as any).eq("id", debate.id).eq("prep_phase_active", false).then(({ error }) => {
        if (error) console.error("Failed to write prep phase to DB:", error);
      });
-  }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
+  }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic, currentSide]);
 
    // Reset turn-end guard whenever a new turn starts (turn_started_at changes)
    useEffect(() => {
@@ -400,52 +401,121 @@ const DebateRoomPage = () => {
       debate?.status === "live" &&
       !debate.prep_phase_active &&
        !prepPhaseRole &&
+       isMyTurn &&
        !turnEndTriggeredRef.current
     ) {
        turnEndTriggeredRef.current = true;
       enterPrepPhase();
     }
-   }, [timeLeft, timerRunning, debate?.status, debate?.prep_phase_active, prepPhaseRole, enterPrepPhase]);
+   }, [timeLeft, timerRunning, debate?.status, debate?.prep_phase_active, prepPhaseRole, isMyTurn, enterPrepPhase]);
 
    // Called via realtime when the speaker (other side) triggered prep phase
   const enterPrepPhaseFromRealtime = useCallback((updated: DebateData) => {
     if (!myParticipant || prepPhaseRole) return;
-     // The listener is always the incoming side (non-speaker)
-    const wasMyTurn = activeSpeakerParticipant?.user_id === user?.id;
+    const outgoingSideId = updated.current_speaker_side_id;
+    const outgoingSideLabel = sides.find((side) => side.id === outgoingSideId)?.label || "";
+    const prepSubtopicTitle = subtopics[updated.current_subtopic_index ?? 0]?.title;
+    const amOutgoingSide = myParticipant.side_id === outgoingSideId;
 
-    if (wasMyTurn) {
-       // Edge case: if somehow realtime says I was the speaker, set outgoing
+    setPrepSpeakerSideLabel(outgoingSideLabel);
+
+    if (amOutgoingSide) {
       const myEntries = transcriptEntries
-        .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+        .filter((e) => e.is_final && e.subtopic === prepSubtopicTitle && e.speaker_side === outgoingSideLabel)
         .sort((a, b) => b.timestamp - a.timestamp);
       const lastEntry = myEntries[0];
       setLastTurnTranscript(lastEntry?.text || "");
       setLastTurnSummary(lastEntry?.ai_summary || "");
-       setPrepPhaseRole("outgoing");
-     } else {
-       setPrepPhaseRole("incoming");
+      setPrepPhaseRole("outgoing");
+    } else {
+      setPrepPhaseRole("incoming");
     }
 
     setPrepStartedAt(updated.prep_phase_started_at ? new Date(updated.prep_phase_started_at).getTime() : null);
     setSelectedPrepDuration(updated.prep_duration_seconds ?? null);
     setTimerRunning(false);
     setTimeLeft(0);
-  }, [myParticipant, prepPhaseRole, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic]);
+  }, [myParticipant, prepPhaseRole, sides, subtopics, transcriptEntries]);
 
   const completePrepPhaseAndAdvance = useCallback(async () => {
-    if (!id || prepExitRef.current) return;
+    if (!id || !debate || prepExitRef.current) return;
 
     prepExitRef.current = true;
 
     try {
+      const currentSideIdx = sides.findIndex((side) => side.id === debate.current_speaker_side_id);
+      let nextSideIdx = (currentSideIdx + 1) % sides.length;
+      let nextTurn = debate.current_turn;
+      let nextSubIdx = debate.current_subtopic_index;
+
+      if (nextSideIdx === 0) nextTurn += 1;
+
+      const basePrepReset = {
+        prep_phase_active: false,
+        prep_phase_started_at: null,
+        prep_duration_seconds: null,
+        prep_side1_ready: false,
+        prep_side2_ready: false,
+      };
+
+      if (nextTurn >= debate.turns_per_subtopic) {
+        const completingSubtopic = subtopics[debate.current_subtopic_index];
+        if (completingSubtopic && isCreator) {
+          generateRoundSummary(completingSubtopic.id, completingSubtopic.title);
+        }
+
+        nextSubIdx += 1;
+        nextTurn = 0;
+        nextSideIdx = 0;
+
+        if (nextSubIdx >= subtopics.length) {
+          await persistTranscripts();
+
+          const editWindowEnd = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+          const { data, error } = await supabase
+            .from("debates")
+            .update({
+              ...basePrepReset,
+              status: "completed",
+              ended_at: new Date().toISOString(),
+              edit_window_ends_at: editWindowEnd,
+            } as any)
+            .eq("id", id)
+            .eq("prep_phase_active", true)
+            .select("id")
+            .maybeSingle();
+
+          if (error) throw error;
+          if (!data) return;
+
+          setPrepPhaseRole(null);
+          setPrepStartedAt(null);
+          setSelectedPrepDuration(null);
+          setPrepSpeakerSideLabel("");
+          setShowCompletionOverlay(true);
+
+          setAiLoading(true);
+          try {
+            const summaries = subtopics.map((st) => ({
+              subtopic: st.title,
+              summary: roundSummaries[st.id]?.summary || arguments_.filter((a) => a.subtopic_id === st.id).map((a) => a.content).join(" | "),
+            }));
+            await streamAI("closing_synthesis", { topic: debate.topic, roundSummaries: summaries });
+          } catch {}
+          setAiLoading(false);
+          return;
+        }
+      }
+
+      const turnNow = new Date().toISOString();
       const { data, error } = await supabase
         .from("debates")
         .update({
-          prep_phase_active: false,
-          prep_phase_started_at: null,
-          prep_duration_seconds: null,
-          prep_side1_ready: false,
-          prep_side2_ready: false,
+          ...basePrepReset,
+          current_subtopic_index: nextSubIdx,
+          current_turn: nextTurn,
+          current_speaker_side_id: sides[nextSideIdx]?.id,
+          turn_started_at: turnNow,
         } as any)
         .eq("id", id)
         .eq("prep_phase_active", true)
@@ -455,15 +525,36 @@ const DebateRoomPage = () => {
       if (error) throw error;
       if (!data) return;
 
+      lastSyncedTurnStartRef.current = turnNow;
       setPrepPhaseRole(null);
       setPrepStartedAt(null);
       setSelectedPrepDuration(null);
+      setPrepSpeakerSideLabel("");
+      setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
+      setTimerRunning(true);
 
-      await advanceTurnRef.current();
+      setAiLoading(true);
+      try {
+        await streamAI("advance_turn", {
+          topic: debate.topic,
+          subtopic: subtopics[nextSubIdx]?.title,
+          previousArguments: currentSubtopicArgs.slice(-3).map((a) => ({
+            side: sides.find((side) => {
+              const participant = participants.find((p) => p.id === a.participant_id);
+              return participant?.side_id === side.id;
+            })?.label || "Unknown",
+            content: a.content,
+          })),
+          nextSide: sides[nextSideIdx]?.label,
+        });
+      } catch {
+        setAiMessage(`Now speaking: ${sides[nextSideIdx]?.label}`);
+      }
+      setAiLoading(false);
     } finally {
       prepExitRef.current = false;
     }
-  }, [id]);
+  }, [id, debate, sides, subtopics, isCreator, roundSummaries, arguments_, currentSubtopicArgs, participants]);
 
   useEffect(() => {
     completePrepPhaseAndAdvanceRef.current = completePrepPhaseAndAdvance;
@@ -472,7 +563,7 @@ const DebateRoomPage = () => {
   const handleSummaryEdited = useCallback((newSummary: string) => {
     // Update the transcript entry's AI summary
     const myEntries = transcriptEntries
-      .filter(e => e.is_final && e.subtopic === currentSubtopic?.title)
+      .filter(e => e.is_final && e.subtopic === currentSubtopic?.title && e.speaker_side === prepSpeakerSideLabel)
       .sort((a, b) => b.timestamp - a.timestamp);
     const lastEntry = myEntries[0];
     if (lastEntry) {
@@ -493,7 +584,7 @@ const DebateRoomPage = () => {
           }
         });
     }
-  }, [transcriptEntries, currentSubtopic, debate?.id]);
+  }, [transcriptEntries, currentSubtopic, prepSpeakerSideLabel, debate?.id]);
 
   const handlePrepReady = useCallback(() => {
     if (!debate) return;
@@ -877,6 +968,7 @@ const DebateRoomPage = () => {
 
   // End turn early — available to all speakers
   const endTurnEarly = () => {
+     if (!isMyTurn) return;
      turnEndTriggeredRef.current = true;
     setTimerRunning(false);
     setTimeLeft(0);
