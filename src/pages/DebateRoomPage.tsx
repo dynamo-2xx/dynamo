@@ -288,7 +288,7 @@ const DebateRoomPage = () => {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [id]);
+  }, [id, isPrepExpired, completePrepPhaseAndAdvance]);
 
   // Timer
   useEffect(() => {
