@@ -275,10 +275,10 @@ const DebateRoomPage = () => {
         }
 
         const bothReady = updated.prep_side1_ready && updated.prep_side2_ready;
-        const prepExpired = isPrepExpired(updated.prep_phase_started_at, updated.prep_duration_seconds);
+        const prepExpired = isPrepExpiredRef.current(updated.prep_phase_started_at, updated.prep_duration_seconds);
 
         if ((bothReady || prepExpired) && prepPhaseRoleRef.current && !prepExitRef.current) {
-          void completePrepPhaseAndAdvance();
+          void completePrepPhaseAndAdvanceRef.current();
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
@@ -290,7 +290,7 @@ const DebateRoomPage = () => {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [id, isPrepExpired, completePrepPhaseAndAdvance]);
+  }, [id]);
 
   // Timer
   useEffect(() => {
