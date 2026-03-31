@@ -67,7 +67,7 @@ const AppLayout = ({ children }: {children: ReactNode;}) => {
           className="flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity whitespace-nowrap">
           
           <PlusCircle className="w-4 h-4" />
-          Start a Debate
+          Get Started
         </RouterNavLink>
       </aside>
 
