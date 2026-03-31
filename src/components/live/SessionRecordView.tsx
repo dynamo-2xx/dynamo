@@ -1,11 +1,12 @@
 import { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Share2, Check, ChevronDown, Zap } from "lucide-react";
+import { ArrowLeft, Share2, Check, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { LiveTranscriptEntry, LiveSummary } from "@/hooks/useLiveTranscription";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import TranscriptCard from "@/components/debate/TranscriptCard";
 import SpeakerBubble from "./SpeakerBubble";
 
 interface SessionRecordViewProps {
@@ -136,15 +137,7 @@ const SessionRecordView = ({
     setIsSharing(false);
   }, [currentShareToken, sessionId]);
 
-
-  // Get subtopic-specific summaries from the latest analysis
-  const subtopicSummaryMap = useMemo(() => {
-    if (summaries.length === 0) return {};
-    const latest = summaries[summaries.length - 1];
-    return latest.subtopic_summaries || {};
-  }, [summaries]);
-
-  // Group entries and summaries by subtopic
+  // Group entries by subtopic
   const groupedData = useMemo(() => {
     const entryGroups: Record<string, LiveTranscriptEntry[]> = {};
     const unassigned: LiveTranscriptEntry[] = [];
@@ -158,17 +151,13 @@ const SessionRecordView = ({
       }
     });
 
-    // Build ordered subtopic list from subtopics array + any entry subtopics + subtopicSummaryMap keys
     const orderedSubtopics = [...subtopics];
     Object.keys(entryGroups).forEach(s => {
       if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
     });
-    Object.keys(subtopicSummaryMap).forEach(s => {
-      if (!orderedSubtopics.includes(s)) orderedSubtopics.push(s);
-    });
 
     return { entryGroups, unassigned, orderedSubtopics };
-  }, [transcriptEntries, subtopics, subtopicSummaryMap]);
+  }, [transcriptEntries, subtopics]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
@@ -199,8 +188,7 @@ const SessionRecordView = ({
           )}
         </div>
 
-
-        {/* Subtopic sections — summaries only */}
+        {/* Subtopic sections with TranscriptCards */}
         {groupedData.orderedSubtopics.length > 0 && (
           <div className="space-y-3 mb-8">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
@@ -208,8 +196,7 @@ const SessionRecordView = ({
             </h2>
 
             {groupedData.orderedSubtopics.map((topic, idx) => {
-              const topicSummary = subtopicSummaryMap[topic];
-              const entryCount = (groupedData.entryGroups[topic] || []).length;
+              const topicEntries = groupedData.entryGroups[topic] || [];
 
               return (
                 <Collapsible key={topic} defaultOpen>
@@ -218,30 +205,28 @@ const SessionRecordView = ({
                     <h3 className="text-sm font-display font-semibold text-foreground flex-1">
                       {idx + 1}. {topic}
                     </h3>
-                    {entryCount > 0 && (
+                    {topicEntries.length > 0 && (
                       <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
-                        {entryCount} statements
+                        {topicEntries.length} statements
                       </span>
                     )}
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="px-5 py-3">
-                      {topicSummary ? (
-                        <div className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
-                          <div className="flex items-center gap-2 px-3 py-2 border-b border-primary/10">
-                            <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                              <Zap className="w-3 h-3 text-primary" />
-                            </div>
-                            <span className="text-[10px] font-semibold uppercase tracking-widest text-primary font-display">
-                              Summary
-                            </span>
-                          </div>
-                          <div className="px-3 py-2">
-                            <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{topicSummary}</p>
-                          </div>
-                        </div>
+                    <div className="px-3 py-3 space-y-2">
+                      {topicEntries.length > 0 ? (
+                        topicEntries.map((entry) => (
+                          <TranscriptCard
+                            key={entry.id}
+                            speakerSide={getSpeakerName(entry.speaker_id)}
+                            sideOrder={entry.speaker_id % 2}
+                            text={entry.text}
+                            aiSummary={entry.ai_summary}
+                            timestamp={entry.timestamp}
+                            autoFlip
+                          />
+                        ))
                       ) : (
-                        <p className="text-xs text-muted-foreground italic py-2">No summary available for this topic.</p>
+                        <p className="text-xs text-muted-foreground italic py-2">No statements for this topic.</p>
                       )}
                     </div>
                   </CollapsibleContent>

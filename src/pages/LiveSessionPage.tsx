@@ -1,13 +1,15 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Square, FileText, ChevronDown, ChevronUp, Radio } from "lucide-react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { motion } from "framer-motion";
+import { Mic, Square, Radio, Loader2, ChevronDown } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/SessionRecordView";
+import TranscriptCard from "@/components/debate/TranscriptCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useLiveTranscription, LiveTranscriptEntry } from "@/hooks/useLiveTranscription";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type SessionPhase = "setup" | "recording" | "ended";
 
@@ -20,7 +22,6 @@ const LiveSessionPage = () => {
   const [sessionId, setSessionId] = useState<string | null>(id || null);
   const [title, setTitle] = useState("");
   const [mode, setMode] = useState<"single_device" | "multi_device">("single_device");
-  const [summaryOpen, setSummaryOpen] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<string>("recording");
   const [sessionData, setSessionData] = useState<any>(null);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
@@ -35,7 +36,6 @@ const LiveSessionPage = () => {
     micError,
     connectionError,
     isSummarizing,
-    generateSummary,
     endSession,
   } = useLiveTranscription({
     sessionId,
@@ -102,7 +102,6 @@ const LiveSessionPage = () => {
   const handleEndSession = useCallback(async () => {
     await endSession();
     setSessionStatus("ended");
-    // Reload session data for the record view
     if (sessionId) {
       const { data } = await supabase
         .from("live_sessions" as any)
@@ -114,7 +113,32 @@ const LiveSessionPage = () => {
     setPhase("ended");
   }, [endSession, sessionId]);
 
-  const latestSummary = summaries.length > 0 ? summaries[summaries.length - 1] : null;
+  // Group entries by subtopic for the recording view
+  const groupedEntries = useMemo(() => {
+    const groups: Record<string, LiveTranscriptEntry[]> = {};
+    const uncategorized: LiveTranscriptEntry[] = [];
+
+    transcriptEntries.forEach((e) => {
+      if (e.subtopic) {
+        if (!groups[e.subtopic]) groups[e.subtopic] = [];
+        groups[e.subtopic].push(e);
+      } else {
+        uncategorized.push(e);
+      }
+    });
+
+    // Ordered subtopics from AI + any from entries
+    const ordered = [...subtopics];
+    Object.keys(groups).forEach((s) => {
+      if (!ordered.includes(s)) ordered.push(s);
+    });
+
+    return { groups, uncategorized, ordered };
+  }, [transcriptEntries, subtopics]);
+
+  const getSpeakerName = (speakerId: number) => {
+    return speakerNames[String(speakerId)] || `Speaker ${speakerId + 1}`;
+  };
 
   // ── ENDED → Full record page ──
   if (phase === "ended") {
@@ -216,6 +240,12 @@ const LiveSessionPage = () => {
             <h1 className="font-display font-bold text-lg truncate">
               {title || "Live Session"}
             </h1>
+            {isSummarizing && (
+              <span className="flex items-center gap-1 text-[10px] text-primary font-semibold">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Analyzing…
+              </span>
+            )}
           </div>
           <button
             onClick={handleEndSession}
@@ -226,8 +256,8 @@ const LiveSessionPage = () => {
           </button>
         </div>
 
-        {/* Per-Speaker Textboxes */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {/* Subtopic-grouped transcript cards */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {micError && (
             <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
               {micError}
@@ -245,53 +275,75 @@ const LiveSessionPage = () => {
             </div>
           )}
 
-          {/* Group entries by speaker and render a growing textbox per speaker */}
-          {(() => {
-            const speakerIds = Array.from(new Set(transcriptEntries.map(e => e.speaker_id))).sort();
-            if (speakerIds.length === 0 && interimText) {
-              return (
-                <div className="bg-card border border-border rounded-xl p-4">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
-                    Speaker 1
+          {/* Subtopic sections */}
+          {groupedEntries.ordered.map((topic) => {
+            const topicEntries = groupedEntries.groups[topic] || [];
+            if (topicEntries.length === 0) return null;
+
+            return (
+              <Collapsible key={topic} defaultOpen>
+                <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-accent/50 transition-colors">
+                  <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                  <h3 className="text-sm font-display font-semibold text-foreground flex-1 truncate">
+                    {topic}
+                  </h3>
+                  <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
+                    {topicEntries.length}
                   </span>
-                  <p className="text-sm text-foreground leading-relaxed italic text-muted-foreground">{interimText}...</p>
-                </div>
-              );
-            }
-            return speakerIds.map(sid => {
-              const name = speakerNames[String(sid)] || `Speaker ${sid + 1}`;
-              const texts = transcriptEntries.filter(e => e.speaker_id === sid).map(e => e.text);
-              const isLeft = sid % 2 === 0;
-              return (
-                <div
-                  key={sid}
-                  className={`rounded-xl border p-4 ${
-                    isLeft
-                      ? "bg-secondary/50 border-border"
-                      : "bg-primary/5 border-primary/20"
-                  }`}
-                >
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                    {name}
-                  </span>
-                  <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                    {texts.join(" ")}
-                  </p>
-                </div>
-              );
-            });
-          })()}
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-2 pt-2 pl-2">
+                    {topicEntries.map((entry) => (
+                      <TranscriptCard
+                        key={entry.id}
+                        speakerSide={getSpeakerName(entry.speaker_id)}
+                        sideOrder={entry.speaker_id % 2}
+                        text={entry.text}
+                        aiSummary={entry.ai_summary}
+                        timestamp={entry.timestamp}
+                        autoFlip
+                        compact
+                      />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+
+          {/* Uncategorized entries */}
+          {groupedEntries.uncategorized.length > 0 && (
+            <div className="space-y-2">
+              {groupedEntries.ordered.length > 0 && (
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Uncategorized
+                </h3>
+              )}
+              {groupedEntries.uncategorized.map((entry) => (
+                <TranscriptCard
+                  key={entry.id}
+                  speakerSide={getSpeakerName(entry.speaker_id)}
+                  sideOrder={entry.speaker_id % 2}
+                  text={entry.text}
+                  aiSummary={entry.ai_summary}
+                  timestamp={entry.timestamp}
+                  autoFlip
+                  compact
+                />
+              ))}
+            </div>
+          )}
 
           {/* Interim text indicator */}
-          {interimText && transcriptEntries.length > 0 && (
+          {interimText && (
             <div className="text-sm text-muted-foreground italic px-3 py-1.5">
               {interimText}...
             </div>
           )}
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-border px-4 py-3 shrink-0 space-y-2">
+        {/* Bottom Bar — simplified */}
+        <div className="border-t border-border px-4 py-3 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {isConnected && (
@@ -301,52 +353,7 @@ const LiveSessionPage = () => {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={generateSummary}
-                disabled={isSummarizing || transcriptEntries.length === 0}
-                className="flex items-center gap-1.5 bg-secondary text-foreground px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40 hover:bg-secondary/80 transition-colors"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                {isSummarizing ? "Summarizing..." : "Generate Summary"}
-              </button>
-              {latestSummary && (
-                <button
-                  onClick={() => setSummaryOpen(!summaryOpen)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {summaryOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                </button>
-              )}
-            </div>
           </div>
-
-          <AnimatePresence>
-            {summaryOpen && latestSummary && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="bg-card border border-border rounded-xl p-4 max-h-48 overflow-y-auto">
-                  <p className="text-xs text-muted-foreground mb-1 font-semibold">
-                    Latest Summary ({summaries.length} total)
-                  </p>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{latestSummary.text}</p>
-                  {latestSummary.subtopics.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {latestSummary.subtopics.map((s) => (
-                        <span key={s} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
     </AppLayout>
