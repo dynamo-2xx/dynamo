@@ -3,11 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface LiveTranscriptEntry {
   id: string;
-  speaker_id: number; // from Deepgram diarization (0, 1, 2...)
-  speaker_label: string; // "Speaker 1", "Speaker 2", etc.
+  speaker_id: number;
+  speaker_label: string;
   text: string;
   words?: { word: string; speaker: number }[];
   subtopic?: string;
+  ai_summary?: string;
   timestamp: number;
   is_final: boolean;
   uncertain?: boolean;
@@ -26,6 +27,8 @@ interface UseLiveTranscriptionProps {
   isActive: boolean;
 }
 
+const BATCH_SIZE = 50;
+
 export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscriptionProps) {
   const [transcriptEntries, setTranscriptEntries] = useState<LiveTranscriptEntry[]>([]);
   const [summaries, setSummaries] = useState<LiveSummary[]>([]);
@@ -43,15 +46,22 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   const transcriptEntriesRef = useRef<LiveTranscriptEntry[]>([]);
   const summariesRef = useRef<LiveSummary[]>([]);
   const subtopicsRef = useRef<string[]>([]);
-  const hasSummarizedRef = useRef(false);
+
+  // Progressive auto-analysis timer refs
+  const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordingStartRef = useRef<number | null>(null);
+  const lastAnalyzedCountRef = useRef(0);
+  const isSummarizingRef = useRef(false);
 
   // Accumulate finals into a single statement until UtteranceEnd
   const statementBufferRef = useRef("");
   const statementSpeakerRef = useRef(0);
+  const statementWordsRef = useRef<{ word: string; speaker: number }[]>([]);
 
   useEffect(() => { transcriptEntriesRef.current = transcriptEntries; }, [transcriptEntries]);
   useEffect(() => { summariesRef.current = summaries; }, [summaries]);
   useEffect(() => { subtopicsRef.current = subtopics; }, [subtopics]);
+  useEffect(() => { isSummarizingRef.current = isSummarizing; }, [isSummarizing]);
 
   const persistSession = useCallback(async (updates: Record<string, any>) => {
     if (!sessionId) return;
@@ -60,9 +70,6 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       .update(updates as any)
       .eq("id", sessionId);
   }, [sessionId]);
-
-  // Track words for split functionality
-  const statementWordsRef = useRef<{ word: string; speaker: number }[]>([]);
 
   const flushStatement = useCallback(() => {
     const text = statementBufferRef.current.trim();
@@ -92,6 +99,146 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
     });
   }, [persistSession]);
 
+  // ── Two-pass analysis ──
+  const runAnalysis = useCallback(async () => {
+    const entries = transcriptEntriesRef.current;
+    if (!entries.length || isSummarizingRef.current) return;
+
+    // Skip if no new entries since last run
+    if (entries.length <= lastAnalyzedCountRef.current) return;
+
+    setIsSummarizing(true);
+
+    try {
+      // Pass 1: Classify — get subtopics and entry assignments
+      const { data, error } = await supabase.functions.invoke("analyze-transcript", {
+        body: {
+          mode: "live_conversation",
+          fullTranscript: entries.map((e) => ({
+            id: e.id,
+            speaker: e.speaker_label,
+            text: e.text,
+          })),
+          previous_subtopics: subtopicsRef.current.length > 0 ? subtopicsRef.current : undefined,
+        },
+      });
+
+      if (error || !data) {
+        console.error("Pass 1 (classify) failed:", error);
+        return;
+      }
+
+      const identifiedSubtopics: string[] = data.subtopics || [];
+      const entrySubtopicMap: Record<string, string> = data.entry_subtopic_map || {};
+
+      // Update subtopics
+      if (identifiedSubtopics.length) {
+        setSubtopics(identifiedSubtopics);
+        persistSession({ subtopics: identifiedSubtopics });
+      }
+
+      // Find entries that need summaries (no ai_summary yet, or subtopic changed)
+      const entriesNeedingSummary: { id: string; speaker: string; text: string }[] = [];
+      const currentEntries = transcriptEntriesRef.current;
+
+      for (const e of currentEntries) {
+        const newSubtopic = entrySubtopicMap[e.id];
+        const subtopicChanged = newSubtopic && newSubtopic !== e.subtopic;
+        if (!e.ai_summary || subtopicChanged) {
+          entriesNeedingSummary.push({ id: e.id, speaker: e.speaker_label, text: e.text });
+        }
+      }
+
+      // Pass 2: Batch per-entry summaries
+      const allEntrySummaries: Record<string, string> = {};
+
+      if (entriesNeedingSummary.length > 0) {
+        const batches: { id: string; speaker: string; text: string }[][] = [];
+        for (let i = 0; i < entriesNeedingSummary.length; i += BATCH_SIZE) {
+          batches.push(entriesNeedingSummary.slice(i, i + BATCH_SIZE));
+        }
+
+        const batchResults = await Promise.all(
+          batches.map(async (batch) => {
+            try {
+              const { data: sumData, error: sumError } = await supabase.functions.invoke("analyze-transcript", {
+                body: { mode: "live_summarize_entries", entries: batch },
+              });
+              if (!sumError && sumData?.entry_summaries) {
+                return sumData.entry_summaries as Record<string, string>;
+              }
+            } catch (err) {
+              console.error("Pass 2 batch failed:", err);
+            }
+            return {};
+          })
+        );
+
+        for (const batch of batchResults) {
+          Object.assign(allEntrySummaries, batch);
+        }
+      }
+
+      // Apply all results to entries
+      setTranscriptEntries((prev) => {
+        const updated = prev.map((e) => ({
+          ...e,
+          subtopic: entrySubtopicMap[e.id] || e.subtopic,
+          ai_summary: allEntrySummaries[e.id] || e.ai_summary,
+        }));
+        persistSession({ transcript_entries: updated });
+        return updated;
+      });
+
+      lastAnalyzedCountRef.current = entries.length;
+    } catch (err) {
+      console.error("Analysis failed:", err);
+    } finally {
+      setIsSummarizing(false);
+    }
+  }, [persistSession]);
+
+  // ── Progressive timer: schedule next analysis tick ──
+  const scheduleNextAnalysis = useCallback(() => {
+    if (analysisTimerRef.current) {
+      clearTimeout(analysisTimerRef.current);
+      analysisTimerRef.current = null;
+    }
+
+    if (!recordingStartRef.current) return;
+
+    const elapsedSeconds = (Date.now() - recordingStartRef.current) / 1000;
+    const interval = (30 + Math.floor(elapsedSeconds / 30) * 5) * 1000;
+
+    analysisTimerRef.current = setTimeout(async () => {
+      await runAnalysis();
+      // Schedule next tick after this one completes
+      scheduleNextAnalysis();
+    }, interval);
+  }, [runAnalysis]);
+
+  // Start/stop the progressive timer when recording state changes
+  useEffect(() => {
+    if (isActive && isConnected) {
+      if (!recordingStartRef.current) {
+        recordingStartRef.current = Date.now();
+      }
+      scheduleNextAnalysis();
+    } else {
+      if (analysisTimerRef.current) {
+        clearTimeout(analysisTimerRef.current);
+        analysisTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (analysisTimerRef.current) {
+        clearTimeout(analysisTimerRef.current);
+        analysisTimerRef.current = null;
+      }
+    };
+  }, [isActive, isConnected, scheduleNextAnalysis]);
+
   const connect = useCallback(async () => {
     if (wsRef.current) return;
     setMicError(null);
@@ -120,7 +267,6 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
         return;
       }
 
-      // Enable diarization for speaker detection
       const ws = new WebSocket(
         `wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&smart_format=true&interim_results=true&diarize=true&endpointing=1000&utterance_end_ms=2000&vad_events=true&encoding=linear16&sample_rate=16000`,
         ["token", tokenData.key]
@@ -139,11 +285,10 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
         processor.onaudioprocess = (e) => {
           if (ws.readyState === WebSocket.OPEN) {
             const inputData = e.inputBuffer.getChannelData(0);
-            // Audio energy gate — skip silent frames to improve diarization
             let sum = 0;
             for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
             const rms = Math.sqrt(sum / inputData.length);
-            if (rms < 0.008) return; // skip near-silent frames
+            if (rms < 0.008) return;
 
             const pcm16 = new Int16Array(inputData.length);
             for (let i = 0; i < inputData.length; i++) {
@@ -173,11 +318,9 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
             if (!transcript) return;
 
             if (data.is_final) {
-              // Split words by speaker changes within this segment
               const words = alt.words || [];
               if (words.length === 0) {
-                // No word-level data, treat as single speaker
-              const speaker = 0;
+                const speaker = 0;
                 if (statementBufferRef.current && statementSpeakerRef.current !== speaker) {
                   flushStatement();
                 }
@@ -185,14 +328,12 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
                 statementBufferRef.current += (statementBufferRef.current ? " " : "") + transcript;
                 flushStatement();
               } else {
-                // Group consecutive words by speaker
                 let currentSpeaker = words[0].speaker ?? 0;
                 let currentWords: string[] = [];
 
                 for (const word of words) {
                   const wordSpeaker = word.speaker ?? 0;
                   if (wordSpeaker !== currentSpeaker) {
-                    // Flush buffer if different speaker, then flush this group
                     if (statementBufferRef.current && statementSpeakerRef.current !== currentSpeaker) {
                       flushStatement();
                     }
@@ -208,7 +349,6 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
                   statementWordsRef.current.push({ word: w, speaker: wordSpeaker });
                 }
 
-                // Handle remaining words
                 if (currentWords.length > 0) {
                   if (statementBufferRef.current && statementSpeakerRef.current !== currentSpeaker) {
                     flushStatement();
@@ -217,7 +357,6 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
                   statementBufferRef.current += (statementBufferRef.current ? " " : "") + currentWords.join(" ");
                 }
               }
-              // Flush immediately after every final so entries appear in real-time
               flushStatement();
               setInterimText("");
             } else {
@@ -257,113 +396,21 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
     setInterimText("");
   }, [flushStatement]);
 
-  const generateSummary = useCallback(async () => {
-    const entries = transcriptEntriesRef.current;
-    if (!entries.length || isSummarizing) return;
-
-    setIsSummarizing(true);
-    hasSummarizedRef.current = true;
-
-    try {
-      // Pass 1: Classify — get subtopics and entry assignments
-      const { data, error } = await supabase.functions.invoke("analyze-transcript", {
-        body: {
-          mode: "live_conversation",
-          fullTranscript: entries.map((e) => ({
-            id: e.id,
-            speaker: e.speaker_label,
-            text: e.text,
-          })),
-        },
-      });
-
-      if (error || !data) {
-        console.error("Pass 1 (classify) failed:", error);
-        return;
-      }
-
-      const identifiedSubtopics: string[] = data.subtopics || [];
-      const entrySubtopicMap: Record<string, string> = data.entry_subtopic_map || {};
-
-      // Update subtopics
-      if (identifiedSubtopics.length) {
-        setSubtopics(identifiedSubtopics);
-        persistSession({ subtopics: identifiedSubtopics });
-      }
-
-      // Update entry subtopic assignments
-      if (Object.keys(entrySubtopicMap).length) {
-        setTranscriptEntries((prev) => {
-          const updated = prev.map((e) => ({
-            ...e,
-            subtopic: entrySubtopicMap[e.id] || e.subtopic,
-          }));
-          persistSession({ transcript_entries: updated });
-          return updated;
-        });
-      }
-
-      // Pass 2: Summarize each subtopic in parallel
-      if (identifiedSubtopics.length > 0) {
-        const entriesById = new Map(entries.map((e) => [e.id, e]));
-        const subtopicSummaries: Record<string, string> = {};
-
-        const summaryPromises = identifiedSubtopics.map(async (st) => {
-          // Filter entries for this subtopic
-          const stEntries = Object.entries(entrySubtopicMap)
-            .filter(([, topic]) => topic === st)
-            .map(([id]) => entriesById.get(id))
-            .filter(Boolean)
-            .map((e) => ({ speaker: e!.speaker_label, text: e!.text }));
-
-          if (stEntries.length === 0) return;
-
-          try {
-            const { data: sumData, error: sumError } = await supabase.functions.invoke("analyze-transcript", {
-              body: { mode: "live_summarize_subtopic", subtopic: st, entries: stEntries },
-            });
-            if (!sumError && sumData?.summary) {
-              subtopicSummaries[st] = sumData.summary;
-            }
-          } catch (err) {
-            console.error(`Failed to summarize subtopic "${st}":`, err);
-          }
-        });
-
-        await Promise.all(summaryPromises);
-
-        if (Object.keys(subtopicSummaries).length > 0) {
-          const summary: LiveSummary = {
-            id: `summary-${Date.now()}`,
-            text: "",
-            subtopic_summaries: subtopicSummaries,
-            created_at: Date.now(),
-            subtopics: identifiedSubtopics,
-          };
-
-          setSummaries((prev) => {
-            const updated = [...prev, summary];
-            persistSession({ summaries: updated });
-            return updated;
-          });
-        }
-      }
-    } catch (err) {
-      console.error("Failed to generate summary:", err);
-    } finally {
-      setIsSummarizing(false);
-    }
-  }, [isSummarizing, persistSession]);
-
   const endSession = useCallback(async () => {
+    // Stop the auto-analysis timer
+    if (analysisTimerRef.current) {
+      clearTimeout(analysisTimerRef.current);
+      analysisTimerRef.current = null;
+    }
+
     disconnect();
 
-    // Always auto-generate a final summary on end
+    // Run a final analysis pass
     if (transcriptEntriesRef.current.length > 0) {
       try {
-        await generateSummary();
+        await runAnalysis();
       } catch (err) {
-        console.error("Failed to auto-generate summary on end:", err);
+        console.error("Failed to run final analysis:", err);
       }
     }
 
@@ -373,7 +420,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
         .update({ status: "ended", ended_at: new Date().toISOString() } as any)
         .eq("id", sessionId);
     }
-  }, [disconnect, generateSummary, sessionId]);
+  }, [disconnect, runAnalysis, sessionId]);
 
   // Auto-connect/disconnect based on isActive
   useEffect(() => {
@@ -398,10 +445,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       if (data) {
         const d = data as any;
         if (d.transcript_entries?.length) setTranscriptEntries(d.transcript_entries);
-        if (d.summaries?.length) {
-          setSummaries(d.summaries);
-          hasSummarizedRef.current = true;
-        }
+        if (d.summaries?.length) setSummaries(d.summaries);
         if (d.subtopics?.length) setSubtopics(d.subtopics);
       }
     };
@@ -419,7 +463,6 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
     isSummarizing,
     connect,
     disconnect,
-    generateSummary,
     endSession,
   };
 }
