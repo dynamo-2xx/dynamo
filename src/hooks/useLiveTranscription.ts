@@ -102,10 +102,16 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   // ── Two-pass analysis ──
   const runAnalysis = useCallback(async () => {
     const entries = transcriptEntriesRef.current;
-    if (!entries.length || isSummarizingRef.current) return;
+    if (!entries.length || isSummarizingRef.current) {
+      console.log("[Analysis] Skipped: entries=", entries.length, "summarizing=", isSummarizingRef.current);
+      return;
+    }
 
     // Skip if no new entries since last run
-    if (entries.length <= lastAnalyzedCountRef.current) return;
+    if (entries.length <= lastAnalyzedCountRef.current) {
+      console.log("[Analysis] Skipped: no new entries since last run");
+      return;
+    }
 
     setIsSummarizing(true);
 
