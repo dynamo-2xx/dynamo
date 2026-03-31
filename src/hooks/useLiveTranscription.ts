@@ -102,10 +102,16 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   // ── Two-pass analysis ──
   const runAnalysis = useCallback(async () => {
     const entries = transcriptEntriesRef.current;
-    if (!entries.length || isSummarizingRef.current) return;
+    if (!entries.length || isSummarizingRef.current) {
+      console.log("[Analysis] Skipped: entries=", entries.length, "summarizing=", isSummarizingRef.current);
+      return;
+    }
 
     // Skip if no new entries since last run
-    if (entries.length <= lastAnalyzedCountRef.current) return;
+    if (entries.length <= lastAnalyzedCountRef.current) {
+      console.log("[Analysis] Skipped: no new entries since last run");
+      return;
+    }
 
     setIsSummarizing(true);
 
@@ -130,6 +136,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
       const identifiedSubtopics: string[] = data.subtopics || [];
       const entrySubtopicMap: Record<string, string> = data.entry_subtopic_map || {};
+      console.log("[Analysis] Pass 1 result:", identifiedSubtopics.length, "subtopics,", Object.keys(entrySubtopicMap).length, "mapped entries");
 
       // Update subtopics
       if (identifiedSubtopics.length) {
@@ -405,8 +412,14 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
     disconnect();
 
+    // Reset summarizing guard so final pass can run even if a previous one was in progress
+    isSummarizingRef.current = false;
+    setIsSummarizing(false);
+    lastAnalyzedCountRef.current = 0; // Force re-analysis of all entries
+
     // Run a final analysis pass
     if (transcriptEntriesRef.current.length > 0) {
+      console.log("[Analysis] Running final pass on", transcriptEntriesRef.current.length, "entries");
       try {
         await runAnalysis();
       } catch (err) {

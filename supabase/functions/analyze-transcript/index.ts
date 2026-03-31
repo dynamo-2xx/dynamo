@@ -96,12 +96,20 @@ SIGNAL → ACTION TABLE
 
 INSTRUCTIONS
 
-You will receive the full transcript and optionally the previous list of subtopics. Your job:
+You will receive transcript entries as JSON objects, each with an "id", "speaker", and "text" field. Your job:
 
 1. Identify distinct subtopics/themes in the conversation using the patterns above.
 2. If previous_subtopics is provided, prefer keeping existing topic labels unless the conversation explicitly justifies a merge, split, or rename.
-3. Assign every transcript entry to exactly one subtopic.
-4. If no clear subtopics emerge, use "General Discussion".
+3. CRITICAL: You MUST assign EVERY transcript entry to exactly one subtopic by mapping its "id" to a subtopic label in entry_subtopic_map. Every entry ID from the input MUST appear as a key in entry_subtopic_map.
+4. If no clear subtopics emerge, use "General Discussion" and assign all entries to it.
+
+EXAMPLE — given entries:
+  [{"id": "entry-1", "speaker": "Speaker 1", "text": "The economy is struggling."},
+   {"id": "entry-2", "speaker": "Speaker 2", "text": "Education needs reform."}]
+
+You would return:
+  subtopics: ["Economic Challenges", "Education Reform"]
+  entry_assignments: [{"entry_id": "entry-1", "subtopic": "Economic Challenges"}, {"entry_id": "entry-2", "subtopic": "Education Reform"}]
 
 Return your analysis using the analyze_conversation tool.`;
 
@@ -116,7 +124,8 @@ serve(async (req) => {
 
     // ── Live conversation: Pass 1 — Classify subtopics ──
     if (mode === "live_conversation") {
-      const userPrompt = `${previous_subtopics?.length ? `Previous subtopics (prefer stability):\n${JSON.stringify(previous_subtopics)}\n\n` : ""}Transcript entries:\n${JSON.stringify(fullTranscript || [], null, 2)}\n\nAnalyze this conversation: identify subtopics and assign each entry to a subtopic.`;
+      const entryIds = (fullTranscript || []).map((e: any) => e.id);
+      const userPrompt = `${previous_subtopics?.length ? `Previous subtopics (prefer stability):\n${JSON.stringify(previous_subtopics)}\n\n` : ""}Transcript entries:\n${JSON.stringify(fullTranscript || [], null, 2)}\n\nAnalyze this conversation: identify subtopics and assign EVERY entry to a subtopic. The entry IDs you must map are: ${JSON.stringify(entryIds)}\n\nYou MUST include ALL of these IDs as keys in entry_subtopic_map.`;
 
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -135,7 +144,7 @@ serve(async (req) => {
               type: "function",
               function: {
                 name: "analyze_conversation",
-                description: "Analyze a live conversation transcript",
+                description: "Analyze a live conversation transcript. You MUST populate entry_subtopic_map with every entry ID from the input.",
                 parameters: {
                   type: "object",
                   properties: {
@@ -144,13 +153,20 @@ serve(async (req) => {
                       items: { type: "string" },
                       description: "List of distinct subtopic/theme labels identified in the conversation",
                     },
-                    entry_subtopic_map: {
-                      type: "object",
-                      description: "Map of transcript entry IDs to their assigned subtopic label",
-                      additionalProperties: { type: "string" },
+                    entry_assignments: {
+                      type: "array",
+                      description: "REQUIRED: An array with one object per transcript entry. Every entry ID from the input MUST appear here.",
+                      items: {
+                        type: "object",
+                        properties: {
+                          entry_id: { type: "string", description: "The exact entry ID from the input transcript" },
+                          subtopic: { type: "string", description: "The subtopic label this entry belongs to" },
+                        },
+                        required: ["entry_id", "subtopic"],
+                      },
                     },
                   },
-                  required: ["subtopics", "entry_subtopic_map"],
+                  required: ["subtopics", "entry_assignments"],
                   additionalProperties: false,
                 },
               },
@@ -173,7 +189,15 @@ serve(async (req) => {
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       if (toolCall) {
         const result = JSON.parse(toolCall.function.arguments);
-        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Convert entry_assignments array to entry_subtopic_map object for the client
+        const entry_subtopic_map: Record<string, string> = {};
+        if (Array.isArray(result.entry_assignments)) {
+          for (const a of result.entry_assignments) {
+            if (a.entry_id && a.subtopic) entry_subtopic_map[a.entry_id] = a.subtopic;
+          }
+        }
+        console.log(`Pass 1: ${result.subtopics?.length || 0} subtopics, ${Object.keys(entry_subtopic_map).length} mapped entries`);
+        return new Response(JSON.stringify({ subtopics: result.subtopics || [], entry_subtopic_map }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       return new Response(JSON.stringify({ subtopics: [], entry_subtopic_map: {} }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -186,9 +210,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({ entry_summaries: {} }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const sysPrompt = `You are an AI conversation analyst. You will receive transcript entries from a live conversation. For each entry, generate a concise 1-2 sentence summary that captures the key point or argument being made. Identify speakers by their labels. Return the result using the summarize_entries tool.`;
+      const entryIds = batchEntries.map((e: any) => e.id);
+      const sysPrompt = `You are an AI conversation analyst. You will receive transcript entries from a live conversation. For each entry, generate a concise 1-2 sentence summary that captures the key point or argument being made. Identify speakers by their labels. You MUST return a summary for EVERY entry provided. Return the result using the summarize_entries tool.`;
 
-      const uPrompt = `Transcript entries to summarize:\n${JSON.stringify(batchEntries, null, 2)}\n\nGenerate a concise summary for each entry.`;
+      const uPrompt = `Transcript entries to summarize:\n${JSON.stringify(batchEntries, null, 2)}\n\nGenerate a concise summary for EACH of these ${batchEntries.length} entries. Entry IDs: ${JSON.stringify(entryIds)}`;
 
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -207,17 +232,24 @@ serve(async (req) => {
               type: "function",
               function: {
                 name: "summarize_entries",
-                description: "Return per-entry summaries",
+                description: "Return per-entry summaries. You MUST include one summary per input entry.",
                 parameters: {
                   type: "object",
                   properties: {
-                    entry_summaries: {
-                      type: "object",
-                      description: "Map of entry ID to concise 1-2 sentence summary",
-                      additionalProperties: { type: "string" },
+                    summaries: {
+                      type: "array",
+                      description: "Array with one summary object per input entry.",
+                      items: {
+                        type: "object",
+                        properties: {
+                          entry_id: { type: "string", description: "The exact entry ID from the input" },
+                          summary: { type: "string", description: "A concise 1-2 sentence summary of the entry" },
+                        },
+                        required: ["entry_id", "summary"],
+                      },
                     },
                   },
-                  required: ["entry_summaries"],
+                  required: ["summaries"],
                   additionalProperties: false,
                 },
               },
@@ -240,7 +272,15 @@ serve(async (req) => {
       const tc = d.choices?.[0]?.message?.tool_calls?.[0];
       if (tc) {
         const result = JSON.parse(tc.function.arguments);
-        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Convert array to map for the client
+        const entry_summaries: Record<string, string> = {};
+        if (Array.isArray(result.summaries)) {
+          for (const s of result.summaries) {
+            if (s.entry_id && s.summary) entry_summaries[s.entry_id] = s.summary;
+          }
+        }
+        console.log(`Pass 2: ${Object.keys(entry_summaries).length} summaries generated`);
+        return new Response(JSON.stringify({ entry_summaries }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       return new Response(JSON.stringify({ entry_summaries: {} }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
