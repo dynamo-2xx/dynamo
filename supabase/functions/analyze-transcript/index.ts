@@ -189,7 +189,15 @@ serve(async (req) => {
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       if (toolCall) {
         const result = JSON.parse(toolCall.function.arguments);
-        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Convert entry_assignments array to entry_subtopic_map object for the client
+        const entry_subtopic_map: Record<string, string> = {};
+        if (Array.isArray(result.entry_assignments)) {
+          for (const a of result.entry_assignments) {
+            if (a.entry_id && a.subtopic) entry_subtopic_map[a.entry_id] = a.subtopic;
+          }
+        }
+        console.log(`Pass 1: ${result.subtopics?.length || 0} subtopics, ${Object.keys(entry_subtopic_map).length} mapped entries`);
+        return new Response(JSON.stringify({ subtopics: result.subtopics || [], entry_subtopic_map }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       return new Response(JSON.stringify({ subtopics: [], entry_subtopic_map: {} }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
