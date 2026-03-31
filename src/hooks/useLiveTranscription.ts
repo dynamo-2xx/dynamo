@@ -136,6 +136,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
       const identifiedSubtopics: string[] = data.subtopics || [];
       const entrySubtopicMap: Record<string, string> = data.entry_subtopic_map || {};
+      console.log("[Analysis] Pass 1 result:", identifiedSubtopics.length, "subtopics,", Object.keys(entrySubtopicMap).length, "mapped entries");
 
       // Update subtopics
       if (identifiedSubtopics.length) {
