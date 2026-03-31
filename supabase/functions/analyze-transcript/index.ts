@@ -155,7 +155,7 @@ serve(async (req) => {
                     },
                     entry_subtopic_map: {
                       type: "object",
-                      description: "Map of transcript entry IDs to their assigned subtopic label",
+                      description: "REQUIRED: Map where each key is a transcript entry ID from the input and the value is the subtopic label it belongs to. EVERY entry ID must be included.",
                       additionalProperties: { type: "string" },
                     },
                   },
