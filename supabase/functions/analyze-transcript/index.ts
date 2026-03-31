@@ -153,13 +153,20 @@ serve(async (req) => {
                       items: { type: "string" },
                       description: "List of distinct subtopic/theme labels identified in the conversation",
                     },
-                    entry_subtopic_map: {
-                      type: "object",
-                      description: "REQUIRED: Map where each key is a transcript entry ID from the input and the value is the subtopic label it belongs to. EVERY entry ID must be included.",
-                      additionalProperties: { type: "string" },
+                    entry_assignments: {
+                      type: "array",
+                      description: "REQUIRED: An array with one object per transcript entry. Every entry ID from the input MUST appear here.",
+                      items: {
+                        type: "object",
+                        properties: {
+                          entry_id: { type: "string", description: "The exact entry ID from the input transcript" },
+                          subtopic: { type: "string", description: "The subtopic label this entry belongs to" },
+                        },
+                        required: ["entry_id", "subtopic"],
+                      },
                     },
                   },
-                  required: ["subtopics", "entry_subtopic_map"],
+                  required: ["subtopics", "entry_assignments"],
                   additionalProperties: false,
                 },
               },
