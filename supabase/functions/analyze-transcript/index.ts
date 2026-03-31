@@ -210,9 +210,10 @@ serve(async (req) => {
         return new Response(JSON.stringify({ entry_summaries: {} }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const sysPrompt = `You are an AI conversation analyst. You will receive transcript entries from a live conversation. For each entry, generate a concise 1-2 sentence summary that captures the key point or argument being made. Identify speakers by their labels. Return the result using the summarize_entries tool.`;
+      const entryIds = batchEntries.map((e: any) => e.id);
+      const sysPrompt = `You are an AI conversation analyst. You will receive transcript entries from a live conversation. For each entry, generate a concise 1-2 sentence summary that captures the key point or argument being made. Identify speakers by their labels. You MUST return a summary for EVERY entry provided. Return the result using the summarize_entries tool.`;
 
-      const uPrompt = `Transcript entries to summarize:\n${JSON.stringify(batchEntries, null, 2)}\n\nGenerate a concise summary for each entry.`;
+      const uPrompt = `Transcript entries to summarize:\n${JSON.stringify(batchEntries, null, 2)}\n\nGenerate a concise summary for EACH of these ${batchEntries.length} entries. Entry IDs: ${JSON.stringify(entryIds)}`;
 
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -231,17 +232,24 @@ serve(async (req) => {
               type: "function",
               function: {
                 name: "summarize_entries",
-                description: "Return per-entry summaries",
+                description: "Return per-entry summaries. You MUST include one summary per input entry.",
                 parameters: {
                   type: "object",
                   properties: {
-                    entry_summaries: {
-                      type: "object",
-                      description: "Map of entry ID to concise 1-2 sentence summary",
-                      additionalProperties: { type: "string" },
+                    summaries: {
+                      type: "array",
+                      description: "Array with one summary object per input entry.",
+                      items: {
+                        type: "object",
+                        properties: {
+                          entry_id: { type: "string", description: "The exact entry ID from the input" },
+                          summary: { type: "string", description: "A concise 1-2 sentence summary of the entry" },
+                        },
+                        required: ["entry_id", "summary"],
+                      },
                     },
                   },
-                  required: ["entry_summaries"],
+                  required: ["summaries"],
                   additionalProperties: false,
                 },
               },
@@ -264,7 +272,15 @@ serve(async (req) => {
       const tc = d.choices?.[0]?.message?.tool_calls?.[0];
       if (tc) {
         const result = JSON.parse(tc.function.arguments);
-        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Convert array to map for the client
+        const entry_summaries: Record<string, string> = {};
+        if (Array.isArray(result.summaries)) {
+          for (const s of result.summaries) {
+            if (s.entry_id && s.summary) entry_summaries[s.entry_id] = s.summary;
+          }
+        }
+        console.log(`Pass 2: ${Object.keys(entry_summaries).length} summaries generated`);
+        return new Response(JSON.stringify({ entry_summaries }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       return new Response(JSON.stringify({ entry_summaries: {} }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
