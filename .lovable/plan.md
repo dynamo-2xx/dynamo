@@ -1,57 +1,76 @@
 
 
-# Fix: Subtopic Summaries Not Generated for Live Sessions
+# Implementation Plan: Live Session Continuous AI Analysis with Flippable Cards
 
-## Problem
+## Overview
 
-The AI correctly identifies subtopics from the transcript but returns **empty `subtopic_summaries`**. DB evidence confirms this — session `d53813b9` has 7 subtopics but `subtopic_summaries: {}`.
+Transform Live recording from batch summarization to continuous, real-time AI analysis with debate-style flippable TranscriptCards grouped by dynamically discovered subtopics.
 
-**Root cause**: The entire transcript (325 entries for a 35-min session) is sent to the AI in a single request. The model identifies subtopic labels but fails to produce per-subtopic summaries — likely because generating 5-7 detailed summaries from 325 entries in one tool call exceeds what the model reliably produces.
+## Changes (4 files)
 
-## Solution: Two-Pass Summarization
+### 1. Edge Function: `supabase/functions/analyze-transcript/index.ts`
 
-Split the summarization into two steps:
+**Modify `live_conversation` mode (Pass 1 — Classify):**
+- Switch model from `gemini-3-flash-preview` to `gemini-2.5-pro`
+- Add `previous_subtopics` input parameter for stability
+- Replace generic system prompt with the full 13-pattern few-shot prompt (definitions, all patterns with examples, signal-action reference table)
+- Tool schema stays: `subtopics`, `entry_subtopic_map`
+- Remove `subtopic_summaries` from the tool schema (already done)
 
-1. **Pass 1 — Classify**: Send the full transcript to the AI. Ask it to identify subtopics and assign each entry to a subtopic (current behavior, works fine). No summaries requested here.
-
-2. **Pass 2 — Summarize per subtopic**: For each identified subtopic, send only the entries assigned to that subtopic and ask for a focused summary. This keeps each request small and focused.
-
-## Changes
-
-### 1. Edge function: `supabase/functions/analyze-transcript/index.ts`
-
-- Add a new mode `"live_summarize_subtopic"` that accepts a subtopic label and a filtered list of entries, and returns a single summary string.
-- Simplify the existing `live_conversation` mode to only return subtopics and entry assignments (remove `subtopic_summaries` from its tool schema since it's not reliably produced).
+**Rename `live_summarize_subtopic` → `live_summarize_entries` (Pass 2 — Per-entry summaries):**
+- Accepts `entries` array (each with `id`, `speaker`, `text`)
+- Returns `entry_summaries: Record<string, string>` (entry_id → concise 1-2 sentence summary)
+- Model: `gemini-3-flash-preview`
+- Batches of ~50 entries max per call
 
 ### 2. Hook: `src/hooks/useLiveTranscription.ts`
 
-- Update `generateSummary()` to:
-  1. Call `analyze-transcript` with `mode: "live_conversation"` to get subtopics + entry mapping
-  2. For each subtopic, call `analyze-transcript` with `mode: "live_summarize_subtopic"` passing only that subtopic's entries
-  3. Collect all per-subtopic summaries into `subtopic_summaries` map
-  4. Save the complete summary object to state and DB
+- Add `ai_summary?: string` to `LiveTranscriptEntry` interface
+- Add progressive auto-analysis timer:
+  - Formula: `interval = 30 + Math.floor(elapsedSeconds / 30) * 5`
+  - Uses `setTimeout` (not `setInterval`), recalculates after each run
+  - `recordingStartRef` tracks when recording began
+  - `lastAnalyzedCountRef` prevents redundant calls when no new entries
+  - Guard against concurrent runs (skip if already summarizing)
+- Rewrite `generateSummary()` as two-pass:
+  1. Pass 1: send full transcript + `previous_subtopics` → get `subtopics` + `entry_subtopic_map`
+  2. Pass 2: batch entries missing `ai_summary` (or whose subtopic changed), send to `live_summarize_entries` → get `entry_summaries` map
+  3. Apply results: update subtopics, entry subtopic assignments, and `ai_summary` on each entry
+  4. Persist to DB
+- Auto-retry: entries without `ai_summary` after a failed Pass 2 will be re-sent on next tick
+- Remove `generateSummary` from returned API (timer handles it); keep `endSession` calling final pass
+- Clean up timer on disconnect/unmount
 
-### 3. No UI changes needed
+### 3. Recording UI: `src/pages/LiveSessionPage.tsx`
 
-`SessionRecordView` already reads from `subtopic_summaries` correctly — once the data is populated, summaries will appear.
+- Replace per-speaker textbox blobs with subtopic-grouped sections
+- Group `transcriptEntries` by `subtopic` field using `useMemo`
+- Render collapsible subtopic sections (using existing `Collapsible` component)
+- Inside each section: `TranscriptCard` per entry with `autoFlip = true`, using `speaker_label` as `speakerSide`, `speaker_id % 2` as `sideOrder`
+- Unassigned entries (no subtopic yet) shown in "Uncategorized" section
+- Remove "Generate Summary" button and bottom summary drawer
+- Add small "Analyzing..." indicator when `isSummarizing` is true
+- Keep: recording header, mic status, end button, error banners, interim text
+
+### 4. Record Page: `src/components/live/SessionRecordView.tsx`
+
+- Replace subtopic summary paragraphs (the `Zap` summary block) with `TranscriptCard` components per entry under each subtopic section
+- Each card shows transcript on front, `ai_summary` on back
+- Remove the `Zap`/summary paragraph layout
+- Keep "Full Transcript" collapsible with `SpeakerBubble` entries at bottom
+
+### 5. No Database Changes
+
+`transcript_entries` JSONB already supports arbitrary fields — `ai_summary` and `subtopic` are already stored there.
 
 ## Technical Details
 
-**New edge function mode payload** (`live_summarize_subtopic`):
-```json
-{
-  "mode": "live_summarize_subtopic",
-  "subtopic": "VC Pitch Strategy: Framework and Execution",
-  "entries": [{ "speaker": "Speaker 1", "text": "..." }, ...]
-}
-```
+**Progressive timer examples:**
+- 0:00–0:29 → 30s, 0:30–0:59 → 35s, 1:00–1:29 → 40s, 5:00 → 80s, 10:00 → 130s
 
-**Returns** (via tool call):
-```json
-{ "summary": "Speaker 1 discussed... Speaker 2 argued..." }
-```
+**Pass 2 batching:** entries batched in groups of ~50 to avoid the empty-summary bug from overloading a single request.
 
-**Parallelization**: The per-subtopic summary calls can be made in parallel (`Promise.all`) since they're independent, keeping total latency reasonable even with 5-7 subtopics.
+**Race condition guard:** `isSummarizing` flag prevents overlapping analysis runs. Timer skips if a run is already in progress.
 
-**Model**: Keep `google/gemini-3-flash-preview` — it handles single-subtopic summaries well. The issue was volume per request, not model capability.
+**Classification prompt:** ~2,500 words including all 13 communication patterns, definitions, and signal-action table. Sent to `gemini-2.5-pro` which handles the context size well.
 
