@@ -412,8 +412,14 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
     disconnect();
 
+    // Reset summarizing guard so final pass can run even if a previous one was in progress
+    isSummarizingRef.current = false;
+    setIsSummarizing(false);
+    lastAnalyzedCountRef.current = 0; // Force re-analysis of all entries
+
     // Run a final analysis pass
     if (transcriptEntriesRef.current.length > 0) {
+      console.log("[Analysis] Running final pass on", transcriptEntriesRef.current.length, "entries");
       try {
         await runAnalysis();
       } catch (err) {
