@@ -261,7 +261,7 @@ const CreateDebatePage = () => {
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Type a topic and let dynamo structure the conversation."
-                  className="w-full bg-card border border-border rounded-xl p-6 font-display text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors min-h-[140px] text-base"
+                  className="w-full bg-card border border-border rounded-xl p-6 font-display text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors min-h-[140px] text-base my-0 py-[24px]"
                   autoFocus
                 />
                 <button
@@ -275,7 +275,7 @@ const CreateDebatePage = () => {
               </div>
               <button
                 onClick={() => navigate("/live/new")}
-                className="mt-3 w-full flex items-center justify-center gap-2 bg-card border border-border text-foreground px-5 py-3 rounded-xl font-semibold text-sm hover:border-primary/40 transition-colors"
+                className="mt-3 w-full bg-card border border-border text-foreground rounded-xl font-semibold text-sm hover:border-primary/40 transition-colors px-[20px] flex-row flex items-center justify-center gap-[8px] mx-0 my-px mb-px py-[55px]"
               >
                 <Mic className="w-4 h-4 text-primary" />
                 Live
