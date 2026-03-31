@@ -96,12 +96,20 @@ SIGNAL → ACTION TABLE
 
 INSTRUCTIONS
 
-You will receive the full transcript and optionally the previous list of subtopics. Your job:
+You will receive transcript entries as JSON objects, each with an "id", "speaker", and "text" field. Your job:
 
 1. Identify distinct subtopics/themes in the conversation using the patterns above.
 2. If previous_subtopics is provided, prefer keeping existing topic labels unless the conversation explicitly justifies a merge, split, or rename.
-3. Assign every transcript entry to exactly one subtopic.
-4. If no clear subtopics emerge, use "General Discussion".
+3. CRITICAL: You MUST assign EVERY transcript entry to exactly one subtopic by mapping its "id" to a subtopic label in entry_subtopic_map. Every entry ID from the input MUST appear as a key in entry_subtopic_map.
+4. If no clear subtopics emerge, use "General Discussion" and assign all entries to it.
+
+EXAMPLE — given entries:
+  [{"id": "entry-1", "speaker": "Speaker 1", "text": "The economy is struggling."},
+   {"id": "entry-2", "speaker": "Speaker 2", "text": "Education needs reform."}]
+
+You would return:
+  subtopics: ["Economic Challenges", "Education Reform"]
+  entry_subtopic_map: {"entry-1": "Economic Challenges", "entry-2": "Education Reform"}
 
 Return your analysis using the analyze_conversation tool.`;
 
