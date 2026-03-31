@@ -144,7 +144,7 @@ serve(async (req) => {
               type: "function",
               function: {
                 name: "analyze_conversation",
-                description: "Analyze a live conversation transcript",
+                description: "Analyze a live conversation transcript. You MUST populate entry_subtopic_map with every entry ID from the input.",
                 parameters: {
                   type: "object",
                   properties: {
