@@ -124,7 +124,8 @@ serve(async (req) => {
 
     // ── Live conversation: Pass 1 — Classify subtopics ──
     if (mode === "live_conversation") {
-      const userPrompt = `${previous_subtopics?.length ? `Previous subtopics (prefer stability):\n${JSON.stringify(previous_subtopics)}\n\n` : ""}Transcript entries:\n${JSON.stringify(fullTranscript || [], null, 2)}\n\nAnalyze this conversation: identify subtopics and assign each entry to a subtopic.`;
+      const entryIds = (fullTranscript || []).map((e: any) => e.id);
+      const userPrompt = `${previous_subtopics?.length ? `Previous subtopics (prefer stability):\n${JSON.stringify(previous_subtopics)}\n\n` : ""}Transcript entries:\n${JSON.stringify(fullTranscript || [], null, 2)}\n\nAnalyze this conversation: identify subtopics and assign EVERY entry to a subtopic. The entry IDs you must map are: ${JSON.stringify(entryIds)}\n\nYou MUST include ALL of these IDs as keys in entry_subtopic_map.`;
 
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
