@@ -109,7 +109,7 @@ EXAMPLE — given entries:
 
 You would return:
   subtopics: ["Economic Challenges", "Education Reform"]
-  entry_subtopic_map: {"entry-1": "Economic Challenges", "entry-2": "Education Reform"}
+  entry_assignments: [{"entry_id": "entry-1", "subtopic": "Economic Challenges"}, {"entry_id": "entry-2", "subtopic": "Education Reform"}]
 
 Return your analysis using the analyze_conversation tool.`;
 
