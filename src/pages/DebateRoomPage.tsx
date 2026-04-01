@@ -401,13 +401,13 @@ const DebateRoomPage = () => {
       debate?.status === "live" &&
       !debate.prep_phase_active &&
        !prepPhaseRole &&
-       isMyTurn &&
+       (isSpeaker || isFacilitator) &&
        !turnEndTriggeredRef.current
     ) {
        turnEndTriggeredRef.current = true;
       enterPrepPhase();
     }
-   }, [timeLeft, timerRunning, debate?.status, debate?.prep_phase_active, prepPhaseRole, isMyTurn, enterPrepPhase]);
+   }, [timeLeft, timerRunning, debate?.status, debate?.prep_phase_active, prepPhaseRole, isSpeaker, isFacilitator, enterPrepPhase]);
 
    // Called via realtime when the speaker (other side) triggered prep phase
   const enterPrepPhaseFromRealtime = useCallback((updated: DebateData) => {
