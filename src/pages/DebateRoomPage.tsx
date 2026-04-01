@@ -346,13 +346,13 @@ const DebateRoomPage = () => {
     return myParticipant.side_id === sortedSides[0]?.id ? 0 : 1;
   }, [myParticipant, sides]);
 
-  // Enter preparation phase between turns (called by the side that triggered it)
+  // Enter preparation phase between turns (called by any speaker/facilitator when timer expires)
   const enterPrepPhase = useCallback(() => {
      if (!debate || !myParticipant || debate.prep_phase_active) return;
 
-     const iAmSpeaker = activeSpeakerParticipant?.user_id === user?.id;
-     if (!iAmSpeaker) return;
      const outgoingSideLabel = currentSide?.label || "";
+     // Determine role: if I'm on the side that was just speaking, I'm "outgoing"; otherwise "incoming"
+     const iAmOnCurrentSide = myParticipant.side_id === currentSide?.id;
 
      const myEntries = transcriptEntries
        .filter((e) => e.is_final && e.subtopic === currentSubtopic?.title && e.speaker_side === outgoingSideLabel)
@@ -362,7 +362,7 @@ const DebateRoomPage = () => {
      setLastTurnTranscript(lastEntry?.text || "");
      setLastTurnSummary(lastEntry?.ai_summary || "");
      setPrepSpeakerSideLabel(outgoingSideLabel);
-     setPrepPhaseRole("outgoing");
+     setPrepPhaseRole(iAmOnCurrentSide ? "outgoing" : "incoming");
 
      const prepSeconds = parseTimeToSeconds(debate.prep_time_max || "60s");
      const startedAt = new Date().toISOString();
@@ -382,7 +382,7 @@ const DebateRoomPage = () => {
       } as any).eq("id", debate.id).eq("prep_phase_active", false).then(({ error }) => {
        if (error) console.error("Failed to write prep phase to DB:", error);
      });
-  }, [debate, myParticipant, activeSpeakerParticipant, user?.id, transcriptEntries, currentSubtopic, currentSide]);
+  }, [debate, myParticipant, transcriptEntries, currentSubtopic, currentSide]);
 
    // Reset turn-end guard whenever a new turn starts (turn_started_at changes)
    useEffect(() => {
