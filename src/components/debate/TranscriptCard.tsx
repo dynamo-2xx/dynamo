@@ -18,11 +18,8 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
   const [autoFlipped, setAutoFlipped] = useState(false);
   const textRef = useRef<HTMLParagraphElement>(null);
   const summaryRef = useRef<HTMLParagraphElement>(null);
-  const frontRef = useRef<HTMLDivElement>(null);
-  const backRef = useRef<HTMLDivElement>(null);
   const [needsSummaryClamp, setNeedsSummaryClamp] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
-  const [cardMinHeight, setCardMinHeight] = useState<number>();
 
   useEffect(() => {
     if (textRef.current) {
