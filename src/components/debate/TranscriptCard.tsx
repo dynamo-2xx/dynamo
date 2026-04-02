@@ -28,23 +28,12 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
     }
   }, [text]);
 
-  // Measure summary clamp
   useEffect(() => {
     if (summaryRef.current && aiSummary) {
       const lineHeight = parseFloat(getComputedStyle(summaryRef.current).lineHeight) || 16;
       setNeedsSummaryClamp(summaryRef.current.scrollHeight > lineHeight * 4.2);
     }
   }, [aiSummary, flipped]);
-
-  useEffect(() => {
-    // Delay measurement to after flip animation completes
-    const timer = setTimeout(() => {
-      const activeRef = flipped ? backRef.current : frontRef.current;
-      const h = activeRef?.scrollHeight ?? 0;
-      if (h > 0) setCardMinHeight(h);
-    }, flipped !== undefined ? 460 : 0); // slightly longer than the 0.45s animation
-    return () => clearTimeout(timer);
-  }, [aiSummary, expanded, summaryExpanded, compact, flipped, needsClamp, needsSummaryClamp]);
 
   // Auto-flip to AI summary when it becomes available
   useEffect(() => {
@@ -63,25 +52,30 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
 
   const isRight = sideOrder !== 0;
 
+  const cardClasses = `rounded-lg px-3 py-2 ${compact ? "text-[11px]" : "text-xs"} ${isRight ? "border-r-[3px]" : "border-l-[3px]"}`;
+  const borderStyle = isRight ? { borderRightColor: sideColor } : { borderLeftColor: sideColor };
+
   return (
     <div
       className={`cursor-default select-text flex ${isRight ? "justify-end" : "justify-start"}`}
       onDoubleClick={handleDoubleClick}
-      style={{ perspective: "800px", minHeight: cardMinHeight }}
+      style={{ perspective: "800px" }}
     >
       <motion.div
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
-        style={{ transformStyle: "preserve-3d", position: "relative", minHeight: cardMinHeight, width: "85%" }}
+        style={{ transformStyle: "preserve-3d", position: "relative", width: "85%" }}
       >
-        {/* Front: transcript */}
+        {/* Front: transcript — in normal flow, hidden via backface when flipped */}
         <div
-          ref={frontRef}
-          className={`rounded-lg px-3 py-2 ${compact ? "text-[11px]" : "text-xs"} ${isRight ? "border-r-[3px]" : "border-l-[3px]"}`}
+          className={cardClasses}
           style={{
-            ...(isRight ? { borderRightColor: sideColor } : { borderLeftColor: sideColor }),
+            ...borderStyle,
             backgroundColor: sideBg,
             backfaceVisibility: "hidden",
+            visibility: flipped ? "hidden" : "visible",
+            height: flipped ? 0 : "auto",
+            overflow: flipped ? "hidden" : "visible",
           }}
         >
           <div className="flex items-center gap-1.5 mb-0.5">
@@ -120,16 +114,22 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
           )}
         </div>
 
-        {/* Back: AI summary */}
+        {/* Back: AI summary — in normal flow when flipped, hidden otherwise */}
         {aiSummary && (
           <div
-            ref={backRef}
-            className={`rounded-lg px-3 py-2 absolute inset-0 overflow-auto ${compact ? "text-[11px]" : "text-xs"} ${isRight ? "border-r-[3px]" : "border-l-[3px]"}`}
+            className={cardClasses}
             style={{
-              ...(isRight ? { borderRightColor: sideColor } : { borderLeftColor: sideColor }),
+              ...borderStyle,
               backgroundColor: sideBg,
               backfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
+              position: flipped ? "relative" : "absolute",
+              top: flipped ? undefined : 0,
+              left: flipped ? undefined : 0,
+              right: flipped ? undefined : 0,
+              visibility: flipped ? "visible" : "hidden",
+              height: flipped ? "auto" : 0,
+              overflow: flipped ? "visible" : "hidden",
             }}
           >
             <div className="flex items-center gap-1.5 mb-0.5">
