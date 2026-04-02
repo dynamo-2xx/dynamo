@@ -10,6 +10,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useLiveTranscription, LiveTranscriptEntry } from "@/hooks/useLiveTranscription";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
 
 type SessionPhase = "setup" | "recording" | "ended";
 
@@ -288,12 +289,12 @@ const LiveSessionPage = () => {
                     {topic}
                   </h3>
                   <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
-                    {topicEntries.length}
+                    {groupConsecutiveEntries(topicEntries).length}
                   </span>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className="space-y-2 pt-2 pl-2">
-                    {topicEntries.map((entry) => (
+                    {groupConsecutiveEntries(topicEntries).map((entry) => (
                       <TranscriptCard
                         key={entry.id}
                         speakerSide={getSpeakerName(entry.speaker_id)}
@@ -319,7 +320,7 @@ const LiveSessionPage = () => {
                   Uncategorized
                 </h3>
               )}
-              {groupedEntries.uncategorized.map((entry) => (
+              {groupConsecutiveEntries(groupedEntries.uncategorized).map((entry) => (
                 <TranscriptCard
                   key={entry.id}
                   speakerSide={getSpeakerName(entry.speaker_id)}
