@@ -320,7 +320,7 @@ const LiveSessionPage = () => {
                   Uncategorized
                 </h3>
               )}
-              {groupedEntries.uncategorized.map((entry) => (
+              {groupConsecutiveEntries(groupedEntries.uncategorized).map((entry) => (
                 <TranscriptCard
                   key={entry.id}
                   speakerSide={getSpeakerName(entry.speaker_id)}

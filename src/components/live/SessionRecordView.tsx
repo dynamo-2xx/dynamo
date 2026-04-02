@@ -215,7 +215,7 @@ const SessionRecordView = ({
                   <CollapsibleContent>
                     <div className="px-3 py-3 space-y-2">
                       {topicEntries.length > 0 ? (
-                        topicEntries.map((entry) => (
+                        groupConsecutiveEntries(topicEntries).map((entry) => (
                           <TranscriptCard
                             key={entry.id}
                             speakerSide={getSpeakerName(entry.speaker_id)}
