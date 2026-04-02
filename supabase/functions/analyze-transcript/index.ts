@@ -211,9 +211,9 @@ serve(async (req) => {
       }
 
       const entryIds = batchEntries.map((e: any) => e.id);
-      const sysPrompt = `You are an AI conversation analyst. You will receive transcript entries from a live conversation. For each entry, generate a concise 1-2 sentence summary that captures the key point or argument being made. Identify speakers by their labels. You MUST return a summary for EVERY entry provided. Return the result using the summarize_entries tool.`;
+      const sysPrompt = `You are an AI conversation analyst. You will receive transcript entries from a live conversation. Each entry may contain multiple paragraphs from the same speaker representing a continuous thought or related ideas that have been grouped together. For each entry, generate a concise 1-3 sentence summary that captures the overall point or argument being made across the entire entry. Do NOT summarize each paragraph separately — synthesize the whole entry into one cohesive summary. Identify speakers by their labels. You MUST return a summary for EVERY entry provided. Return the result using the summarize_entries tool.`;
 
-      const uPrompt = `Transcript entries to summarize:\n${JSON.stringify(batchEntries, null, 2)}\n\nGenerate a concise summary for EACH of these ${batchEntries.length} entries. Entry IDs: ${JSON.stringify(entryIds)}`;
+      const uPrompt = `Transcript entries to summarize:\n${JSON.stringify(batchEntries.map((e: any) => ({ id: e.id, speaker: e.speaker, text: e.text })), null, 2)}\n\nGenerate a concise summary for EACH of these ${batchEntries.length} entries. Entry IDs: ${JSON.stringify(entryIds)}`;
 
       const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",

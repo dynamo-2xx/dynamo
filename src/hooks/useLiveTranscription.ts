@@ -144,25 +144,57 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
         persistSession({ subtopics: identifiedSubtopics });
       }
 
-      // Find entries that need summaries (no ai_summary yet, or subtopic changed)
-      const entriesNeedingSummary: { id: string; speaker: string; text: string }[] = [];
+      // Group consecutive same-speaker entries before summarization
+      // This ensures the AI summarizes coherent thoughts, not fragments
       const currentEntries = transcriptEntriesRef.current;
+      
+      // Build groups: consecutive entries from same speaker that need summaries
+      interface EntryGroup {
+        ids: string[];
+        speaker: string;
+        combinedText: string;
+      }
+      
+      const groups: EntryGroup[] = [];
+      let currentGroup: EntryGroup | null = null;
 
       for (const e of currentEntries) {
         const newSubtopic = entrySubtopicMap[e.id];
         const subtopicChanged = newSubtopic && newSubtopic !== e.subtopic;
-        if (!e.ai_summary || subtopicChanged) {
-          entriesNeedingSummary.push({ id: e.id, speaker: e.speaker_label, text: e.text });
+        const needsSummary = !e.ai_summary || subtopicChanged;
+
+        if (needsSummary) {
+          if (currentGroup && currentGroup.speaker === e.speaker_label) {
+            // Same speaker, extend group
+            currentGroup.ids.push(e.id);
+            currentGroup.combinedText += "\n\n" + e.text;
+          } else {
+            // Different speaker or first entry — flush previous group, start new
+            if (currentGroup) groups.push(currentGroup);
+            currentGroup = { ids: [e.id], speaker: e.speaker_label, combinedText: e.text };
+          }
+        } else {
+          // Entry doesn't need summary — flush current group
+          if (currentGroup) { groups.push(currentGroup); currentGroup = null; }
         }
       }
+      if (currentGroup) groups.push(currentGroup);
 
-      // Pass 2: Batch per-entry summaries
+      // Pass 2: Batch grouped summaries
       const allEntrySummaries: Record<string, string> = {};
 
-      if (entriesNeedingSummary.length > 0) {
-        const batches: { id: string; speaker: string; text: string }[][] = [];
-        for (let i = 0; i < entriesNeedingSummary.length; i += BATCH_SIZE) {
-          batches.push(entriesNeedingSummary.slice(i, i + BATCH_SIZE));
+      if (groups.length > 0) {
+        // Convert groups into entries for the edge function (one per group, using first ID)
+        const groupEntries = groups.map(g => ({
+          id: g.ids[0], // use first entry's ID as group ID
+          speaker: g.speaker,
+          text: g.combinedText,
+          entry_ids: g.ids, // pass all IDs so we can map back
+        }));
+
+        const batches: typeof groupEntries[] = [];
+        for (let i = 0; i < groupEntries.length; i += BATCH_SIZE) {
+          batches.push(groupEntries.slice(i, i + BATCH_SIZE));
         }
 
         const batchResults = await Promise.all(
@@ -183,6 +215,16 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
         for (const batch of batchResults) {
           Object.assign(allEntrySummaries, batch);
+        }
+
+        // Expand group summaries: apply the group leader's summary to ALL entries in the group
+        for (const g of groups) {
+          const leaderSummary = allEntrySummaries[g.ids[0]];
+          if (leaderSummary) {
+            for (const id of g.ids) {
+              allEntrySummaries[id] = leaderSummary;
+            }
+          }
         }
       }
 
