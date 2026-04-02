@@ -10,6 +10,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useLiveTranscription, LiveTranscriptEntry } from "@/hooks/useLiveTranscription";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
 
 type SessionPhase = "setup" | "recording" | "ended";
 

@@ -8,6 +8,7 @@ import { LiveTranscriptEntry, LiveSummary } from "@/hooks/useLiveTranscription";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import SpeakerBubble from "./SpeakerBubble";
+import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
 
 interface SessionRecordViewProps {
   sessionId: string;
