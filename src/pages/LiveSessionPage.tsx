@@ -289,7 +289,7 @@ const LiveSessionPage = () => {
                     {topic}
                   </h3>
                   <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
-                    {topicEntries.length}
+                    {groupConsecutiveEntries(topicEntries).length}
                   </span>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
