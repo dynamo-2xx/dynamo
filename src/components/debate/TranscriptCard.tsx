@@ -40,10 +40,13 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
   }, [aiSummary, flipped]);
 
   useEffect(() => {
-    const frontHeight = frontRef.current?.scrollHeight ?? 0;
-    const backHeight = backRef.current?.scrollHeight ?? 0;
-    const activeHeight = flipped ? backHeight : frontHeight;
-    if (activeHeight > 0) setCardMinHeight(activeHeight);
+    // Delay measurement to after flip animation completes
+    const timer = setTimeout(() => {
+      const activeRef = flipped ? backRef.current : frontRef.current;
+      const h = activeRef?.scrollHeight ?? 0;
+      if (h > 0) setCardMinHeight(h);
+    }, flipped !== undefined ? 460 : 0); // slightly longer than the 0.45s animation
+    return () => clearTimeout(timer);
   }, [aiSummary, expanded, summaryExpanded, compact, flipped, needsClamp, needsSummaryClamp]);
 
   // Auto-flip to AI summary when it becomes available
