@@ -294,7 +294,7 @@ const LiveSessionPage = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className="space-y-2 pt-2 pl-2">
-                    {topicEntries.map((entry) => (
+                    {groupConsecutiveEntries(topicEntries).map((entry) => (
                       <TranscriptCard
                         key={entry.id}
                         speakerSide={getSpeakerName(entry.speaker_id)}
