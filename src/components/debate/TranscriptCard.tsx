@@ -44,7 +44,18 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
   }, [aiSummary, autoFlip, autoFlipped]);
 
   const handleDoubleClick = () => {
-    if (aiSummary) setFlipped((f) => !f);
+    if (aiSummary) {
+      setFlipped((f) => {
+        if (!f) {
+          // Flipping to summary — reset summary expand
+          setSummaryExpanded(false);
+        } else {
+          // Flipping to transcript — reset transcript expand
+          setExpanded(false);
+        }
+        return !f;
+      });
+    }
   };
 
   const sideColor = sideOrder === 0 ? "hsl(var(--side-1))" : "hsl(var(--side-2))";
