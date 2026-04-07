@@ -277,16 +277,19 @@ const DebateRoomPage = () => {
               ? new Date(updated.prep_phase_started_at).getTime()
               : null,
           );
-        } else if (prepPhaseRoleRef.current) {
+        }
+
+        // Check bothReady BEFORE clearing prep state to avoid race condition
+        const bothReady = updated.prep_side1_ready && updated.prep_side2_ready;
+        if (bothReady && prepPhaseRoleRef.current && !prepExitRef.current) {
+          void completePrepPhaseAndAdvanceRef.current();
+        }
+
+        // Clear local prep state only after the bothReady check
+        if (!updated.prep_phase_active && prepPhaseRoleRef.current) {
           setPrepPhaseRole(null);
           setPrepStartedAt(null);
           setSelectedPrepDuration(null);
-        }
-
-         const bothReady = updated.prep_side1_ready && updated.prep_side2_ready;
-
-         if (bothReady && prepPhaseRoleRef.current && !prepExitRef.current) {
-          void completePrepPhaseAndAdvanceRef.current();
         }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${id}` }, (payload) => {
@@ -586,14 +589,18 @@ const DebateRoomPage = () => {
     }
   }, [transcriptEntries, currentSubtopic, prepSpeakerSideLabel, debate?.id]);
 
-  const handlePrepReady = useCallback(() => {
+  const handlePrepReady = useCallback(async () => {
     if (!debate) return;
     // Set MY side's ready flag
     const sideIdx = getMySideIndex();
     const updatePayload = sideIdx === 0
       ? { prep_side1_ready: true }
       : { prep_side2_ready: true };
-    supabase.from("debates").update(updatePayload as any).eq("id", debate.id);
+    const { error } = await supabase.from("debates").update(updatePayload as any).eq("id", debate.id);
+    if (error) {
+      console.error("Failed to set ready flag:", error);
+      toast({ title: "Failed to signal ready", description: "Please try again.", variant: "destructive" });
+    }
     // Don't clear local state yet — wait for both sides via realtime
   }, [debate, getMySideIndex]);
 
