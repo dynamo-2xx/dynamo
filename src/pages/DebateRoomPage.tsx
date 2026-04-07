@@ -599,7 +599,7 @@ const DebateRoomPage = () => {
     const { error } = await supabase.from("debates").update(updatePayload as any).eq("id", debate.id);
     if (error) {
       console.error("Failed to set ready flag:", error);
-      toast({ title: "Failed to signal ready", description: "Please try again.", variant: "destructive" });
+      toast.error("Failed to signal ready. Please try again.");
     }
     // Don't clear local state yet — wait for both sides via realtime
   }, [debate, getMySideIndex]);
