@@ -6,13 +6,13 @@ import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
 
 const navItems = [
-{ to: "/", icon: Home, label: "Home" },
-{ to: "/explore", icon: Compass, label: "Explore" },
-{ to: "/create", icon: PlusCircle, label: "Create" },
-{ to: "/profile", icon: User, label: "Profile" }];
+  { to: "/", icon: Home, label: "Home" },
+  { to: "/explore", icon: Compass, label: "Explore" },
+  { to: "/create", icon: PlusCircle, label: "Create" },
+  { to: "/profile", icon: User, label: "Profile" },
+];
 
-
-const AppLayout = ({ children }: {children: ReactNode;}) => {
+const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -21,18 +21,17 @@ const AppLayout = ({ children }: {children: ReactNode;}) => {
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "hidden md:flex flex-col border-r border-border bg-card p-6 gap-2 fixed h-full transition-all duration-300 z-30",
+          "hidden md:flex flex-col border-r border-border bg-background p-6 gap-2 fixed h-full transition-all duration-300 z-30",
           sidebarOpen ? "w-64" : "w-0 p-0 overflow-hidden border-r-0"
         )}
       >
         <div className="mb-8 flex items-center gap-3">
           <img src={logoSmiley} alt="d. logo" className="w-10 h-10 dark:invert" />
-          <div>
-            <h1 className="text-2xl font-display font-bold text-foreground">dynamo</h1>
-            <p className="text-xs text-muted-foreground mt-0.5 font-body">People to the Power</p>
-          </div>
+          <span className="font-body text-foreground text-sm font-medium tracking-[0.16em] uppercase">
+            DYNAMO
+          </span>
         </div>
-        <nav className="flex flex-col gap-1 flex-1">
+        <nav className="flex flex-col gap-0.5 flex-1">
           {navItems.map((item) => {
             const active = location.pathname === item.to;
             return (
@@ -40,42 +39,45 @@ const AppLayout = ({ children }: {children: ReactNode;}) => {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
-                  active ?
-                  "bg-primary/10 text-primary" :
-                  "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                )}>
-                
+                  "flex items-center gap-3 px-4 py-3 rounded-lg text-[13px] transition-colors whitespace-nowrap font-body",
+                  active
+                    ? "text-foreground font-medium bg-accent border-l-2 border-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
                 <item.icon className="w-5 h-5" />
                 {item.label}
-              </RouterNavLink>);
-
+              </RouterNavLink>
+            );
           })}
         </nav>
-        <div className="flex items-center justify-between mb-2">
-          <ThemeToggle />
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-            title="Close sidebar"
+        <div className="mt-auto space-y-3">
+          <p className="text-[11px] text-muted-foreground font-body">People to the Power</p>
+          <div className="flex items-center justify-between">
+            <ThemeToggle />
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              title="Close sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          </div>
+          <RouterNavLink
+            to="/create"
+            className="flex items-center justify-center gap-2 border border-border text-foreground rounded-lg py-3 font-body text-xs font-medium hover:bg-accent transition-colors whitespace-nowrap"
           >
-            <PanelLeftClose className="w-4 h-4" />
-          </button>
+            <PlusCircle className="w-4 h-4" />
+            Get Started
+          </RouterNavLink>
         </div>
-        <RouterNavLink
-          to="/create"
-          className="flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity whitespace-nowrap">
-          
-          <PlusCircle className="w-4 h-4" />
-          Get Started
-        </RouterNavLink>
       </aside>
 
       {/* Reopen button when sidebar is closed */}
       {!sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
-          className="hidden md:flex fixed top-4 left-4 z-40 p-2 rounded-lg bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          className="hidden md:flex fixed top-4 left-4 z-40 p-2 rounded-lg bg-background border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           title="Open sidebar"
         >
           <PanelLeft className="w-5 h-5" />
@@ -88,7 +90,7 @@ const AppLayout = ({ children }: {children: ReactNode;}) => {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border flex justify-around py-2 z-40">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border flex justify-around py-2 z-40">
         {navItems.map((item) => {
           const active = location.pathname === item.to;
           const isCreate = item.to === "/create";
@@ -97,22 +99,22 @@ const AppLayout = ({ children }: {children: ReactNode;}) => {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex flex-col items-center gap-0.5 text-[10px] font-medium transition-colors p-1",
-                isCreate ?
-                "text-primary" :
-                active ?
-                "text-primary" :
-                "text-muted-foreground"
-              )}>
-              
+                "flex flex-col items-center gap-0.5 text-[10px] font-body transition-colors p-1",
+                isCreate
+                  ? "text-foreground"
+                  : active
+                  ? "text-foreground font-medium"
+                  : "text-muted-foreground"
+              )}
+            >
               <item.icon className={cn("w-5 h-5", isCreate && "w-7 h-7")} />
               {!isCreate && <span>{item.label}</span>}
-            </RouterNavLink>);
-
+            </RouterNavLink>
+          );
         })}
       </nav>
-    </div>);
-
+    </div>
+  );
 };
 
 export default AppLayout;
