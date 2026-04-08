@@ -1,19 +1,24 @@
 
 
-# Fix "I'm Ready" Button in Prep Phase
+# Change Live Session Analysis Interval to 3 Minutes
 
-## Changes (1 file only: `src/pages/DebateRoomPage.tsx`)
+## What changes
+**One file: `src/hooks/useLiveTranscription.ts`**
 
-### Fix 1: Race condition in realtime handler (lines 280-290)
-Move the `bothReady` check **before** the block that clears `prepPhaseRole`. Currently at line 280, when `prep_phase_active` becomes `false`, the code clears `prepPhaseRoleRef` immediately — then the `bothReady` check at line 288 fails because the role is already `null`.
+### Change 1: Fixed 3-minute interval (line 260)
+Replace the progressive timer formula:
+```typescript
+const interval = (30 + Math.floor(elapsedSeconds / 30) * 5) * 1000;
+```
+With a fixed 3-minute interval:
+```typescript
+const interval = 180_000; // 3 minutes
+```
 
-**New order:**
-1. Check `bothReady` first (while `prepPhaseRoleRef` is still set)
-2. Then clear local prep state when `prep_phase_active` is `false`
+The `elapsedSeconds` calculation on line 259 and `recordingStartRef` become unused but are harmless to leave (they don't affect behavior). Alternatively, we can remove the `elapsedSeconds` line for cleanliness.
 
-### Fix 2: Add `await` + error handling to `handlePrepReady` (line 596)
-The Supabase `.update()` call is fire-and-forget. Make the callback `async`, `await` the result, check for errors, and show a toast on failure so the user can retry.
+### Change 2: No change needed for end-of-session analysis
+The `endSession` function (line 448–478) already resets `lastAnalyzedCountRef` to 0 and calls `await runAnalysis()` before marking the session ended. This guarantees a final analysis pass. No modification needed.
 
-### Fix 3: No other changes
-No changes to `PrepPhaseOverlay.tsx`, `completePrepPhaseAndAdvance`, or any other file.
+**Nothing else changes.**
 
