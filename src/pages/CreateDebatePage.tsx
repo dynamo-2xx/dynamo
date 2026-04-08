@@ -240,7 +240,7 @@ const CreateDebatePage = () => {
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
               <div className="text-center mb-10">
-                <h2 className="text-3xl font-display font-bold mb-3 md:text-3xl">What's on your mind?</h2>
+                <h2 className="text-2xl font-display mb-3 md:text-3xl">What's on your mind?</h2>
                 <div className="h-6 relative overflow-hidden">
                   <AnimatePresence mode="wait">
                     <motion.p
@@ -261,13 +261,13 @@ const CreateDebatePage = () => {
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Type a topic and let dynamo structure the conversation."
-                  className="w-full bg-card border border-border rounded-xl p-6 font-display text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 resize-none transition-colors min-h-[140px] text-base my-0 py-[24px]"
+                  className="w-full bg-background border border-border rounded-lg p-6 font-display text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 resize-none transition-colors min-h-[140px] text-base my-0 py-[24px]"
                   autoFocus
                 />
                 <button
                   onClick={handleGenerate}
                   disabled={!prompt.trim()}
-                  className="absolute bottom-4 right-4 flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
+                  className="absolute bottom-4 right-4 flex items-center gap-2 bg-foreground text-background px-5 py-2.5 rounded-full font-body text-xs font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
                 >
                   <Sparkles className="w-4 h-4" />
                   Create
@@ -275,9 +275,9 @@ const CreateDebatePage = () => {
               </div>
               <button
                 onClick={() => navigate("/live/new")}
-                className="mt-3 w-full bg-card border border-border text-foreground rounded-xl font-semibold text-sm hover:border-primary/40 transition-colors px-[20px] flex-row flex items-center justify-center gap-[8px] mx-0 my-px mb-px py-[55px]"
+                className="mt-3 w-full bg-background border border-border text-foreground rounded-lg font-body text-xs font-medium hover:border-foreground/30 transition-colors px-[20px] flex-row flex items-center justify-center gap-[8px] mx-0 my-px mb-px py-[55px]"
               >
-                <Mic className="w-4 h-4 text-primary" />
+                <Mic className="w-4 h-4 text-foreground" />
                 Live
               </button>
             </motion.div>
@@ -291,24 +291,24 @@ const CreateDebatePage = () => {
 
           {step === 3 && debate && (
             <motion.div key="step3" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
-              <h2 className="text-2xl font-display font-bold mb-6">Review Your Debate</h2>
+              <h2 className="text-2xl font-display mb-6">Review Your Debate</h2>
 
               <div className="space-y-6">
                 {/* Topic */}
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2 block">Main Topic</label>
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-2 block">Main Topic</label>
                   <input
                     value={debate.topic}
                     onChange={(e) => setDebate({ ...debate, topic: e.target.value })}
-                    className="w-full bg-transparent text-lg font-display font-semibold text-foreground focus:outline-none"
+                    className="w-full bg-transparent text-lg font-display text-foreground focus:outline-none"
                   />
                 </div>
 
                 {/* Subtopics */}
-                <div className="bg-card border border-border rounded-xl p-5">
+                <div className="bg-background border border-border rounded-lg p-5">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Subtopics</label>
-                    <button onClick={addSubtopic} className="text-primary hover:opacity-80 transition-opacity">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider">Subtopics</label>
+                    <button onClick={addSubtopic} className="text-foreground hover:opacity-80 transition-opacity">
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
@@ -325,7 +325,7 @@ const CreateDebatePage = () => {
                         <input
                           value={st}
                           onChange={(e) => updateSubtopic(i, e.target.value)}
-                          className="flex-1 bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                          className="flex-1 bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
                         />
                         {debate.subtopics.length > 1 && (
                           <button onClick={() => removeSubtopic(i)} className="text-muted-foreground hover:text-destructive transition-colors">
@@ -338,8 +338,8 @@ const CreateDebatePage = () => {
                 </div>
 
                 {/* Sides */}
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">Participant Sides</label>
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Participant Sides</label>
                   <div className="flex gap-2">
                     {debate.sides.map((side, i) => (
                       <input
@@ -350,7 +350,7 @@ const CreateDebatePage = () => {
                           updated[i] = e.target.value;
                           setDebate({ ...debate, sides: updated });
                         }}
-                        className="flex-1 bg-secondary/50 rounded-lg px-3 py-2 text-sm text-center font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                        className="flex-1 bg-accent rounded-lg px-3 py-2 text-sm text-center font-body font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
                       />
                     ))}
                   </div>
@@ -358,8 +358,8 @@ const CreateDebatePage = () => {
 
                 {/* Turns & Time */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-card border border-border rounded-xl p-5">
-                    <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">Turns per Subtopic</label>
+                  <div className="bg-background border border-border rounded-lg p-5">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Turns per Subtopic</label>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setDebate({ ...debate, turnsPerSubtopic: Math.max(1, debate.turnsPerSubtopic - 1) })}
@@ -367,7 +367,7 @@ const CreateDebatePage = () => {
                       >
                         <Minus className="w-4 h-4" />
                       </button>
-                      <span className="text-2xl font-display font-bold text-primary">{debate.turnsPerSubtopic}</span>
+                      <span className="text-2xl font-display text-foreground">{debate.turnsPerSubtopic}</span>
                       <button
                         onClick={() => setDebate({ ...debate, turnsPerSubtopic: Math.min(10, debate.turnsPerSubtopic + 1) })}
                         className="text-muted-foreground hover:text-foreground transition-colors"
@@ -376,12 +376,12 @@ const CreateDebatePage = () => {
                       </button>
                     </div>
                   </div>
-                  <div className="bg-card border border-border rounded-xl p-5">
-                    <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">Time per Turn</label>
+                  <div className="bg-background border border-border rounded-lg p-5">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Time per Turn</label>
                     <select
                       value={debate.timePerTurn}
                       onChange={(e) => setDebate({ ...debate, timePerTurn: e.target.value })}
-                      className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                      className="w-full bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
                     >
                       {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
@@ -389,15 +389,15 @@ const CreateDebatePage = () => {
                 </div>
 
                 {/* Preparation Time Range */}
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
                     <Clock className="w-3.5 h-3.5 inline mr-1" />
                     Preparation Time Between Turns
                   </label>
                    <select
                      value={debate.prepTime}
                      onChange={(e) => setDebate({ ...debate, prepTime: e.target.value })}
-                     className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                     className="w-full bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
                    >
                      {PREP_TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                    </select>
@@ -406,8 +406,8 @@ const CreateDebatePage = () => {
                   </p>
                  </div>
                 {/* Invite Users (optional) */}
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
                     <Mail className="w-3.5 h-3.5 inline mr-1" />
                     Invite Speakers <span className="normal-case font-normal">(optional)</span>
                   </label>
@@ -419,12 +419,12 @@ const CreateDebatePage = () => {
                         if (e.key === "Enter") { e.preventDefault(); addInvite(); }
                       }}
                       placeholder="Username or email address"
-                      className="flex-1 bg-secondary/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                      className="flex-1 bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
                     />
                     <button
                       onClick={addInvite}
                       disabled={!inviteInput.trim()}
-                      className="text-primary hover:opacity-80 transition-opacity disabled:opacity-40"
+                      className="text-foreground hover:opacity-80 transition-opacity disabled:opacity-40"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -434,7 +434,7 @@ const CreateDebatePage = () => {
                       {invitedUsernames.map((username) => (
                         <span
                           key={username}
-                          className="inline-flex items-center gap-1 bg-primary/10 text-primary rounded-full px-2.5 py-1 text-xs font-medium"
+                          className="inline-flex items-center gap-1 bg-accent text-foreground rounded-full px-2.5 py-1 text-xs font-body font-medium"
                         >
                           {username}
                           <button
@@ -450,18 +450,18 @@ const CreateDebatePage = () => {
                 </div>
 
                 {/* Visibility */}
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-3 block">Visibility</label>
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Visibility</label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setIsPublic(false)}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors ${!isPublic ? "bg-primary/10 text-primary border border-primary/30" : "bg-secondary/50 text-muted-foreground border border-transparent"}`}
+                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-body font-medium transition-colors ${!isPublic ? "bg-foreground text-background border border-foreground" : "bg-accent text-muted-foreground border border-transparent"}`}
                     >
                       <Lock className="w-4 h-4" /> Private
                     </button>
                     <button
                       onClick={() => setIsPublic(true)}
-                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors ${isPublic ? "bg-primary/10 text-primary border border-primary/30" : "bg-secondary/50 text-muted-foreground border border-transparent"}`}
+                      className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-body font-medium transition-colors ${isPublic ? "bg-foreground text-background border border-foreground" : "bg-accent text-muted-foreground border border-transparent"}`}
                     >
                       <Globe className="w-4 h-4" /> Public
                     </button>
@@ -472,14 +472,14 @@ const CreateDebatePage = () => {
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); }}
-                    className="flex-1 border border-border rounded-lg py-3 text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+                    className="flex-1 border border-border rounded-lg py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
                   >
                     Start Over
                   </button>
                   <button
                     onClick={handleCreateDebate}
                     disabled={saving}
-                    className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg py-3 font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
                     {saving ? "Creating…" : invitedUsernames.length > 0 ? "Create & Invite" : "Create Debate"}
                     <ArrowRight className="w-4 h-4" />

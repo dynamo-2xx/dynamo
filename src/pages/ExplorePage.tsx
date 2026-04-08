@@ -34,26 +34,26 @@ const ExplorePage = () => {
     <AppLayout>
       <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <h2 className="text-3xl font-display font-bold mb-6">Explore</h2>
+          <h2 className="text-2xl font-display mb-6">Explore</h2>
 
           <div className="relative mb-6">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search topics, arguments, communities..."
-              className="w-full bg-card border border-border rounded-lg pl-10 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 transition-colors"
+              className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-3 text-[13px] font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 transition-colors"
             />
           </div>
 
-          <div className="flex gap-1 mb-6 bg-card border border-border rounded-lg p-1">
+          <div className="flex gap-1 mb-6 bg-background border border-border rounded-lg p-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-xs font-semibold transition-all",
+                  "flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-xs font-body font-medium transition-all",
                   activeTab === tab.id
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-foreground text-background"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >

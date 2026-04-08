@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Georgia", "Fraunces", "serif"],
+        display: ["Instrument Serif", "serif"],
         body: ["DM Sans", "sans-serif"],
       },
       colors: {
