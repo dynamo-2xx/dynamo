@@ -30,7 +30,7 @@ const DynamoLoader = ({ onComplete, duration = 2500 }: DynamoLoaderProps) => {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
-      <div className="text-3xl md:text-5xl lg:text-6xl font-display font-bold tracking-tight select-none">
+      <div className="text-3xl md:text-5xl lg:text-6xl font-display tracking-tight select-none">
         {SLOGAN.split("").map((char, i) => (
           <motion.span
             key={i}
@@ -39,16 +39,16 @@ const DynamoLoader = ({ onComplete, duration = 2500 }: DynamoLoaderProps) => {
               opacity: i < revealedCount ? 1 : 0.15,
             }}
             transition={{ duration: 0.08 }}
-            className={`inline-block ${i < revealedCount ? "text-primary" : "text-muted-foreground"}`}
+            className={`inline-block ${i < revealedCount ? "text-foreground" : "text-muted-foreground"}`}
             style={{ whiteSpace: "pre" }}
           >
             {char}
           </motion.span>
         ))}
       </div>
-      <div className="mt-8 w-64 h-1 rounded-full bg-muted overflow-hidden">
+      <div className="mt-8 w-64 h-1 rounded-full bg-accent overflow-hidden">
         <motion.div
-          className="h-full bg-primary rounded-full"
+          className="h-full bg-foreground rounded-full"
           style={{ width: `${progress * 100}%` }}
         />
       </div>
