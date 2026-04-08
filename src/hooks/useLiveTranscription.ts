@@ -256,8 +256,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
     if (!recordingStartRef.current) return;
 
-    const elapsedSeconds = (Date.now() - recordingStartRef.current) / 1000;
-    const interval = (30 + Math.floor(elapsedSeconds / 30) * 5) * 1000;
+    const interval = 180_000; // 3 minutes
 
     analysisTimerRef.current = setTimeout(async () => {
       await runAnalysis();
