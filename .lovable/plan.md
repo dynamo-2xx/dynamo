@@ -1,24 +1,21 @@
 
 
-# Change Live Session Analysis Interval to 3 Minutes
+# Fix Squished/Narrow Serif Font Rendering
 
-## What changes
-**One file: `src/hooks/useLiveTranscription.ts`**
+## Root Causes
+1. **Dark mode thinning**: Light-on-dark text gets subpixel anti-aliasing that makes strokes thinner, causing serif letters to look horizontally condensed. This is a well-known rendering issue.
+2. **Potential font load race**: The `@import` for Google Fonts can be slow; if Instrument Serif hasn't loaded yet, the `serif` fallback (Times New Roman) is noticeably narrower.
 
-### Change 1: Fixed 3-minute interval (line 260)
-Replace the progressive timer formula:
-```typescript
-const interval = (30 + Math.floor(elapsedSeconds / 30) * 5) * 1000;
-```
-With a fixed 3-minute interval:
-```typescript
-const interval = 180_000; // 3 minutes
-```
+## Changes (2 files, visual-only)
 
-The `elapsedSeconds` calculation on line 259 and `recordingStartRef` become unused but are harmless to leave (they don't affect behavior). Alternatively, we can remove the `elapsedSeconds` line for cleanliness.
+### 1. `index.html` — Add font preconnect + preload
+Add `<link rel="preconnect">` for Google Fonts and a `<link rel="preload">` for the stylesheet before the page renders. This ensures Instrument Serif loads before first paint instead of relying on a CSS `@import` which blocks later.
 
-### Change 2: No change needed for end-of-session analysis
-The `endSession` function (line 448–478) already resets `lastAnalyzedCountRef` to 0 and calls `await runAnalysis()` before marking the session ended. This guarantees a final analysis pass. No modification needed.
+### 2. `src/index.css` — Fix rendering
+- Add `-webkit-font-smoothing: antialiased` and `-moz-osx-font-smoothing: grayscale` to the `body` rule. This switches from subpixel to grayscale anti-aliasing, which renders consistent stroke widths in both light and dark mode.
+- Move the Google Fonts `@import` to a `<link>` in `index.html` instead (faster loading, avoids render-blocking CSS import).
+- Remove the `@import` line from `index.css`.
 
-**Nothing else changes.**
+### No logic changes
+No routing, Supabase, auth, debate room, or live session code is touched.
 
