@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;1,9..40,400;1,9..40,500&display=swap');
+/* Fonts loaded via <link> in index.html for faster rendering */
 
 @tailwind base;
 @tailwind components;
@@ -110,6 +110,8 @@
     @apply bg-background text-foreground;
     font-family: var(--font-body);
     font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
