@@ -100,7 +100,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   }, [persistSession]);
 
   // ── Two-pass analysis ──
-  const runAnalysis = useCallback(async () => {
+  const runAnalysis = useCallback(async (includeSummaries: boolean = false) => {
     const entries = transcriptEntriesRef.current;
     if (!entries.length || isSummarizingRef.current) {
       console.log("[Analysis] Skipped: entries=", entries.length, "summarizing=", isSummarizingRef.current);
@@ -144,85 +144,80 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
         persistSession({ subtopics: identifiedSubtopics });
       }
 
-      // Group consecutive same-speaker entries before summarization
-      // This ensures the AI summarizes coherent thoughts, not fragments
-      const currentEntries = transcriptEntriesRef.current;
-      
-      // Build groups: consecutive entries from same speaker that need summaries
-      interface EntryGroup {
-        ids: string[];
-        speaker: string;
-        combinedText: string;
-      }
-      
-      const groups: EntryGroup[] = [];
-      let currentGroup: EntryGroup | null = null;
-
-      for (const e of currentEntries) {
-        const newSubtopic = entrySubtopicMap[e.id];
-        const subtopicChanged = newSubtopic && newSubtopic !== e.subtopic;
-        const needsSummary = !e.ai_summary || subtopicChanged;
-
-        if (needsSummary) {
-          if (currentGroup && currentGroup.speaker === e.speaker_label) {
-            // Same speaker, extend group
-            currentGroup.ids.push(e.id);
-            currentGroup.combinedText += "\n\n" + e.text;
-          } else {
-            // Different speaker or first entry — flush previous group, start new
-            if (currentGroup) groups.push(currentGroup);
-            currentGroup = { ids: [e.id], speaker: e.speaker_label, combinedText: e.text };
-          }
-        } else {
-          // Entry doesn't need summary — flush current group
-          if (currentGroup) { groups.push(currentGroup); currentGroup = null; }
-        }
-      }
-      if (currentGroup) groups.push(currentGroup);
-
-      // Pass 2: Batch grouped summaries
+      // Pass 2: Summarization — only when explicitly requested (session end)
       const allEntrySummaries: Record<string, string> = {};
 
-      if (groups.length > 0) {
-        // Convert groups into entries for the edge function (one per group, using first ID)
-        const groupEntries = groups.map(g => ({
-          id: g.ids[0], // use first entry's ID as group ID
-          speaker: g.speaker,
-          text: g.combinedText,
-          entry_ids: g.ids, // pass all IDs so we can map back
-        }));
-
-        const batches: typeof groupEntries[] = [];
-        for (let i = 0; i < groupEntries.length; i += BATCH_SIZE) {
-          batches.push(groupEntries.slice(i, i + BATCH_SIZE));
+      if (includeSummaries) {
+        // Group consecutive same-speaker entries before summarization
+        const currentEntries = transcriptEntriesRef.current;
+        
+        interface EntryGroup {
+          ids: string[];
+          speaker: string;
+          combinedText: string;
         }
+        
+        const groups: EntryGroup[] = [];
+        let currentGroup: EntryGroup | null = null;
 
-        const batchResults = await Promise.all(
-          batches.map(async (batch) => {
-            try {
-              const { data: sumData, error: sumError } = await supabase.functions.invoke("analyze-transcript", {
-                body: { mode: "live_summarize_entries", entries: batch },
-              });
-              if (!sumError && sumData?.entry_summaries) {
-                return sumData.entry_summaries as Record<string, string>;
-              }
-            } catch (err) {
-              console.error("Pass 2 batch failed:", err);
+        for (const e of currentEntries) {
+          const newSubtopic = entrySubtopicMap[e.id];
+          const subtopicChanged = newSubtopic && newSubtopic !== e.subtopic;
+          const needsSummary = !e.ai_summary || subtopicChanged;
+
+          if (needsSummary) {
+            if (currentGroup && currentGroup.speaker === e.speaker_label) {
+              currentGroup.ids.push(e.id);
+              currentGroup.combinedText += "\n\n" + e.text;
+            } else {
+              if (currentGroup) groups.push(currentGroup);
+              currentGroup = { ids: [e.id], speaker: e.speaker_label, combinedText: e.text };
             }
-            return {};
-          })
-        );
-
-        for (const batch of batchResults) {
-          Object.assign(allEntrySummaries, batch);
+          } else {
+            if (currentGroup) { groups.push(currentGroup); currentGroup = null; }
+          }
         }
+        if (currentGroup) groups.push(currentGroup);
 
-        // Expand group summaries: apply the group leader's summary to ALL entries in the group
-        for (const g of groups) {
-          const leaderSummary = allEntrySummaries[g.ids[0]];
-          if (leaderSummary) {
-            for (const id of g.ids) {
-              allEntrySummaries[id] = leaderSummary;
+        if (groups.length > 0) {
+          const groupEntries = groups.map(g => ({
+            id: g.ids[0],
+            speaker: g.speaker,
+            text: g.combinedText,
+            entry_ids: g.ids,
+          }));
+
+          const batches: typeof groupEntries[] = [];
+          for (let i = 0; i < groupEntries.length; i += BATCH_SIZE) {
+            batches.push(groupEntries.slice(i, i + BATCH_SIZE));
+          }
+
+          const batchResults = await Promise.all(
+            batches.map(async (batch) => {
+              try {
+                const { data: sumData, error: sumError } = await supabase.functions.invoke("analyze-transcript", {
+                  body: { mode: "live_summarize_entries", entries: batch },
+                });
+                if (!sumError && sumData?.entry_summaries) {
+                  return sumData.entry_summaries as Record<string, string>;
+                }
+              } catch (err) {
+                console.error("Pass 2 batch failed:", err);
+              }
+              return {};
+            })
+          );
+
+          for (const batch of batchResults) {
+            Object.assign(allEntrySummaries, batch);
+          }
+
+          for (const g of groups) {
+            const leaderSummary = allEntrySummaries[g.ids[0]];
+            if (leaderSummary) {
+              for (const id of g.ids) {
+                allEntrySummaries[id] = leaderSummary;
+              }
             }
           }
         }
@@ -462,7 +457,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
     if (transcriptEntriesRef.current.length > 0) {
       console.log("[Analysis] Running final pass on", transcriptEntriesRef.current.length, "entries");
       try {
-        await runAnalysis();
+        await runAnalysis(true);
       } catch (err) {
         console.error("Failed to run final analysis:", err);
       }
