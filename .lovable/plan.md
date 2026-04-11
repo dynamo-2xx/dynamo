@@ -1,21 +1,33 @@
 
 
-# Fix Squished/Narrow Serif Font Rendering
+# Defer Per-Entry Summaries to Session End
 
-## Root Causes
-1. **Dark mode thinning**: Light-on-dark text gets subpixel anti-aliasing that makes strokes thinner, causing serif letters to look horizontally condensed. This is a well-known rendering issue.
-2. **Potential font load race**: The `@import` for Google Fonts can be slow; if Instrument Serif hasn't loaded yet, the `serif` fallback (Times New Roman) is noticeably narrower.
+## Current cost breakdown per 3-minute tick
+Each tick runs **two** AI calls:
+1. **Pass 1 — Classification** (Gemini 2.5 Pro): subtopic identification + entry mapping
+2. **Pass 2 — Summarization** (Gemini 3 Flash): per-entry summaries in batches
 
-## Changes (2 files, visual-only)
+For a 30-minute session, that's ~10 ticks = **10 classification calls + 10 summarization calls**.
 
-### 1. `index.html` — Add font preconnect + preload
-Add `<link rel="preconnect">` for Google Fonts and a `<link rel="preload">` for the stylesheet before the page renders. This ensures Instrument Serif loads before first paint instead of relying on a CSS `@import` which blocks later.
+## Proposed change
+- **Keep Pass 1 (classification) running every 3 minutes** — this gives you real-time subtopic grouping during recording.
+- **Skip Pass 2 (summarization) during recording** — no per-entry AI summaries while live.
+- **Run Pass 2 once at session end** — the `endSession` flow already does a final `runAnalysis()`. We just make Pass 2 only execute during that final pass.
 
-### 2. `src/index.css` — Fix rendering
-- Add `-webkit-font-smoothing: antialiased` and `-moz-osx-font-smoothing: grayscale` to the `body` rule. This switches from subpixel to grayscale anti-aliasing, which renders consistent stroke widths in both light and dark mode.
-- Move the Google Fonts `@import` to a `<link>` in `index.html` instead (faster loading, avoids render-blocking CSS import).
-- Remove the `@import` line from `index.css`.
+## Cost impact
+- Eliminates ~9 out of 10 summarization calls per session (Flash model, cheaper but still adds up).
+- Classification (the more expensive Pro model call) remains unchanged — this is the price of real-time structure.
+- Net saving: roughly **30-40% of total AI cost per session** (summarization is cheaper per call than classification, but it runs in batches that multiply).
 
-### No logic changes
-No routing, Supabase, auth, debate room, or live session code is touched.
+## Changes (1 file)
+
+### `src/hooks/useLiveTranscription.ts` — `runAnalysis` function (~line 130-248)
+- Add a parameter `includesSummaries: boolean` to `runAnalysis` (default `false`).
+- Wrap the entire Pass 2 block (lines 183-228) in `if (includesSummaries)`.
+- In the scheduled timer call (~line 262), call `runAnalysis()` without summaries (default).
+- In `endSession` (where the final analysis runs), call `runAnalysis(true)` to include Pass 2.
+- During recording, cards will show transcript text only (no `ai_summary`). Once the session ends, all entries get summaries and the record view displays them.
+
+### No other files change
+The edge function, UI components, and session record view remain untouched.
 
