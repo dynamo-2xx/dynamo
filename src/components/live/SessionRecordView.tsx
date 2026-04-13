@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import SpeakerBubble from "./SpeakerBubble";
 import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
+import RecordQAChat from "./RecordQAChat";
 
 interface SessionRecordViewProps {
   sessionId: string;
@@ -273,6 +274,15 @@ const SessionRecordView = ({
           <p className="text-muted-foreground text-center py-8 text-sm">No transcript entries recorded.</p>
         )}
       </motion.div>
+
+      <RecordQAChat
+        sessionId={sessionId}
+        transcriptEntries={transcriptEntries}
+        subtopics={subtopics}
+        summaries={summaries}
+        speakerNames={speakerNames}
+        shareToken={currentShareToken}
+      />
     </div>
   );
 };
