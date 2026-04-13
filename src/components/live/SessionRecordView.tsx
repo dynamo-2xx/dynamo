@@ -274,6 +274,15 @@ const SessionRecordView = ({
           <p className="text-muted-foreground text-center py-8 text-sm">No transcript entries recorded.</p>
         )}
       </motion.div>
+
+      <RecordQAChat
+        sessionId={sessionId}
+        transcriptEntries={transcriptEntries}
+        subtopics={subtopics}
+        summaries={summaries}
+        speakerNames={speakerNames}
+        shareToken={currentShareToken}
+      />
     </div>
   );
 };
