@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import SpeakerBubble from "./SpeakerBubble";
 import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
+import RecordQAChat from "./RecordQAChat";
 
 interface SessionRecordViewProps {
   sessionId: string;
