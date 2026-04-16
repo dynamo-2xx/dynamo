@@ -76,7 +76,7 @@ const ExplorePage = () => {
                 transition={{ delay: i * 0.08 }}
                 className="relative group cursor-pointer rounded-xl overflow-hidden border border-border bg-accent/40 hover:border-foreground/20 transition-colors"
                 onClick={() => navigate(`/explore/${d.id}`)}
-                <div className="p-6 pb-8 flex flex-col justify-between min-h-[220px]">
+              >
                   <div>
                     {d.community && (
                       <span className="text-[10px] font-body font-medium uppercase tracking-wider text-muted-foreground">
