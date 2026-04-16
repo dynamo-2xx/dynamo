@@ -1,39 +1,62 @@
 
 
-# Record Q&A Chat Feature
+# Debate Detail Page — Apple Music Album Style
 
-Add a floating chat button (smiley-face logo) at the bottom of every session record that expands into a multi-turn AI chat. The AI answers questions sourced from the transcript/summaries and provides hotlinks to the relevant sections.
+## Concept
+Clicking a debate card on the Explore page navigates to `/explore/:debateId`, a new page modeled after the Apple Music album detail view. The debate topic replaces the album title, a generated visual/gradient replaces the album art, and subtopics with their argument threads replace the tracklist.
 
-## Changes
+## Layout (mirroring the Apple Music screenshot)
 
-### 1. New edge function: `supabase/functions/record-qa/index.ts`
-- Accepts `{ sessionId, messages }` where messages is the multi-turn conversation history.
-- Fetches the live session's `transcript_entries`, `summaries`, and `subtopics` from the database.
-- Constructs a system prompt instructing the AI to answer only from the transcript data and to cite sources using a structured format (e.g., `[Topic: "Topic Name"]` or `[Entry: "speaker text snippet"]`).
-- Calls Lovable AI Gateway (`google/gemini-3-flash-preview`) with the transcript as context + conversation history.
-- Returns the AI response (non-streaming, via `supabase.functions.invoke`).
-- For shared sessions: validates that the session has a `share_token` (no auth required for those). For owned sessions: validates auth.
-- Handles 429/402 errors.
+```text
+┌──────────────────────────────────────────────────┐
+│  ← Back to Explore                               │
+├──────────────────────────────────────────────────┤
+│  ┌─────────────┐   Debate Topic (large heading)  │
+│  │             │   Community / Category           │
+│  │  Generated  │   Status · Date                  │
+│  │  Visual     │                                  │
+│  │  (gradient  │   "Description text that gives   │
+│  │   square)   │    context about the debate..."  │
+│  │             │                                  │
+│  └─────────────┘   [8 participants] [34 args]     │
+├──────────────────────────────────────────────────┤
+│  SUBTOPICS                                        │
+│  ─────────────────────────────────────────────── │
+│  1   Infrastructure Costs          5 arguments ···│
+│  2   Environmental Impact          3 arguments ···│
+│  3   Community Displacement        4 arguments ···│
+│  4   Economic Benefits             6 arguments ···│
+│  ─────────────────────────────────────────────── │
+│                                                   │
+│  Clicking a row expands inline to show the        │
+│  argument thread (using LiveArgumentMap style)     │
+└──────────────────────────────────────────────────┘
+```
 
-### 2. New component: `src/components/live/RecordQAChat.tsx`
-- A floating button in the bottom-right corner using the smiley-face logo (`@/assets/logo-smiley.png`).
-- On click, expands into a chat panel (fixed position, ~400px tall) with:
-  - Message history rendered with `react-markdown` for AI responses.
-  - AI citations formatted as clickable links that open the referenced topic section in a dialog/sheet.
-  - Input field + send button at the bottom.
-- Multi-turn: stores `messages[]` in local state, sends full history to the edge function each call.
-- Loading state while waiting for AI response.
-- Close button to collapse back to the smiley icon.
+## Files
 
-### 3. Citation modal: `src/components/live/CitationModal.tsx`
-- A dialog/sheet that opens when a user clicks a hotlink in an AI answer.
-- Receives the topic name or entry ID and displays the matching subtopic section with its transcript cards (reusing existing `TranscriptCard` + `groupConsecutiveEntries`).
-- Shows speaker names and summaries in context.
+### 1. New page: `src/pages/ExploreDebateDetailPage.tsx`
+- Hero section: side-by-side layout (image left, metadata right) on desktop; stacked on mobile
+- Generated visual: a gradient square using the debate's mock ID as a seed for color variation (no real images needed)
+- Metadata: topic (Instrument Serif, large), community badge, status pill (LIVE/Completed), date, participant/argument counts, description with "MORE" truncation
+- Subtopic tracklist: numbered rows with subtopic name, argument count, and expand chevron
+- Expanded row: shows argument threads inline using the same threaded rendering pattern from `LiveArgumentMap` (side-colored border-left nodes with labels)
+- Back button navigates to `/explore`
+- All data is hardcoded mock data (2-3 debates with 3-5 subtopics each, 2-4 arguments per subtopic)
 
-### 4. Update `src/components/live/SessionRecordView.tsx`
-- Import and render `<RecordQAChat>` at the bottom of the component, passing `sessionId`, `transcriptEntries`, `subtopics`, `summaries`, `speakerNames`, and `readOnly` status.
+### 2. Update `src/pages/ExplorePage.tsx`
+- Wrap each debate card (featured, trending, latest) with a `Link` or `onClick` + `navigate` to `/explore/:id`
+- Add mock IDs to the debate data objects
 
-### No logic changes
-- No changes to transcription, summarization, routing, auth flows, or Supabase queries.
-- The edge function is new and self-contained.
+### 3. Update `src/App.tsx`
+- Add route: `/explore/:debateId` → `<ExploreDebateDetailPage />`
+
+### Design tokens
+- Follows existing branding: white bg, Instrument Serif headings, DM Sans body, 0.5px borders, monochrome palette
+- Purple accent for subtopic labels (per branding memory)
+- Row hover state matches existing `hover:border-foreground/20` pattern
+- Framer Motion entrance animations consistent with Explore page
+
+### No backend changes
+Purely UI with mock data. No database, edge function, or auth changes.
 
