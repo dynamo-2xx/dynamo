@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import ExplorePage from "./pages/ExplorePage";
+import ExploreDebateDetailPage from "./pages/ExploreDebateDetailPage";
 import CreateDebatePage from "./pages/CreateDebatePage";
 import MyDebatesPage from "./pages/MyDebatesPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -36,6 +37,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/explore/:debateId" element={<ExploreDebateDetailPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />

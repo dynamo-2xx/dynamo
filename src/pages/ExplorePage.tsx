@@ -46,7 +46,7 @@ const categories = [
 
 const ExplorePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
-
+  const navigate = useNavigate();
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
@@ -75,7 +75,7 @@ const ExplorePage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.08 }}
                 className="relative group cursor-pointer rounded-xl overflow-hidden border border-border bg-accent/40 hover:border-foreground/20 transition-colors"
-              >
+                onClick={() => navigate(`/explore/${d.id}`)}
                 <div className="p-6 pb-8 flex flex-col justify-between min-h-[220px]">
                   <div>
                     {d.community && (
@@ -124,7 +124,7 @@ const ExplorePage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <CompactCard {...d} rank={i + 1} />
+                <CompactCard {...d} rank={i + 1} onClick={() => navigate(`/explore/${d.id}`)} />
               </motion.div>
             ))}
           </div>
@@ -139,7 +139,7 @@ const ExplorePage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <ListRow {...d} />
+                <ListRow {...d} onClick={() => navigate(`/explore/${d.id}`)} />
               </motion.div>
             ))}
           </div>
@@ -179,14 +179,16 @@ const CompactCard = ({
   participants,
   arguments: argCount,
   rank,
+  onClick,
 }: {
   topic: string;
   date: string;
   participants: number;
   arguments: number;
   rank: number;
+  onClick?: () => void;
 }) => (
-  <div className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group">
+  <div onClick={onClick} className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group">
     <span className="text-[10px] font-body text-muted-foreground font-medium">#{rank} Trending</span>
     <h4 className="font-display text-sm mt-1 leading-snug line-clamp-2 group-hover:text-foreground transition-colors">
       {topic}
@@ -206,6 +208,7 @@ const ListRow = ({
   arguments: argCount,
   community,
   verified,
+  onClick,
 }: {
   topic: string;
   date: string;
@@ -213,8 +216,9 @@ const ListRow = ({
   arguments: number;
   community?: string;
   verified?: boolean;
+  onClick?: () => void;
 }) => (
-  <div className="flex items-center gap-4 border border-border rounded-xl px-5 py-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group">
+  <div onClick={onClick} className="flex items-center gap-4 border border-border rounded-xl px-5 py-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group">
     <div className="flex-1 min-w-0">
       <h4 className="font-display text-sm leading-snug truncate group-hover:text-foreground transition-colors">
         {topic}
