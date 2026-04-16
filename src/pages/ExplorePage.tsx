@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { MapPin, TrendingUp, Sparkles, Search, ChevronRight, Clock, Users, MessageSquare, Shield } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { cn } from "@/lib/utils";
 
 const featuredDebates = [
   {
+    id: "featured-1",
     topic: "Should our city invest in a new light rail line?",
     description: "A heated local debate with verified council members weighing in on transit infrastructure.",
     date: "5h ago",
@@ -16,6 +18,7 @@ const featuredDebates = [
     status: "live" as const,
   },
   {
+    id: "featured-2",
     topic: "Is AI art real art?",
     description: "Artists and technologists clash over the boundaries of creativity in the age of generative AI.",
     date: "12h ago",
@@ -26,15 +29,15 @@ const featuredDebates = [
 ];
 
 const trendingDebates = [
-  { topic: "Should voting be mandatory?", date: "1 day ago", participants: 6, arguments: 42 },
-  { topic: "Nuclear energy: solution or risk?", date: "3 days ago", participants: 8, arguments: 55 },
-  { topic: "Does social media do more harm than good for democracy?", date: "1 week ago", participants: 5, arguments: 31 },
+  { id: "trending-1", topic: "Should voting be mandatory?", date: "1 day ago", participants: 6, arguments: 42 },
+  { id: "trending-2", topic: "Nuclear energy: solution or risk?", date: "3 days ago", participants: 8, arguments: 55 },
+  { id: "trending-3", topic: "Does social media do more harm than good for democracy?", date: "1 week ago", participants: 5, arguments: 31 },
 ];
 
 const latestDebates = [
-  { topic: "Park funding allocation for 2026", date: "2 days ago", participants: 5, arguments: 19, community: "Portland, OR", verified: true },
-  { topic: "Should school start times be pushed to 9am?", date: "3 days ago", participants: 3, arguments: 18, community: "Education" },
-  { topic: "Remote work mandates: fair or outdated?", date: "4 days ago", participants: 7, arguments: 29 },
+  { id: "latest-1", topic: "Park funding allocation for 2026", date: "2 days ago", participants: 5, arguments: 19, community: "Portland, OR", verified: true },
+  { id: "latest-2", topic: "Should school start times be pushed to 9am?", date: "3 days ago", participants: 3, arguments: 18, community: "Education" },
+  { id: "latest-3", topic: "Remote work mandates: fair or outdated?", date: "4 days ago", participants: 7, arguments: 29 },
 ];
 
 const categories = [
@@ -43,7 +46,7 @@ const categories = [
 
 const ExplorePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
-
+  const navigate = useNavigate();
   return (
     <AppLayout>
       <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
@@ -72,6 +75,7 @@ const ExplorePage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.08 }}
                 className="relative group cursor-pointer rounded-xl overflow-hidden border border-border bg-accent/40 hover:border-foreground/20 transition-colors"
+                onClick={() => navigate(`/explore/${d.id}`)}
               >
                 <div className="p-6 pb-8 flex flex-col justify-between min-h-[220px]">
                   <div>
@@ -121,7 +125,7 @@ const ExplorePage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <CompactCard {...d} rank={i + 1} />
+                <CompactCard {...d} rank={i + 1} onClick={() => navigate(`/explore/${d.id}`)} />
               </motion.div>
             ))}
           </div>
@@ -136,7 +140,7 @@ const ExplorePage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <ListRow {...d} />
+                <ListRow {...d} onClick={() => navigate(`/explore/${d.id}`)} />
               </motion.div>
             ))}
           </div>
@@ -176,14 +180,16 @@ const CompactCard = ({
   participants,
   arguments: argCount,
   rank,
+  onClick,
 }: {
   topic: string;
   date: string;
   participants: number;
   arguments: number;
   rank: number;
+  onClick?: () => void;
 }) => (
-  <div className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group">
+  <div onClick={onClick} className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group">
     <span className="text-[10px] font-body text-muted-foreground font-medium">#{rank} Trending</span>
     <h4 className="font-display text-sm mt-1 leading-snug line-clamp-2 group-hover:text-foreground transition-colors">
       {topic}
@@ -203,6 +209,7 @@ const ListRow = ({
   arguments: argCount,
   community,
   verified,
+  onClick,
 }: {
   topic: string;
   date: string;
@@ -210,8 +217,9 @@ const ListRow = ({
   arguments: number;
   community?: string;
   verified?: boolean;
+  onClick?: () => void;
 }) => (
-  <div className="flex items-center gap-4 border border-border rounded-xl px-5 py-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group">
+  <div onClick={onClick} className="flex items-center gap-4 border border-border rounded-xl px-5 py-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group">
     <div className="flex-1 min-w-0">
       <h4 className="font-display text-sm leading-snug truncate group-hover:text-foreground transition-colors">
         {topic}
