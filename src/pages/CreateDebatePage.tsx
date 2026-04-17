@@ -277,7 +277,6 @@ const CreateDebatePage = () => {
                   Create
                 </button>
               </div>
-              </div>
             </motion.div>
           )}
 
