@@ -453,6 +453,41 @@ const CreateDebatePage = () => {
                   )}
                 </div>
 
+                {/* Location & Schedule */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-background border border-border rounded-lg p-5">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
+                      <MapPin className="w-3.5 h-3.5 inline mr-1" />
+                      Location <span className="normal-case font-normal">(optional)</span>
+                    </label>
+                    <input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g. Brooklyn, NY"
+                      className="w-full bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-2 font-body">
+                      Helps local audiences discover this debate.
+                    </p>
+                  </div>
+                  <div className="bg-background border border-border rounded-lg p-5">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
+                      <CalendarIcon className="w-3.5 h-3.5 inline mr-1" />
+                      Schedule <span className="normal-case font-normal">(optional)</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      min={new Date().toISOString().slice(0, 16)}
+                      className="w-full bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-2 font-body">
+                      Leave empty to start as a draft.
+                    </p>
+                  </div>
+                </div>
+
                 {/* Visibility */}
                 <div className="bg-background border border-border rounded-lg p-5">
                   <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Visibility</label>
