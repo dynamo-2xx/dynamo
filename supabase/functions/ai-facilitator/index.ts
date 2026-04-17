@@ -12,7 +12,8 @@ type ActionType =
   | "round_summary"
   | "argument_map"
   | "advance_turn"
-  | "closing_synthesis";
+  | "closing_synthesis"
+  | "resolution_subtopic";
 
 serve(async (req) => {
   if (req.method === "OPTIONS")
