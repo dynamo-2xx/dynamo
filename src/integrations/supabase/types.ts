@@ -85,6 +85,75 @@ export type Database = {
           },
         ]
       }
+      debate_grades: {
+        Row: {
+          argument_quality: number | null
+          clarity_structure: number | null
+          created_at: string
+          criticism: string | null
+          debate_id: string
+          grade_kind: string
+          graded_content: string | null
+          id: string
+          narrative: string | null
+          opposition_engagement: number | null
+          overall_label: string | null
+          overall_score: number | null
+          participant_id: string
+          resolution_label: string | null
+          resolution_score: number | null
+          stakes_articulation: number | null
+          subtopic_id: string | null
+          suggestion: string | null
+          turn_index: number | null
+          user_id: string
+        }
+        Insert: {
+          argument_quality?: number | null
+          clarity_structure?: number | null
+          created_at?: string
+          criticism?: string | null
+          debate_id: string
+          grade_kind?: string
+          graded_content?: string | null
+          id?: string
+          narrative?: string | null
+          opposition_engagement?: number | null
+          overall_label?: string | null
+          overall_score?: number | null
+          participant_id: string
+          resolution_label?: string | null
+          resolution_score?: number | null
+          stakes_articulation?: number | null
+          subtopic_id?: string | null
+          suggestion?: string | null
+          turn_index?: number | null
+          user_id: string
+        }
+        Update: {
+          argument_quality?: number | null
+          clarity_structure?: number | null
+          created_at?: string
+          criticism?: string | null
+          debate_id?: string
+          grade_kind?: string
+          graded_content?: string | null
+          id?: string
+          narrative?: string | null
+          opposition_engagement?: number | null
+          overall_label?: string | null
+          overall_score?: number | null
+          participant_id?: string
+          resolution_label?: string | null
+          resolution_score?: number | null
+          stakes_articulation?: number | null
+          subtopic_id?: string | null
+          suggestion?: string | null
+          turn_index?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       debate_invitations: {
         Row: {
           created_at: string
@@ -332,6 +401,7 @@ export type Database = {
           ended_at: string | null
           facilitator_type: string
           facilitator_user_id: string | null
+          feedback_enabled: boolean
           id: string
           institution_tag: string | null
           is_public: boolean
@@ -367,6 +437,7 @@ export type Database = {
           ended_at?: string | null
           facilitator_type?: string
           facilitator_user_id?: string | null
+          feedback_enabled?: boolean
           id?: string
           institution_tag?: string | null
           is_public?: boolean
@@ -402,6 +473,7 @@ export type Database = {
           ended_at?: string | null
           facilitator_type?: string
           facilitator_user_id?: string | null
+          feedback_enabled?: boolean
           id?: string
           institution_tag?: string | null
           is_public?: boolean
