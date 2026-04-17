@@ -124,6 +124,111 @@ const DebateRoomPage = () => {
   const [notebookContent, setNotebookContent] = useState<string>("");
   const [notebookOpen, setNotebookOpen] = useState(false);
 
+  // Grading
+  const { gradeTurn, gradeFinal } = useGrading();
+  const lastGradedTurnRef = useRef<string | null>(null);
+  const finalGradedRef = useRef(false);
+
+  // Per-turn grading: when current_turn or current_subtopic_index advances,
+  // grade the speaker (and their last argument) for the turn that just ended.
+  useEffect(() => {
+    if (!debate?.feedback_enabled || !debate || !id) return;
+    if (debate.status !== "live") return;
+    if (!sides.length || !subtopics.length) return;
+
+    const prevSubIdx = debate.current_subtopic_index;
+    const prevTurn = debate.current_turn;
+    // Identify the side that just spoke = the one BEFORE the current speaker in rotation.
+    const currentSideIdx = sides.findIndex((s) => s.id === debate.current_speaker_side_id);
+    if (currentSideIdx < 0) return;
+    const justSpokeIdx = (currentSideIdx - 1 + sides.length) % sides.length;
+    const justSpokeSide = sides[justSpokeIdx];
+    if (!justSpokeSide) return;
+    const justSpokeSubtopic = subtopics[prevSubIdx];
+    if (!justSpokeSubtopic) return;
+
+    // Their participant
+    const speakerParticipant = participants.find((p) => p.side_id === justSpokeSide.id);
+    if (!speakerParticipant) return;
+
+    // Most recent argument for that participant in this subtopic
+    const theirArgs = arguments_.filter(
+      (a) => a.participant_id === speakerParticipant.id && a.subtopic_id === justSpokeSubtopic.id
+    );
+    const lastArg = theirArgs[theirArgs.length - 1];
+    if (!lastArg) return;
+
+    const key = `${speakerParticipant.id}|${justSpokeSubtopic.id}|${prevTurn}|${lastArg.id}`;
+    if (lastGradedTurnRef.current === key) return;
+    lastGradedTurnRef.current = key;
+
+    const opposing = arguments_
+      .filter((a) => a.subtopic_id === justSpokeSubtopic.id && a.participant_id !== speakerParticipant.id)
+      .slice(-3)
+      .map((a) => {
+        const p = participants.find((pp) => pp.id === a.participant_id);
+        const s = sides.find((ss) => ss.id === p?.side_id);
+        return { side: s?.label ?? "Unknown", content: a.content };
+      });
+
+    gradeTurn({
+      debateId: id,
+      participantId: speakerParticipant.id,
+      userId: speakerParticipant.user_id,
+      subtopicId: justSpokeSubtopic.id,
+      turnIndex: prevTurn,
+      topic: debate.topic,
+      subtopic: justSpokeSubtopic.title,
+      side: justSpokeSide.label,
+      content: lastArg.content,
+      opposingArguments: opposing,
+      includeResolution: subtopics.length >= 4, // collaborative mode adds a 4th+ resolution subtopic
+    });
+  }, [debate?.current_turn, debate?.current_subtopic_index, debate?.current_speaker_side_id, debate?.feedback_enabled, debate?.status, sides, subtopics, participants, arguments_, gradeTurn, id, debate?.topic]);
+
+  // Final grading: once the debate is completed, grade every participant once.
+  useEffect(() => {
+    if (!debate?.feedback_enabled || !debate || !id) return;
+    if (debate.status !== "completed") return;
+    if (finalGradedRef.current) return;
+    if (!sides.length || !participants.length || !subtopics.length) return;
+    finalGradedRef.current = true;
+
+    participants.forEach((p) => {
+      const side = sides.find((s) => s.id === p.side_id);
+      if (!side) return;
+      const myArgs = arguments_
+        .filter((a) => a.participant_id === p.id)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      if (!myArgs.length) return;
+      const allTurns = myArgs.map((a) => ({
+        subtopic: subtopics.find((s) => s.id === a.subtopic_id)?.title ?? "",
+        content: a.content,
+      }));
+      const opposingTurns = arguments_
+        .filter((a) => a.participant_id !== p.id)
+        .map((a) => {
+          const op = participants.find((pp) => pp.id === a.participant_id);
+          const os = sides.find((ss) => ss.id === op?.side_id);
+          return {
+            subtopic: subtopics.find((s) => s.id === a.subtopic_id)?.title ?? "",
+            side: os?.label ?? "Unknown",
+            content: a.content,
+          };
+        });
+      gradeFinal({
+        debateId: id,
+        participantId: p.id,
+        userId: p.user_id,
+        topic: debate.topic,
+        side: side.label,
+        allTurns,
+        opposingTurns,
+        includeResolution: subtopics.length >= 4,
+      });
+    });
+  }, [debate?.status, debate?.feedback_enabled, debate, id, sides, subtopics, participants, arguments_, gradeFinal]);
+
   // Deepgram transcription — activate for all non-spectators as soon as debate is live
   const currentSubtopicForTranscript = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSideForTranscript = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
