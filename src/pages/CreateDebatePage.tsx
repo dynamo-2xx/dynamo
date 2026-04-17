@@ -671,7 +671,7 @@ const CreateDebatePage = () => {
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button
-                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); }}
+                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); setMode("adversarial"); setResolutionPreview(""); setResolutionAdded(false); setHoveringCollab(false); }}
                     className="flex-1 border border-border rounded-lg py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
                   >
                     Start Over
