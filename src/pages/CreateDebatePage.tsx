@@ -40,6 +40,8 @@ const CreateDebatePage = () => {
   const [inviteInput, setInviteInput] = useState("");
   const [invitedUsernames, setInvitedUsernames] = useState<string[]>([]);
   const [taglineIndex, setTaglineIndex] = useState(0);
+  const [location, setLocation] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string
 
   useEffect(() => {
     const interval = setInterval(() => {
