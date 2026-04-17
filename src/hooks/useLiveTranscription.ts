@@ -248,11 +248,17 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
       // Apply all results to entries
       setTranscriptEntries((prev) => {
-        const updated = prev.map((e) => ({
-          ...e,
-          subtopic: entrySubtopicMap[e.id] || e.subtopic,
-          ai_summary: allEntrySummaries[e.id] || e.ai_summary,
-        }));
+        const updated = prev.map((e) => {
+          const tm = entryThreadMap[e.id];
+          return {
+            ...e,
+            subtopic: entrySubtopicMap[e.id] || e.subtopic,
+            ai_summary: allEntrySummaries[e.id] || e.ai_summary,
+            thread_id: tm?.thread_id || e.thread_id,
+            thread_role: (tm?.role as any) || e.thread_role,
+            parent_entry_id: tm?.parent_entry_id !== undefined ? tm.parent_entry_id : e.parent_entry_id,
+          };
+        });
         persistSession({ transcript_entries: updated });
         return updated;
       });
