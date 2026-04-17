@@ -4,11 +4,10 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Share2, Check, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { LiveTranscriptEntry, LiveSummary } from "@/hooks/useLiveTranscription";
+import { LiveTranscriptEntry, LiveSummary, LiveThreadMeta } from "@/hooks/useLiveTranscription";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import TranscriptCard from "@/components/debate/TranscriptCard";
 import SpeakerBubble from "./SpeakerBubble";
-import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
+import LiveThreadView from "./LiveThreadView";
 import RecordQAChat from "./RecordQAChat";
 
 interface SessionRecordViewProps {
@@ -22,6 +21,7 @@ interface SessionRecordViewProps {
   speakerNames: Record<string, string>;
   shareToken: string | null;
   readOnly?: boolean;
+  threadTitles?: Record<string, LiveThreadMeta>;
   onEntriesUpdate?: (entries: LiveTranscriptEntry[]) => void;
   onSpeakerNamesUpdate?: (names: Record<string, string>) => void;
 }
@@ -37,11 +37,19 @@ const SessionRecordView = ({
   speakerNames,
   shareToken,
   readOnly = false,
+  threadTitles: threadTitlesProp,
   onEntriesUpdate,
   onSpeakerNamesUpdate,
 }: SessionRecordViewProps) => {
   const [currentShareToken, setCurrentShareToken] = useState(shareToken);
   const [isSharing, setIsSharing] = useState(false);
+
+  // Resolve thread titles: prefer prop, fall back to summaries sentinel
+  const threadTitles = useMemo<Record<string, LiveThreadMeta>>(() => {
+    if (threadTitlesProp && Object.keys(threadTitlesProp).length > 0) return threadTitlesProp;
+    const meta = (summaries as any[]).find((s) => s?.id === "__threads_meta__");
+    return (meta?.thread_titles || {}) as Record<string, LiveThreadMeta>;
+  }, [threadTitlesProp, summaries]);
 
   const duration = endedAt && createdAt
     ? Math.round((new Date(endedAt).getTime() - new Date(createdAt).getTime()) / 60000)
@@ -214,19 +222,13 @@ const SessionRecordView = ({
                     )}
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="px-3 py-3 space-y-2">
+                    <div className="px-3 py-3">
                       {topicEntries.length > 0 ? (
-                        groupConsecutiveEntries(topicEntries).map((entry) => (
-                          <TranscriptCard
-                            key={entry.id}
-                            speakerSide={getSpeakerName(entry.speaker_id)}
-                            sideOrder={entry.speaker_id % 2}
-                            text={entry.text}
-                            aiSummary={entry.ai_summary}
-                            timestamp={entry.timestamp}
-                            autoFlip
-                          />
-                        ))
+                        <LiveThreadView
+                          entries={topicEntries}
+                          threadTitles={threadTitles}
+                          getSpeakerName={getSpeakerName}
+                        />
                       ) : (
                         <p className="text-xs text-muted-foreground italic py-2">No statements for this topic.</p>
                       )}

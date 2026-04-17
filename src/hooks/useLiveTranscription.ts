@@ -12,6 +12,14 @@ export interface LiveTranscriptEntry {
   timestamp: number;
   is_final: boolean;
   uncertain?: boolean;
+  thread_id?: string;
+  thread_role?: "argument" | "counter" | "continuation";
+  parent_entry_id?: string | null;
+}
+
+export interface LiveThreadMeta {
+  title: string;
+  subtopic: string;
 }
 
 export interface LiveSummary {
@@ -33,6 +41,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   const [transcriptEntries, setTranscriptEntries] = useState<LiveTranscriptEntry[]>([]);
   const [summaries, setSummaries] = useState<LiveSummary[]>([]);
   const [subtopics, setSubtopics] = useState<string[]>([]);
+  const [threads, setThreads] = useState<Record<string, LiveThreadMeta>>({});
   const [isConnected, setIsConnected] = useState(false);
   const [interimText, setInterimText] = useState("");
   const [micError, setMicError] = useState<string | null>(null);
@@ -46,6 +55,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   const transcriptEntriesRef = useRef<LiveTranscriptEntry[]>([]);
   const summariesRef = useRef<LiveSummary[]>([]);
   const subtopicsRef = useRef<string[]>([]);
+  const threadsRef = useRef<Record<string, LiveThreadMeta>>({});
 
   // Progressive auto-analysis timer refs
   const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +71,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   useEffect(() => { transcriptEntriesRef.current = transcriptEntries; }, [transcriptEntries]);
   useEffect(() => { summariesRef.current = summaries; }, [summaries]);
   useEffect(() => { subtopicsRef.current = subtopics; }, [subtopics]);
+  useEffect(() => { threadsRef.current = threads; }, [threads]);
   useEffect(() => { isSummarizingRef.current = isSummarizing; }, [isSummarizing]);
 
   const persistSession = useCallback(async (updates: Record<string, any>) => {
@@ -136,12 +147,24 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
       const identifiedSubtopics: string[] = data.subtopics || [];
       const entrySubtopicMap: Record<string, string> = data.entry_subtopic_map || {};
-      console.log("[Analysis] Pass 1 result:", identifiedSubtopics.length, "subtopics,", Object.keys(entrySubtopicMap).length, "mapped entries");
+      const entryThreadMap: Record<string, { thread_id: string; role: string; parent_entry_id: string | null }> = data.entry_thread_map || {};
+      const newThreads: Record<string, LiveThreadMeta> = data.threads || {};
+      console.log("[Analysis] Pass 1 result:", identifiedSubtopics.length, "subtopics,", Object.keys(entrySubtopicMap).length, "mapped entries,", Object.keys(newThreads).length, "threads");
 
       // Update subtopics
       if (identifiedSubtopics.length) {
         setSubtopics(identifiedSubtopics);
         persistSession({ subtopics: identifiedSubtopics });
+      }
+
+      // Merge thread metadata (preserve existing titles if AI dropped any)
+      const mergedThreads = { ...threadsRef.current, ...newThreads };
+      if (Object.keys(newThreads).length > 0) {
+        setThreads(mergedThreads);
+        // Persist threads in summaries JSONB as a single sentinel record
+        const otherSummaries = (summariesRef.current || []).filter((s: any) => s?.id !== "__threads_meta__");
+        const threadsMeta: any = { id: "__threads_meta__", text: "", created_at: Date.now(), subtopics: [], thread_titles: mergedThreads };
+        persistSession({ summaries: [...otherSummaries, threadsMeta] });
       }
 
       // Pass 2: Summarization — only when explicitly requested (session end)
@@ -225,11 +248,17 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
       // Apply all results to entries
       setTranscriptEntries((prev) => {
-        const updated = prev.map((e) => ({
-          ...e,
-          subtopic: entrySubtopicMap[e.id] || e.subtopic,
-          ai_summary: allEntrySummaries[e.id] || e.ai_summary,
-        }));
+        const updated = prev.map((e) => {
+          const tm = entryThreadMap[e.id];
+          return {
+            ...e,
+            subtopic: entrySubtopicMap[e.id] || e.subtopic,
+            ai_summary: allEntrySummaries[e.id] || e.ai_summary,
+            thread_id: tm?.thread_id || e.thread_id,
+            thread_role: (tm?.role as any) || e.thread_role,
+            parent_entry_id: tm?.parent_entry_id !== undefined ? tm.parent_entry_id : e.parent_entry_id,
+          };
+        });
         persistSession({ transcript_entries: updated });
         return updated;
       });
@@ -494,7 +523,12 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       if (data) {
         const d = data as any;
         if (d.transcript_entries?.length) setTranscriptEntries(d.transcript_entries);
-        if (d.summaries?.length) setSummaries(d.summaries);
+        if (d.summaries?.length) {
+          setSummaries(d.summaries);
+          // Extract thread metadata sentinel if present
+          const meta = (d.summaries as any[]).find((s: any) => s?.id === "__threads_meta__");
+          if (meta?.thread_titles) setThreads(meta.thread_titles);
+        }
         if (d.subtopics?.length) setSubtopics(d.subtopics);
       }
     };
@@ -505,6 +539,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
     transcriptEntries,
     summaries,
     subtopics,
+    threads,
     interimText,
     isConnected,
     micError,
