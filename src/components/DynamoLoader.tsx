@@ -30,6 +30,14 @@ const DynamoLoader = ({ onComplete, duration = 2500 }: DynamoLoaderProps) => {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="mb-6 text-[11px] md:text-xs font-body font-medium tracking-[0.4em] text-muted-foreground uppercase select-none"
+      >
+        DYNAMO
+      </motion.div>
       <div className="text-3xl md:text-5xl lg:text-6xl font-display tracking-tight select-none">
         {SLOGAN.split("").map((char, i) => (
           <motion.span
