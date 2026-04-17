@@ -114,8 +114,25 @@ const ParticipantSharedView = ({
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         localStreamRef.current = stream;
         setLocalCameraOn(true);
-      } catch {}
+      } catch {
+        toast.error("Camera permission denied. Please allow access in your browser.");
+      }
     }
+  };
+
+  const handleToggleMic = async () => {
+    // First click: request mic permission so the browser prompt happens here, in the console
+    if (!deepgramActive) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Release the test stream — Deepgram hook acquires its own when activated
+        stream.getTracks().forEach(t => t.stop());
+      } catch {
+        toast.error("Microphone permission denied. Please allow access in your browser.");
+        return;
+      }
+    }
+    onToggleDeepgram?.();
   };
 
   // Cleanup on unmount
