@@ -110,6 +110,25 @@ const FacilitatorView = ({
               >
                 <Monitor className="w-4 h-4" /> Projector
               </button>
+              <div className="flex flex-col items-center gap-1.5">
+                {aiMessage && onToggleAiMessage && (
+                  <DLogoButton
+                    onClick={onToggleAiMessage}
+                    active={!aiMessageCollapsed}
+                    pulse={aiMessagePulse}
+                  />
+                )}
+                {currentSubtopicArgs.length > 0 && (
+                  <IconCircleButton
+                    onClick={() => setArgumentMapOpen((v) => !v)}
+                    active={argumentMapOpen}
+                    title="Argument map"
+                    ariaLabel="Toggle argument map overlay"
+                  >
+                    <Map className="w-3.5 h-3.5" />
+                  </IconCircleButton>
+                )}
+              </div>
               <DebateTimer timeLeft={timeLeft} size="lg" />
             </div>
           </div>
@@ -139,9 +158,9 @@ const FacilitatorView = ({
           </div>
         </div>
 
-        {/* AI message */}
+        {/* AI message — auto-collapses 5s after streaming completes */}
         <AnimatePresence>
-          {aiMessage && (
+          {aiMessage && !aiMessageCollapsed && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
