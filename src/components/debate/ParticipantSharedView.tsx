@@ -77,16 +77,18 @@ interface ParticipantSharedViewProps {
 
 const ParticipantSharedView = ({
   debate, sides, subtopics, arguments: args, participants,
-  timeLeft, aiMessage,
+  timeLeft, aiMessage, aiMessageCollapsed = false, aiMessagePulse = false, onToggleAiMessage,
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
   isPublisher, timerRunning,
   transcriptEntries = [], deepgramConnected, deepgramActive, interimText,
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
   onToggleDeepgram, onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
+  onOpenNotebook,
   roundSummaries = {},
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [argumentMapOpen, setArgumentMapOpen] = useState(false);
 
   // Camera state — independently toggleable per participant
   const localVideoRef = useRef<HTMLVideoElement>(null);
