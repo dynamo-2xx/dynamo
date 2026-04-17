@@ -350,6 +350,77 @@ Grade this speaker using the grade_final tool.`;
         type: "function",
         function: { name: "classify_argument" },
       };
+    } else if (action === "grade_turn" || action === "grade_final") {
+      const isFinal = action === "grade_final";
+      const toolName = isFinal ? "grade_final" : "grade_turn";
+
+      const baseProps: Record<string, unknown> = {
+        argument_quality: { type: "number", minimum: 0, maximum: 10 },
+        opposition_engagement: { type: "number", minimum: 0, maximum: 10 },
+        clarity_structure: { type: "number", minimum: 0, maximum: 10 },
+        stakes_articulation: { type: "number", minimum: 0, maximum: 10 },
+        overall_score: { type: "number", minimum: 0, maximum: 10 },
+        overall_label: {
+          type: "string",
+          enum: ["Exceptional", "Strong", "Developing", "Needs Work", "Insufficient"],
+        },
+        resolution_score: { type: "number", minimum: 0, maximum: 10, nullable: true },
+        resolution_label: {
+          type: "string",
+          enum: ["Consensus Builder", "Collaborative", "Neutral", "Resistant", "Adversarial"],
+          nullable: true,
+        },
+      };
+
+      if (isFinal) {
+        (baseProps as any).narrative = { type: "string" };
+      } else {
+        (baseProps as any).suggestion = { type: "string" };
+        (baseProps as any).criticism = { type: "string" };
+      }
+
+      const required = isFinal
+        ? [
+            "argument_quality",
+            "opposition_engagement",
+            "clarity_structure",
+            "stakes_articulation",
+            "overall_score",
+            "overall_label",
+            "narrative",
+          ]
+        : [
+            "argument_quality",
+            "opposition_engagement",
+            "clarity_structure",
+            "stakes_articulation",
+            "overall_score",
+            "overall_label",
+            "suggestion",
+            "criticism",
+          ];
+
+      body.tools = [
+        {
+          type: "function",
+          function: {
+            name: toolName,
+            description: isFinal
+              ? "Return a final aggregated performance grade for one speaker."
+              : "Return a per-turn performance grade for one speaker.",
+            parameters: {
+              type: "object",
+              properties: baseProps,
+              required,
+              additionalProperties: false,
+            },
+          },
+        },
+      ];
+      body.tool_choice = {
+        type: "function",
+        function: { name: toolName },
+      };
     }
 
     // For non-tool-calling actions, just stream text
