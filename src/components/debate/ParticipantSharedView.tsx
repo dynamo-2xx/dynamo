@@ -219,6 +219,23 @@ const ParticipantSharedView = ({
   const onlyLocalOn = localCameraOn && !remoteCameraOn;
   const onlyRemoteOn = !localCameraOn && remoteCameraOn;
 
+  // Build argument-map nodes for the overlay (current subtopic only)
+  const overlayArgs = currentSubtopicArgs.map((a) => {
+    const participant = participants.find((p) => p.id === a.participant_id);
+    const side = sides.find((s) => s.id === participant?.side_id);
+    return {
+      id: a.id,
+      content: a.content,
+      argumentType: a.argument_type,
+      sideLabel: side?.label || "Unknown",
+      sideOrder: side?.sort_order ?? 0,
+      participantId: a.participant_id,
+      parentArgumentId: a.parent_argument_id,
+      createdAt: a.created_at,
+      isEdited: a.is_edited,
+    };
+  });
+
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Top bar */}
@@ -236,6 +253,35 @@ const ParticipantSharedView = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Stack: d. (top), map (middle), notebook (bottom) */}
+          <div className="flex flex-col items-center gap-1.5">
+            {aiMessage && onToggleAiMessage && (
+              <DLogoButton
+                onClick={onToggleAiMessage}
+                active={!aiMessageCollapsed}
+                pulse={aiMessagePulse}
+              />
+            )}
+            {overlayArgs.length > 0 && (
+              <IconCircleButton
+                onClick={() => setArgumentMapOpen((v) => !v)}
+                active={argumentMapOpen}
+                title="Argument map"
+                ariaLabel="Toggle argument map overlay"
+              >
+                <Map className="w-3.5 h-3.5" />
+              </IconCircleButton>
+            )}
+            {onOpenNotebook && isSpeaker && (
+              <IconCircleButton
+                onClick={onOpenNotebook}
+                title="My notes"
+                ariaLabel="Open notebook"
+              >
+                <NotebookPen className="w-3.5 h-3.5" />
+              </IconCircleButton>
+            )}
+          </div>
           <DebateTimer timeLeft={timeLeft} size="md" />
           <button
             onClick={() => setSidebarExpanded(!sidebarExpanded)}
@@ -266,9 +312,9 @@ const ParticipantSharedView = ({
         </div>
       )}
 
-      {/* AI message */}
+      {/* AI message — auto-collapses 5s after streaming completes */}
       <AnimatePresence>
-        {aiMessage && (
+        {aiMessage && !aiMessageCollapsed && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
