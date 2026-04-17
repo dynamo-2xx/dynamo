@@ -58,6 +58,11 @@ const CreateDebatePage = () => {
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
     setStep(2);
+    // Reset collaborative state for a fresh generation
+    setMode("adversarial");
+    setResolutionPreview("");
+    setResolutionAdded(false);
+    setHoveringCollab(false);
 
     try {
       const response = await supabase.functions.invoke("ai-facilitator", {
@@ -92,6 +97,83 @@ const CreateDebatePage = () => {
   }, [prompt]);
 
   const handleGenerationComplete = useCallback(() => {}, []);
+
+  // Fetch the AI-suggested resolution subtopic (cached after first fetch)
+  const fetchResolutionPreview = useCallback(async () => {
+    if (!debate || resolutionPreview || resolutionLoading) return;
+    setResolutionLoading(true);
+    try {
+      const response = await supabase.functions.invoke("ai-facilitator", {
+        body: {
+          action: "resolution_subtopic",
+          payload: {
+            topic: debate.topic,
+            subtopics: debate.subtopics,
+            sides: debate.sides,
+          },
+        },
+      });
+      if (response.error) throw response.error;
+      const text = (response.data?.content ?? "").trim().replace(/^["']|["']$/g, "");
+      setResolutionPreview(text || "Where could we compromise — and if not, why is the divide irreducible?");
+    } catch (err) {
+      console.error("Resolution fetch failed:", err);
+      setResolutionPreview("Where could we compromise — and if not, why is the divide irreducible?");
+    } finally {
+      setResolutionLoading(false);
+    }
+  }, [debate, resolutionPreview, resolutionLoading]);
+
+  // When user picks Collaborative, solidify the suggestion into the subtopics list.
+  const selectCollaborative = useCallback(async () => {
+    if (!debate) return;
+    setMode("collaborative");
+    // Ensure we have a suggestion text
+    let text = resolutionPreview;
+    if (!text) {
+      setResolutionLoading(true);
+      try {
+        const response = await supabase.functions.invoke("ai-facilitator", {
+          body: {
+            action: "resolution_subtopic",
+            payload: { topic: debate.topic, subtopics: debate.subtopics, sides: debate.sides },
+          },
+        });
+        if (response.error) throw response.error;
+        text = ((response.data?.content ?? "") as string).trim().replace(/^["']|["']$/g, "")
+          || "Where could we compromise — and if not, why is the divide irreducible?";
+        setResolutionPreview(text);
+      } catch (err) {
+        console.error("Resolution fetch failed:", err);
+        text = "Where could we compromise — and if not, why is the divide irreducible?";
+        setResolutionPreview(text);
+      } finally {
+        setResolutionLoading(false);
+      }
+    }
+    if (!resolutionAdded) {
+      setDebate({ ...debate, subtopics: [...debate.subtopics, text] });
+      setResolutionAdded(true);
+    }
+    setHoveringCollab(false);
+  }, [debate, resolutionPreview, resolutionAdded]);
+
+  const selectAdversarial = useCallback(() => {
+    if (!debate) return;
+    setMode("adversarial");
+    // Remove the resolution subtopic if it was added and unmodified
+    if (resolutionAdded && resolutionPreview) {
+      const lastIdx = debate.subtopics.lastIndexOf(resolutionPreview);
+      if (lastIdx !== -1) {
+        const next = [...debate.subtopics];
+        next.splice(lastIdx, 1);
+        setDebate({ ...debate, subtopics: next });
+      }
+      // If the user edited it, leave it in place — they own it now.
+      setResolutionAdded(false);
+    }
+    setHoveringCollab(false);
+  }, [debate, resolutionAdded, resolutionPreview]);
 
   const updateSubtopic = (index: number, value: string) => {
     if (!debate) return;
