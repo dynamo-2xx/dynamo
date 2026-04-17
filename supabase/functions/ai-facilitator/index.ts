@@ -127,6 +127,21 @@ In 3-4 sentences: strongest arguments from each side and key unresolved question
         break;
       }
 
+      case "resolution_subtopic": {
+        const { topic, subtopics, sides } = payload as {
+          topic: string;
+          subtopics: string[];
+          sides: string[];
+        };
+        systemPrompt = `You are d., an AI debate architect specializing in collaborative resolution. You craft a single resolution-oriented subtopic that asks debaters to actively seek compromise, consensus, or — failing that — a precise articulation of why their fundamental differences preclude compromise. The output is ONE concise question (8-14 words), specific to the topic and sides provided. No preamble, no quotes, no period unless it ends with one naturally. Examples of tone: "Where could we compromise?", "What shared ground exists between liberty and safety here?", "If no compromise is possible, what makes the divide irreducible?"`;
+        userPrompt = `Topic: "${topic}"
+Sides: ${sides.join(" vs ")}
+Existing subtopics: ${subtopics.map((s) => `"${s}"`).join(", ")}
+
+Write ONE resolution-seeking subtopic question tailored to this specific debate. It must invite compromise OR force a clear articulation of why compromise is impossible. Output ONLY the question text — nothing else.`;
+        break;
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: `Unknown action: ${action}` }),
