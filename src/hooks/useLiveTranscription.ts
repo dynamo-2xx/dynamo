@@ -523,7 +523,12 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       if (data) {
         const d = data as any;
         if (d.transcript_entries?.length) setTranscriptEntries(d.transcript_entries);
-        if (d.summaries?.length) setSummaries(d.summaries);
+        if (d.summaries?.length) {
+          setSummaries(d.summaries);
+          // Extract thread metadata sentinel if present
+          const meta = (d.summaries as any[]).find((s: any) => s?.id === "__threads_meta__");
+          if (meta?.thread_titles) setThreads(meta.thread_titles);
+        }
         if (d.subtopics?.length) setSubtopics(d.subtopics);
       }
     };
@@ -534,6 +539,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
     transcriptEntries,
     summaries,
     subtopics,
+    threads,
     interimText,
     isConnected,
     micError,
