@@ -13,6 +13,7 @@ import RoundSummaryCard from "./RoundSummaryCard";
 import DLogoButton from "./DLogoButton";
 import IconCircleButton from "./IconCircleButton";
 import ArgumentMapOverlay from "./ArgumentMapOverlay";
+import NotebookOverlay from "./NotebookOverlay";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
@@ -362,6 +363,14 @@ const ParticipantSharedView = ({
             onClose={() => setArgumentMapOpen(false)}
             arguments={overlayArgs}
             subtopicTitle={currentSubtopic?.title}
+          />
+
+          {/* Translucent notebook overlay */}
+          <NotebookOverlay
+            open={notebookOpen}
+            onClose={() => onCloseNotebook?.()}
+            value={notebookContent}
+            onChange={(v) => onNotebookContentChange?.(v)}
           />
         </div>
       </div>
