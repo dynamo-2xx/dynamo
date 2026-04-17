@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,8 @@ const CreateDebatePage = () => {
   const [inviteInput, setInviteInput] = useState("");
   const [invitedUsernames, setInvitedUsernames] = useState<string[]>([]);
   const [taglineIndex, setTaglineIndex] = useState(0);
+  const [location, setLocation] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -137,7 +139,9 @@ const CreateDebatePage = () => {
           prep_time_min: debate.prepTime,
           prep_time_max: debate.prepTime,
           facilitator_type: "ai",
-          status: "draft",
+          status: scheduledAt ? "scheduled" : "draft",
+          location: location.trim() || null,
+          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
         } as any)
         .select()
         .single();
@@ -449,6 +453,41 @@ const CreateDebatePage = () => {
                   )}
                 </div>
 
+                {/* Location & Schedule */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-background border border-border rounded-lg p-5">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
+                      <MapPin className="w-3.5 h-3.5 inline mr-1" />
+                      Location <span className="normal-case font-normal">(optional)</span>
+                    </label>
+                    <input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g. Brooklyn, NY"
+                      className="w-full bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-2 font-body">
+                      Helps local audiences discover this debate.
+                    </p>
+                  </div>
+                  <div className="bg-background border border-border rounded-lg p-5">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
+                      <CalendarIcon className="w-3.5 h-3.5 inline mr-1" />
+                      Schedule <span className="normal-case font-normal">(optional)</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      min={new Date().toISOString().slice(0, 16)}
+                      className="w-full bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-2 font-body">
+                      Leave empty to start as a draft.
+                    </p>
+                  </div>
+                </div>
+
                 {/* Visibility */}
                 <div className="bg-background border border-border rounded-lg p-5">
                   <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Visibility</label>
@@ -471,7 +510,7 @@ const CreateDebatePage = () => {
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button
-                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); }}
+                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); }}
                     className="flex-1 border border-border rounded-lg py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
                   >
                     Start Over
