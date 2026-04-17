@@ -1,61 +1,50 @@
 
-The user wants threaded arguments (from the previously-approved plan) to be **collapsible under each subtopic**, each with an **AI-generated title** describing the thread's content. This sits on top of the threading work already planned.
 
-Mental model:
-```
-Subtopic: "Infrastructure Costs"
-  ▸ Thread: "Funding via municipal bonds vs. private capital"  [4 entries]
-  ▸ Thread: "Long-term maintenance burden"                     [2 entries]
-  ▸ Thread: "Cost overruns from comparable projects"           [3 entries]
-```
-Each thread row is a collapsible. Click to expand → see the threaded argument/counter nodes inside.
+The user wants me to implement the previously-discussed scope (auto-collapsing "d." narration, removing the redundant top-right permissions button, and converting the argument map into a translucent overlay opened via a map button), then test it end-to-end and return screenshots.
 
-Key design decisions to lock in:
-- **Title source**: AI-generated as part of the existing Pass 1 analysis (extend the `entry_thread_map` to also return per-thread titles). Cheaper than a separate pass, and the model already has full context.
-- **Title style**: Short noun phrase, 3–7 words, sentence case (matches the subtopic style already used).
-- **Default state**: Threads collapsed by default (subtopics stay expanded). Avoids a wall of nested content on long sessions.
-- **Live view behavior**: Title appears as soon as the thread has ≥2 entries; until then, show "New thread" placeholder so it doesn't flicker.
-- **Fallback**: Old sessions without thread metadata → keep current flat rendering (no broken titles).
+Combining all approved scope into one consolidated plan:
 
-No new questions — scope is clear and additive to the approved threading plan.
+# Plan: Debate Room polish — d. button, permissions consolidation, map overlay, plus E2E test
 
----
+## Implementation
 
-# Plan: Collapsible Titled Threads Under Subtopics
+### 1. Auto-collapsing "d." narration
+- `DebateRoomPage.tsx`: add `aiMessageStreaming` and `aiMessageCollapsed` state. Set streaming true while `streamAI` reads SSE; on completion, schedule a 5s `setTimeout` to collapse. Reset (re-open + pulse) when `aiMessage` content changes for a new turn. Cancel timer on unmount or speaker timer start.
+- New shared component `src/components/debate/IconCircleButton.tsx`: 28x28 circular button (`bg-primary/10`, `border-primary/20`), accepts icon or text content + optional pulse prop. Used for d., map, notebook.
+- New `src/components/debate/DLogoButton.tsx` thin wrapper rendering `d.` in Instrument Serif.
 
-## What changes
+### 2. Argument map → translucent overlay
+- New `src/components/debate/ArgumentMapOverlay.tsx`: `AnimatePresence` floating panel anchored top-left over camera area. `bg-background/70 backdrop-blur-xl`, rounded-2xl, soft shadow, `max-h-[70vh]` scrollable, header with title + close `×`, click-outside to close. Renders existing `LiveArgumentMap` inside.
+- Map button uses `Map` from `lucide-react`, same circle styling.
 
-### 1. Edge function — extend `entry_thread_map` with titles
-In `supabase/functions/analyze-transcript/index.ts` (`live_conversation` mode), add a sibling field to the existing thread map:
-- `threads`: `{ [thread_id]: { title: string, subtopic: string } }`
-- Prompt instruction: "For each thread, generate a 3–7 word title in sentence case that captures the specific point being argued (not the subtopic name). Example: under 'Infrastructure Costs', a thread might be 'Funding via municipal bonds'."
+### 3. Consolidate permissions into bottom console
+- Remove `<MediaPermissions variant="header" />` from `DebateRoomPage.tsx` header.
+- In `ParticipantSharedView.tsx` and `FacilitatorView.tsx` bottom console:
+  - Camera button's first-press handler: if no `localStreamRef`, call `getUserMedia({ video: true })` first, then toggle. Show inline error toast on permission denied.
+  - Mic button: same pattern with `{ audio: true }` before starting Deepgram.
 
-### 2. Hook — persist thread titles
-In `src/hooks/useLiveTranscription.ts`:
-- Add `live_threads?: Record<string, { title: string; subtopic: string }>` to session state.
-- Persist to `live_sessions` JSONB alongside `transcript_entries` (reuse existing fetch-and-merge).
+### 4. Stack of circle buttons in metadata row
+Vertical stack to the left of timer (top→bottom): `[d.]`, `[map]`, `[notebook]`. All three share `IconCircleButton` styling. Conditionally render d. only when `aiMessage` exists; map only when arguments exist; notebook stays as-is.
 
-### 3. `LiveThreadView.tsx` — render as collapsibles
-The threaded renderer (planned previously) becomes a list of `<Collapsible>` rows, one per thread:
-- **Trigger row**: chevron + thread title + entry count badge (matches existing subtopic row styling).
-- **Content**: the threaded argument/counter nodes (indented, speaker-colored borders).
-- **Default**: collapsed.
-- **Title fallback**: if no title yet (live, <2 entries) → "New thread"; if old session (no thread metadata) → flat list with no thread wrapper.
+### 5. Files touched
+- `src/pages/DebateRoomPage.tsx` — state + remove header MediaPermissions + prop drilling
+- `src/components/debate/ParticipantSharedView.tsx` — buttons, overlay, permission flow
+- `src/components/debate/FacilitatorView.tsx` — same
+- `src/components/debate/IconCircleButton.tsx` — NEW
+- `src/components/debate/DLogoButton.tsx` — NEW
+- `src/components/debate/ArgumentMapOverlay.tsx` — NEW
 
-### 4. UI integration (unchanged surfaces from prior plan)
-- `SessionRecordView.tsx`: subtopic dropdowns now contain collapsible thread rows instead of a flat list.
-- Live recording view: same structure, threads update live as entries are classified.
+## Testing & deliverable
 
-## Visual structure
-```
-[Subtopic ▾]  Infrastructure Costs                   12 statements
-   [Thread ▸]  Funding via municipal bonds            4 statements
-   [Thread ▸]  Long-term maintenance burden           2 statements
-   [Thread ▸]  Cost overruns from comparable projects 3 statements
-   [Thread ▸]  New thread                             1 statement
-```
+After implementation, navigate to a debate room in the preview, capture screenshots showing:
+1. Header without the redundant permissions button
+2. The three stacked circle buttons (d., map, notebook) in the metadata row
+3. d. narration auto-collapsed → click reopens the panel
+4. Map button opens the translucent argument map overlay over the camera
+5. Bottom console camera/mic buttons triggering permission flow
+
+Return the screenshots inline as confirmation.
 
 ## Out of scope
-- No DB schema changes (titles live inside existing `live_sessions` JSONB).
-- No changes to the Debate feature (already threaded; titling can be a follow-up if you want it there too).
-- No manual editing of titles in this pass (can be a follow-up).
+No DB/edge function changes. Threaded-arguments work from prior approved plans is unaffected.
+
