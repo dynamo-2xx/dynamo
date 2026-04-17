@@ -42,6 +42,11 @@ const CreateDebatePage = () => {
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [location, setLocation] = useState("");
   const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string
+  const [mode, setMode] = useState<"adversarial" | "collaborative">("adversarial");
+  const [resolutionPreview, setResolutionPreview] = useState<string>(""); // AI-generated suggestion (cached)
+  const [resolutionLoading, setResolutionLoading] = useState(false);
+  const [hoveringCollab, setHoveringCollab] = useState(false);
+  const [resolutionAdded, setResolutionAdded] = useState(false); // true once user has solidified it (or confirmed in collab mode)
 
   useEffect(() => {
     const interval = setInterval(() => {
