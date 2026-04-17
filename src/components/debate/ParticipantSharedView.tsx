@@ -72,6 +72,10 @@ interface ParticipantSharedViewProps {
   onSkipTurn?: () => void;
   onNextSubtopic?: () => void;
   onOpenNotebook?: () => void;
+  notebookOpen?: boolean;
+  notebookContent?: string;
+  onNotebookContentChange?: (val: string) => void;
+  onCloseNotebook?: () => void;
   roundSummaries?: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>;
 }
 
@@ -85,6 +89,10 @@ const ParticipantSharedView = ({
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
   onToggleDeepgram, onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
   onOpenNotebook,
+  notebookOpen = false,
+  notebookContent = "",
+  onNotebookContentChange,
+  onCloseNotebook,
   roundSummaries = {},
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
