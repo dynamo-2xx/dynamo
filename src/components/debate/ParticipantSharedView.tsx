@@ -3,16 +3,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, MicOff, Send, SkipForward, ChevronDown,
   Users, Pause, Play, Plus, ChevronRight,
-  Video, VideoOff, Maximize2, Minimize2,
+  Video, VideoOff, Maximize2, Minimize2, Map, NotebookPen,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
 import SpeechInput, { type SpeechInputHandle } from "./SpeechInput";
 import TranscriptCard from "./TranscriptCard";
 import RoundSummaryCard from "./RoundSummaryCard";
+import DLogoButton from "./DLogoButton";
+import IconCircleButton from "./IconCircleButton";
+import ArgumentMapOverlay from "./ArgumentMapOverlay";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
+import { toast } from "sonner";
 
 interface Side { id: string; label: string; sort_order: number; }
 interface Subtopic { id: string; title: string; sort_order: number; }
@@ -39,6 +43,9 @@ interface ParticipantSharedViewProps {
   participants: Participant[];
   timeLeft: number;
   aiMessage: string;
+  aiMessageCollapsed?: boolean;
+  aiMessagePulse?: boolean;
+  onToggleAiMessage?: () => void;
   canSpeak: boolean;
   isMyTurn: boolean;
   isSpeaker: boolean;
@@ -64,6 +71,7 @@ interface ParticipantSharedViewProps {
   onExtendTime?: () => void;
   onSkipTurn?: () => void;
   onNextSubtopic?: () => void;
+  onOpenNotebook?: () => void;
   roundSummaries?: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>;
 }
 
