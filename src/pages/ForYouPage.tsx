@@ -5,14 +5,16 @@ import { useForYouDebates } from "@/hooks/useHomeDebates";
 import { useAuth } from "@/contexts/AuthContext";
 import DebateCoverCard from "@/components/home/DebateCoverCard";
 import AppLayout from "@/components/AppLayout";
+import LocationPrompt from "@/components/home/LocationPrompt";
 
 type Mode = "trending" | "local";
 
 const ForYouPage = () => {
   const [mode, setMode] = useState<Mode>("trending");
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const { profile } = useAuth();
   const { items, loading } = useForYouDebates(mode, 60);
-  const localDisabled = !profile?.location;
+  const hasLocation = !!profile?.location;
 
   return (
     <AppLayout>
@@ -43,10 +45,11 @@ const ForYouPage = () => {
               Trending
             </button>
             <button
-              onClick={() => !localDisabled && setMode("local")}
-              disabled={localDisabled}
-              title={localDisabled ? "Set your location in your profile to see local debates" : undefined}
-              className={`px-3 py-1 rounded-full text-xs font-body transition-colors disabled:opacity-40 ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
+              onClick={() => {
+                if (!hasLocation) setLocationPromptOpen(true);
+                else setMode("local");
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-body transition-colors ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
             >
               Local
             </button>
@@ -67,6 +70,11 @@ const ForYouPage = () => {
           </div>
         )}
       </div>
+      <LocationPrompt
+        open={locationPromptOpen}
+        onOpenChange={setLocationPromptOpen}
+        onSaved={() => setMode("local")}
+      />
     </AppLayout>
   );
 };
