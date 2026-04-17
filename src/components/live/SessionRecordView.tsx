@@ -4,11 +4,10 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Share2, Check, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { LiveTranscriptEntry, LiveSummary } from "@/hooks/useLiveTranscription";
+import { LiveTranscriptEntry, LiveSummary, LiveThreadMeta } from "@/hooks/useLiveTranscription";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import TranscriptCard from "@/components/debate/TranscriptCard";
 import SpeakerBubble from "./SpeakerBubble";
-import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
+import LiveThreadView from "./LiveThreadView";
 import RecordQAChat from "./RecordQAChat";
 
 interface SessionRecordViewProps {
