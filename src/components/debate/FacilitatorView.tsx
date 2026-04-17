@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play, Pause, SkipForward, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio, Map } from "lucide-react";
+import { Play, Pause, SkipForward, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio, Map as MapIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
@@ -128,7 +128,7 @@ const FacilitatorView = ({
                     title="Argument map"
                     ariaLabel="Toggle argument map overlay"
                   >
-                    <Map className="w-3.5 h-3.5" />
+                    <MapIcon className="w-3.5 h-3.5" />
                   </IconCircleButton>
                 )}
               </div>

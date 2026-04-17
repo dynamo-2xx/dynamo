@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, MicOff, Send, SkipForward, ChevronDown,
   Users, Pause, Play, Plus, ChevronRight,
-  Video, VideoOff, Maximize2, Minimize2, Map, NotebookPen,
+  Video, VideoOff, Maximize2, Minimize2, Map as MapIcon, NotebookPen,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
