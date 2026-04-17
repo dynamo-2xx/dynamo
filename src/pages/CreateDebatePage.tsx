@@ -139,7 +139,9 @@ const CreateDebatePage = () => {
           prep_time_min: debate.prepTime,
           prep_time_max: debate.prepTime,
           facilitator_type: "ai",
-          status: "draft",
+          status: scheduledAt ? "scheduled" : "draft",
+          location: location.trim() || null,
+          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
         } as any)
         .select()
         .single();
