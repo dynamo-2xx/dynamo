@@ -45,10 +45,11 @@ const ForYouPage = () => {
               Trending
             </button>
             <button
-              onClick={() => !localDisabled && setMode("local")}
-              disabled={localDisabled}
-              title={localDisabled ? "Set your location in your profile to see local debates" : undefined}
-              className={`px-3 py-1 rounded-full text-xs font-body transition-colors disabled:opacity-40 ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
+              onClick={() => {
+                if (!hasLocation) setLocationPromptOpen(true);
+                else setMode("local");
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-body transition-colors ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
             >
               Local
             </button>
@@ -69,6 +70,11 @@ const ForYouPage = () => {
           </div>
         )}
       </div>
+      <LocationPrompt
+        open={locationPromptOpen}
+        onOpenChange={setLocationPromptOpen}
+        onSaved={() => setMode("local")}
+      />
     </AppLayout>
   );
 };
