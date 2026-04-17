@@ -94,6 +94,11 @@ const DebateRoomPage = () => {
 
   const [aiMessage, setAiMessage] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiMessageStreaming, setAiMessageStreaming] = useState(false);
+  const [aiMessageCollapsed, setAiMessageCollapsed] = useState(false);
+  const [aiMessagePulse, setAiMessagePulse] = useState(false);
+  const aiCollapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showShare, setShowShare] = useState(false);
   const [copied, setCopied] = useState(false);
