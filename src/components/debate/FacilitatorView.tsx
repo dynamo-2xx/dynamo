@@ -94,7 +94,23 @@ const FacilitatorView = ({
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Main panel */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col relative">
+        {/* Argument map overlay */}
+        <ArgumentMapOverlay
+          open={argumentMapOpen}
+          onClose={() => setArgumentMapOpen(false)}
+          arguments={currentSubtopicArgs.map((a) => {
+            const p = participants.find((p) => p.id === a.participant_id);
+            const side = sides.find((s) => s.id === p?.side_id);
+            return {
+              id: a.id, content: a.content, argumentType: a.argument_type,
+              sideLabel: side?.label || "Unknown", sideOrder: side?.sort_order ?? 0,
+              participantId: a.participant_id, parentArgumentId: a.parent_argument_id,
+              createdAt: a.created_at, isEdited: a.is_edited,
+            };
+          })}
+          subtopicTitle={currentSubtopic?.title}
+        />
         {/* Speaker + Timer section */}
         <div className="border-b border-border bg-card px-6 py-5">
           <div className="flex items-start justify-between">
