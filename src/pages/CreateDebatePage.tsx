@@ -183,7 +183,7 @@ const CreateDebatePage = () => {
   };
 
   const addSubtopic = () => {
-    if (!debate || debate.subtopics.length >= 5) return;
+    if (!debate || debate.subtopics.length >= 6) return;
     setDebate({ ...debate, subtopics: [...debate.subtopics, ""] });
   };
 
