@@ -12,6 +12,14 @@ export interface LiveTranscriptEntry {
   timestamp: number;
   is_final: boolean;
   uncertain?: boolean;
+  thread_id?: string;
+  thread_role?: "argument" | "counter" | "continuation";
+  parent_entry_id?: string | null;
+}
+
+export interface LiveThreadMeta {
+  title: string;
+  subtopic: string;
 }
 
 export interface LiveSummary {
@@ -33,6 +41,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   const [transcriptEntries, setTranscriptEntries] = useState<LiveTranscriptEntry[]>([]);
   const [summaries, setSummaries] = useState<LiveSummary[]>([]);
   const [subtopics, setSubtopics] = useState<string[]>([]);
+  const [threads, setThreads] = useState<Record<string, LiveThreadMeta>>({});
   const [isConnected, setIsConnected] = useState(false);
   const [interimText, setInterimText] = useState("");
   const [micError, setMicError] = useState<string | null>(null);
@@ -46,6 +55,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   const transcriptEntriesRef = useRef<LiveTranscriptEntry[]>([]);
   const summariesRef = useRef<LiveSummary[]>([]);
   const subtopicsRef = useRef<string[]>([]);
+  const threadsRef = useRef<Record<string, LiveThreadMeta>>({});
 
   // Progressive auto-analysis timer refs
   const analysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +71,7 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
   useEffect(() => { transcriptEntriesRef.current = transcriptEntries; }, [transcriptEntries]);
   useEffect(() => { summariesRef.current = summaries; }, [summaries]);
   useEffect(() => { subtopicsRef.current = subtopics; }, [subtopics]);
+  useEffect(() => { threadsRef.current = threads; }, [threads]);
   useEffect(() => { isSummarizingRef.current = isSummarizing; }, [isSummarizing]);
 
   const persistSession = useCallback(async (updates: Record<string, any>) => {
