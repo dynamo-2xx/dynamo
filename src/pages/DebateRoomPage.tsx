@@ -1259,16 +1259,7 @@ const DebateRoomPage = () => {
                 onNotebookChange={setNotebookContent}
               />
             )}
-            {/* Notebook button — visible during live debate when not in prep */}
-            {!prepPhaseRole && isSpeaker && (
-              <button
-                onClick={() => setNotebookOpen(true)}
-                className="absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full bg-card border border-border shadow-md flex items-center justify-center hover:bg-accent transition-colors"
-                title="My Notes"
-              >
-                <NotebookPen className="w-4 h-4 text-foreground" />
-              </button>
-            )}
+            {/* Notebook button now lives inside ParticipantSharedView's metadata-row stack */}
             {/* Notebook Sheet */}
             <Sheet open={notebookOpen} onOpenChange={setNotebookOpen}>
               <SheetContent side="right" className="w-[340px] sm:w-[400px] flex flex-col">

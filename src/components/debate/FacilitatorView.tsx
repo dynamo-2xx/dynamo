@@ -38,6 +38,9 @@ interface FacilitatorViewProps {
   transcriptEntries?: TranscriptEntry[];
   deepgramConnected?: boolean;
   interimText?: string;
+  aiMessageCollapsed?: boolean;
+  aiMessagePulse?: boolean;
+  onToggleAiMessage?: () => void;
   onToggleTimer: () => void;
   onResetTimer: () => void;
   onExtendTime: () => void;
