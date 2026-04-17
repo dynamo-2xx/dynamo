@@ -253,35 +253,6 @@ const ParticipantSharedView = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Stack: d. (top), map (middle), notebook (bottom) */}
-          <div className="flex flex-col items-center gap-1.5">
-            {aiMessage && onToggleAiMessage && (
-              <DLogoButton
-                onClick={onToggleAiMessage}
-                active={!aiMessageCollapsed}
-                pulse={aiMessagePulse}
-              />
-            )}
-            {overlayArgs.length > 0 && (
-              <IconCircleButton
-                onClick={() => setArgumentMapOpen((v) => !v)}
-                active={argumentMapOpen}
-                title="Argument map"
-                ariaLabel="Toggle argument map overlay"
-              >
-                <MapIcon className="w-3.5 h-3.5" />
-              </IconCircleButton>
-            )}
-            {onOpenNotebook && isSpeaker && (
-              <IconCircleButton
-                onClick={onOpenNotebook}
-                title="My notes"
-                ariaLabel="Open notebook"
-              >
-                <NotebookPen className="w-3.5 h-3.5" />
-              </IconCircleButton>
-            )}
-          </div>
           <DebateTimer timeLeft={timeLeft} size="md" />
         </div>
       </div>
@@ -436,6 +407,35 @@ const ParticipantSharedView = ({
               >
                 <Send className="w-5 h-5" />
               </button>
+              {/* Stack: d. (top), map (middle), notebook (bottom) — to the right of Send */}
+              <div className="flex flex-col items-center gap-1.5 shrink-0 self-end">
+                {aiMessage && onToggleAiMessage && (
+                  <DLogoButton
+                    onClick={onToggleAiMessage}
+                    active={!aiMessageCollapsed}
+                    pulse={aiMessagePulse}
+                  />
+                )}
+                {overlayArgs.length > 0 && (
+                  <IconCircleButton
+                    onClick={() => setArgumentMapOpen((v) => !v)}
+                    active={argumentMapOpen}
+                    title="Argument map"
+                    ariaLabel="Toggle argument map overlay"
+                  >
+                    <MapIcon className="w-3.5 h-3.5" />
+                  </IconCircleButton>
+                )}
+                {onOpenNotebook && isSpeaker && (
+                  <IconCircleButton
+                    onClick={onOpenNotebook}
+                    title="My notes"
+                    ariaLabel="Open notebook"
+                  >
+                    <NotebookPen className="w-3.5 h-3.5" />
+                  </IconCircleButton>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex justify-end mt-2 max-w-3xl mx-auto">
