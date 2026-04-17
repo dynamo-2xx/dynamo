@@ -156,6 +156,7 @@ const LiveSessionPage = () => {
           subtopics={subtopics.length > 0 ? subtopics : (sd.subtopics || [])}
           speakerNames={speakerNames}
           shareToken={sd.share_token || null}
+          threadTitles={threads}
           onEntriesUpdate={() => {}}
           onSpeakerNamesUpdate={setSpeakerNames}
         />
