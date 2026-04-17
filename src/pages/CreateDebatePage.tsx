@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,11 @@ const CreateDebatePage = () => {
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [location, setLocation] = useState("");
   const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string
+  const [mode, setMode] = useState<"adversarial" | "collaborative">("adversarial");
+  const [resolutionPreview, setResolutionPreview] = useState<string>(""); // AI-generated suggestion (cached)
+  const [resolutionLoading, setResolutionLoading] = useState(false);
+  const [hoveringCollab, setHoveringCollab] = useState(false);
+  const [resolutionAdded, setResolutionAdded] = useState(false); // true once user has solidified it (or confirmed in collab mode)
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -53,6 +58,11 @@ const CreateDebatePage = () => {
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
     setStep(2);
+    // Reset collaborative state for a fresh generation
+    setMode("adversarial");
+    setResolutionPreview("");
+    setResolutionAdded(false);
+    setHoveringCollab(false);
 
     try {
       const response = await supabase.functions.invoke("ai-facilitator", {
@@ -88,6 +98,83 @@ const CreateDebatePage = () => {
 
   const handleGenerationComplete = useCallback(() => {}, []);
 
+  // Fetch the AI-suggested resolution subtopic (cached after first fetch)
+  const fetchResolutionPreview = useCallback(async () => {
+    if (!debate || resolutionPreview || resolutionLoading) return;
+    setResolutionLoading(true);
+    try {
+      const response = await supabase.functions.invoke("ai-facilitator", {
+        body: {
+          action: "resolution_subtopic",
+          payload: {
+            topic: debate.topic,
+            subtopics: debate.subtopics,
+            sides: debate.sides,
+          },
+        },
+      });
+      if (response.error) throw response.error;
+      const text = (response.data?.content ?? "").trim().replace(/^["']|["']$/g, "");
+      setResolutionPreview(text || "Where could we compromise — and if not, why is the divide irreducible?");
+    } catch (err) {
+      console.error("Resolution fetch failed:", err);
+      setResolutionPreview("Where could we compromise — and if not, why is the divide irreducible?");
+    } finally {
+      setResolutionLoading(false);
+    }
+  }, [debate, resolutionPreview, resolutionLoading]);
+
+  // When user picks Collaborative, solidify the suggestion into the subtopics list.
+  const selectCollaborative = useCallback(async () => {
+    if (!debate) return;
+    setMode("collaborative");
+    // Ensure we have a suggestion text
+    let text = resolutionPreview;
+    if (!text) {
+      setResolutionLoading(true);
+      try {
+        const response = await supabase.functions.invoke("ai-facilitator", {
+          body: {
+            action: "resolution_subtopic",
+            payload: { topic: debate.topic, subtopics: debate.subtopics, sides: debate.sides },
+          },
+        });
+        if (response.error) throw response.error;
+        text = ((response.data?.content ?? "") as string).trim().replace(/^["']|["']$/g, "")
+          || "Where could we compromise — and if not, why is the divide irreducible?";
+        setResolutionPreview(text);
+      } catch (err) {
+        console.error("Resolution fetch failed:", err);
+        text = "Where could we compromise — and if not, why is the divide irreducible?";
+        setResolutionPreview(text);
+      } finally {
+        setResolutionLoading(false);
+      }
+    }
+    if (!resolutionAdded) {
+      setDebate({ ...debate, subtopics: [...debate.subtopics, text] });
+      setResolutionAdded(true);
+    }
+    setHoveringCollab(false);
+  }, [debate, resolutionPreview, resolutionAdded]);
+
+  const selectAdversarial = useCallback(() => {
+    if (!debate) return;
+    setMode("adversarial");
+    // Remove the resolution subtopic if it was added and unmodified
+    if (resolutionAdded && resolutionPreview) {
+      const lastIdx = debate.subtopics.lastIndexOf(resolutionPreview);
+      if (lastIdx !== -1) {
+        const next = [...debate.subtopics];
+        next.splice(lastIdx, 1);
+        setDebate({ ...debate, subtopics: next });
+      }
+      // If the user edited it, leave it in place — they own it now.
+      setResolutionAdded(false);
+    }
+    setHoveringCollab(false);
+  }, [debate, resolutionAdded, resolutionPreview]);
+
   const updateSubtopic = (index: number, value: string) => {
     if (!debate) return;
     const updated = [...debate.subtopics];
@@ -96,7 +183,7 @@ const CreateDebatePage = () => {
   };
 
   const addSubtopic = () => {
-    if (!debate || debate.subtopics.length >= 5) return;
+    if (!debate || debate.subtopics.length >= 6) return;
     setDebate({ ...debate, subtopics: [...debate.subtopics, ""] });
   };
 
@@ -301,6 +388,66 @@ const CreateDebatePage = () => {
                   />
                 </div>
 
+                {/* Mode: Adversarial / Collaborative */}
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
+                    Debate Mode
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAdversarial}
+                      className={`flex flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors border ${
+                        mode === "adversarial"
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-accent text-foreground border-transparent hover:border-foreground/20"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-body font-medium">
+                        <Swords className="w-4 h-4" /> Adversarial
+                      </span>
+                      <span className={`text-[11px] font-body ${mode === "adversarial" ? "text-background/70" : "text-muted-foreground"}`}>
+                        Sides argue for their position.
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectCollaborative}
+                      onMouseEnter={() => {
+                        if (mode !== "collaborative") {
+                          setHoveringCollab(true);
+                          fetchResolutionPreview();
+                        }
+                      }}
+                      onMouseLeave={() => setHoveringCollab(false)}
+                      onFocus={() => {
+                        if (mode !== "collaborative") {
+                          setHoveringCollab(true);
+                          fetchResolutionPreview();
+                        }
+                      }}
+                      onBlur={() => setHoveringCollab(false)}
+                      className={`flex flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors border ${
+                        mode === "collaborative"
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-accent text-foreground border-transparent hover:border-foreground/20"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-body font-medium">
+                        <Handshake className="w-4 h-4" /> Collaborative
+                      </span>
+                      <span className={`text-[11px] font-body ${mode === "collaborative" ? "text-background/70" : "text-muted-foreground"}`}>
+                        Adds a resolution-seeking subtopic.
+                      </span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-3 font-body">
+                    {mode === "collaborative"
+                      ? "A resolution subtopic has been added below. Edit or remove it like any other."
+                      : "Hover Collaborative to preview the resolution subtopic that would be added."}
+                  </p>
+                </div>
+
                 {/* Subtopics */}
                 <div className="bg-background border border-border rounded-lg p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -332,6 +479,27 @@ const CreateDebatePage = () => {
                       </Reorder.Item>
                     ))}
                   </Reorder.Group>
+
+                  {/* Translucent preview of the resolution subtopic on hover */}
+                  <AnimatePresence>
+                    {hoveringCollab && mode !== "collaborative" && (
+                      <motion.div
+                        key="resolution-ghost"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 0.45, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.18 }}
+                        className="flex items-center gap-2 mt-2 pointer-events-none"
+                        aria-hidden="true"
+                      >
+                        <Handshake className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground w-5">{debate.subtopics.length + 1}.</span>
+                        <div className="flex-1 bg-accent/60 border border-dashed border-foreground/20 rounded-lg px-3 py-2 text-sm font-body text-foreground italic">
+                          {resolutionLoading && !resolutionPreview ? "Generating resolution prompt…" : resolutionPreview || "Where could we compromise?"}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Sides */}
@@ -503,7 +671,7 @@ const CreateDebatePage = () => {
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button
-                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); }}
+                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); setMode("adversarial"); setResolutionPreview(""); setResolutionAdded(false); setHoveringCollab(false); }}
                     className="flex-1 border border-border rounded-lg py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
                   >
                     Start Over
