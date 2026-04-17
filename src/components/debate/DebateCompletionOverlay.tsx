@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Trophy, Clock, MessageSquare, ExternalLink, Home } from "lucide-react";
+import { Trophy, Clock, MessageSquare, Home, Award } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface DebateCompletionOverlayProps {
@@ -8,6 +8,7 @@ interface DebateCompletionOverlayProps {
   argumentCount: number;
   editWindowEndsAt: string | null;
   debateId: string;
+  feedbackEnabled?: boolean;
   onDismiss: () => void;
 }
 
@@ -17,6 +18,7 @@ const DebateCompletionOverlay = ({
   argumentCount,
   editWindowEndsAt,
   debateId,
+  feedbackEnabled = false,
   onDismiss,
 }: DebateCompletionOverlayProps) => {
   const navigate = useNavigate();
@@ -61,7 +63,7 @@ const DebateCompletionOverlay = ({
         </div>
 
         {editHoursLeft > 0 && (
-          <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 mb-6">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 mb-4">
             <div className="flex items-center gap-2 justify-center text-sm text-primary font-body">
               <Clock className="w-4 h-4" />
               <span className="font-semibold">{editHoursLeft}h</span>
@@ -70,10 +72,35 @@ const DebateCompletionOverlay = ({
           </div>
         )}
 
+        {feedbackEnabled && (
+          <div className="bg-accent border border-border rounded-lg px-4 py-3 mb-4 text-left">
+            <div className="flex items-center gap-2 text-sm text-foreground font-body mb-1">
+              <Award className="w-4 h-4" />
+              <span className="font-semibold">Your private grade is ready</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground font-body">
+              Dynamo graded your performance across four dimensions. Only you can see it.
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
+          {feedbackEnabled && (
+            <button
+              onClick={() => navigate(`/debate/${debateId}/grade`)}
+              className="w-full flex items-center justify-center gap-2 bg-foreground text-background px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity font-body"
+            >
+              <Award className="w-4 h-4" />
+              View Your Performance
+            </button>
+          )}
           <button
             onClick={onDismiss}
-            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity font-body"
+            className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity font-body ${
+              feedbackEnabled
+                ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                : "bg-primary text-primary-foreground"
+            }`}
           >
             <MessageSquare className="w-4 h-4" />
             Review & Edit

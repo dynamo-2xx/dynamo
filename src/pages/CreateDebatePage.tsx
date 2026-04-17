@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,8 @@ const CreateDebatePage = () => {
   const [resolutionLoading, setResolutionLoading] = useState(false);
   const [hoveringCollab, setHoveringCollab] = useState(false);
   const [resolutionAdded, setResolutionAdded] = useState(false); // true once user has solidified it (or confirmed in collab mode)
+  const [feedbackEnabled, setFeedbackEnabled] = useState(false);
+  const [feedbackExplainerOpen, setFeedbackExplainerOpen] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -229,6 +231,7 @@ const CreateDebatePage = () => {
           status: scheduledAt ? "scheduled" : "draft",
           location: location.trim() || null,
           scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+          feedback_enabled: feedbackEnabled,
         } as any)
         .select()
         .single();

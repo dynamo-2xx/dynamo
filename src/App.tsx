@@ -15,6 +15,7 @@ import ProfilePage from "./pages/ProfilePage";
 import AuthPage from "./pages/AuthPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DebateRoomPage from "./pages/DebateRoomPage";
+import DebateGradeReportPage from "./pages/DebateGradeReportPage";
 import JoinDebatePage from "./pages/JoinDebatePage";
 import NotificationsPage from "./pages/NotificationsPage";
 import DebatePreviewPage from "./pages/DebatePreviewPage";
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />
               <Route path="/debate/:id" element={<ProtectedRoute><DebateRoomPage /></ProtectedRoute>} />
+              <Route path="/debate/:id/grade" element={<ProtectedRoute><DebateGradeReportPage /></ProtectedRoute>} />
               <Route path="/debate/:id/projector" element={<ProjectorPage />} />
               <Route path="/debate/:id/audience" element={<AudiencePage />} />
               <Route path="/join/:code" element={<JoinDebatePage />} />
