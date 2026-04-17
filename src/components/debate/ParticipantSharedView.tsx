@@ -13,6 +13,7 @@ import RoundSummaryCard from "./RoundSummaryCard";
 import DLogoButton from "./DLogoButton";
 import IconCircleButton from "./IconCircleButton";
 import ArgumentMapOverlay from "./ArgumentMapOverlay";
+import NotebookOverlay from "./NotebookOverlay";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
@@ -72,6 +73,10 @@ interface ParticipantSharedViewProps {
   onSkipTurn?: () => void;
   onNextSubtopic?: () => void;
   onOpenNotebook?: () => void;
+  notebookOpen?: boolean;
+  notebookContent?: string;
+  onNotebookContentChange?: (val: string) => void;
+  onCloseNotebook?: () => void;
   roundSummaries?: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>;
 }
 
@@ -85,6 +90,10 @@ const ParticipantSharedView = ({
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
   onToggleDeepgram, onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
   onOpenNotebook,
+  notebookOpen = false,
+  notebookContent = "",
+  onNotebookContentChange,
+  onCloseNotebook,
   roundSummaries = {},
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
@@ -355,6 +364,14 @@ const ParticipantSharedView = ({
             arguments={overlayArgs}
             subtopicTitle={currentSubtopic?.title}
           />
+
+          {/* Translucent notebook overlay */}
+          <NotebookOverlay
+            open={notebookOpen}
+            onClose={() => onCloseNotebook?.()}
+            value={notebookContent}
+            onChange={(v) => onNotebookContentChange?.(v)}
+          />
         </div>
       </div>
 
@@ -428,9 +445,10 @@ const ParticipantSharedView = ({
                 )}
                 {onOpenNotebook && isSpeaker && (
                   <IconCircleButton
-                    onClick={onOpenNotebook}
+                    onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
+                    active={notebookOpen}
                     title="My notes"
-                    ariaLabel="Open notebook"
+                    ariaLabel="Toggle notebook"
                   >
                     <NotebookPen className="w-3.5 h-3.5" />
                   </IconCircleButton>
