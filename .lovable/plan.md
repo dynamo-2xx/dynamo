@@ -1,50 +1,62 @@
 
 
-The user wants me to implement the previously-discussed scope (auto-collapsing "d." narration, removing the redundant top-right permissions button, and converting the argument map into a translucent overlay opened via a map button), then test it end-to-end and return screenshots.
+# Plan: Home page redesign (revised)
 
-Combining all approved scope into one consolidated plan:
+## A. Schema (one migration)
+- `profiles.banner_url text null`
+- `debates.cover_image_url text null`
 
-# Plan: Debate Room polish — d. button, permissions consolidation, map overlay, plus E2E test
+## B. Top section — greeting + persistent tagline
+Single fixed-height slot:
+1. **Greeting `h2`** "Good evening, {display_name}." — fades out after 3.2s and is **replaced in place** by the X-style header (banner + avatar + display name + @handle). `[p]` tagline stays visible the entire time, never fades.
+2. **Tagline `[p]`** rotates every 5s through:
+   - "What's the story today?"
+   - "What do you want to debate today?"
+   - "People to the power!"
+   - "Got a take? Put it to the test."
+   Persists below greeting, then below header. Crossfade between messages only (the `<p>` slot itself never disappears).
 
-## Implementation
+## C. Action row
+2-column grid: **Create** (PlusCircle → `/create`) + **Live** (Radio → `/live`). Same card style as today.
 
-### 1. Auto-collapsing "d." narration
-- `DebateRoomPage.tsx`: add `aiMessageStreaming` and `aiMessageCollapsed` state. Set streaming true while `streamAI` reads SSE; on completion, schedule a 5s `setTimeout` to collapse. Reset (re-open + pulse) when `aiMessage` content changes for a new turn. Cancel timer on unmount or speaker timer start.
-- New shared component `src/components/debate/IconCircleButton.tsx`: 28x28 circular button (`bg-primary/10`, `border-primary/20`), accepts icon or text content + optional pulse prop. Used for d., map, notebook.
-- New `src/components/debate/DLogoButton.tsx` thin wrapper rendering `d.` in Instrument Serif.
+## D. Two carousels
 
-### 2. Argument map → translucent overlay
-- New `src/components/debate/ArgumentMapOverlay.tsx`: `AnimatePresence` floating panel anchored top-left over camera area. `bg-background/70 backdrop-blur-xl`, rounded-2xl, soft shadow, `max-h-[70vh]` scrollable, header with title + close `×`, click-outside to close. Renders existing `LiveArgumentMap` inside.
-- Map button uses `Map` from `lucide-react`, same circle styling.
+### 1. "Conversations that may concern you"
+- Header row: title left · `Trending | Local` toggle pill · **"Open" arrow button top-right** → navigates to `/for-you`.
+- Source: live public debates first, then most-engaged public debates (participant count desc). `Local` filters by `profile.location`.
 
-### 3. Consolidate permissions into bottom console
-- Remove `<MediaPermissions variant="header" />` from `DebateRoomPage.tsx` header.
-- In `ParticipantSharedView.tsx` and `FacilitatorView.tsx` bottom console:
-  - Camera button's first-press handler: if no `localStreamRef`, call `getUserMedia({ video: true })` first, then toggle. Show inline error toast on permission denied.
-  - Mic button: same pattern with `{ audio: true }` before starting Deepgram.
+### 2. "My Recent" (NEW, replaces old Recent list)
+- Header row: title left · **"Open" arrow button top-right** → navigates to `/my-recent`.
+- Source: debates where the current user is creator or participant, ordered by `updated_at` desc.
 
-### 4. Stack of circle buttons in metadata row
-Vertical stack to the left of timer (top→bottom): `[d.]`, `[map]`, `[notebook]`. All three share `IconCircleButton` styling. Conditionally render d. only when `aiMessage` exists; map only when arguments exist; notebook stays as-is.
+### Carousel mechanics (shared)
+- Cards: aspect 16/10, rounded-xl, 0.5px border. Background = `cover_image_url` else gradient hashed from topic. LIVE chip with pulsing green dot, participant count pill, topic in Instrument Serif (clamp-2).
+- Auto-advance 1 card every 5s, wraps. Arrow buttons at edges. Any user interaction (arrow, drag, scroll, focus) pauses auto-advance; resumes after **10s of inactivity**. Honors `prefers-reduced-motion`.
+- 1 card on mobile, 2 on md, 3 on lg.
 
-### 5. Files touched
-- `src/pages/DebateRoomPage.tsx` — state + remove header MediaPermissions + prop drilling
-- `src/components/debate/ParticipantSharedView.tsx` — buttons, overlay, permission flow
-- `src/components/debate/FacilitatorView.tsx` — same
-- `src/components/debate/IconCircleButton.tsx` — NEW
-- `src/components/debate/DLogoButton.tsx` — NEW
-- `src/components/debate/ArgumentMapOverlay.tsx` — NEW
+## E. Two new expanded pages
+- `/for-you` — full catalogue of the trending/local set. Top bar: back arrow (left) · page title · **"Explore →" link top-right** (this is where the Explore link lives now). Same Trending/Local toggle. Grid layout (responsive 1/2/3 columns).
+- `/my-recent` — same shell, lists user's debates. Top-right also shows "Explore →".
 
-## Testing & deliverable
+Both pages reuse the same card component as the carousel.
 
-After implementation, navigate to a debate room in the preview, capture screenshots showing:
-1. Header without the redundant permissions button
-2. The three stacked circle buttons (d., map, notebook) in the metadata row
-3. d. narration auto-collapsed → click reopens the panel
-4. Map button opens the translucent argument map overlay over the camera
-5. Bottom console camera/mic buttons triggering permission flow
+## F. Files
+- **Migration**: 2 nullable columns.
+- **NEW** `src/components/home/GreetingHeader.tsx` — greeting → X-style header swap (tagline lives outside, in HomePage).
+- **NEW** `src/components/home/RotatingTagline.tsx` — 4-message crossfade.
+- **NEW** `src/components/home/DebateCoverCard.tsx` — shared card (carousel + grid pages).
+- **NEW** `src/components/home/AutoCarousel.tsx` — fetch-agnostic carousel shell with auto-advance + pause-on-interaction.
+- **NEW** `src/pages/ForYouPage.tsx`, `src/pages/MyRecentPage.tsx`.
+- **NEW** `src/lib/gradient.ts` — deterministic gradient util.
+- **EDIT** `src/pages/HomePage.tsx` — compose new sections.
+- **EDIT** `src/App.tsx` — register `/for-you` and `/my-recent` routes (protected).
 
-Return the screenshots inline as confirmation.
-
-## Out of scope
-No DB/edge function changes. Threaded-arguments work from prior approved plans is unaffected.
+## G. Self-check
+- [ ] Only `h2` fades; `[p]` tagline never disappears and keeps cycling.
+- [ ] Header (banner + avatar + name + @handle) replaces greeting in place, no layout jump.
+- [ ] Create + Live side-by-side.
+- [ ] Two carousels, each with top-right "Open" button to a dedicated catalogue page.
+- [ ] Catalogue pages have back arrow + Explore link top-right.
+- [ ] Auto-rotate 5s, pause on interaction, resume after 10s.
+- [ ] Build passes; routes work; gradient fallback renders when cover/banner null.
 
