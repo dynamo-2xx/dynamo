@@ -3,14 +3,13 @@ import { motion } from "framer-motion";
 import { Mic, Square, Radio, Loader2, ChevronDown } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/SessionRecordView";
-import TranscriptCard from "@/components/debate/TranscriptCard";
+import LiveThreadView from "@/components/live/LiveThreadView";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useLiveTranscription, LiveTranscriptEntry } from "@/hooks/useLiveTranscription";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
 
 type SessionPhase = "setup" | "recording" | "ended";
 
@@ -32,6 +31,7 @@ const LiveSessionPage = () => {
     transcriptEntries,
     summaries,
     subtopics,
+    threads,
     interimText,
     isConnected,
     micError,
