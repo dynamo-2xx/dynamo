@@ -269,7 +269,7 @@ const ParticipantSharedView = ({
                 title="Argument map"
                 ariaLabel="Toggle argument map overlay"
               >
-                <Map className="w-3.5 h-3.5" />
+                <MapIcon className="w-3.5 h-3.5" />
               </IconCircleButton>
             )}
             {onOpenNotebook && isSpeaker && (
