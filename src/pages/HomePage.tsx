@@ -8,6 +8,7 @@ import RotatingTagline from "@/components/home/RotatingTagline";
 import AutoCarousel from "@/components/home/AutoCarousel";
 import DebateCoverCard from "@/components/home/DebateCoverCard";
 import { useForYouDebates, useMyRecentDebates } from "@/hooks/useHomeDebates";
+import LocationPrompt from "@/components/home/LocationPrompt";
 
 type Mode = "trending" | "local";
 
@@ -38,7 +39,8 @@ const SectionHeader = ({
 const HomePage = () => {
   const { profile } = useAuth();
   const [mode, setMode] = useState<Mode>("trending");
-  const localDisabled = !profile?.location;
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+  const hasLocation = !!profile?.location;
   const { items: forYou } = useForYouDebates(mode, 12);
   const { items: myRecent } = useMyRecentDebates(12);
 
@@ -93,10 +95,11 @@ const HomePage = () => {
                   Trending
                 </button>
                 <button
-                  onClick={() => !localDisabled && setMode("local")}
-                  disabled={localDisabled}
-                  title={localDisabled ? "Set your location in your profile to see local debates" : undefined}
-                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-body transition-colors disabled:opacity-40 ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
+                  onClick={() => {
+                    if (!hasLocation) setLocationPromptOpen(true);
+                    else setMode("local");
+                  }}
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-body transition-colors ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
                 >
                   Local
                 </button>
@@ -120,6 +123,12 @@ const HomePage = () => {
           />
         </section>
       </motion.div>
+
+      <LocationPrompt
+        open={locationPromptOpen}
+        onOpenChange={setLocationPromptOpen}
+        onSaved={() => setMode("local")}
+      />
     </div>
   );
 };
