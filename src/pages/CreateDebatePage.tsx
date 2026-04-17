@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,8 @@ const CreateDebatePage = () => {
   const [resolutionLoading, setResolutionLoading] = useState(false);
   const [hoveringCollab, setHoveringCollab] = useState(false);
   const [resolutionAdded, setResolutionAdded] = useState(false); // true once user has solidified it (or confirmed in collab mode)
+  const [feedbackEnabled, setFeedbackEnabled] = useState(false);
+  const [feedbackExplainerOpen, setFeedbackExplainerOpen] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -229,6 +231,7 @@ const CreateDebatePage = () => {
           status: scheduledAt ? "scheduled" : "draft",
           location: location.trim() || null,
           scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+          feedback_enabled: feedbackEnabled,
         } as any)
         .select()
         .single();
@@ -668,10 +671,78 @@ const CreateDebatePage = () => {
                   </div>
                 </div>
 
+                {/* Performance Feedback */}
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
+                    <Award className="w-3.5 h-3.5 inline mr-1" />
+                    Performance Feedback
+                  </label>
+                  <p className="text-xs font-body text-foreground mb-3">
+                    Want a private AI-graded performance report after the debate?
+                  </p>
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackEnabled(false)}
+                      className={`flex-1 rounded-lg py-2.5 text-sm font-body font-medium transition-colors border ${
+                        !feedbackEnabled
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-accent text-muted-foreground border-transparent"
+                      }`}
+                    >
+                      No
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFeedbackEnabled(true)}
+                      className={`flex-1 rounded-lg py-2.5 text-sm font-body font-medium transition-colors border ${
+                        feedbackEnabled
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-accent text-muted-foreground border-transparent"
+                      }`}
+                    >
+                      Yes
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackExplainerOpen((v) => !v)}
+                    className="flex items-center gap-1 text-[11px] font-body text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronDown className={`w-3 h-3 transition-transform ${feedbackExplainerOpen ? "rotate-180" : ""}`} />
+                    What's graded?
+                  </button>
+                  <AnimatePresence>
+                    {feedbackExplainerOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <ul className="text-[11px] font-body text-muted-foreground mt-3 space-y-1.5 list-disc pl-4">
+                          <li><span className="text-foreground">Argument Quality</span> — logic, relevance, evidence.</li>
+                          <li><span className="text-foreground">Opposition Engagement</span> — direct rebuttals and acknowledgment.</li>
+                          <li><span className="text-foreground">Clarity & Structure</span> — coherent point, reasoning, conclusion.</li>
+                          <li><span className="text-foreground">Stakes Articulation</span> — what's at risk if your side loses.</li>
+                          <li><span className="text-foreground">Overall Performance</span> — weighted average with a label (Exceptional → Insufficient).</li>
+                          {mode === "collaborative" && (
+                            <li><span className="text-foreground">Resolution Engagement</span> — separate score for consensus-seeking (only because Collaborative mode is on).</li>
+                          )}
+                        </ul>
+                        <p className="text-[10px] font-body text-muted-foreground mt-2 italic">
+                          Grades are private to each speaker. Dynamo never declares a winner.
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button
-                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); setMode("adversarial"); setResolutionPreview(""); setResolutionAdded(false); setHoveringCollab(false); }}
+                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); setMode("adversarial"); setResolutionPreview(""); setResolutionAdded(false); setHoveringCollab(false); setFeedbackEnabled(false); setFeedbackExplainerOpen(false); }}
                     className="flex-1 border border-border rounded-lg py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
                   >
                     Start Over
