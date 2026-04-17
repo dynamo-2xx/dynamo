@@ -1204,6 +1204,9 @@ const DebateRoomPage = () => {
               participants={participants}
               timeLeft={timeLeft}
               aiMessage={aiMessage}
+              aiMessageCollapsed={aiMessageCollapsed}
+              aiMessagePulse={aiMessagePulse}
+              onToggleAiMessage={toggleAiMessage}
               canSpeak={canSpeak}
               isMyTurn={!!isMyTurn}
               isSpeaker={isSpeaker}
