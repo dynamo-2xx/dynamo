@@ -1233,6 +1233,10 @@ const DebateRoomPage = () => {
               onSkipTurn={handleSkipTurn}
               onNextSubtopic={handleNextSubtopic}
               onOpenNotebook={() => setNotebookOpen(true)}
+              notebookOpen={notebookOpen}
+              notebookContent={notebookContent}
+              onNotebookContentChange={setNotebookContent}
+              onCloseNotebook={() => setNotebookOpen(false)}
               roundSummaries={roundSummaries}
             />
             {/* Prep phase overlay */}
@@ -1260,20 +1264,7 @@ const DebateRoomPage = () => {
               />
             )}
             {/* Notebook button now lives inside ParticipantSharedView's metadata-row stack */}
-            {/* Notebook Sheet */}
-            <Sheet open={notebookOpen} onOpenChange={setNotebookOpen}>
-              <SheetContent side="right" className="w-[340px] sm:w-[400px] flex flex-col">
-                <SheetHeader>
-                  <SheetTitle className="font-display">My Notes</SheetTitle>
-                </SheetHeader>
-                <textarea
-                  value={notebookContent}
-                  onChange={(e) => setNotebookContent(e.target.value)}
-                  placeholder="Your preparation notes appear here…"
-                  className="flex-1 mt-4 w-full bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground font-body resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
-                />
-              </SheetContent>
-            </Sheet>
+            {/* Notebook is rendered as a translucent draggable overlay inside ParticipantSharedView */}
           </div>
         )}
 

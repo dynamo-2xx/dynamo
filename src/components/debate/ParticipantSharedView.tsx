@@ -445,9 +445,10 @@ const ParticipantSharedView = ({
                 )}
                 {onOpenNotebook && isSpeaker && (
                   <IconCircleButton
-                    onClick={onOpenNotebook}
+                    onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
+                    active={notebookOpen}
                     title="My notes"
-                    ariaLabel="Open notebook"
+                    ariaLabel="Toggle notebook"
                   >
                     <NotebookPen className="w-3.5 h-3.5" />
                   </IconCircleButton>
