@@ -277,7 +277,7 @@ const LiveSessionPage = () => {
             </div>
           )}
 
-          {/* Subtopic sections */}
+          {/* Subtopic sections — each contains collapsible argument threads */}
           {groupedEntries.ordered.map((topic) => {
             const topicEntries = groupedEntries.groups[topic] || [];
             if (topicEntries.length === 0) return null;
@@ -290,23 +290,17 @@ const LiveSessionPage = () => {
                     {topic}
                   </h3>
                   <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
-                    {groupConsecutiveEntries(topicEntries).length}
+                    {topicEntries.length} {topicEntries.length === 1 ? "statement" : "statements"}
                   </span>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="space-y-2 pt-2 pl-2">
-                    {groupConsecutiveEntries(topicEntries).map((entry) => (
-                      <TranscriptCard
-                        key={entry.id}
-                        speakerSide={getSpeakerName(entry.speaker_id)}
-                        sideOrder={entry.speaker_id % 2}
-                        text={entry.text}
-                        aiSummary={entry.ai_summary}
-                        timestamp={entry.timestamp}
-                        autoFlip
-                        compact
-                      />
-                    ))}
+                  <div className="pt-2 pl-2">
+                    <LiveThreadView
+                      entries={topicEntries}
+                      threadTitles={threads}
+                      getSpeakerName={getSpeakerName}
+                      compact
+                    />
                   </div>
                 </CollapsibleContent>
               </Collapsible>
@@ -321,18 +315,12 @@ const LiveSessionPage = () => {
                   Uncategorized
                 </h3>
               )}
-              {groupConsecutiveEntries(groupedEntries.uncategorized).map((entry) => (
-                <TranscriptCard
-                  key={entry.id}
-                  speakerSide={getSpeakerName(entry.speaker_id)}
-                  sideOrder={entry.speaker_id % 2}
-                  text={entry.text}
-                  aiSummary={entry.ai_summary}
-                  timestamp={entry.timestamp}
-                  autoFlip
-                  compact
-                />
-              ))}
+              <LiveThreadView
+                entries={groupedEntries.uncategorized}
+                threadTitles={threads}
+                getSpeakerName={getSpeakerName}
+                compact
+              />
             </div>
           )}
 
