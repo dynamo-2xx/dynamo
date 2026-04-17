@@ -19,7 +19,7 @@ import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+
 
 type UserRole = "facilitator" | "speaker" | "spectator";
 
