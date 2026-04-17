@@ -1065,15 +1065,6 @@ const DebateRoomPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {(isFacilitator || isSpeaker) && user && (
-            <MediaPermissions
-              role={isFacilitator ? "facilitator" : "speaker"}
-              isMicEnabled={micEnabled}
-              userId={user.id}
-              isActivelySpeaking={isRecording && canSpeak}
-              variant="header"
-            />
-          )}
 
           {isCreator && (
             <div className="relative">
@@ -1189,6 +1180,9 @@ const DebateRoomPage = () => {
             timerRunning={timerRunning}
             aiMessage={aiMessage}
             aiLoading={aiLoading}
+            aiMessageCollapsed={aiMessageCollapsed}
+            aiMessagePulse={aiMessagePulse}
+            onToggleAiMessage={toggleAiMessage}
             transcriptEntries={transcriptEntries}
             deepgramConnected={deepgramConnected}
             interimText={interimText}
