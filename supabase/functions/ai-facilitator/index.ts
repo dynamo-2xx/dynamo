@@ -221,6 +221,7 @@ Grade this speaker using the grade_final tool.`;
         break;
       }
 
+      default:
         return new Response(
           JSON.stringify({ error: `Unknown action: ${action}` }),
           {
