@@ -1,102 +1,124 @@
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { PlusCircle, Zap, TrendingUp } from "lucide-react";
+import { PlusCircle, Radio, ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import GreetingHeader from "@/components/home/GreetingHeader";
+import RotatingTagline from "@/components/home/RotatingTagline";
+import AutoCarousel from "@/components/home/AutoCarousel";
+import DebateCoverCard from "@/components/home/DebateCoverCard";
+import { useForYouDebates, useMyRecentDebates } from "@/hooks/useHomeDebates";
 
-interface DebateRow {
-  id: string;
-  topic: string;
-  status: string;
-  created_at: string;
-  is_public: boolean;
-}
+type Mode = "trending" | "local";
+
+const SectionHeader = ({
+  title,
+  toRoute,
+  right,
+}: {
+  title: string;
+  toRoute: string;
+  right?: React.ReactNode;
+}) => (
+  <div className="flex items-center justify-between gap-3 mb-3">
+    <div className="flex items-center gap-3 min-w-0">
+      <h3 className="font-display text-lg truncate">{title}</h3>
+      {right}
+    </div>
+    <Link
+      to={toRoute}
+      aria-label={`Open ${title}`}
+      className="shrink-0 w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+    >
+      <ArrowUpRight className="w-4 h-4" />
+    </Link>
+  </div>
+);
 
 const HomePage = () => {
-  const [liveDebates, setLiveDebates] = useState<DebateRow[]>([]);
-  const [recentDebates, setRecentDebates] = useState<DebateRow[]>([]);
-
-  useEffect(() => {
-    const load = async () => {
-      const [liveRes, recentRes] = await Promise.all([
-        supabase.from("debates").select("id, topic, status, created_at, is_public").eq("status", "live").eq("is_public", true).order("created_at", { ascending: false }).limit(5),
-        supabase.from("debates").select("id, topic, status, created_at, is_public").neq("status", "live").eq("is_public", true).order("created_at", { ascending: false }).limit(10),
-      ]);
-      setLiveDebates((liveRes.data || []) as DebateRow[]);
-      setRecentDebates((recentRes.data || []) as DebateRow[]);
-    };
-    load();
-  }, []);
-
-  const statusBadge = (s: string) => {
-    if (s === "live") return "bg-[#dcfce7] text-[#166534]";
-    if (s === "completed") return "bg-accent text-muted-foreground";
-    return "bg-accent text-muted-foreground";
-  };
-
-  const DebateLink = ({ d }: { d: DebateRow }) => (
-    <Link
-      to={`/debate/${d.id}`}
-      className="bg-background border border-border rounded-lg p-5 hover:border-foreground/20 transition-colors block"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-display text-sm text-foreground">{d.topic}</h3>
-          <p className="text-[11px] text-muted-foreground mt-1 font-body">{new Date(d.created_at).toLocaleDateString()}</p>
-        </div>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-body font-medium uppercase tracking-wider shrink-0 ${statusBadge(d.status)}`}>
-          {d.status}
-        </span>
-      </div>
-    </Link>
-  );
+  const { profile } = useAuth();
+  const [mode, setMode] = useState<Mode>("trending");
+  const localDisabled = !profile?.location;
+  const { items: forYou } = useForYouDebates(mode, 12);
+  const { items: myRecent } = useMyRecentDebates(12);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <h2 className="text-[28px] font-display mb-2">Good evening.</h2>
-        <p className="text-muted-foreground font-body text-sm mb-8">What do you want to debate today?</p>
+        {/* Greeting → header swap */}
+        <GreetingHeader />
 
-        <Link
-          to="/create"
-          className="flex items-center gap-3 bg-background border border-border hover:border-foreground/20 rounded-lg p-5 mb-10 transition-colors group"
-        >
-          <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-            <PlusCircle className="w-5 h-5 text-foreground" />
-          </div>
-          <div>
-            <p className="font-body text-sm font-medium group-hover:text-foreground transition-colors">Create</p>
-            <p className="text-[11px] text-muted-foreground font-body">Type a topic and let dynamo structure the conversation</p>
-          </div>
-        </Link>
+        {/* Persistent tagline */}
+        <RotatingTagline className="mb-8" />
 
-        {liveDebates.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 mb-4">
-              <Zap className="w-4 h-4 text-foreground" />
-              <h3 className="font-display text-lg">Happening Now</h3>
+        {/* Action row: Create + Live side-by-side */}
+        <div className="grid grid-cols-2 gap-3 mb-10">
+          <Link
+            to="/create"
+            className="flex items-center gap-3 bg-background border border-border hover:border-foreground/20 rounded-lg p-5 transition-colors group"
+          >
+            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+              <PlusCircle className="w-5 h-5 text-foreground" />
             </div>
-            <div className="grid gap-3 mb-10">
-              {liveDebates.map((d) => <DebateLink key={d.id} d={d} />)}
+            <div className="min-w-0">
+              <p className="font-body text-sm font-medium">Create</p>
+              <p className="text-[11px] text-muted-foreground font-body truncate">Structure a debate</p>
             </div>
-          </>
-        )}
+          </Link>
+          <Link
+            to="/live/new"
+            className="flex items-center gap-3 bg-background border border-border hover:border-foreground/20 rounded-lg p-5 transition-colors group"
+          >
+            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+              <Radio className="w-5 h-5 text-foreground" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-body text-sm font-medium">Live</p>
+              <p className="text-[11px] text-muted-foreground font-body truncate">Capture a real conversation</p>
+            </div>
+          </Link>
+        </div>
 
-        {recentDebates.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-4 h-4 text-foreground" />
-              <h3 className="font-display text-lg">Recent Debates</h3>
-            </div>
-            <div className="grid gap-3">
-              {recentDebates.map((d) => <DebateLink key={d.id} d={d} />)}
-            </div>
-          </>
-        )}
+        {/* For-you carousel */}
+        <section className="mb-10">
+          <SectionHeader
+            title="Conversations that may concern you"
+            toRoute="/for-you"
+            right={
+              <div className="inline-flex border border-border rounded-full p-0.5 shrink-0">
+                <button
+                  onClick={() => setMode("trending")}
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-body transition-colors ${mode === "trending" ? "bg-foreground text-background" : "text-muted-foreground"}`}
+                >
+                  Trending
+                </button>
+                <button
+                  onClick={() => !localDisabled && setMode("local")}
+                  disabled={localDisabled}
+                  title={localDisabled ? "Set your location in your profile to see local debates" : undefined}
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-body transition-colors disabled:opacity-40 ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
+                >
+                  Local
+                </button>
+              </div>
+            }
+          />
+          <AutoCarousel
+            items={forYou}
+            getKey={(d) => d.id}
+            renderItem={(d) => <DebateCoverCard d={d} />}
+          />
+        </section>
 
-        {liveDebates.length === 0 && recentDebates.length === 0 && (
-          <p className="text-muted-foreground text-center py-12 font-body text-sm">No public debates yet. Be the first to start one!</p>
-        )}
+        {/* My Recent carousel */}
+        <section>
+          <SectionHeader title="My Recent" toRoute="/my-recent" />
+          <AutoCarousel
+            items={myRecent}
+            getKey={(d) => d.id}
+            renderItem={(d) => <DebateCoverCard d={d} />}
+          />
+        </section>
       </motion.div>
     </div>
   );

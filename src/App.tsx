@@ -23,6 +23,8 @@ import ProjectorPage from "./pages/ProjectorPage";
 import AudiencePage from "./pages/AudiencePage";
 import LiveSessionPage from "./pages/LiveSessionPage";
 import SharedLiveSessionPage from "./pages/SharedLiveSessionPage";
+import ForYouPage from "./pages/ForYouPage";
+import MyRecentPage from "./pages/MyRecentPage";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +53,8 @@ const App = () => (
               <Route path="/live/:id" element={<ProtectedRoute><LiveSessionPage /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
               <Route path="/my-debates" element={<ProtectedRoute><MyDebatesPage /></ProtectedRoute>} />
+              <Route path="/for-you" element={<ProtectedRoute><ForYouPage /></ProtectedRoute>} />
+              <Route path="/my-recent" element={<ProtectedRoute><MyRecentPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
