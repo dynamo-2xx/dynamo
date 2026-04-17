@@ -213,19 +213,13 @@ const SessionRecordView = ({
                     )}
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="px-3 py-3 space-y-2">
+                    <div className="px-3 py-3">
                       {topicEntries.length > 0 ? (
-                        groupConsecutiveEntries(topicEntries).map((entry) => (
-                          <TranscriptCard
-                            key={entry.id}
-                            speakerSide={getSpeakerName(entry.speaker_id)}
-                            sideOrder={entry.speaker_id % 2}
-                            text={entry.text}
-                            aiSummary={entry.ai_summary}
-                            timestamp={entry.timestamp}
-                            autoFlip
-                          />
-                        ))
+                        <LiveThreadView
+                          entries={topicEntries}
+                          threadTitles={threadTitles}
+                          getSpeakerName={getSpeakerName}
+                        />
                       ) : (
                         <p className="text-xs text-muted-foreground italic py-2">No statements for this topic.</p>
                       )}
