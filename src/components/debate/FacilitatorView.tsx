@@ -52,9 +52,11 @@ const FacilitatorView = ({
   debateId, debate, sides, subtopics, arguments: args, participants,
   timeLeft, timerRunning, aiMessage, aiLoading,
   transcriptEntries = [], deepgramConnected, interimText,
+  aiMessageCollapsed = false, aiMessagePulse = false, onToggleAiMessage,
   onToggleTimer, onResetTimer, onExtendTime, onSkipTurn, onNextTurn,
 }: FacilitatorViewProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [argumentMapOpen, setArgumentMapOpen] = useState(false);
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
   const currentSubtopicArgs = args.filter((a) => a.subtopic_id === currentSubtopic?.id);
