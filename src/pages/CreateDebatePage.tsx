@@ -388,6 +388,66 @@ const CreateDebatePage = () => {
                   />
                 </div>
 
+                {/* Mode: Adversarial / Collaborative */}
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
+                    Debate Mode
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAdversarial}
+                      className={`flex flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors border ${
+                        mode === "adversarial"
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-accent text-foreground border-transparent hover:border-foreground/20"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-body font-medium">
+                        <Swords className="w-4 h-4" /> Adversarial
+                      </span>
+                      <span className={`text-[11px] font-body ${mode === "adversarial" ? "text-background/70" : "text-muted-foreground"}`}>
+                        Sides argue for their position.
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectCollaborative}
+                      onMouseEnter={() => {
+                        if (mode !== "collaborative") {
+                          setHoveringCollab(true);
+                          fetchResolutionPreview();
+                        }
+                      }}
+                      onMouseLeave={() => setHoveringCollab(false)}
+                      onFocus={() => {
+                        if (mode !== "collaborative") {
+                          setHoveringCollab(true);
+                          fetchResolutionPreview();
+                        }
+                      }}
+                      onBlur={() => setHoveringCollab(false)}
+                      className={`flex flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors border ${
+                        mode === "collaborative"
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-accent text-foreground border-transparent hover:border-foreground/20"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-body font-medium">
+                        <Handshake className="w-4 h-4" /> Collaborative
+                      </span>
+                      <span className={`text-[11px] font-body ${mode === "collaborative" ? "text-background/70" : "text-muted-foreground"}`}>
+                        Adds a resolution-seeking subtopic.
+                      </span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-3 font-body">
+                    {mode === "collaborative"
+                      ? "A resolution subtopic has been added below. Edit or remove it like any other."
+                      : "Hover Collaborative to preview the resolution subtopic that would be added."}
+                  </p>
+                </div>
+
                 {/* Subtopics */}
                 <div className="bg-background border border-border rounded-lg p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -419,6 +479,27 @@ const CreateDebatePage = () => {
                       </Reorder.Item>
                     ))}
                   </Reorder.Group>
+
+                  {/* Translucent preview of the resolution subtopic on hover */}
+                  <AnimatePresence>
+                    {hoveringCollab && mode !== "collaborative" && (
+                      <motion.div
+                        key="resolution-ghost"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 0.45, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.18 }}
+                        className="flex items-center gap-2 mt-2 pointer-events-none"
+                        aria-hidden="true"
+                      >
+                        <Handshake className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground w-5">{debate.subtopics.length + 1}.</span>
+                        <div className="flex-1 bg-accent/60 border border-dashed border-foreground/20 rounded-lg px-3 py-2 text-sm font-body text-foreground italic">
+                          {resolutionLoading && !resolutionPreview ? "Generating resolution prompt…" : resolutionPreview || "Where could we compromise?"}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Sides */}
