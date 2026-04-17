@@ -147,12 +147,21 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
 
       const identifiedSubtopics: string[] = data.subtopics || [];
       const entrySubtopicMap: Record<string, string> = data.entry_subtopic_map || {};
-      console.log("[Analysis] Pass 1 result:", identifiedSubtopics.length, "subtopics,", Object.keys(entrySubtopicMap).length, "mapped entries");
+      const entryThreadMap: Record<string, { thread_id: string; role: string; parent_entry_id: string | null }> = data.entry_thread_map || {};
+      const newThreads: Record<string, LiveThreadMeta> = data.threads || {};
+      console.log("[Analysis] Pass 1 result:", identifiedSubtopics.length, "subtopics,", Object.keys(entrySubtopicMap).length, "mapped entries,", Object.keys(newThreads).length, "threads");
 
       // Update subtopics
       if (identifiedSubtopics.length) {
         setSubtopics(identifiedSubtopics);
         persistSession({ subtopics: identifiedSubtopics });
+      }
+
+      // Merge thread metadata (preserve existing titles if AI dropped any)
+      const mergedThreads = { ...threadsRef.current, ...newThreads };
+      if (Object.keys(newThreads).length > 0) {
+        setThreads(mergedThreads);
+        persistSession({ summaries: [{ id: "threads-meta", text: "", created_at: Date.now(), subtopics: [], thread_titles: mergedThreads } as any] });
       }
 
       // Pass 2: Summarization — only when explicitly requested (session end)
