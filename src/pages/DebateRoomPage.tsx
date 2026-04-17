@@ -626,43 +626,86 @@ const DebateRoomPage = () => {
 
   // SSE stream helper
   const streamAI = async (action: string, payload: Record<string, unknown>) => {
-    const response = await fetchWithRetry(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-facilitator`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ action, payload }),
-      }
-    );
-    if (!response.ok || !response.body) throw new Error("Stream failed");
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let text = "";
-    let buf = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      let nl: number;
-      while ((nl = buf.indexOf("\n")) !== -1) {
-        let line = buf.slice(0, nl);
-        buf = buf.slice(nl + 1);
-        if (line.endsWith("\r")) line = line.slice(0, -1);
-        if (!line.startsWith("data: ")) continue;
-        const json = line.slice(6).trim();
-        if (json === "[DONE]") break;
-        try {
-          const parsed = JSON.parse(json);
-          const c = parsed.choices?.[0]?.delta?.content;
-          if (c) { text += c; setAiMessage(text); }
-        } catch {}
-      }
+    setAiMessageStreaming(true);
+    // Clear any pending auto-collapse and reopen the panel for the new message
+    if (aiCollapseTimerRef.current) {
+      clearTimeout(aiCollapseTimerRef.current);
+      aiCollapseTimerRef.current = null;
     }
-    return text;
+    setAiMessageCollapsed(false);
+    setAiMessagePulse(false);
+    try {
+      const response = await fetchWithRetry(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-facilitator`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ action, payload }),
+        }
+      );
+      if (!response.ok || !response.body) throw new Error("Stream failed");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let text = "";
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) !== -1) {
+          let line = buf.slice(0, nl);
+          buf = buf.slice(nl + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(json);
+            const c = parsed.choices?.[0]?.delta?.content;
+            if (c) { text += c; setAiMessage(text); }
+          } catch {}
+        }
+      }
+      return text;
+    } finally {
+      setAiMessageStreaming(false);
+    }
   };
+
+  // Auto-collapse the d. narration 5s after streaming ends; pulse the logo button briefly
+  useEffect(() => {
+    if (aiMessageStreaming || !aiMessage) return;
+    setAiMessagePulse(true);
+    if (aiPulseTimerRef.current) clearTimeout(aiPulseTimerRef.current);
+    aiPulseTimerRef.current = setTimeout(() => setAiMessagePulse(false), 2000);
+    if (aiCollapseTimerRef.current) clearTimeout(aiCollapseTimerRef.current);
+    aiCollapseTimerRef.current = setTimeout(() => setAiMessageCollapsed(true), 5000);
+    return () => {
+      if (aiCollapseTimerRef.current) clearTimeout(aiCollapseTimerRef.current);
+      if (aiPulseTimerRef.current) clearTimeout(aiPulseTimerRef.current);
+    };
+  }, [aiMessageStreaming, aiMessage]);
+
+  // Collapse immediately when the speaker timer starts ticking with a fresh turn
+  useEffect(() => {
+    if (timerRunning && !aiMessageStreaming && aiMessage) {
+      if (aiCollapseTimerRef.current) clearTimeout(aiCollapseTimerRef.current);
+      setAiMessageCollapsed(true);
+    }
+  }, [timerRunning, aiMessageStreaming, aiMessage]);
+
+  const toggleAiMessage = useCallback(() => {
+    if (aiCollapseTimerRef.current) {
+      clearTimeout(aiCollapseTimerRef.current);
+      aiCollapseTimerRef.current = null;
+    }
+    setAiMessagePulse(false);
+    setAiMessageCollapsed((prev) => !prev);
+  }, []);
 
   const startDebate = async () => {
     if (!debate || !id) return;
