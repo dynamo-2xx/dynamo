@@ -161,7 +161,10 @@ export function useLiveTranscription({ sessionId, isActive }: UseLiveTranscripti
       const mergedThreads = { ...threadsRef.current, ...newThreads };
       if (Object.keys(newThreads).length > 0) {
         setThreads(mergedThreads);
-        persistSession({ summaries: [{ id: "threads-meta", text: "", created_at: Date.now(), subtopics: [], thread_titles: mergedThreads } as any] });
+        // Persist threads in summaries JSONB as a single sentinel record
+        const otherSummaries = (summariesRef.current || []).filter((s: any) => s?.id !== "__threads_meta__");
+        const threadsMeta: any = { id: "__threads_meta__", text: "", created_at: Date.now(), subtopics: [], thread_titles: mergedThreads };
+        persistSession({ summaries: [...otherSummaries, threadsMeta] });
       }
 
       // Pass 2: Summarization — only when explicitly requested (session end)
