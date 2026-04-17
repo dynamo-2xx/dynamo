@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { Play, Pause, SkipForward, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio } from "lucide-react";
+import { Play, Pause, SkipForward, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio, Map } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
 import TranscriptCard from "./TranscriptCard";
+import DLogoButton from "./DLogoButton";
+import IconCircleButton from "./IconCircleButton";
+import ArgumentMapOverlay from "./ArgumentMapOverlay";
 import type { TranscriptEntry, ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
 
 interface Side { id: string; label: string; sort_order: number; }
