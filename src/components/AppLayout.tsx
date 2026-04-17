@@ -8,7 +8,6 @@ import logoSmiley from "@/assets/logo-smiley.png";
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/explore", icon: Compass, label: "Explore" },
-  { to: "/create", icon: PlusCircle, label: "Create" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
 
