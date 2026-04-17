@@ -17,6 +17,7 @@ import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay
 import RoundSummaryCard from "@/components/debate/RoundSummaryCard";
 import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
+import { useGrading } from "@/hooks/useGrading";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -47,6 +48,7 @@ interface DebateData {
   prep_duration_seconds: number | null;
   prep_side1_ready: boolean;
   prep_side2_ready: boolean;
+  feedback_enabled?: boolean;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
