@@ -8,7 +8,6 @@ import logoSmiley from "@/assets/logo-smiley.png";
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/explore", icon: Compass, label: "Explore" },
-  { to: "/create", icon: PlusCircle, label: "Create" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
 
@@ -93,22 +92,17 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border flex justify-around py-2 z-40">
         {navItems.map((item) => {
           const active = location.pathname === item.to;
-          const isCreate = item.to === "/create";
           return (
             <RouterNavLink
               key={item.to}
               to={item.to}
               className={cn(
                 "flex flex-col items-center gap-0.5 text-[10px] font-body transition-colors p-1",
-                isCreate
-                  ? "text-foreground"
-                  : active
-                  ? "text-foreground font-medium"
-                  : "text-muted-foreground"
+                active ? "text-foreground font-medium" : "text-muted-foreground"
               )}
             >
-              <item.icon className={cn("w-5 h-5", isCreate && "w-7 h-7")} />
-              {!isCreate && <span>{item.label}</span>}
+              <item.icon className="w-5 h-5" />
+              <span>{item.label}</span>
             </RouterNavLink>
           );
         })}

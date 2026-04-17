@@ -277,13 +277,6 @@ const CreateDebatePage = () => {
                   Create
                 </button>
               </div>
-              <button
-                onClick={() => navigate("/live/new")}
-                className="mt-3 w-full bg-background border border-border text-foreground rounded-lg font-body text-xs font-medium hover:border-foreground/30 transition-colors px-[20px] flex-row flex items-center justify-center gap-[8px] mx-0 my-px mb-px py-[55px]"
-              >
-                <Mic className="w-4 h-4 text-foreground" />
-                Live
-              </button>
             </motion.div>
           )}
 
