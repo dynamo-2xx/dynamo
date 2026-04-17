@@ -283,13 +283,6 @@ const ParticipantSharedView = ({
             )}
           </div>
           <DebateTimer timeLeft={timeLeft} size="md" />
-          <button
-            onClick={() => setSidebarExpanded(!sidebarExpanded)}
-            className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {sidebarExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
         </div>
       </div>
 
@@ -414,7 +407,7 @@ const ParticipantSharedView = ({
             )}
             {/* Mic / Deepgram toggle */}
             <button
-              onClick={onToggleDeepgram}
+              onClick={handleToggleMic}
               className={`p-3 rounded-lg transition-colors shrink-0 ${
                 deepgramActive
                   ? "bg-primary text-primary-foreground hover:bg-primary/90 animate-pulse"

@@ -1232,6 +1232,7 @@ const DebateRoomPage = () => {
               onExtendTime={handleExtendTime}
               onSkipTurn={handleSkipTurn}
               onNextSubtopic={handleNextSubtopic}
+              onOpenNotebook={() => setNotebookOpen(true)}
               roundSummaries={roundSummaries}
             />
             {/* Prep phase overlay */}
