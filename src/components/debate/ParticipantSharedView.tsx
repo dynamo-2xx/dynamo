@@ -3,16 +3,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, MicOff, Send, SkipForward, ChevronDown,
   Users, Pause, Play, Plus, ChevronRight,
-  Video, VideoOff, Maximize2, Minimize2,
+  Video, VideoOff, Maximize2, Minimize2, Map as MapIcon, NotebookPen,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
 import SpeechInput, { type SpeechInputHandle } from "./SpeechInput";
 import TranscriptCard from "./TranscriptCard";
 import RoundSummaryCard from "./RoundSummaryCard";
+import DLogoButton from "./DLogoButton";
+import IconCircleButton from "./IconCircleButton";
+import ArgumentMapOverlay from "./ArgumentMapOverlay";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
+import { toast } from "sonner";
 
 interface Side { id: string; label: string; sort_order: number; }
 interface Subtopic { id: string; title: string; sort_order: number; }
@@ -39,6 +43,9 @@ interface ParticipantSharedViewProps {
   participants: Participant[];
   timeLeft: number;
   aiMessage: string;
+  aiMessageCollapsed?: boolean;
+  aiMessagePulse?: boolean;
+  onToggleAiMessage?: () => void;
   canSpeak: boolean;
   isMyTurn: boolean;
   isSpeaker: boolean;
@@ -64,21 +71,24 @@ interface ParticipantSharedViewProps {
   onExtendTime?: () => void;
   onSkipTurn?: () => void;
   onNextSubtopic?: () => void;
+  onOpenNotebook?: () => void;
   roundSummaries?: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>;
 }
 
 const ParticipantSharedView = ({
   debate, sides, subtopics, arguments: args, participants,
-  timeLeft, aiMessage,
+  timeLeft, aiMessage, aiMessageCollapsed = false, aiMessagePulse = false, onToggleAiMessage,
   canSpeak, isMyTurn, isSpeaker, userId, micEnabled, isRecording,
   argumentText, submitting, speechRef, currentSide,
   isPublisher, timerRunning,
   transcriptEntries = [], deepgramConnected, deepgramActive, interimText,
   onArgumentTextChange, onSetRecording, onSubmit, onEndTurnEarly,
   onToggleDeepgram, onToggleTimer, onExtendTime, onSkipTurn, onNextSubtopic,
+  onOpenNotebook,
   roundSummaries = {},
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [argumentMapOpen, setArgumentMapOpen] = useState(false);
 
   // Camera state — independently toggleable per participant
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -104,8 +114,25 @@ const ParticipantSharedView = ({
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         localStreamRef.current = stream;
         setLocalCameraOn(true);
-      } catch {}
+      } catch {
+        toast.error("Camera permission denied. Please allow access in your browser.");
+      }
     }
+  };
+
+  const handleToggleMic = async () => {
+    // First click: request mic permission so the browser prompt happens here, in the console
+    if (!deepgramActive) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Release the test stream — Deepgram hook acquires its own when activated
+        stream.getTracks().forEach(t => t.stop());
+      } catch {
+        toast.error("Microphone permission denied. Please allow access in your browser.");
+        return;
+      }
+    }
+    onToggleDeepgram?.();
   };
 
   // Cleanup on unmount
@@ -192,6 +219,23 @@ const ParticipantSharedView = ({
   const onlyLocalOn = localCameraOn && !remoteCameraOn;
   const onlyRemoteOn = !localCameraOn && remoteCameraOn;
 
+  // Build argument-map nodes for the overlay (current subtopic only)
+  const overlayArgs = currentSubtopicArgs.map((a) => {
+    const participant = participants.find((p) => p.id === a.participant_id);
+    const side = sides.find((s) => s.id === participant?.side_id);
+    return {
+      id: a.id,
+      content: a.content,
+      argumentType: a.argument_type,
+      sideLabel: side?.label || "Unknown",
+      sideOrder: side?.sort_order ?? 0,
+      participantId: a.participant_id,
+      parentArgumentId: a.parent_argument_id,
+      createdAt: a.created_at,
+      isEdited: a.is_edited,
+    };
+  });
+
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Top bar */}
@@ -209,14 +253,36 @@ const ParticipantSharedView = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Stack: d. (top), map (middle), notebook (bottom) */}
+          <div className="flex flex-col items-center gap-1.5">
+            {aiMessage && onToggleAiMessage && (
+              <DLogoButton
+                onClick={onToggleAiMessage}
+                active={!aiMessageCollapsed}
+                pulse={aiMessagePulse}
+              />
+            )}
+            {overlayArgs.length > 0 && (
+              <IconCircleButton
+                onClick={() => setArgumentMapOpen((v) => !v)}
+                active={argumentMapOpen}
+                title="Argument map"
+                ariaLabel="Toggle argument map overlay"
+              >
+                <MapIcon className="w-3.5 h-3.5" />
+              </IconCircleButton>
+            )}
+            {onOpenNotebook && isSpeaker && (
+              <IconCircleButton
+                onClick={onOpenNotebook}
+                title="My notes"
+                ariaLabel="Open notebook"
+              >
+                <NotebookPen className="w-3.5 h-3.5" />
+              </IconCircleButton>
+            )}
+          </div>
           <DebateTimer timeLeft={timeLeft} size="md" />
-          <button
-            onClick={() => setSidebarExpanded(!sidebarExpanded)}
-            className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {sidebarExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
         </div>
       </div>
 
@@ -239,9 +305,9 @@ const ParticipantSharedView = ({
         </div>
       )}
 
-      {/* AI message */}
+      {/* AI message — auto-collapses 5s after streaming completes */}
       <AnimatePresence>
-        {aiMessage && (
+        {aiMessage && !aiMessageCollapsed && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -261,10 +327,9 @@ const ParticipantSharedView = ({
         )}
       </AnimatePresence>
 
-      {/* Main content area: main box + sidebar */}
-      <div className="flex-1 flex overflow-hidden min-h-0 w-full">
-        {/* Main box */}
-        <div className={`flex flex-col min-h-0 overflow-hidden transition-all duration-300 ${sidebarExpanded ? "w-[60%]" : "w-[80%]"}`}>
+      {/* Main content area: full-width main box with translucent argument-map overlay */}
+      <div className="flex-1 flex overflow-hidden min-h-0 w-full relative">
+        <div className="flex flex-col min-h-0 overflow-hidden w-full relative">
           {/* Both cameras off → show live thread */}
           {bothOff && (
             <div className="flex-1 flex flex-col min-h-0">
@@ -311,104 +376,15 @@ const ParticipantSharedView = ({
               )}
             </div>
           )}
+
+          {/* Translucent argument-map overlay */}
+          <ArgumentMapOverlay
+            open={argumentMapOpen}
+            onClose={() => setArgumentMapOpen(false)}
+            arguments={overlayArgs}
+            subtopicTitle={currentSubtopic?.title}
+          />
         </div>
-
-        {/* Sidebar — argument map organized by subtopic dropdowns */}
-        <aside className={`border-l border-border bg-card/50 flex flex-col min-h-0 overflow-hidden transition-all duration-300 ${sidebarExpanded ? "w-[40%]" : "w-[20%]"}`}>
-          {/* Participants */}
-          <div className="border-b border-border p-3 shrink-0">
-            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 font-body">
-              <Users className="w-3 h-3 inline mr-1" /> Participants
-            </h3>
-            <div className="space-y-1.5">
-              {sides.map((side) => (
-                <div key={side.id}>
-                  <p className={`text-[10px] font-semibold uppercase tracking-wider ${
-                    side.sort_order === 0 ? "text-[hsl(var(--side-1))]" : "text-[hsl(var(--side-2))]"
-                  }`}>{side.label}</p>
-                  {participants.filter((p) => p.side_id === side.id).map((p) => (
-                    <div key={p.id} className="text-[11px] text-foreground flex items-center gap-1 font-body ml-2">
-                      <div className={`w-1.5 h-1.5 rounded-full ${
-                        side.sort_order === 0 ? "bg-[hsl(var(--side-1))]" : "bg-[hsl(var(--side-2))]"
-                      }`} />
-                      {p.user_id === userId ? "You" : p.user_id.slice(0, 8)}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Argument Map header */}
-          <div className="border-b border-border p-3 shrink-0">
-            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground font-body">
-              Argument Map
-            </h3>
-          </div>
-
-          {/* Subtopic dropdowns with argument map cards */}
-          <div className="flex-1 p-2 space-y-1 overflow-y-auto min-h-0">
-            {subtopics.map((st, stIdx) => {
-              const items = getSubtopicItems(st);
-              const isCurrent = stIdx === (debate.current_subtopic_index ?? 0);
-              const roundSummary = roundSummaries[st.id];
-
-              return (
-                <Collapsible key={st.id} defaultOpen={isCurrent}>
-                  <CollapsibleTrigger className="flex items-center gap-1.5 w-full rounded-lg px-2.5 py-2 text-left hover:bg-accent/50 transition-colors">
-                    <ChevronDown className="w-3 h-3 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
-                    <span className={`text-[10px] font-semibold uppercase tracking-wider flex-1 ${
-                      isCurrent ? "text-primary" : "text-muted-foreground"
-                    }`}>
-                      {st.title}
-                    </span>
-                    {items.length > 0 && (
-                      <span className="text-[9px] bg-muted rounded-full px-1.5 py-0.5 text-muted-foreground">
-                        {items.length}
-                      </span>
-                    )}
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="pl-2 pr-1 pb-2 space-y-1.5">
-                      {/* Round summary pinned at top if available */}
-                      {roundSummary && !isCurrent && (
-                        <RoundSummaryCard
-                          summary={roundSummary.summary}
-                          keyArguments={roundSummary.key_arguments}
-                          subtopicTitle={st.title}
-                          compact
-                        />
-                      )}
-                      {items.map((item) => (
-                        <TranscriptCard
-                          key={item.id}
-                          speakerSide={item.speakerSide}
-                          sideOrder={item.sideOrder}
-                          text={item.text}
-                          aiSummary={item.aiSummary}
-                          timestamp={item.timestamp}
-                          compact
-                          autoFlip
-                        />
-                      ))}
-                      {items.length === 0 && (
-                        <p className="text-[10px] text-muted-foreground italic font-body py-2 px-2">
-                          No statements yet
-                        </p>
-                      )}
-                      {/* Interim text for current subtopic */}
-                      {isCurrent && interimText && (
-                        <div className="text-[10px] text-muted-foreground italic font-body px-2 py-1 bg-muted/50 rounded">
-                          🎙 {interimText}
-                        </div>
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
-          </div>
-        </aside>
       </div>
 
       {/* Fixed input area at bottom — text input only (mic goes directly to argument map via Deepgram) */}
@@ -431,7 +407,7 @@ const ParticipantSharedView = ({
             )}
             {/* Mic / Deepgram toggle */}
             <button
-              onClick={onToggleDeepgram}
+              onClick={handleToggleMic}
               className={`p-3 rounded-lg transition-colors shrink-0 ${
                 deepgramActive
                   ? "bg-primary text-primary-foreground hover:bg-primary/90 animate-pulse"

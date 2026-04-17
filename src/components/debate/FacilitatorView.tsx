@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { Play, Pause, SkipForward, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio } from "lucide-react";
+import { Play, Pause, SkipForward, ChevronRight, Zap, Plus, PanelRightOpen, PanelRightClose, Monitor, Radio, Map as MapIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DebateTimer from "./DebateTimer";
 import LiveArgumentMap from "./LiveArgumentMap";
 import TranscriptCard from "./TranscriptCard";
+import DLogoButton from "./DLogoButton";
+import IconCircleButton from "./IconCircleButton";
+import ArgumentMapOverlay from "./ArgumentMapOverlay";
 import type { TranscriptEntry, ArgumentMapEntry } from "@/hooks/useDeepgramTranscription";
 
 interface Side { id: string; label: string; sort_order: number; }
@@ -38,6 +41,9 @@ interface FacilitatorViewProps {
   transcriptEntries?: TranscriptEntry[];
   deepgramConnected?: boolean;
   interimText?: string;
+  aiMessageCollapsed?: boolean;
+  aiMessagePulse?: boolean;
+  onToggleAiMessage?: () => void;
   onToggleTimer: () => void;
   onResetTimer: () => void;
   onExtendTime: () => void;
@@ -49,9 +55,11 @@ const FacilitatorView = ({
   debateId, debate, sides, subtopics, arguments: args, participants,
   timeLeft, timerRunning, aiMessage, aiLoading,
   transcriptEntries = [], deepgramConnected, interimText,
+  aiMessageCollapsed = false, aiMessagePulse = false, onToggleAiMessage,
   onToggleTimer, onResetTimer, onExtendTime, onSkipTurn, onNextTurn,
 }: FacilitatorViewProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [argumentMapOpen, setArgumentMapOpen] = useState(false);
   const currentSubtopic = subtopics[debate.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
   const currentSubtopicArgs = args.filter((a) => a.subtopic_id === currentSubtopic?.id);
@@ -86,7 +94,23 @@ const FacilitatorView = ({
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Main panel */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col relative">
+        {/* Argument map overlay */}
+        <ArgumentMapOverlay
+          open={argumentMapOpen}
+          onClose={() => setArgumentMapOpen(false)}
+          arguments={currentSubtopicArgs.map((a) => {
+            const p = participants.find((p) => p.id === a.participant_id);
+            const side = sides.find((s) => s.id === p?.side_id);
+            return {
+              id: a.id, content: a.content, argumentType: a.argument_type,
+              sideLabel: side?.label || "Unknown", sideOrder: side?.sort_order ?? 0,
+              participantId: a.participant_id, parentArgumentId: a.parent_argument_id,
+              createdAt: a.created_at, isEdited: a.is_edited,
+            };
+          })}
+          subtopicTitle={currentSubtopic?.title}
+        />
         {/* Speaker + Timer section */}
         <div className="border-b border-border bg-card px-6 py-5">
           <div className="flex items-start justify-between">
@@ -105,6 +129,25 @@ const FacilitatorView = ({
               >
                 <Monitor className="w-4 h-4" /> Projector
               </button>
+              <div className="flex flex-col items-center gap-1.5">
+                {aiMessage && onToggleAiMessage && (
+                  <DLogoButton
+                    onClick={onToggleAiMessage}
+                    active={!aiMessageCollapsed}
+                    pulse={aiMessagePulse}
+                  />
+                )}
+                {currentSubtopicArgs.length > 0 && (
+                  <IconCircleButton
+                    onClick={() => setArgumentMapOpen((v) => !v)}
+                    active={argumentMapOpen}
+                    title="Argument map"
+                    ariaLabel="Toggle argument map overlay"
+                  >
+                    <MapIcon className="w-3.5 h-3.5" />
+                  </IconCircleButton>
+                )}
+              </div>
               <DebateTimer timeLeft={timeLeft} size="lg" />
             </div>
           </div>
@@ -134,9 +177,9 @@ const FacilitatorView = ({
           </div>
         </div>
 
-        {/* AI message */}
+        {/* AI message — auto-collapses 5s after streaming completes */}
         <AnimatePresence>
-          {aiMessage && (
+          {aiMessage && !aiMessageCollapsed && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
