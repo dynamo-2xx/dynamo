@@ -144,7 +144,83 @@ Write ONE resolution-seeking subtopic question tailored to this specific debate.
         break;
       }
 
-      default:
+      case "grade_turn": {
+        const { topic, subtopic, side, content, opposingArguments, includeResolution } = payload as {
+          topic: string;
+          subtopic: string;
+          side: string;
+          content: string;
+          opposingArguments: Array<{ side: string; content: string }>;
+          includeResolution: boolean;
+        };
+        systemPrompt = `You are d.'s performance analyst. You grade ONE speaker's most recent turn on four dimensions, each scored 0.0–10.0 (one decimal allowed). Grade ONLY on what was said — never on speaking style, accent, tone, or delivery speed. Never declare a winner. Be honest, specific, and concise.
+
+Dimensions:
+1. argument_quality — logical soundness, relevance, evidence/reasoning. Penalize fallacies, unsupported assertions, off-topic statements.
+2. opposition_engagement — how directly and substantively this turn responds to the opposing side's arguments. Reward direct counters, acknowledgment of opposing points, substantive rebuttals. Penalize ignoring opposition.
+3. clarity_structure — clarity and coherence: clear point, supporting reasoning, conclusion. Penalize rambling, incoherence, unclear statements.
+4. stakes_articulation — how effectively the turn communicates what is at risk if their position loses. Reward specific, compelling stakes. Penalize vague/absent stakes.
+
+Also produce:
+- overall_score: weighted average of the four dimensions (equal weight is fine: average them) to one decimal.
+- overall_label: Exceptional (9–10), Strong (7–8.9), Developing (5–6.9), Needs Work (3–4.9), Insufficient (0–2.9).
+- suggestion: ONE actionable improvement, max 1 sentence.
+- criticism: ONE specific weakness from this turn, max 1 sentence.
+${includeResolution ? `
+ALSO grade resolution_score (0.0–10.0) INDEPENDENTLY based on: willingness to acknowledge valid opposing points, movement toward shared position, constructive framing of disagreement, explicit attempts to find common ground.
+- resolution_label: Consensus Builder (9–10), Collaborative (7–8.9), Neutral (5–6.9), Resistant (3–4.9), Adversarial (0–2.9).` : ""}`;
+        userPrompt = `Topic: "${topic}"
+Subtopic: "${subtopic}"
+Speaker side: "${side}"
+
+Speaker's turn (verbatim):
+"""
+${content}
+"""
+
+Recent opposing arguments (for engagement context):
+${opposingArguments.length ? opposingArguments.map((a) => `[${a.side}] ${a.content}`).join("\n") : "(none yet)"}
+
+Grade this turn using the grade_turn tool.`;
+        break;
+      }
+
+      case "grade_final": {
+        const { topic, side, allTurns, opposingTurns, includeResolution } = payload as {
+          topic: string;
+          side: string;
+          allTurns: Array<{ subtopic: string; content: string }>;
+          opposingTurns: Array<{ subtopic: string; side: string; content: string }>;
+          includeResolution: boolean;
+        };
+        systemPrompt = `You are d.'s performance analyst. You produce a FINAL aggregated performance grade for ONE speaker across the entire debate. Grade ONLY on what was said. Never declare a winner. Be honest and specific.
+
+Score four dimensions (0.0–10.0):
+1. argument_quality — across the whole debate
+2. opposition_engagement — across the whole debate
+3. clarity_structure — across the whole debate
+4. stakes_articulation — across the whole debate
+
+Then produce:
+- overall_score: weighted average (equal weight, one decimal).
+- overall_label: Exceptional (9–10), Strong (7–8.9), Developing (5–6.9), Needs Work (3–4.9), Insufficient (0–2.9).
+- narrative: 3–5 sentence private performance summary. Specific, no fluff, addressed to the speaker in second person ("you").
+${includeResolution ? `
+ALSO grade resolution_score (0.0–10.0) INDEPENDENTLY across the whole debate based on: acknowledgment of valid opposing points, movement toward shared positions, constructive framing of disagreements, explicit attempts to find common ground.
+- resolution_label: Consensus Builder (9–10), Collaborative (7–8.9), Neutral (5–6.9), Resistant (3–4.9), Adversarial (0–2.9).` : ""}`;
+        userPrompt = `Topic: "${topic}"
+Speaker side: "${side}"
+
+Speaker's turns (in order):
+${allTurns.map((t, i) => `Turn ${i + 1} — ${t.subtopic}:\n${t.content}`).join("\n\n")}
+
+Opposing turns (for context):
+${opposingTurns.length ? opposingTurns.map((t) => `[${t.side} — ${t.subtopic}] ${t.content}`).join("\n") : "(none)"}
+
+Grade this speaker using the grade_final tool.`;
+        break;
+      }
+
         return new Response(
           JSON.stringify({ error: `Unknown action: ${action}` }),
           {
