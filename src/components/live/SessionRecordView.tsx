@@ -21,6 +21,7 @@ interface SessionRecordViewProps {
   speakerNames: Record<string, string>;
   shareToken: string | null;
   readOnly?: boolean;
+  threadTitles?: Record<string, LiveThreadMeta>;
   onEntriesUpdate?: (entries: LiveTranscriptEntry[]) => void;
   onSpeakerNamesUpdate?: (names: Record<string, string>) => void;
 }
@@ -36,11 +37,19 @@ const SessionRecordView = ({
   speakerNames,
   shareToken,
   readOnly = false,
+  threadTitles: threadTitlesProp,
   onEntriesUpdate,
   onSpeakerNamesUpdate,
 }: SessionRecordViewProps) => {
   const [currentShareToken, setCurrentShareToken] = useState(shareToken);
   const [isSharing, setIsSharing] = useState(false);
+
+  // Resolve thread titles: prefer prop, fall back to summaries sentinel
+  const threadTitles = useMemo<Record<string, LiveThreadMeta>>(() => {
+    if (threadTitlesProp && Object.keys(threadTitlesProp).length > 0) return threadTitlesProp;
+    const meta = (summaries as any[]).find((s) => s?.id === "__threads_meta__");
+    return (meta?.thread_titles || {}) as Record<string, LiveThreadMeta>;
+  }, [threadTitlesProp, summaries]);
 
   const duration = endedAt && createdAt
     ? Math.round((new Date(endedAt).getTime() - new Date(createdAt).getTime()) / 60000)
