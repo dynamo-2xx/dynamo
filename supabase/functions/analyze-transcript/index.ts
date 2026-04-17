@@ -100,16 +100,40 @@ You will receive transcript entries as JSON objects, each with an "id", "speaker
 
 1. Identify distinct subtopics/themes in the conversation using the patterns above.
 2. If previous_subtopics is provided, prefer keeping existing topic labels unless the conversation explicitly justifies a merge, split, or rename.
-3. CRITICAL: You MUST assign EVERY transcript entry to exactly one subtopic by mapping its "id" to a subtopic label in entry_subtopic_map. Every entry ID from the input MUST appear as a key in entry_subtopic_map.
+3. CRITICAL: You MUST assign EVERY transcript entry to exactly one subtopic by mapping its "id" to a subtopic label in entry_assignments. Every entry ID from the input MUST appear there.
 4. If no clear subtopics emerge, use "General Discussion" and assign all entries to it.
 
+5. ARGUMENT THREADING (within each subtopic):
+   - Group entries into ARGUMENT THREADS. A thread starts when a speaker introduces a new specific point/claim, and continues with counter-arguments and elaborations responding to that same point.
+   - role = "argument": a NEW specific point being introduced (starts a new thread).
+   - role = "counter": a direct rebuttal/challenge/disagreement to a prior entry in the same thread (set parent_entry_id).
+   - role = "continuation": the same speaker (or another speaker) elaborating/agreeing/extending the same point already on the table (same thread, optional parent_entry_id).
+   - Threads are SCOPED WITHIN A SUBTOPIC. When the subtopic changes, any open thread is closed.
+   - Use stable thread IDs of the form "thread-1", "thread-2", etc. — number them in order of first appearance.
+   - Every entry MUST be assigned to exactly one thread.
+
+6. THREAD TITLES:
+   - For EACH thread, generate a short 3–7 word title in sentence case that captures the SPECIFIC point being argued (NOT the subtopic name).
+   - Example: under subtopic "Infrastructure Costs", a thread title could be "Funding via municipal bonds" or "Long-term maintenance burden" — never just "Infrastructure Costs".
+   - If a thread only has 1 entry and the point is unclear, use a tentative noun phrase from the entry itself.
+   - Title MUST be different from the subtopic label.
+
 EXAMPLE — given entries:
-  [{"id": "entry-1", "speaker": "Speaker 1", "text": "The economy is struggling."},
-   {"id": "entry-2", "speaker": "Speaker 2", "text": "Education needs reform."}]
+  [{"id": "e1", "speaker": "Speaker 1", "text": "We should fund the bridge with municipal bonds."},
+   {"id": "e2", "speaker": "Speaker 2", "text": "Bonds will saddle taxpayers with debt for decades."},
+   {"id": "e3", "speaker": "Speaker 1", "text": "Maintenance is also a huge concern long-term."}]
 
 You would return:
-  subtopics: ["Economic Challenges", "Education Reform"]
-  entry_assignments: [{"entry_id": "entry-1", "subtopic": "Economic Challenges"}, {"entry_id": "entry-2", "subtopic": "Education Reform"}]
+  subtopics: ["Infrastructure Costs"]
+  entry_assignments: [
+    {"entry_id": "e1", "subtopic": "Infrastructure Costs", "thread_id": "thread-1", "role": "argument", "parent_entry_id": null},
+    {"entry_id": "e2", "subtopic": "Infrastructure Costs", "thread_id": "thread-1", "role": "counter", "parent_entry_id": "e1"},
+    {"entry_id": "e3", "subtopic": "Infrastructure Costs", "thread_id": "thread-2", "role": "argument", "parent_entry_id": null}
+  ]
+  threads: [
+    {"thread_id": "thread-1", "subtopic": "Infrastructure Costs", "title": "Funding via municipal bonds"},
+    {"thread_id": "thread-2", "subtopic": "Infrastructure Costs", "title": "Long-term maintenance burden"}
+  ]
 
 Return your analysis using the analyze_conversation tool.`;
 
@@ -144,7 +168,7 @@ serve(async (req) => {
               type: "function",
               function: {
                 name: "analyze_conversation",
-                description: "Analyze a live conversation transcript. You MUST populate entry_subtopic_map with every entry ID from the input.",
+                description: "Analyze a live conversation transcript. Identify subtopics, assign every entry to a subtopic AND an argument thread, and produce a short title for each thread.",
                 parameters: {
                   type: "object",
                   properties: {
@@ -155,18 +179,34 @@ serve(async (req) => {
                     },
                     entry_assignments: {
                       type: "array",
-                      description: "REQUIRED: An array with one object per transcript entry. Every entry ID from the input MUST appear here.",
+                      description: "REQUIRED: An array with one object per transcript entry. Every entry ID from the input MUST appear here, with subtopic, thread_id, and role.",
                       items: {
                         type: "object",
                         properties: {
                           entry_id: { type: "string", description: "The exact entry ID from the input transcript" },
                           subtopic: { type: "string", description: "The subtopic label this entry belongs to" },
+                          thread_id: { type: "string", description: "Stable thread id like 'thread-1'. Threads are scoped within a subtopic." },
+                          role: { type: "string", enum: ["argument", "counter", "continuation"], description: "argument = new point starting a thread; counter = rebuts a prior entry; continuation = extends the current thread." },
+                          parent_entry_id: { type: "string", description: "For 'counter' (and optionally 'continuation'), the entry_id this responds to. Use empty string if none." },
                         },
-                        required: ["entry_id", "subtopic"],
+                        required: ["entry_id", "subtopic", "thread_id", "role"],
+                      },
+                    },
+                    threads: {
+                      type: "array",
+                      description: "REQUIRED: One object per unique thread_id used in entry_assignments. Title is a 3–7 word noun phrase in sentence case capturing the specific point of the thread (NOT the subtopic name).",
+                      items: {
+                        type: "object",
+                        properties: {
+                          thread_id: { type: "string" },
+                          subtopic: { type: "string" },
+                          title: { type: "string", description: "3–7 word sentence-case title of the specific point of this thread" },
+                        },
+                        required: ["thread_id", "subtopic", "title"],
                       },
                     },
                   },
-                  required: ["subtopics", "entry_assignments"],
+                  required: ["subtopics", "entry_assignments", "threads"],
                   additionalProperties: false,
                 },
               },
@@ -189,18 +229,31 @@ serve(async (req) => {
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       if (toolCall) {
         const result = JSON.parse(toolCall.function.arguments);
-        // Convert entry_assignments array to entry_subtopic_map object for the client
         const entry_subtopic_map: Record<string, string> = {};
+        const entry_thread_map: Record<string, { thread_id: string; role: string; parent_entry_id: string | null }> = {};
         if (Array.isArray(result.entry_assignments)) {
           for (const a of result.entry_assignments) {
             if (a.entry_id && a.subtopic) entry_subtopic_map[a.entry_id] = a.subtopic;
+            if (a.entry_id && a.thread_id && a.role) {
+              entry_thread_map[a.entry_id] = {
+                thread_id: a.thread_id,
+                role: a.role,
+                parent_entry_id: a.parent_entry_id && a.parent_entry_id !== "" ? a.parent_entry_id : null,
+              };
+            }
           }
         }
-        console.log(`Pass 1: ${result.subtopics?.length || 0} subtopics, ${Object.keys(entry_subtopic_map).length} mapped entries`);
-        return new Response(JSON.stringify({ subtopics: result.subtopics || [], entry_subtopic_map }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const threads: Record<string, { title: string; subtopic: string }> = {};
+        if (Array.isArray(result.threads)) {
+          for (const t of result.threads) {
+            if (t.thread_id && t.title) threads[t.thread_id] = { title: t.title, subtopic: t.subtopic || "" };
+          }
+        }
+        console.log(`Pass 1: ${result.subtopics?.length || 0} subtopics, ${Object.keys(entry_subtopic_map).length} mapped entries, ${Object.keys(threads).length} threads`);
+        return new Response(JSON.stringify({ subtopics: result.subtopics || [], entry_subtopic_map, entry_thread_map, threads }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      return new Response(JSON.stringify({ subtopics: [], entry_subtopic_map: {} }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ subtopics: [], entry_subtopic_map: {}, entry_thread_map: {}, threads: {} }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ── Live: Pass 2 — Per-entry summaries ──
