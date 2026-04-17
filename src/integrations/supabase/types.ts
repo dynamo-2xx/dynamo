@@ -322,6 +322,7 @@ export type Database = {
       debates: {
         Row: {
           community_tag: string | null
+          cover_image_url: string | null
           created_at: string
           created_by: string
           current_speaker_side_id: string | null
@@ -356,6 +357,7 @@ export type Database = {
         }
         Insert: {
           community_tag?: string | null
+          cover_image_url?: string | null
           created_at?: string
           created_by: string
           current_speaker_side_id?: string | null
@@ -390,6 +392,7 @@ export type Database = {
         }
         Update: {
           community_tag?: string | null
+          cover_image_url?: string | null
           created_at?: string
           created_by?: string
           current_speaker_side_id?: string | null
@@ -481,6 +484,7 @@ export type Database = {
         Row: {
           affiliation: string | null
           avatar_url: string | null
+          banner_url: string | null
           created_at: string
           display_name: string | null
           id: string
@@ -493,6 +497,7 @@ export type Database = {
         Insert: {
           affiliation?: string | null
           avatar_url?: string | null
+          banner_url?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
@@ -505,6 +510,7 @@ export type Database = {
         Update: {
           affiliation?: string | null
           avatar_url?: string | null
+          banner_url?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
