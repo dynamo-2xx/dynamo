@@ -1293,6 +1293,7 @@ const DebateRoomPage = () => {
                 argumentCount={arguments_.length}
                 editWindowEndsAt={debate.edit_window_ends_at}
                 debateId={id!}
+                feedbackEnabled={!!debate.feedback_enabled}
                 onDismiss={() => setShowCompletionOverlay(false)}
               />
             )}
