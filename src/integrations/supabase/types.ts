@@ -178,6 +178,7 @@ export type Database = {
           debate_id: string
           id: string
           invite_token: string | null
+          invite_token_hash: string | null
           invited_email: string | null
           invited_user_id: string
           invited_username: string
@@ -189,6 +190,7 @@ export type Database = {
           debate_id: string
           id?: string
           invite_token?: string | null
+          invite_token_hash?: string | null
           invited_email?: string | null
           invited_user_id: string
           invited_username: string
@@ -200,6 +202,7 @@ export type Database = {
           debate_id?: string
           id?: string
           invite_token?: string | null
+          invite_token_hash?: string | null
           invited_email?: string | null
           invited_user_id?: string
           invited_username?: string
@@ -794,6 +797,19 @@ export type Database = {
     }
     Functions: {
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
+      create_debate_invitation: {
+        Args: {
+          _debate_id: string
+          _invited_email: string
+          _invited_user_id: string
+          _invited_username: string
+          _side_id: string
+        }
+        Returns: {
+          id: string
+          invite_token: string
+        }[]
+      }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
@@ -855,6 +871,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
     }
     Enums: {
       app_role: "personal" | "education" | "community" | "admin"
