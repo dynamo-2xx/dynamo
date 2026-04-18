@@ -1,53 +1,75 @@
 
+Tackling tasks 1, 2, 5, 9. All four are scoped and low-risk.
 
-## Pre-launch checklist
+**1. Leaked-password protection**
+Enable HIBP check via auth config (`password_hibp_enabled: true`). Single config call, no UI.
 
-Two categories of work remain: (1) the security findings that we discussed earlier but were never actually applied, and (2) light polish + the data cleanup you just asked for.
+**2. Live sessions public SELECT**
+Current policy: `auth.uid() = created_by` only. Migration to drop and recreate as:
+```sql
+USING (auth.uid() = created_by OR is_public = true)
+```
+This lets others see public live sessions. The existing `share_token` flow (via `get_shared_live_session` RPC) is unaffected since it's SECURITY DEFINER.
 
-### 1. Delete the 11 stuck live debates
+Also need to verify `useHomeDebates` Trending query for live sessions filters `is_public = true` so we don't suddenly show private ones from others (already filters on `created_by = user.id` for "My Recent" — fine; but need to check Trending live_sessions branch).
 
-Hard delete all `debates` rows where `status = 'live'` (11 rows, oldest from 2026-03-09, newest 2026-03-30). Cascading rows in `debate_participants`, `debate_sides`, `debate_subtopics`, `arguments`, `round_summaries`, `debate_transcripts`, `debate_invitations`, `debate_grades`, `debate_tags` will be removed in the same transaction (no FKs declared, so we delete child rows explicitly first).
+**3. Task 5 — `index.html` SEO polish**
+Current `index.html` is missing OG image, Twitter handle, and has no canonical. Need to:
+- Add `<meta property="og:image">` pointing to a Dynamo-branded image
+- Add `<meta property="og:url">` and `<meta property="og:site_name" content="Dynamo">`
+- Add `<meta name="twitter:title">`, `<meta name="twitter:description">`, `<meta name="twitter:image">`
+- Add a theme-color meta
 
-No live_sessions are stuck (`status='recording'` returns 0 rows).
+OG image: generate one matching brand (white bg, black "d.", "People to the Power" tagline, Instrument Serif). Save to `/public/og-image.png` (1200x630). I'll generate this in default mode using the same monochrome brand tokens.
 
-### 2. Outstanding security findings (10 total — never actually shipped)
+**4. Task 9 — Empty Home state**
+Need to inspect HomePage to see how empty For You / My Recent currently render. The carousels (`AutoCarousel`) likely render nothing or a blank when items are empty. Add an empty-state card inside each `<section>` when `items.length === 0`:
+- For You empty → "No conversations yet today" + Explore button
+- My Recent empty → "You haven't joined a debate yet" + Create + Explore buttons
+- If BOTH empty (brand new user) → swap the two carousels for a single welcome card with two CTAs (Create / Explore) above the existing structure
 
-The earlier "security fix" pass didn't land in the database. Re-running the scan confirms all 10 are still open:
+Will use existing `Link` to `/create` and `/explore`, monochrome styling per brand memory.
 
-**Errors (3) — must fix before launch:**
-- `debates` SELECT policy is `true` → leaks every private debate's topic, join code, scheduling to any signed-in user. Restrict to `is_public = true OR created_by = auth.uid() OR EXISTS participant`.
-- `debate_invitations` → no DELETE policy; emails + tokens persist forever. Add DELETE for creator/invitee on accepted/rejected rows.
-- `realtime.messages` → no RLS, anyone can subscribe to any private debate channel. Add policy gating channel topic against `debate_participants`/`debates.created_by`.
+## Plan summary
 
-**Warnings (7) — fix together since they're the same pattern:**
-- `arguments`, `debate_participants`, `debate_sides`, `debate_subtopics`, `round_summaries` — all use SELECT `true`. Replace with helper `can_view_debate(debate_id)` that checks public OR creator OR participant.
-- `live_sessions.share_token` — add SELECT policy `share_token IS NOT NULL AND share_token = current_setting(...)` OR drop the column. Recommend keeping + adding a token-based RPC since `SharedLiveSessionPage` exists.
-- `avatars` / `banners` public buckets — leave public (intentional for profile images), mark finding as acknowledged.
+```text
+┌─ Task 1: Auth ───────────────────────────────┐
+│ configure_auth password_hibp_enabled = true  │
+└──────────────────────────────────────────────┘
 
-Approach: one migration creating a `can_view_debate(uuid)` SECURITY DEFINER helper, then drop+recreate the 6 affected SELECT policies, plus the realtime + invitations DELETE policies.
+┌─ Task 2: live_sessions RLS ──────────────────┐
+│ Migration: drop+recreate SELECT policy        │
+│   USING (created_by = auth.uid()             │
+│          OR is_public = true)                 │
+│ Verify useHomeDebates trending already        │
+│   filters is_public on live_sessions          │
+└──────────────────────────────────────────────┘
 
-### 3. Auth hardening
+┌─ Task 5: SEO ────────────────────────────────┐
+│ Generate /public/og-image.png (1200x630)     │
+│ Update index.html:                            │
+│   + og:image, og:url, og:site_name           │
+│   + twitter:title/desc/image                  │
+│   + theme-color                               │
+└──────────────────────────────────────────────┘
 
-Enable **leaked password protection** in Supabase Auth settings (HaveIBeenPwned check on signup/password change). One toggle.
+┌─ Task 9: Empty Home ─────────────────────────┐
+│ HomePage.tsx: add empty-state cards           │
+│  For You empty → CTA Explore                  │
+│  My Recent empty → CTA Create + Explore       │
+│  Both empty (new user) → welcome card top     │
+└──────────────────────────────────────────────┘
+```
 
-### 4. SEO / social polish (`index.html`)
+## Files touched
+- `supabase/migrations/<new>.sql` — drop+recreate live_sessions SELECT policy
+- Auth config — HIBP toggle (no file)
+- `public/og-image.png` — new generated artifact
+- `index.html` — meta tags
+- `src/pages/HomePage.tsx` — empty states
+- `src/hooks/useHomeDebates.ts` — verify/patch trending live_sessions to require `is_public = true`
 
-- Replace OG image `https://lovable.dev/opengraph-image-p98pqg.png` with a Dynamo-branded image (or remove until you have one).
-- Replace `twitter:site` `@Lovable` with your handle (or remove).
-- Remove the `<!-- TODO -->` comment.
-- Add `<link rel="canonical">` once you have your custom domain.
-
-### 5. Final smoke test
-
-After the above: log out → confirm Explore loads with public debates only, log in as a second account → confirm you can't see another user's private debate, create a debate with tags → confirm it appears under the topic page, follow a user → confirm presence widget updates.
-
----
-
-### Technical notes
-
-- Use migration tool for the schema/policy changes (steps 2).
-- Use insert tool (DELETE statements) for the live-debate cleanup (step 1).
-- Auth setting (step 3) is a Supabase config toggle, not a migration.
-- `index.html` is a regular file edit.
-- Two new memory files worth saving after: `mem://security/rls-helpers` (the `can_view_debate` pattern) and update the index Core line about RLS.
-
+## Out of scope (explicitly not touching)
+- Tasks 3, 4, 6, 7, 8 from the pre-launch list
+- Any other RLS policies
+- Any styling outside the empty Home state
