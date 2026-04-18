@@ -234,8 +234,14 @@ const MyDebatesPage = () => {
   })();
 
   const bulkPrivacy = async (next: boolean) => {
-    const items = ownedSelectedItems().filter((i) => i.kind !== "live_session");
-    if (items.length === 0) return;
+    const all = ownedSelectedItems();
+    const items = all.filter((i) => i.kind !== "live_session");
+    if (items.length === 0) {
+      if (all.length > 0) {
+        toast({ title: "Live sessions are always shareable", description: "Public/Private only applies to debates." });
+      }
+      return;
+    }
     setBusy(true);
     const { error } = await supabase
       .from("debates")
@@ -252,8 +258,14 @@ const MyDebatesPage = () => {
   };
 
   const bulkArchive = async () => {
-    const items = ownedSelectedItems().filter((i) => i.kind !== "live_session");
-    if (items.length === 0) return;
+    const all = ownedSelectedItems();
+    const items = all.filter((i) => i.kind !== "live_session");
+    if (items.length === 0) {
+      if (all.length > 0) {
+        toast({ title: "Live sessions can't be archived", description: "Use Delete to remove them." });
+      }
+      return;
+    }
     setBusy(true);
     const { error } = await supabase
       .from("debates")
