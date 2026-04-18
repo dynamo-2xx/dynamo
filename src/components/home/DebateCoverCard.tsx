@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2 } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
@@ -40,7 +40,6 @@ interface Props {
 
 const DebateCoverCard = ({ d, onChanged }: Props) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -52,7 +51,7 @@ const DebateCoverCard = ({ d, onChanged }: Props) => {
     ? { backgroundImage: `url(${d.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { backgroundImage: gradientFromSeed(d.topic) };
 
-  const stop = (e: React.MouseEvent | React.PointerEvent) => {
+  const stop = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
   };
@@ -99,17 +98,17 @@ const DebateCoverCard = ({ d, onChanged }: Props) => {
   };
 
   return (
-    <>
+    <div className="relative group">
       <Link
         to={`/debate/${d.id}`}
-        className="group relative block w-full aspect-[16/10] rounded-xl overflow-hidden border border-border hover:border-foreground/30 transition-colors"
+        className="relative block w-full aspect-[16/10] rounded-xl overflow-hidden border border-border hover:border-foreground/30 transition-colors"
         style={bg}
       >
         {/* Bottom gradient for legibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Top row */}
-        <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-2">
+        {/* Top-left status pill */}
+        <div className="absolute top-3 left-3">
           {isLive ? (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-body font-medium uppercase tracking-wider bg-white/90 text-foreground">
               <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] animate-pulse" />
@@ -132,65 +131,19 @@ const DebateCoverCard = ({ d, onChanged }: Props) => {
               {d.status}
             </span>
           )}
-
-          <div className="flex items-center gap-1.5">
-            {typeof d.participant_count === "number" && d.participant_count > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-body bg-white/85 text-foreground">
-                <Users className="w-3 h-3" />
-                {d.participant_count}
-              </span>
-            )}
-            {showOwnerControls && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    onClick={stop}
-                    onPointerDown={stop}
-                    aria-label="More actions"
-                    className="w-7 h-7 rounded-full bg-white/90 hover:bg-white text-foreground flex items-center justify-center transition-colors"
-                  >
-                    <MoreHorizontal className="w-3.5 h-3.5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" onClick={stop} className="w-48">
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      stop(e);
-                      togglePrivacy();
-                    }}
-                  >
-                    {d.is_public ? (
-                      <>
-                        <Lock className="w-4 h-4 mr-2" /> Make Private
-                      </>
-                    ) : (
-                      <>
-                        <Globe className="w-4 h-4 mr-2" /> Make Public
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      stop(e);
-                      archive();
-                    }}
-                  >
-                    <Archive className="w-4 h-4 mr-2" /> Archive
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      stop(e);
-                      setConfirmDeleteOpen(true);
-                    }}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
         </div>
+
+        {/* Participant count (left of menu) */}
+        {typeof d.participant_count === "number" && d.participant_count > 0 && (
+          <div
+            className={`absolute top-3 ${showOwnerControls ? "right-12" : "right-3"}`}
+          >
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-body bg-white/85 text-foreground">
+              <Users className="w-3 h-3" />
+              {d.participant_count}
+            </span>
+          </div>
+        )}
 
         {/* Bottom topic */}
         <div className="absolute bottom-3 left-3 right-3">
@@ -199,6 +152,60 @@ const DebateCoverCard = ({ d, onChanged }: Props) => {
           </h4>
         </div>
       </Link>
+
+      {/* Owner action menu — sibling of <Link>, not a child, so clicks don't navigate */}
+      {showOwnerControls && (
+        <div className="absolute top-3 right-3 z-10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={stop}
+                onPointerDown={stop}
+                aria-label="More actions"
+                className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-foreground flex items-center justify-center transition-colors shadow-sm"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  togglePrivacy();
+                }}
+              >
+                {d.is_public ? (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" /> Make Private
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-4 h-4 mr-2" /> Make Public
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  archive();
+                }}
+              >
+                <Archive className="w-4 h-4 mr-2" /> Archive
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setConfirmDeleteOpen(true);
+                }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
@@ -223,7 +230,7 @@ const DebateCoverCard = ({ d, onChanged }: Props) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 };
 
