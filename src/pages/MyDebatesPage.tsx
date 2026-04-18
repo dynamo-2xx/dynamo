@@ -424,7 +424,34 @@ const MyDebatesPage = () => {
           {loading ? (
             <p className="text-muted-foreground text-center py-12 animate-pulse">Loading…</p>
           ) : currentList.length === 0 ? (
-            <p className="text-muted-foreground text-center py-12">{emptyMessage}</p>
+            <div className="border border-dashed border-border rounded-xl px-6 py-10 text-center">
+              <p className="text-sm font-body text-foreground mb-3">{emptyMessage}</p>
+              <div className="flex justify-center gap-2 flex-wrap">
+                {activeTab === "live" ? (
+                  <Link
+                    to="/live/new"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body hover:opacity-90 transition-opacity"
+                  >
+                    Start a live session
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      to="/create"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body hover:opacity-90 transition-opacity"
+                    >
+                      Create a debate
+                    </Link>
+                    <Link
+                      to="/explore"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs font-body hover:border-foreground/30 transition-colors"
+                    >
+                      Explore
+                    </Link>
+                  </>
+                )}
+              </div>
+            </div>
           ) : (() => {
             const renderCard = (d: DebateCoverItem) => {
               const isOwner = !!user && d.created_by === user.id;

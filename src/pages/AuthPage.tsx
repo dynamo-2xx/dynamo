@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -139,6 +140,13 @@ const AuthPage = () => {
             >
               {mode === "login" ? "Sign up" : "Sign in"}
             </button>
+          </p>
+
+          <p className="text-[11px] text-muted-foreground text-center mt-6">
+            By continuing, you agree to our{" "}
+            <Link to="/terms" className="underline hover:text-foreground transition-colors">Terms</Link>{" "}
+            and{" "}
+            <Link to="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
           </p>
         </div>
       </motion.div>

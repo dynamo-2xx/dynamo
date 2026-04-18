@@ -178,9 +178,18 @@ const NotificationsPage = () => {
         {loading ? (
           <p className="text-muted-foreground text-sm font-body">Loading…</p>
         ) : invitations.length === 0 ? (
-          <div className="text-center py-16">
+          <div className="border border-dashed border-border rounded-xl px-6 py-12 text-center">
             <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground font-body">No notifications yet</p>
+            <p className="text-sm font-body text-foreground mb-1">No notifications yet</p>
+            <p className="text-xs text-muted-foreground font-body mb-4">
+              Invitations to debates will show up here.
+            </p>
+            <Link
+              to="/explore"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs font-body hover:border-foreground/30 transition-colors"
+            >
+              Explore debates
+            </Link>
           </div>
         ) : (
           <div className="space-y-6">
