@@ -190,6 +190,14 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
         </ul>
       )}
     </div>
+    <InviteFriendsDialog
+      open={inviteOpen}
+      onOpenChange={setInviteOpen}
+      debateId={debateId}
+      debateTopic={debateTopic}
+      sides={sides}
+    />
+    </>
   );
 };
 
