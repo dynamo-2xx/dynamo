@@ -310,14 +310,37 @@ const MyDebatesPage = () => {
         }}
       >
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex items-center gap-3 mb-6">
-            <Link
-              to="/profile"
-              className="rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] inline-flex items-center justify-center -ml-2"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <h2 className="text-2xl sm:text-3xl font-display font-bold">My Agenda</h2>
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <Link
+                to="/profile"
+                className="rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] inline-flex items-center justify-center -ml-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+              <h2 className="text-2xl sm:text-3xl font-display font-bold">My Agenda</h2>
+            </div>
+            {currentList.length > 0 && (
+              <div className="flex items-center gap-2 shrink-0">
+                {selectionMode && (
+                  <button
+                    onClick={() => {
+                      const ids = selectableIdsInView();
+                      setSelected(allSelected ? new Set() : new Set(ids));
+                    }}
+                    className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
+                  >
+                    {allSelected ? "Deselect all" : "Select all"}
+                  </button>
+                )}
+                <button
+                  onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+                  className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
+                >
+                  {selectionMode ? "Done" : "Select"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Tabs */}
