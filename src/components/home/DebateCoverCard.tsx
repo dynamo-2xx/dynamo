@@ -1,12 +1,11 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check, HandHeart } from "lucide-react";
+import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import InterestedDialog from "@/components/debate/InterestedDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
