@@ -329,7 +329,7 @@ const CreateDebatePage = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto px-4 py-8 md:py-16">
+      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8 md:py-16">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
