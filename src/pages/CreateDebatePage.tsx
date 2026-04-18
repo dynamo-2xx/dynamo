@@ -52,6 +52,8 @@ const CreateDebatePage = () => {
   const [feedbackEnabled, setFeedbackEnabled] = useState(false);
   const [feedbackExplainerOpen, setFeedbackExplainerOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [description, setDescription] = useState("");
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
   // Stable IDs for subtopic editor rows — prevents input remount on every keystroke.
   const [subtopicItems, setSubtopicItems] = useState<{ id: string; title: string }[]>([]);
 
@@ -280,6 +282,7 @@ const CreateDebatePage = () => {
           location: location.trim() || null,
           scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
           feedback_enabled: feedbackEnabled,
+          description: description.trim() || null,
         } as any)
         .select()
         .single();
@@ -483,6 +486,31 @@ const CreateDebatePage = () => {
                     onChange={(e) => setDebate({ ...debate, topic: e.target.value })}
                     className="w-full bg-transparent text-lg font-display text-foreground focus:outline-none"
                   />
+
+                  {/* Description (collapsible) */}
+                  <div className="mt-3 border-t border-border pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setDescriptionOpen((v) => !v)}
+                      className="w-full flex items-center justify-between text-left"
+                    >
+                      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium">
+                        Description <span className="normal-case font-normal">(optional)</span>
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-muted-foreground transition-transform ${descriptionOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {descriptionOpen && (
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Briefly describe context, framing, or what you hope to explore."
+                        rows={3}
+                        className="w-full mt-2 bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20 resize-none"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Tags */}
