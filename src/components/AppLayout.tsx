@@ -4,6 +4,7 @@ import { Home, Compass, PlusCircle, User, PanelLeftClose, PanelLeft } from "luci
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
