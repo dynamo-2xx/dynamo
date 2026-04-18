@@ -531,20 +531,21 @@ const CreateDebatePage = () => {
                   </div>
                   <Reorder.Group
                     axis="y"
-                    values={debate.subtopics}
-                    onReorder={(newOrder) => setDebate({ ...debate, subtopics: newOrder })}
+                    values={subtopicItems}
+                    onReorder={reorderSubtopics}
                     className="space-y-2"
                   >
-                    {debate.subtopics.map((st, i) => (
-                      <Reorder.Item key={st || `subtopic-${i}`} value={st} className="flex items-center gap-2">
+                    {subtopicItems.map((item, i) => (
+                      <Reorder.Item key={item.id} value={item} className="flex items-center gap-2">
                         <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
                         <span className="text-xs text-muted-foreground w-5">{i + 1}.</span>
                         <input
-                          value={st}
+                          value={item.title}
                           onChange={(e) => updateSubtopic(i, e.target.value)}
-                          className="flex-1 bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                          placeholder="Subtopic"
+                          className="flex-1 bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
                         />
-                        {debate.subtopics.length > 1 && (
+                        {subtopicItems.length > 1 && (
                           <button onClick={() => removeSubtopic(i)} className="text-muted-foreground hover:text-destructive transition-colors">
                             <X className="w-3.5 h-3.5" />
                           </button>
