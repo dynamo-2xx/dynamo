@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import TagPicker from "@/components/tags/TagPicker";
 import type { Tag } from "@/hooks/useTags";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -398,6 +398,15 @@ const CreateDebatePage = () => {
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-1.5 text-sm font-body text-muted-foreground hover:text-foreground transition-colors mb-6 group"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                Back
+              </button>
               <div className="text-center mb-10">
                 <h2 className="text-2xl font-display mb-3 md:text-3xl">What's on your mind?</h2>
                 <div className="h-6 relative overflow-hidden">
