@@ -1004,22 +1004,220 @@ const CreateDebatePage = () => {
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  {invitedUsernames.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {invitedUsernames.map((username) => (
-                        <span
-                          key={username}
-                          className="inline-flex items-center gap-1 bg-accent text-foreground rounded-full px-2.5 py-1 text-xs font-body font-medium"
-                        >
-                          {username}
-                          <button
-                            onClick={() => removeInvite(username)}
-                            className="hover:text-destructive transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
+                  {/* Interested users (edit mode only) */}
+                  {editId ? (
+                    interestedUsers.filter(
+                      (u) => !invitedEntries.some((e) => e.userId === u.user_id),
+                    ).length > 0 ? (
+                      <div className="mt-3">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-1.5">
+                          Interested <span className="normal-case font-normal">(tap to add)</span>
+                        </p>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {interestedUsers
+                            .filter((u) => !invitedEntries.some((e) => e.userId === u.user_id))
+                            .map((u) => (
+                              <button
+                                key={u.user_id}
+                                type="button"
+                                onClick={() => addInterestedToInvite(u)}
+                                className="shrink-0 inline-flex items-center gap-1.5 bg-accent hover:bg-accent/70 text-foreground rounded-full pl-1 pr-2.5 py-1 text-xs font-body font-medium transition-colors"
+                              >
+                                {u.avatar_url ? (
+                                  <img src={u.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                    {(u.display_name || "?").slice(0, 2).toUpperCase()}
+                                  </span>
+                                )}
+                                {u.display_name || "Interested"}
+                                <Plus className="w-3 h-3 opacity-60" />
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground mt-2 font-body italic">
+                      Save the debate first to see who's expressed interest.
+                    </p>
+                  )}
+
+                  {/* Drag-and-drop side assignment */}
+                  {invitedEntries.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium">
+                        Assign to a side <span className="normal-case font-normal">(drag, or tap a person then tap a side)</span>
+                      </p>
+
+                      {/* Unassigned tray */}
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const key = e.dataTransfer.getData("text/plain");
+                          const target = invitedEntries.find((en) => entryKey(en) === key);
+                          if (target) assignSide(target, null);
+                          setDraggingId(null);
+                        }}
+                        onClick={() => {
+                          if (tapSelectedId) {
+                            const target = invitedEntries.find((en) => entryKey(en) === tapSelectedId);
+                            if (target) {
+                              assignSide(target, null);
+                              setTapSelectedId(null);
+                            }
+                          }
+                        }}
+                        className="border border-dashed border-border rounded-lg p-3 min-h-[56px] bg-accent/30"
+                      >
+                        <p className="text-[10px] text-muted-foreground font-body mb-1.5">Unassigned</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {invitedEntries.filter((e) => !e.sideId).map((e) => {
+                            const k = entryKey(e);
+                            const selected = tapSelectedId === k;
+                            return (
+                              <div
+                                key={k}
+                                draggable
+                                onDragStart={(ev) => {
+                                  ev.dataTransfer.setData("text/plain", k);
+                                  ev.dataTransfer.effectAllowed = "move";
+                                  setDraggingId(k);
+                                }}
+                                onDragEnd={() => setDraggingId(null)}
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  setTapSelectedId(selected ? null : k);
+                                }}
+                                className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all ${
+                                  selected
+                                    ? "bg-foreground text-background ring-2 ring-foreground"
+                                    : "bg-background border border-border text-foreground"
+                                } ${draggingId === k ? "opacity-50" : ""}`}
+                              >
+                                {e.avatarUrl ? (
+                                  <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                    {e.username.slice(0, 2).toUpperCase()}
+                                  </span>
+                                )}
+                                {e.username}
+                                <button
+                                  type="button"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    removeInvite(e);
+                                  }}
+                                  className="hover:text-destructive transition-colors ml-0.5"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                          {invitedEntries.filter((e) => !e.sideId).length === 0 && (
+                            <span className="text-[11px] text-muted-foreground font-body italic">All assigned ✓</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Side columns */}
+                      <div className="flex items-stretch gap-0 rounded-lg border border-border overflow-hidden">
+                        {debate.sides.map((label, i) => {
+                          const sid = sideIds[i];
+                          if (!sid) return null;
+                          return (
+                            <div key={sid} className="flex-1 flex">
+                              <div
+                                onDragOver={(ev) => {
+                                  ev.preventDefault();
+                                  ev.dataTransfer.dropEffect = "move";
+                                }}
+                                onDrop={(ev) => {
+                                  ev.preventDefault();
+                                  const key = ev.dataTransfer.getData("text/plain");
+                                  const target = invitedEntries.find((en) => entryKey(en) === key);
+                                  if (target) assignSide(target, sid);
+                                  setDraggingId(null);
+                                }}
+                                onClick={() => {
+                                  if (tapSelectedId) {
+                                    const target = invitedEntries.find((en) => entryKey(en) === tapSelectedId);
+                                    if (target) {
+                                      assignSide(target, sid);
+                                      setTapSelectedId(null);
+                                    }
+                                  }
+                                }}
+                                className="flex-1 p-3 min-h-[120px] bg-background"
+                              >
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-1.5 truncate">
+                                  {label}
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {invitedEntries.filter((e) => e.sideId === sid).map((e) => {
+                                    const k = entryKey(e);
+                                    const selected = tapSelectedId === k;
+                                    return (
+                                      <div
+                                        key={k}
+                                        draggable
+                                        onDragStart={(ev) => {
+                                          ev.dataTransfer.setData("text/plain", k);
+                                          ev.dataTransfer.effectAllowed = "move";
+                                          setDraggingId(k);
+                                        }}
+                                        onDragEnd={() => setDraggingId(null)}
+                                        onClick={(ev) => {
+                                          ev.stopPropagation();
+                                          setTapSelectedId(selected ? null : k);
+                                        }}
+                                        className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all ${
+                                          selected
+                                            ? "bg-foreground text-background ring-2 ring-foreground"
+                                            : "bg-accent text-foreground"
+                                        } ${draggingId === k ? "opacity-50" : ""}`}
+                                      >
+                                        {e.avatarUrl ? (
+                                          <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                        ) : (
+                                          <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                            {e.username.slice(0, 2).toUpperCase()}
+                                          </span>
+                                        )}
+                                        {e.username}
+                                        <button
+                                          type="button"
+                                          onClick={(ev) => {
+                                            ev.stopPropagation();
+                                            removeInvite(e);
+                                          }}
+                                          className="hover:text-destructive transition-colors ml-0.5"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                  {invitedEntries.filter((e) => e.sideId === sid).length === 0 && (
+                                    <span className="text-[11px] text-muted-foreground font-body italic">
+                                      Drop here
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {i < debate.sides.length - 1 && (
+                                <div className="w-px bg-border" aria-hidden="true" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
