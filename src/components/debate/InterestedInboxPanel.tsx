@@ -141,6 +141,7 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
       .channel(`dm-inbox-debate-${debateId}-${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, () => refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "dm_threads" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${debateId}` }, () => refresh())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
