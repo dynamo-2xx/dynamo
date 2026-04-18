@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
+import TagPicker from "@/components/tags/TagPicker";
+import type { Tag } from "@/hooks/useTags";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
@@ -315,6 +317,13 @@ const CreateDebatePage = () => {
           }
           toast.success(`${emailInvites.length} email invitation${emailInvites.length !== 1 ? "s" : ""} queued`);
         }
+      }
+
+      // Attach buffered tags
+      if (selectedTags.length > 0) {
+        await (supabase as any)
+          .from("debate_tags")
+          .insert(selectedTags.map((t: any) => ({ debate_id: dbDebate.id, tag_id: t.id })));
       }
 
       toast.success("Debate created!");
