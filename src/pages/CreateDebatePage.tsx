@@ -544,39 +544,74 @@ const CreateDebatePage = () => {
         });
       }
 
-      // 5. Send invitations (usernames and emails)
-      if (invitedUsernames.length > 0) {
-        const usernameInvites = invitedUsernames.filter((u) => !isEmail(u));
-        const emailInvites = invitedUsernames.filter((u) => isEmail(u));
+      // 5. Send invitations (usernames and emails) — with side assignments from DnD
+      // Build a map: current sideIds[i] (synthetic OR pre-edit DB IDs) → freshly-inserted DB side IDs.
+      const { data: freshSides } = await supabase
+        .from("debate_sides")
+        .select("id, sort_order")
+        .eq("debate_id", dbDebate.id)
+        .order("sort_order");
+      const sideIdMap = new Map<string, string>();
+      (freshSides || []).forEach((s: any, i: number) => {
+        const oldId = sideIds[i];
+        if (oldId) sideIdMap.set(oldId, s.id);
+      });
+      const resolveSideId = (sid: string | null | undefined) =>
+        sid ? sideIdMap.get(sid) ?? null : null;
 
-        if (usernameInvites.length > 0) {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("user_id, display_name")
-            .in("display_name", usernameInvites);
+      // In edit mode, wipe old invitations so we can re-insert with current side assignments.
+      if (editId) {
+        await supabase.from("debate_invitations").delete().eq("debate_id", editId);
+      }
 
-          if (profiles && profiles.length > 0) {
-            const invitations = profiles.map((p) => ({
-              debate_id: dbDebate.id,
-              invited_user_id: p.user_id,
-              invited_username: p.display_name || "",
-            }));
-            await supabase.from("debate_invitations").insert(invitations);
-            toast.success(`${profiles.length} invitation${profiles.length !== 1 ? "s" : ""} sent`);
+      if (invitedEntries.length > 0) {
+        const usernameEntries = invitedEntries.filter((e) => !e.email);
+        const emailEntries = invitedEntries.filter((e) => !!e.email);
+
+        if (usernameEntries.length > 0) {
+          // Entries with a known userId can be inserted directly.
+          const known = usernameEntries.filter((e) => !!e.userId);
+          const unknown = usernameEntries.filter((e) => !e.userId);
+
+          const insertRows: any[] = known.map((e) => ({
+            debate_id: dbDebate.id,
+            invited_user_id: e.userId,
+            invited_username: e.username,
+            side_id: resolveSideId(e.sideId),
+          }));
+
+          if (unknown.length > 0) {
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("user_id, display_name")
+              .in("display_name", unknown.map((e) => e.username));
+            const profMap = new Map((profiles || []).map((p) => [p.display_name, p]));
+            unknown.forEach((e) => {
+              const p: any = profMap.get(e.username);
+              if (p) {
+                insertRows.push({
+                  debate_id: dbDebate.id,
+                  invited_user_id: p.user_id,
+                  invited_username: p.display_name || e.username,
+                  side_id: resolveSideId(e.sideId),
+                });
+              }
+            });
+            const found = new Set((profiles || []).map((p: any) => p.display_name));
+            const notFound = unknown.filter((e) => !found.has(e.username)).map((e) => e.username);
+            if (notFound.length > 0) {
+              toast.warning(`Users not found: ${notFound.join(", ")}`);
+            }
           }
 
-          const foundNames = (profiles || []).map((p) => p.display_name);
-          const notFound = usernameInvites.filter((u) => !foundNames.includes(u));
-          if (notFound.length > 0) {
-            toast.warning(`Users not found: ${notFound.join(", ")}`);
+          if (insertRows.length > 0) {
+            await supabase.from("debate_invitations").insert(insertRows);
+            toast.success(`${insertRows.length} invitation${insertRows.length !== 1 ? "s" : ""} sent`);
           }
         }
 
-        if (emailInvites.length > 0) {
-          for (const invEmail of emailInvites) {
-            // Generate a plaintext token client-side; the DB trigger will hash it on insert
-            // and clear the plaintext column. We pass the plaintext to the email function
-            // so it can build the link — the token is never persisted as plaintext.
+        if (emailEntries.length > 0) {
+          for (const entry of emailEntries) {
             const tokenBytes = new Uint8Array(32);
             crypto.getRandomValues(tokenBytes);
             const inviteToken = Array.from(tokenBytes)
@@ -586,9 +621,10 @@ const CreateDebatePage = () => {
             const { data: inv } = await supabase.from("debate_invitations").insert({
               debate_id: dbDebate.id,
               invited_user_id: user.id,
-              invited_username: invEmail,
-              invited_email: invEmail,
+              invited_username: entry.username,
+              invited_email: entry.email!,
               invite_token: inviteToken,
+              side_id: resolveSideId(entry.sideId),
             }).select("id").single();
 
             if (inv) {
@@ -597,7 +633,7 @@ const CreateDebatePage = () => {
               }).catch((err) => console.error("Email send error:", err));
             }
           }
-          toast.success(`${emailInvites.length} email invitation${emailInvites.length !== 1 ? "s" : ""} queued`);
+          toast.success(`${emailEntries.length} email invitation${emailEntries.length !== 1 ? "s" : ""} queued`);
         }
       }
 
