@@ -8,6 +8,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,29 +106,32 @@ const MyRecentPage = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto px-4 py-6 md:py-10 pb-32">
+      <div className={cn(
+        "max-w-5xl mx-auto px-4 py-6 md:py-10",
+        selectionMode ? "pb-44 md:pb-32" : "pb-8 md:pb-12",
+      )}>
         <div className="flex items-center justify-between mb-6">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-body"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-body min-h-[44px]"
           >
             <ArrowLeft className="w-4 h-4" />
             Home
           </Link>
           <Link
             to="/my-debates"
-            className="text-sm font-body text-foreground hover:underline"
+            className="text-sm font-body text-foreground hover:underline min-h-[44px] inline-flex items-center"
           >
             My Agenda →
           </Link>
         </div>
 
         <div className="flex items-end justify-between mb-5 gap-3 flex-wrap">
-          <h1 className="text-[24px] font-display">My Recent</h1>
+          <h1 className="text-[22px] sm:text-[24px] font-display">My Recent</h1>
           {items.length > 0 && (
             <button
               onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
-              className="text-xs font-body px-3 py-1 rounded-full border border-border hover:border-foreground/40 transition-colors"
+              className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
             >
               {selectionMode ? "Done" : "Select"}
             </button>
@@ -162,7 +166,7 @@ const MyRecentPage = () => {
               {hasMore && !showAll ? (
                 <button
                   onClick={() => setShowAll(true)}
-                  className="text-sm font-body px-4 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors"
+                  className="text-sm font-body px-5 py-2.5 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[44px]"
                 >
                   See all ({items.length})
                 </button>

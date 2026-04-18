@@ -76,7 +76,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       {!sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
-          className="hidden md:flex fixed top-4 left-4 z-40 p-2 rounded-lg bg-background border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="hidden md:flex fixed top-4 left-4 z-40 min-w-[44px] min-h-[44px] items-center justify-center rounded-lg bg-background border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           title="Open sidebar"
         >
           <PanelLeft className="w-5 h-5" />
@@ -88,8 +88,8 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         {children}
       </main>
 
-      {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border flex justify-around py-2 z-40">
+      {/* Mobile bottom nav — fixed h-16, ≥44px tap targets */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border flex justify-around z-40 pb-[env(safe-area-inset-bottom)]">
         {navItems.map((item) => {
           const active = location.pathname === item.to;
           return (
@@ -97,7 +97,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex flex-col items-center gap-0.5 text-[10px] font-body transition-colors p-1",
+                "flex flex-col items-center justify-center gap-0.5 text-[10px] font-body transition-colors flex-1 min-h-[44px]",
                 active ? "text-foreground font-medium" : "text-muted-foreground"
               )}
             >

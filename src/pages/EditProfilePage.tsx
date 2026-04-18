@@ -188,25 +188,25 @@ const EditProfilePage = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto px-4 py-8 md:py-12 pb-32 md:pb-12">
+      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8 md:py-12 pb-40 md:pb-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
           {/* Header */}
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6 sm:mb-8">
             <button
               onClick={handleCancel}
-              className="p-2 -ml-2 rounded-md hover:bg-accent transition-colors"
+              className="-ml-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors"
               aria-label="Back"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h2 className="text-2xl font-display">Edit profile</h2>
+            <h2 className="text-xl sm:text-2xl font-display">Edit profile</h2>
           </div>
 
           {/* Banner + Avatar */}
           <section className="bg-background border border-border rounded-lg overflow-hidden mb-6">
             <div className="relative">
               <div
-                className="w-full aspect-[3/1] bg-cover bg-center"
+                className="w-full aspect-[5/2] sm:aspect-[3/1] bg-cover bg-center"
                 style={bannerStyle}
               />
               <button
@@ -236,8 +236,8 @@ const EditProfilePage = () => {
             </div>
 
             <div className="px-4 sm:px-5 pb-5">
-              <div className="flex items-end gap-4 -mt-12">
-                <div className="relative">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 -mt-12">
+                <div className="relative shrink-0">
                   <div className="w-24 h-24 rounded-full bg-accent border-4 border-background overflow-hidden flex items-center justify-center">
                     {form.avatar_url ? (
                       <img
@@ -274,7 +274,7 @@ const EditProfilePage = () => {
                     }}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground font-body pb-2">
+                <p className="text-xs text-muted-foreground font-body sm:pb-2">
                   Square image works best for the avatar; a wide image works best for the banner.
                 </p>
               </div>
@@ -371,14 +371,14 @@ const EditProfilePage = () => {
             </div>
           </section>
 
-          {/* Save / Cancel — sticky on mobile, inline on md+ */}
-          <div className="sticky bottom-16 md:static md:bottom-auto bg-background/95 backdrop-blur md:backdrop-blur-none border-t md:border-t-0 border-border -mx-4 md:mx-0 px-4 md:px-0 py-3 md:py-0 flex items-center justify-end gap-2">
+          {/* Save / Cancel — sticky on mobile (above bottom nav), inline on md+ */}
+          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] md:static md:bottom-auto bg-background/95 backdrop-blur md:backdrop-blur-none border-t md:border-t-0 border-border -mx-4 md:mx-0 px-4 md:px-0 py-3 md:py-0 flex items-center justify-end gap-2">
             <Button
               type="button"
               variant="ghost"
               onClick={handleCancel}
               disabled={saving}
-              className="font-body"
+              className="font-body min-h-[44px]"
             >
               Cancel
             </Button>
@@ -386,7 +386,7 @@ const EditProfilePage = () => {
               type="button"
               onClick={handleSave}
               disabled={!isDirty || saving}
-              className="font-body min-w-[110px]"
+              className="font-body min-w-[110px] min-h-[44px]"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save changes"}
             </Button>
