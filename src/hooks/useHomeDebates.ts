@@ -30,7 +30,8 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         .select(
           "id, topic, status, cover_image_url, created_at, location, is_public, created_by, debate_participants(count)",
         )
-        .eq("is_public", true);
+        .eq("is_public", true)
+        .not("status", "in", "(draft,archived)");
 
       if (mode === "local" && profile?.location) {
         query = query.eq("location", profile.location);

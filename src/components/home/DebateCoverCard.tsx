@@ -56,7 +56,7 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const isArchived = d.status === "archived";
   const isOwner = !!user && !!d.created_by && user.id === d.created_by;
   const showOwnerControls = isOwner && !isLive && !selectionMode && !isLiveSession;
-  const selectable = !!selectionMode && isOwner && !isLiveSession;
+  const selectable = !!selectionMode && isOwner;
   const linkTo = isLiveSession ? `/live/${d.id}` : `/debate/${d.id}`;
 
   const bg = d.cover_image_url

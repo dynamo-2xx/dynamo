@@ -10,6 +10,7 @@ import DebateCoverCard from "@/components/home/DebateCoverCard";
 import { useForYouDebates, useMyRecentDebates } from "@/hooks/useHomeDebates";
 import LocationPrompt from "@/components/home/LocationPrompt";
 import FriendsOnlineWidget from "@/components/home/FriendsOnlineWidget";
+import { formatTodayLong } from "@/lib/date";
 
 type Mode = "trending" | "local";
 
@@ -89,7 +90,7 @@ const HomePage = () => {
         {/* For-you carousel */}
         <section className="mb-10">
           <SectionHeader
-            title="Conversations that may concern you"
+            title={formatTodayLong()}
             toRoute="/for-you"
             right={
               <div className="inline-flex border border-border rounded-full p-0.5 shrink-0">

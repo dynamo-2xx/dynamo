@@ -10,6 +10,7 @@ import LocationPrompt from "@/components/home/LocationPrompt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { formatTodayLong } from "@/lib/date";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -149,7 +150,7 @@ const ForYouPage = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-5 gap-3">
-          <h1 className="text-[20px] sm:text-[24px] font-display leading-tight">Conversations that may concern you</h1>
+          <h1 className="text-[20px] sm:text-[24px] font-display leading-tight">{formatTodayLong()}</h1>
           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
             {items.length > 0 && (
               <button
