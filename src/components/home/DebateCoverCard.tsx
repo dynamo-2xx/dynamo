@@ -161,9 +161,16 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
         )}
       </div>
 
-      {/* Participant count */}
+      {/* Participant count — moves to bottom-right on small cards to avoid colliding with ⋯ */}
       {typeof d.participant_count === "number" && d.participant_count > 0 && (
-        <div className={cn("absolute top-3", showOwnerControls ? "right-12" : "right-3")}>
+        <div
+          className={cn(
+            "absolute z-10",
+            showOwnerControls
+              ? "bottom-3 right-3 sm:top-3 sm:bottom-auto sm:right-14"
+              : "top-3 right-3",
+          )}
+        >
           <span className={cn(PILL_BASE, "bg-background/90 text-foreground normal-case tracking-normal")}>
             <Users className="w-3 h-3" />
             {d.participant_count}
@@ -207,7 +214,7 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
       {/* Owner action menu — sibling of <Link>, absolutely positioned with high z-index */}
       {showOwnerControls && (
         <div
-          className="absolute top-3 right-3 z-20"
+          className="absolute top-2 right-2 z-20"
           onClick={(e) => e.stopPropagation()}
         >
           <DropdownMenu>
@@ -216,9 +223,9 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
                 type="button"
                 onClick={(e) => e.stopPropagation()}
                 aria-label="More actions"
-                className="w-7 h-7 rounded-full bg-background/95 hover:bg-background text-foreground flex items-center justify-center transition-colors shadow-sm border border-border"
+                className="w-9 h-9 sm:w-7 sm:h-7 rounded-full bg-background/95 hover:bg-background text-foreground flex items-center justify-center transition-colors shadow-sm border border-border"
               >
-                <MoreHorizontal className="w-3.5 h-3.5" />
+                <MoreHorizontal className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 z-50">
