@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check } from "lucide-react";
+import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check, HandHeart } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import InterestedDialog from "@/components/debate/InterestedDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,7 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const { user } = useAuth();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [interestedOpen, setInterestedOpen] = useState(false);
 
   const isLiveSession = d.kind === "live_session";
   const isLive = d.status === "live";
@@ -58,6 +60,8 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const showOwnerControls = isOwner && !isLive && !selectionMode && !isLiveSession;
   const selectable = !!selectionMode && isOwner;
   const linkTo = isLiveSession ? `/live/${d.id}` : `/debate/${d.id}`;
+  const showInterestedCta =
+    !!user && !isOwner && !isLiveSession && !isArchived && !selectionMode && !!d.is_public;
 
   const bg = d.cover_image_url
     ? { backgroundImage: `url(${d.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -279,6 +283,33 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+      )}
+
+      {/* Interested? CTA for non-owners on public debates */}
+      {showInterestedCta && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setInterestedOpen(true);
+          }}
+          className="absolute bottom-2 right-2 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/95 text-foreground border border-border text-[11px] font-body font-medium hover:bg-foreground hover:text-background transition-colors shadow-sm"
+        >
+          <HandHeart className="w-3.5 h-3.5" />
+          Interested?
+        </button>
+      )}
+
+      {showInterestedCta && (
+        <InterestedDialog
+          open={interestedOpen}
+          onOpenChange={setInterestedOpen}
+          debateId={d.id}
+          debateTopic={d.topic}
+          debateStatus={d.status}
+          createdBy={d.created_by || ""}
+        />
       )}
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>

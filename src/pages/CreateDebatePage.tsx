@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import TagPicker from "@/components/tags/TagPicker";
 import type { Tag } from "@/hooks/useTags";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -259,7 +259,7 @@ const CreateDebatePage = () => {
 
   const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
-  const handleCreateDebate = async () => {
+  const handleCreateDebate = async (publishMode: boolean = false) => {
     if (!debate || !user) return;
     setSaving(true);
 
@@ -276,7 +276,7 @@ const CreateDebatePage = () => {
           prep_time_min: debate.prepTime,
           prep_time_max: debate.prepTime,
           facilitator_type: "ai",
-          status: scheduledAt ? "scheduled" : "draft",
+          status: publishMode ? "scheduled" : (scheduledAt ? "scheduled" : "draft"),
           location: location.trim() || null,
           scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
           feedback_enabled: feedbackEnabled,
@@ -382,8 +382,19 @@ const CreateDebatePage = () => {
           .insert(selectedTags.map((t: any) => ({ debate_id: dbDebate.id, tag_id: t.id })));
       }
 
-      toast.success("Debate created!");
-      navigate(`/debate/${dbDebate.id}`);
+      if (publishMode) {
+        const hasTags = selectedTags.length > 0;
+        if (hasTags) {
+          toast.success("Debate published! Find it on Explore under your tags.");
+          navigate(`/explore/topic/${selectedTags[0].slug}`);
+        } else {
+          toast.success("Debate published! Find it under My Recent on your profile.");
+          navigate(`/my-recent`);
+        }
+      } else {
+        toast.success("Debate created!");
+        navigate(`/debate/${dbDebate.id}`);
+      }
     } catch (err: any) {
       console.error("Create debate error:", err);
       toast.error(err.message || "Failed to create debate");
@@ -398,6 +409,15 @@ const CreateDebatePage = () => {
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-1.5 text-sm font-body text-muted-foreground hover:text-foreground transition-colors mb-6 group"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                Back
+              </button>
               <div className="text-center mb-10">
                 <h2 className="text-2xl font-display mb-3 md:text-3xl">What's on your mind?</h2>
                 <div className="h-6 relative overflow-hidden">
@@ -443,6 +463,15 @@ const CreateDebatePage = () => {
 
           {step === 3 && debate && (
             <motion.div key="step3" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-1.5 text-sm font-body text-muted-foreground hover:text-foreground transition-colors mb-6 group"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                Back
+              </button>
               <h2 className="text-2xl font-display mb-6">Review Your Debate</h2>
 
               <div className="space-y-6">
@@ -821,20 +850,22 @@ const CreateDebatePage = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button
-                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); setMode("adversarial"); setResolutionPreview(""); setResolutionAdded(false); setHoveringCollab(false); setFeedbackEnabled(false); setFeedbackExplainerOpen(false); }}
-                    className="flex-1 border border-border rounded-lg py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+                    onClick={() => handleCreateDebate(false)}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
                   >
-                    Start Over
+                    {saving ? "Saving…" : invitedUsernames.length > 0 ? "Save & Invite" : "Save Debate"}
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={handleCreateDebate}
+                    onClick={() => handleCreateDebate(true)}
                     disabled={saving}
                     className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
-                    {saving ? "Creating…" : invitedUsernames.length > 0 ? "Create & Invite" : "Create Debate"}
-                    <ArrowRight className="w-4 h-4" />
+                    {saving ? "Publishing…" : "Publish Debate"}
+                    <Send className="w-4 h-4" />
                   </button>
                 </div>
               </div>
