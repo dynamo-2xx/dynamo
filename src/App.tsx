@@ -34,6 +34,7 @@ import PublicProfilePage from "./pages/PublicProfilePage";
 import AdminTagsPage from "./pages/AdminTagsPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
+import MessagesPage from "./pages/MessagesPage";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,8 @@ const App = () => (
               <Route path="/live/shared/:token" element={<SharedLiveSessionPage />} />
               <Route path="/live/:id" element={<ProtectedRoute><LiveSessionPage /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+              <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+              <Route path="/messages/:threadId" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
               <Route path="/my-debates" element={<ProtectedRoute><MyDebatesPage /></ProtectedRoute>} />
               <Route path="/for-you" element={<ProtectedRoute><ForYouPage /></ProtectedRoute>} />
               <Route path="/my-recent" element={<ProtectedRoute><MyRecentPage /></ProtectedRoute>} />

@@ -6,6 +6,7 @@ export type NotificationType =
   | "interest_confirmed"
   | "time_counter_proposed"
   | "invitation"
+  | "direct_message"
   | "generic";
 
 export interface CreateNotificationInput {

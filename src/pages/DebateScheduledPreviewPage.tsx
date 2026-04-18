@@ -6,8 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { gradientFromSeed } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
-import InterestedDialog from "@/components/debate/InterestedDialog";
-import InterestThreadChat from "@/components/debate/InterestThreadChat";
+import InterestedComposer from "@/components/debate/InterestedComposer";
 
 interface Subtopic {
   id: string;
@@ -29,8 +28,7 @@ const DebateScheduledPreviewPage = () => {
   const [sides, setSides] = useState<Side[]>([]);
   const [loading, setLoading] = useState(true);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
-  const [interestedOpen, setInterestedOpen] = useState(false);
-  const [myInterest, setMyInterest] = useState<{ id: string } | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [publisherName, setPublisherName] = useState<string>("");
 
   useEffect(() => {
@@ -45,7 +43,6 @@ const DebateScheduledPreviewPage = () => {
       ]);
       if (cancelled) return;
 
-      // If the debate is already live or completed, route to the room.
       if (d && (d.status === "live" || d.status === "completed")) {
         navigate(`/debate/${id}`, { replace: true });
         return;
@@ -63,17 +60,6 @@ const DebateScheduledPreviewPage = () => {
           .eq("user_id", d.created_by)
           .maybeSingle();
         if (!cancelled) setPublisherName(prof?.display_name || "Publisher");
-      }
-
-      if (user && d) {
-        const { data: interest } = await (supabase as any)
-          .from("debate_interests")
-          .select("id")
-          .eq("debate_id", id)
-          .eq("user_id", user.id)
-          .neq("status", "cancelled")
-          .maybeSingle();
-        if (!cancelled) setMyInterest(interest);
       }
     })();
     return () => {
@@ -103,7 +89,7 @@ const DebateScheduledPreviewPage = () => {
   }
 
   const isOwner = !!user && user.id === debate.created_by;
-  const showInterestedCta = !!user && !isOwner && !myInterest;
+  const showInterestedCta = !!user && !isOwner;
 
   const bg = debate.cover_image_url
     ? { backgroundImage: `url(${debate.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -152,7 +138,7 @@ const DebateScheduledPreviewPage = () => {
           </div>
         </div>
 
-        {/* Description (collapsible under main topic) */}
+        {/* Description */}
         {debate.description && (
           <div className="border border-border rounded-lg mb-6 overflow-hidden">
             <button
@@ -175,9 +161,8 @@ const DebateScheduledPreviewPage = () => {
           </div>
         )}
 
-        {/* Template — locked, read-only */}
+        {/* Template */}
         <div className="space-y-4">
-          {/* Sides */}
           {sides.length > 0 && (
             <div className="bg-background border border-border rounded-lg p-5">
               <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium block mb-3">
@@ -196,7 +181,6 @@ const DebateScheduledPreviewPage = () => {
             </div>
           )}
 
-          {/* Subtopics */}
           <div className="bg-background border border-border rounded-lg p-5">
             <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium block mb-3">
               Subtopics
@@ -211,7 +195,6 @@ const DebateScheduledPreviewPage = () => {
             </ol>
           </div>
 
-          {/* Format */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-background border border-border rounded-lg p-4">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body mb-1">
@@ -228,7 +211,7 @@ const DebateScheduledPreviewPage = () => {
           </div>
         </div>
 
-        {/* Owner panel: edit + start now */}
+        {/* Owner panel */}
         {isOwner && (
           <div className="mt-8 sticky bottom-4 z-10 flex flex-col sm:flex-row gap-2">
             <button
@@ -248,12 +231,12 @@ const DebateScheduledPreviewPage = () => {
           </div>
         )}
 
-        {/* Interested CTA */}
+        {/* Interested CTA — opens DM composer */}
         {showInterestedCta && (
           <div className="mt-8 sticky bottom-4 z-10">
             <button
               type="button"
-              onClick={() => setInterestedOpen(true)}
+              onClick={() => setComposerOpen(true)}
               className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-foreground text-background text-sm font-body font-medium hover:opacity-90 transition-opacity shadow-lg"
             >
               <HandHeart className="w-4 h-4" />
@@ -261,42 +244,17 @@ const DebateScheduledPreviewPage = () => {
             </button>
           </div>
         )}
-
-        {myInterest && !isOwner && (
-          <p className="mt-8 text-center text-xs font-body text-muted-foreground">
-            You expressed interest. Use the chat below to coordinate with {publisherName}.
-          </p>
-        )}
       </div>
 
-      <InterestedDialog
-        open={interestedOpen}
-        onOpenChange={(o) => {
-          setInterestedOpen(o);
-          if (!o && user && id) {
-            // refresh interest after dialog closes
-            (supabase as any)
-              .from("debate_interests")
-              .select("id")
-              .eq("debate_id", id)
-              .eq("user_id", user.id)
-              .neq("status", "cancelled")
-              .maybeSingle()
-              .then(({ data }: any) => setMyInterest(data));
-          }
-        }}
-        debateId={debate.id}
-        debateTopic={debate.topic}
-        debateStatus={debate.status}
-        createdBy={debate.created_by}
-      />
-
-      {/* Floating coordination chat — visible only after interest exists */}
-      {myInterest && (
-        <InterestThreadChat
-          interestId={myInterest.id}
+      {showInterestedCta && (
+        <InterestedComposer
+          open={composerOpen}
+          onOpenChange={setComposerOpen}
           debateId={debate.id}
-          otherPartyName={publisherName}
+          debateTopic={debate.topic}
+          publisherId={debate.created_by}
+          publisherName={publisherName}
+          sides={sides.map((s) => ({ id: s.id, label: s.label }))}
         />
       )}
     </AppLayout>
