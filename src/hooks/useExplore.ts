@@ -62,6 +62,7 @@ export function useFeaturedDebates(limit = 4) {
           .select(DEBATE_SELECT)
           .eq("is_public", true)
           .neq("status", "live")
+          .neq("status", "archived")
           .gte("created_at", since)
           .limit(limit * 2);
         const additions = (rest || [])
@@ -94,6 +95,7 @@ export function useTrendingDebates(limit = 6) {
         .from("debates")
         .select(DEBATE_SELECT)
         .eq("is_public", true)
+        .neq("status", "archived")
         .gte("created_at", since)
         .limit(50);
       const mapped = (data || []).map(mapDebate).sort((a, b) => b.participant_count - a.participant_count);
@@ -120,6 +122,7 @@ export function useLatestDebates(limit = 8) {
         .from("debates")
         .select(DEBATE_SELECT)
         .eq("is_public", true)
+        .neq("status", "archived")
         .order("created_at", { ascending: false })
         .limit(limit);
       if (!cancelled) {
@@ -164,6 +167,7 @@ export function useDebatesByTag(tagId: string | null, limit = 50) {
         .select(DEBATE_SELECT)
         .in("id", ids)
         .eq("is_public", true)
+        .neq("status", "archived")
         .order("created_at", { ascending: false });
       if (!cancelled) {
         setItems((data || []).map(mapDebate));

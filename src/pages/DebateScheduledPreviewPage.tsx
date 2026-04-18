@@ -228,6 +228,26 @@ const DebateScheduledPreviewPage = () => {
           </div>
         </div>
 
+        {/* Owner panel: edit + start now */}
+        {isOwner && (
+          <div className="mt-8 sticky bottom-4 z-10 flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(`/create?edit=${debate.id}`)}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-border bg-background text-sm font-body font-medium hover:bg-accent transition-colors"
+            >
+              Edit / Set time
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/debate/${debate.id}`)}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-foreground text-background text-sm font-body font-medium hover:opacity-90 transition-opacity shadow-lg"
+            >
+              Open debate room
+            </button>
+          </div>
+        )}
+
         {/* Interested CTA */}
         {showInterestedCta && (
           <div className="mt-8 sticky bottom-4 z-10">
