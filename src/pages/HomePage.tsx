@@ -65,7 +65,7 @@ const HomePage = () => {
               <PlusCircle className="w-5 h-5 text-foreground" />
             </div>
             <div className="min-w-0">
-              <p className="font-body text-sm font-medium">Create</p>
+              <p className="font-body text-sm font-medium">Debate</p>
               <p className="text-[11px] text-muted-foreground font-body truncate">Structure a debate</p>
             </div>
           </Link>
