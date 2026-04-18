@@ -7,7 +7,10 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check, X, MessageSquare, ArrowLeft } from "lucide-react";
+import { Check, X, MessageSquare, ArrowLeft, Bell, ThumbsUp, Clock } from "lucide-react";
+import { useNotifications } from "@/hooks/useNotifications";
+import { createNotification } from "@/lib/notifications";
+import { useAuth as _useAuthDup } from "@/contexts/AuthContext";
 
 interface Invitation {
   id: string;
