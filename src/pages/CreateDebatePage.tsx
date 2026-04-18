@@ -145,6 +145,7 @@ const CreateDebatePage = () => {
         timePerTurn: d.time_per_turn,
         prepTime: d.prep_time_min || "30s",
       });
+      setSideIds((sds || []).map((s: any) => s.id as string));
       setIsPublic(d.is_public);
       setLocation(d.location || "");
       setScheduledAt(
@@ -155,6 +156,71 @@ const CreateDebatePage = () => {
       setResolutionAdded(true);
       setEditLoading(false);
       setStep(3);
+
+      // Load existing invitations into invitedEntries
+      const { data: invs } = await supabase
+        .from("debate_invitations")
+        .select("invited_user_id, invited_username, invited_email, side_id")
+        .eq("debate_id", editId);
+      const invitedIds = new Set<string>();
+      if (invs && invs.length > 0) {
+        const userIds = invs.map((i: any) => i.invited_user_id).filter(Boolean);
+        userIds.forEach((id: string) => invitedIds.add(id));
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id, display_name, avatar_url")
+          .in("user_id", userIds);
+        const profMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+        setInvitedEntries(
+          invs.map((i: any) => {
+            const p: any = profMap.get(i.invited_user_id);
+            return {
+              username: i.invited_username || p?.display_name || i.invited_email || "Invitee",
+              userId: i.invited_user_id,
+              sideId: i.side_id ?? null,
+              avatarUrl: p?.avatar_url ?? null,
+              email: i.invited_email ?? null,
+              source: "manual" as const,
+            };
+          }),
+        );
+      }
+
+      // Load interested users (excluding creator, participants, already-invited)
+      const [{ data: interests }, { data: parts }] = await Promise.all([
+        supabase
+          .from("debate_interests")
+          .select("user_id, side_id, role")
+          .eq("debate_id", editId),
+        supabase
+          .from("debate_participants")
+          .select("user_id")
+          .eq("debate_id", editId),
+      ]);
+      const partIds = new Set((parts || []).map((p: any) => p.user_id));
+      const filteredInterests = (interests || []).filter(
+        (i: any) =>
+          i.user_id !== d.created_by &&
+          !partIds.has(i.user_id) &&
+          !invitedIds.has(i.user_id),
+      );
+      if (filteredInterests.length > 0) {
+        const ids = filteredInterests.map((i: any) => i.user_id);
+        const { data: iProfs } = await supabase
+          .from("profiles")
+          .select("user_id, display_name, avatar_url")
+          .in("user_id", ids);
+        const iMap = new Map((iProfs || []).map((p: any) => [p.user_id, p]));
+        setInterestedUsers(
+          filteredInterests.map((i: any) => ({
+            user_id: i.user_id,
+            display_name: (iMap.get(i.user_id) as any)?.display_name ?? null,
+            avatar_url: (iMap.get(i.user_id) as any)?.avatar_url ?? null,
+            side_id: i.side_id ?? null,
+            role: i.role,
+          })),
+        );
+      }
     })();
     return () => {
       cancelled = true;
