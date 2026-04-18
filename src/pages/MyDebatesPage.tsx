@@ -101,12 +101,13 @@ const MyDebatesPage = () => {
     if (s === "live" || s === "recording") return "bg-green-500/20 text-green-400";
     if (s === "completed" || s === "ended") return "bg-primary/20 text-primary";
     if (s === "draft") return "bg-muted text-muted-foreground";
+    if (s === "archived") return "bg-secondary text-foreground border border-dashed border-border";
     return "bg-secondary text-muted-foreground";
   };
 
-  const currentList = activeTab === "drafts" ? drafts : activeTab === "live" ? [] : debates;
-  const emptyMessage = activeTab === "drafts"
-    ? "You have no unpublished drafts."
+  const currentList = activeTab === "archive" ? archive : activeTab === "live" ? [] : debates;
+  const emptyMessage = activeTab === "archive"
+    ? "Nothing in your archive yet. Drafts and archived debates appear here."
     : activeTab === "live"
     ? "You have no live session records yet."
     : "You haven't participated in any debates yet.";
@@ -136,15 +137,15 @@ const MyDebatesPage = () => {
               Debates
             </button>
             <button
-              onClick={() => setSearchParams({ tab: "drafts" })}
+              onClick={() => setSearchParams({ tab: "archive" })}
               className={cn(
                 "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors",
-                activeTab === "drafts"
+                activeTab === "archive"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Drafts
+              Archive
             </button>
             <button
               onClick={() => setSearchParams({ tab: "live" })}
