@@ -252,6 +252,7 @@ const CreateDebatePage = () => {
         timePerTurn: data.time_per_turn,
         prepTime: "1 min",
       });
+      setSideIds((data.sides as string[]).map((_, i) => `new-side-${i}`));
       setStep(3);
     } catch (err) {
       console.error("Generation failed:", err);
