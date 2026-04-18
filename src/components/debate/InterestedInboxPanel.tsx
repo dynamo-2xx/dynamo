@@ -38,12 +38,39 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
   const { user } = useAuth();
   const { openThread } = useFloatingDM();
   const [threads, setThreads] = useState<InterestedThread[]>([]);
+  const [joined, setJoined] = useState<JoinedParticipant[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const refresh = async () => {
     if (!user) return;
     setLoading(true);
+
+    // Fetch joined participants (excluding owner)
+    const { data: parts } = await supabase
+      .from("debate_participants")
+      .select("user_id, side_id")
+      .eq("debate_id", debateId);
+    const partList = (parts || []).filter((p: any) => p.user_id !== user.id);
+    if (partList.length > 0) {
+      const ids = partList.map((p: any) => p.user_id);
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url")
+        .in("user_id", ids);
+      const profMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+      setJoined(
+        partList.map((p: any) => ({
+          user_id: p.user_id,
+          side_id: p.side_id ?? null,
+          display_name: (profMap.get(p.user_id) as any)?.display_name ?? null,
+          avatar_url: (profMap.get(p.user_id) as any)?.avatar_url ?? null,
+        })),
+      );
+    } else {
+      setJoined([]);
+    }
+
     const { data: rows } = await (supabase as any)
       .from("dm_threads")
       .select("*")
