@@ -19,6 +19,23 @@ interface GeneratedDebate {
   prepTime: string;
 }
 
+interface InvitedEntry {
+  username: string;
+  userId?: string | null;
+  sideId?: string | null; // null = unassigned; matches a side id from sideIds[] or a synthetic index
+  avatarUrl?: string | null;
+  source: "manual" | "interested";
+  email?: string | null;
+}
+
+interface InterestedUser {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  side_id: string | null;
+  role: string;
+}
+
 const TAGLINES = [
   "People to the Power!",
   "Your voice. Your power.",
@@ -43,7 +60,11 @@ const CreateDebatePage = () => {
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
-  const [invitedUsernames, setInvitedUsernames] = useState<string[]>([]);
+  const [invitedEntries, setInvitedEntries] = useState<InvitedEntry[]>([]);
+  const [sideIds, setSideIds] = useState<string[]>([]); // parallel to debate.sides; real DB IDs in edit mode, synthetic in create mode
+  const [interestedUsers, setInterestedUsers] = useState<InterestedUser[]>([]);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [tapSelectedId, setTapSelectedId] = useState<string | null>(null);
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [location, setLocation] = useState("");
   const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string
@@ -124,6 +145,7 @@ const CreateDebatePage = () => {
         timePerTurn: d.time_per_turn,
         prepTime: d.prep_time_min || "30s",
       });
+      setSideIds((sds || []).map((s: any) => s.id as string));
       setIsPublic(d.is_public);
       setLocation(d.location || "");
       setScheduledAt(
@@ -134,6 +156,71 @@ const CreateDebatePage = () => {
       setResolutionAdded(true);
       setEditLoading(false);
       setStep(3);
+
+      // Load existing invitations into invitedEntries
+      const { data: invs } = await supabase
+        .from("debate_invitations")
+        .select("invited_user_id, invited_username, invited_email, side_id")
+        .eq("debate_id", editId);
+      const invitedIds = new Set<string>();
+      if (invs && invs.length > 0) {
+        const userIds = invs.map((i: any) => i.invited_user_id).filter(Boolean);
+        userIds.forEach((id: string) => invitedIds.add(id));
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id, display_name, avatar_url")
+          .in("user_id", userIds);
+        const profMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+        setInvitedEntries(
+          invs.map((i: any) => {
+            const p: any = profMap.get(i.invited_user_id);
+            return {
+              username: i.invited_username || p?.display_name || i.invited_email || "Invitee",
+              userId: i.invited_user_id,
+              sideId: i.side_id ?? null,
+              avatarUrl: p?.avatar_url ?? null,
+              email: i.invited_email ?? null,
+              source: "manual" as const,
+            };
+          }),
+        );
+      }
+
+      // Load interested users (excluding creator, participants, already-invited)
+      const [{ data: interests }, { data: parts }] = await Promise.all([
+        supabase
+          .from("debate_interests")
+          .select("user_id, side_id, role")
+          .eq("debate_id", editId),
+        supabase
+          .from("debate_participants")
+          .select("user_id")
+          .eq("debate_id", editId),
+      ]);
+      const partIds = new Set((parts || []).map((p: any) => p.user_id));
+      const filteredInterests = (interests || []).filter(
+        (i: any) =>
+          i.user_id !== d.created_by &&
+          !partIds.has(i.user_id) &&
+          !invitedIds.has(i.user_id),
+      );
+      if (filteredInterests.length > 0) {
+        const ids = filteredInterests.map((i: any) => i.user_id);
+        const { data: iProfs } = await supabase
+          .from("profiles")
+          .select("user_id, display_name, avatar_url")
+          .in("user_id", ids);
+        const iMap = new Map((iProfs || []).map((p: any) => [p.user_id, p]));
+        setInterestedUsers(
+          filteredInterests.map((i: any) => ({
+            user_id: i.user_id,
+            display_name: (iMap.get(i.user_id) as any)?.display_name ?? null,
+            avatar_url: (iMap.get(i.user_id) as any)?.avatar_url ?? null,
+            side_id: i.side_id ?? null,
+            role: i.role,
+          })),
+        );
+      }
     })();
     return () => {
       cancelled = true;
@@ -165,6 +252,7 @@ const CreateDebatePage = () => {
         timePerTurn: data.time_per_turn,
         prepTime: "1 min",
       });
+      setSideIds((data.sides as string[]).map((_, i) => `new-side-${i}`));
       setStep(3);
     } catch (err) {
       console.error("Generation failed:", err);
@@ -176,6 +264,7 @@ const CreateDebatePage = () => {
         timePerTurn: "2 min",
         prepTime: "1 min",
       });
+      setSideIds(["new-side-0", "new-side-1"]);
       setStep(3);
       toast.error("AI generation had an issue — using a default structure. You can edit everything.");
     }
@@ -295,17 +384,52 @@ const CreateDebatePage = () => {
   const addInvite = () => {
     const value = inviteInput.trim();
     if (!value) return;
-    if (invitedUsernames.includes(value)) {
+    if (invitedEntries.some((e) => e.username.toLowerCase() === value.toLowerCase())) {
       toast.error("Already added");
       return;
     }
-    setInvitedUsernames((prev) => [...prev, value]);
+    setInvitedEntries((prev) => [
+      ...prev,
+      { username: value, sideId: null, source: "manual", email: isEmail(value) ? value : null },
+    ]);
     setInviteInput("");
   };
 
-  const removeInvite = (value: string) => {
-    setInvitedUsernames((prev) => prev.filter((u) => u !== value));
+  const removeInvite = (entry: InvitedEntry) => {
+    setInvitedEntries((prev) =>
+      prev.filter((e) => !(e.username === entry.username && e.userId === entry.userId)),
+    );
+    // Restore to interested pool if it came from there
+    if (entry.source === "interested" && entry.userId) {
+      // No-op: interested list is the source-of-truth view; we filter it client-side below.
+    }
   };
+
+  const addInterestedToInvite = (u: InterestedUser) => {
+    if (invitedEntries.some((e) => e.userId === u.user_id)) return;
+    setInvitedEntries((prev) => [
+      ...prev,
+      {
+        username: u.display_name || "Interested user",
+        userId: u.user_id,
+        sideId: u.side_id,
+        avatarUrl: u.avatar_url,
+        source: "interested",
+      },
+    ]);
+  };
+
+  const assignSide = (target: InvitedEntry, sideId: string | null) => {
+    setInvitedEntries((prev) =>
+      prev.map((e) =>
+        e.username === target.username && e.userId === target.userId
+          ? { ...e, sideId }
+          : e,
+      ),
+    );
+  };
+
+  const entryKey = (e: InvitedEntry) => `${e.userId ?? "x"}|${e.username}`;
 
   const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
@@ -420,39 +544,74 @@ const CreateDebatePage = () => {
         });
       }
 
-      // 5. Send invitations (usernames and emails)
-      if (invitedUsernames.length > 0) {
-        const usernameInvites = invitedUsernames.filter((u) => !isEmail(u));
-        const emailInvites = invitedUsernames.filter((u) => isEmail(u));
+      // 5. Send invitations (usernames and emails) — with side assignments from DnD
+      // Build a map: current sideIds[i] (synthetic OR pre-edit DB IDs) → freshly-inserted DB side IDs.
+      const { data: freshSides } = await supabase
+        .from("debate_sides")
+        .select("id, sort_order")
+        .eq("debate_id", dbDebate.id)
+        .order("sort_order");
+      const sideIdMap = new Map<string, string>();
+      (freshSides || []).forEach((s: any, i: number) => {
+        const oldId = sideIds[i];
+        if (oldId) sideIdMap.set(oldId, s.id);
+      });
+      const resolveSideId = (sid: string | null | undefined) =>
+        sid ? sideIdMap.get(sid) ?? null : null;
 
-        if (usernameInvites.length > 0) {
-          const { data: profiles } = await supabase
-            .from("profiles")
-            .select("user_id, display_name")
-            .in("display_name", usernameInvites);
+      // In edit mode, wipe old invitations so we can re-insert with current side assignments.
+      if (editId) {
+        await supabase.from("debate_invitations").delete().eq("debate_id", editId);
+      }
 
-          if (profiles && profiles.length > 0) {
-            const invitations = profiles.map((p) => ({
-              debate_id: dbDebate.id,
-              invited_user_id: p.user_id,
-              invited_username: p.display_name || "",
-            }));
-            await supabase.from("debate_invitations").insert(invitations);
-            toast.success(`${profiles.length} invitation${profiles.length !== 1 ? "s" : ""} sent`);
+      if (invitedEntries.length > 0) {
+        const usernameEntries = invitedEntries.filter((e) => !e.email);
+        const emailEntries = invitedEntries.filter((e) => !!e.email);
+
+        if (usernameEntries.length > 0) {
+          // Entries with a known userId can be inserted directly.
+          const known = usernameEntries.filter((e) => !!e.userId);
+          const unknown = usernameEntries.filter((e) => !e.userId);
+
+          const insertRows: any[] = known.map((e) => ({
+            debate_id: dbDebate.id,
+            invited_user_id: e.userId,
+            invited_username: e.username,
+            side_id: resolveSideId(e.sideId),
+          }));
+
+          if (unknown.length > 0) {
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("user_id, display_name")
+              .in("display_name", unknown.map((e) => e.username));
+            const profMap = new Map((profiles || []).map((p) => [p.display_name, p]));
+            unknown.forEach((e) => {
+              const p: any = profMap.get(e.username);
+              if (p) {
+                insertRows.push({
+                  debate_id: dbDebate.id,
+                  invited_user_id: p.user_id,
+                  invited_username: p.display_name || e.username,
+                  side_id: resolveSideId(e.sideId),
+                });
+              }
+            });
+            const found = new Set((profiles || []).map((p: any) => p.display_name));
+            const notFound = unknown.filter((e) => !found.has(e.username)).map((e) => e.username);
+            if (notFound.length > 0) {
+              toast.warning(`Users not found: ${notFound.join(", ")}`);
+            }
           }
 
-          const foundNames = (profiles || []).map((p) => p.display_name);
-          const notFound = usernameInvites.filter((u) => !foundNames.includes(u));
-          if (notFound.length > 0) {
-            toast.warning(`Users not found: ${notFound.join(", ")}`);
+          if (insertRows.length > 0) {
+            await supabase.from("debate_invitations").insert(insertRows);
+            toast.success(`${insertRows.length} invitation${insertRows.length !== 1 ? "s" : ""} sent`);
           }
         }
 
-        if (emailInvites.length > 0) {
-          for (const invEmail of emailInvites) {
-            // Generate a plaintext token client-side; the DB trigger will hash it on insert
-            // and clear the plaintext column. We pass the plaintext to the email function
-            // so it can build the link — the token is never persisted as plaintext.
+        if (emailEntries.length > 0) {
+          for (const entry of emailEntries) {
             const tokenBytes = new Uint8Array(32);
             crypto.getRandomValues(tokenBytes);
             const inviteToken = Array.from(tokenBytes)
@@ -462,9 +621,10 @@ const CreateDebatePage = () => {
             const { data: inv } = await supabase.from("debate_invitations").insert({
               debate_id: dbDebate.id,
               invited_user_id: user.id,
-              invited_username: invEmail,
-              invited_email: invEmail,
+              invited_username: entry.username,
+              invited_email: entry.email!,
               invite_token: inviteToken,
+              side_id: resolveSideId(entry.sideId),
             }).select("id").single();
 
             if (inv) {
@@ -473,7 +633,7 @@ const CreateDebatePage = () => {
               }).catch((err) => console.error("Email send error:", err));
             }
           }
-          toast.success(`${emailInvites.length} email invitation${emailInvites.length !== 1 ? "s" : ""} queued`);
+          toast.success(`${emailEntries.length} email invitation${emailEntries.length !== 1 ? "s" : ""} queued`);
         }
       }
 
@@ -844,22 +1004,220 @@ const CreateDebatePage = () => {
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  {invitedUsernames.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {invitedUsernames.map((username) => (
-                        <span
-                          key={username}
-                          className="inline-flex items-center gap-1 bg-accent text-foreground rounded-full px-2.5 py-1 text-xs font-body font-medium"
-                        >
-                          {username}
-                          <button
-                            onClick={() => removeInvite(username)}
-                            className="hover:text-destructive transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
+                  {/* Interested users (edit mode only) */}
+                  {editId ? (
+                    interestedUsers.filter(
+                      (u) => !invitedEntries.some((e) => e.userId === u.user_id),
+                    ).length > 0 ? (
+                      <div className="mt-3">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-1.5">
+                          Interested <span className="normal-case font-normal">(tap to add)</span>
+                        </p>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {interestedUsers
+                            .filter((u) => !invitedEntries.some((e) => e.userId === u.user_id))
+                            .map((u) => (
+                              <button
+                                key={u.user_id}
+                                type="button"
+                                onClick={() => addInterestedToInvite(u)}
+                                className="shrink-0 inline-flex items-center gap-1.5 bg-accent hover:bg-accent/70 text-foreground rounded-full pl-1 pr-2.5 py-1 text-xs font-body font-medium transition-colors"
+                              >
+                                {u.avatar_url ? (
+                                  <img src={u.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                    {(u.display_name || "?").slice(0, 2).toUpperCase()}
+                                  </span>
+                                )}
+                                {u.display_name || "Interested"}
+                                <Plus className="w-3 h-3 opacity-60" />
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground mt-2 font-body italic">
+                      Save the debate first to see who's expressed interest.
+                    </p>
+                  )}
+
+                  {/* Drag-and-drop side assignment */}
+                  {invitedEntries.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium">
+                        Assign to a side <span className="normal-case font-normal">(drag, or tap a person then tap a side)</span>
+                      </p>
+
+                      {/* Unassigned tray */}
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const key = e.dataTransfer.getData("text/plain");
+                          const target = invitedEntries.find((en) => entryKey(en) === key);
+                          if (target) assignSide(target, null);
+                          setDraggingId(null);
+                        }}
+                        onClick={() => {
+                          if (tapSelectedId) {
+                            const target = invitedEntries.find((en) => entryKey(en) === tapSelectedId);
+                            if (target) {
+                              assignSide(target, null);
+                              setTapSelectedId(null);
+                            }
+                          }
+                        }}
+                        className="border border-dashed border-border rounded-lg p-3 min-h-[56px] bg-accent/30"
+                      >
+                        <p className="text-[10px] text-muted-foreground font-body mb-1.5">Unassigned</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {invitedEntries.filter((e) => !e.sideId).map((e) => {
+                            const k = entryKey(e);
+                            const selected = tapSelectedId === k;
+                            return (
+                              <div
+                                key={k}
+                                draggable
+                                onDragStart={(ev) => {
+                                  ev.dataTransfer.setData("text/plain", k);
+                                  ev.dataTransfer.effectAllowed = "move";
+                                  setDraggingId(k);
+                                }}
+                                onDragEnd={() => setDraggingId(null)}
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  setTapSelectedId(selected ? null : k);
+                                }}
+                                className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all ${
+                                  selected
+                                    ? "bg-foreground text-background ring-2 ring-foreground"
+                                    : "bg-background border border-border text-foreground"
+                                } ${draggingId === k ? "opacity-50" : ""}`}
+                              >
+                                {e.avatarUrl ? (
+                                  <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                    {e.username.slice(0, 2).toUpperCase()}
+                                  </span>
+                                )}
+                                {e.username}
+                                <button
+                                  type="button"
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    removeInvite(e);
+                                  }}
+                                  className="hover:text-destructive transition-colors ml-0.5"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                          {invitedEntries.filter((e) => !e.sideId).length === 0 && (
+                            <span className="text-[11px] text-muted-foreground font-body italic">All assigned ✓</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Side columns */}
+                      <div className="flex items-stretch gap-0 rounded-lg border border-border overflow-hidden">
+                        {debate.sides.map((label, i) => {
+                          const sid = sideIds[i];
+                          if (!sid) return null;
+                          return (
+                            <div key={sid} className="flex-1 flex">
+                              <div
+                                onDragOver={(ev) => {
+                                  ev.preventDefault();
+                                  ev.dataTransfer.dropEffect = "move";
+                                }}
+                                onDrop={(ev) => {
+                                  ev.preventDefault();
+                                  const key = ev.dataTransfer.getData("text/plain");
+                                  const target = invitedEntries.find((en) => entryKey(en) === key);
+                                  if (target) assignSide(target, sid);
+                                  setDraggingId(null);
+                                }}
+                                onClick={() => {
+                                  if (tapSelectedId) {
+                                    const target = invitedEntries.find((en) => entryKey(en) === tapSelectedId);
+                                    if (target) {
+                                      assignSide(target, sid);
+                                      setTapSelectedId(null);
+                                    }
+                                  }
+                                }}
+                                className="flex-1 p-3 min-h-[120px] bg-background"
+                              >
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-1.5 truncate">
+                                  {label}
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {invitedEntries.filter((e) => e.sideId === sid).map((e) => {
+                                    const k = entryKey(e);
+                                    const selected = tapSelectedId === k;
+                                    return (
+                                      <div
+                                        key={k}
+                                        draggable
+                                        onDragStart={(ev) => {
+                                          ev.dataTransfer.setData("text/plain", k);
+                                          ev.dataTransfer.effectAllowed = "move";
+                                          setDraggingId(k);
+                                        }}
+                                        onDragEnd={() => setDraggingId(null)}
+                                        onClick={(ev) => {
+                                          ev.stopPropagation();
+                                          setTapSelectedId(selected ? null : k);
+                                        }}
+                                        className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all ${
+                                          selected
+                                            ? "bg-foreground text-background ring-2 ring-foreground"
+                                            : "bg-accent text-foreground"
+                                        } ${draggingId === k ? "opacity-50" : ""}`}
+                                      >
+                                        {e.avatarUrl ? (
+                                          <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                        ) : (
+                                          <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                            {e.username.slice(0, 2).toUpperCase()}
+                                          </span>
+                                        )}
+                                        {e.username}
+                                        <button
+                                          type="button"
+                                          onClick={(ev) => {
+                                            ev.stopPropagation();
+                                            removeInvite(e);
+                                          }}
+                                          className="hover:text-destructive transition-colors ml-0.5"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                  {invitedEntries.filter((e) => e.sideId === sid).length === 0 && (
+                                    <span className="text-[11px] text-muted-foreground font-body italic">
+                                      Drop here
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {i < debate.sides.length - 1 && (
+                                <div className="w-px bg-border" aria-hidden="true" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -993,7 +1351,7 @@ const CreateDebatePage = () => {
                     disabled={saving}
                     className="flex-1 flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
                   >
-                    {saving ? "Saving…" : invitedUsernames.length > 0 ? "Save & Invite" : "Save Debate"}
+                    {saving ? "Saving…" : invitedEntries.length > 0 ? "Save & Invite" : "Save Debate"}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                   <button
