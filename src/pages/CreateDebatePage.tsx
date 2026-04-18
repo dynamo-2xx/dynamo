@@ -51,6 +51,7 @@ const CreateDebatePage = () => {
   const [resolutionAdded, setResolutionAdded] = useState(false); // true once user has solidified it (or confirmed in collab mode)
   const [feedbackEnabled, setFeedbackEnabled] = useState(false);
   const [feedbackExplainerOpen, setFeedbackExplainerOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -397,6 +398,21 @@ const CreateDebatePage = () => {
                     value={debate.topic}
                     onChange={(e) => setDebate({ ...debate, topic: e.target.value })}
                     className="w-full bg-transparent text-lg font-display text-foreground focus:outline-none"
+                  />
+                </div>
+
+                {/* Tags */}
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-2 block">
+                    Tags <span className="normal-case font-normal">(helps people on Explore find this)</span>
+                  </label>
+                  <TagPicker
+                    kind="debate"
+                    recordId={null}
+                    buffered={selectedTags}
+                    onBufferedChange={setSelectedTags}
+                    max={5}
+                    compact
                   />
                 </div>
 

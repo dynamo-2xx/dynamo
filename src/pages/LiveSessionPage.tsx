@@ -4,6 +4,8 @@ import { Mic, Square, Radio, Loader2, ChevronDown } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/SessionRecordView";
 import LiveThreadView from "@/components/live/LiveThreadView";
+import TagPicker from "@/components/tags/TagPicker";
+import type { Tag } from "@/hooks/useTags";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
@@ -25,6 +27,7 @@ const LiveSessionPage = () => {
   const [sessionStatus, setSessionStatus] = useState<string>("recording");
   const [sessionData, setSessionData] = useState<any>(null);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
+  const [setupTags, setSetupTags] = useState<Tag[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const {
