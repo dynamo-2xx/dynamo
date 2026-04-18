@@ -14,7 +14,7 @@ function AutoCarousel<T>({
   renderItem,
   getKey,
   intervalMs = 5000,
-  resumeAfterMs = 10000,
+  resumeAfterMs = 5000,
 }: Props<T>) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
