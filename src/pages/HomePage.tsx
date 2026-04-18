@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { PlusCircle, Radio, ArrowUpRight, Compass, Sparkles } from "lucide-react";
+import { PlusCircle, Radio, ArrowUpRight, Compass } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import GreetingHeader from "@/components/home/GreetingHeader";
 import RotatingTagline from "@/components/home/RotatingTagline";
@@ -11,6 +11,9 @@ import { useForYouDebates, useMyRecentDebates } from "@/hooks/useHomeDebates";
 import LocationPrompt from "@/components/home/LocationPrompt";
 import FriendsOnlineWidget from "@/components/home/FriendsOnlineWidget";
 import { formatTodayLong } from "@/lib/date";
+import EmptyStateHint from "@/components/home/EmptyStateHint";
+import { useEmptyStateHint } from "@/hooks/useEmptyStateHint";
+import AuthPromptDialog from "@/components/AuthPromptDialog";
 
 type Mode = "trending" | "local";
 
@@ -39,12 +42,37 @@ const SectionHeader = ({
 );
 
 const HomePage = () => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [mode, setMode] = useState<Mode>("trending");
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
+  const [highlightActions, setHighlightActions] = useState(false);
   const hasLocation = !!profile?.location;
   const { items: forYou } = useForYouDebates(mode, 12);
   const { items: myRecent } = useMyRecentDebates(12);
+
+  const actionRowRef = useRef<HTMLDivElement>(null);
+  const forYouHint = useEmptyStateHint<HTMLDivElement>();
+  const myRecentHint = useEmptyStateHint<HTMLDivElement>();
+
+  const handleProtectedAction = (e: React.MouseEvent) => {
+    if (!user) {
+      e.preventDefault();
+      setAuthPromptOpen(true);
+    }
+  };
+
+  const handleScrollToActions = () => {
+    actionRowRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setHighlightActions(true);
+    window.setTimeout(() => setHighlightActions(false), 1500);
+  };
+
+  const actionCardClass = `flex items-center gap-3 bg-background border rounded-lg p-5 transition-all duration-500 group ${
+    highlightActions
+      ? "border-foreground/40 ring-2 ring-foreground/30"
+      : "border-border hover:border-foreground/20"
+  }`;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
@@ -56,69 +84,54 @@ const HomePage = () => {
         <RotatingTagline className="mb-8" />
 
         {/* Action row: Create + Live side-by-side */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <Link
-            to="/create"
-            className="flex items-center gap-3 bg-background border border-border hover:border-foreground/20 rounded-lg p-5 transition-colors group"
-          >
-            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
-              <PlusCircle className="w-5 h-5 text-foreground" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-body text-sm font-medium">Debate</p>
-              <p className="text-[11px] text-muted-foreground font-body truncate">Structure a debate</p>
-            </div>
-          </Link>
-          <Link
-            to="/live/new"
-            className="flex items-center gap-3 bg-background border border-border hover:border-foreground/20 rounded-lg p-5 transition-colors group"
-          >
-            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
-              <Radio className="w-5 h-5 text-foreground" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-body text-sm font-medium">Live</p>
-              <p className="text-[11px] text-muted-foreground font-body truncate">Capture a real conversation</p>
-            </div>
-          </Link>
+        <div ref={actionRowRef} className="grid grid-cols-2 gap-3 mb-6 scroll-mt-4">
+          {user ? (
+            <Link to="/create" className={actionCardClass}>
+              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+                <PlusCircle className="w-5 h-5 text-foreground" />
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="font-body text-sm font-medium">Debate</p>
+                <p className="text-[11px] text-muted-foreground font-body truncate">Structure a debate</p>
+              </div>
+            </Link>
+          ) : (
+            <button type="button" onClick={handleProtectedAction} className={actionCardClass}>
+              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+                <PlusCircle className="w-5 h-5 text-foreground" />
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="font-body text-sm font-medium">Debate</p>
+                <p className="text-[11px] text-muted-foreground font-body truncate">Structure a debate</p>
+              </div>
+            </button>
+          )}
+          {user ? (
+            <Link to="/live/new" className={actionCardClass}>
+              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+                <Radio className="w-5 h-5 text-foreground" />
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="font-body text-sm font-medium">Live</p>
+                <p className="text-[11px] text-muted-foreground font-body truncate">Capture a real conversation</p>
+              </div>
+            </Link>
+          ) : (
+            <button type="button" onClick={handleProtectedAction} className={actionCardClass}>
+              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+                <Radio className="w-5 h-5 text-foreground" />
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="font-body text-sm font-medium">Live</p>
+                <p className="text-[11px] text-muted-foreground font-body truncate">Capture a real conversation</p>
+              </div>
+            </button>
+          )}
         </div>
 
         <div className="mb-10">
           <FriendsOnlineWidget />
         </div>
-
-        {/* New-user welcome (both empty) */}
-        {forYou.length === 0 && myRecent.length === 0 && (
-          <section className="mb-10">
-            <div className="border border-border rounded-xl p-6 md:p-8 bg-background">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5 text-foreground" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-display text-xl mb-1">Welcome to Dynamo</h3>
-                  <p className="text-sm text-muted-foreground font-body">
-                    Start a structured debate, or browse what people are debating today.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  to="/create"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-sm font-body hover:opacity-90 transition-opacity"
-                >
-                  <PlusCircle className="w-4 h-4" /> Create a debate
-                </Link>
-                <Link
-                  to="/explore"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border text-sm font-body hover:border-foreground/30 transition-colors"
-                >
-                  <Compass className="w-4 h-4" /> Explore
-                </Link>
-              </div>
-            </div>
-          </section>
-        )}
 
         {/* For-you carousel */}
         <section className="mb-10">
@@ -146,11 +159,17 @@ const HomePage = () => {
             }
           />
           {forYou.length === 0 ? (
-            <div className="border border-dashed border-border rounded-xl p-6 text-center">
+            <div ref={forYouHint.ref} className="border border-dashed border-border rounded-xl p-6 text-center">
               <p className="text-sm text-muted-foreground font-body mb-3">
-                {mode === "local"
-                  ? "No local conversations yet. Try Trending."
-                  : "No conversations yet today."}
+                <EmptyStateHint
+                  active={forYouHint.active}
+                  baseText={
+                    mode === "local"
+                      ? "No local conversations yet. Try Trending."
+                      : "No conversations yet today."
+                  }
+                  hintMessages={["Break the ice!", "Move a mountain!"]}
+                />
               </p>
               <Link
                 to="/explore"
@@ -172,17 +191,22 @@ const HomePage = () => {
         <section>
           <SectionHeader title="My Recent" toRoute="/my-recent" />
           {myRecent.length === 0 ? (
-            <div className="border border-dashed border-border rounded-xl p-6 text-center">
+            <div ref={myRecentHint.ref} className="border border-dashed border-border rounded-xl p-6 text-center">
               <p className="text-sm text-muted-foreground font-body mb-3">
-                You haven't joined a debate yet.
+                <EmptyStateHint
+                  active={myRecentHint.active}
+                  baseText="You haven't joined a debate yet."
+                  hintMessages={["Your conversations go here."]}
+                />
               </p>
               <div className="flex justify-center gap-2 flex-wrap">
-                <Link
-                  to="/create"
+                <button
+                  type="button"
+                  onClick={handleScrollToActions}
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body hover:opacity-90 transition-opacity"
                 >
                   <PlusCircle className="w-3.5 h-3.5" /> Create
-                </Link>
+                </button>
                 <Link
                   to="/explore"
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs font-body hover:border-foreground/30 transition-colors"
@@ -206,6 +230,7 @@ const HomePage = () => {
         onOpenChange={setLocationPromptOpen}
         onSaved={() => setMode("local")}
       />
+      <AuthPromptDialog open={authPromptOpen} onOpenChange={setAuthPromptOpen} />
     </div>
   );
 };
