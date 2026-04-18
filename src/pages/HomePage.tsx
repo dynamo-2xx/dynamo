@@ -64,7 +64,7 @@ const HomePage = () => {
   };
 
   const handleScrollToActions = () => {
-    actionRowRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setHighlightActions(true);
     window.setTimeout(() => setHighlightActions(false), 1500);
   };
