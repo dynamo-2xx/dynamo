@@ -80,8 +80,10 @@ const HomePage = () => {
         {/* Greeting → header swap */}
         <GreetingHeader />
 
-        {/* Persistent tagline */}
-        <RotatingTagline className="mb-8" />
+        {/* Persistent tagline — centered between header and action row */}
+        <div className="flex items-center justify-center py-6">
+          <RotatingTagline />
+        </div>
 
         {/* Action row: Create + Live side-by-side */}
         <div ref={actionRowRef} className="grid grid-cols-2 gap-3 mb-6 scroll-mt-4">
