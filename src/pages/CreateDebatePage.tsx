@@ -452,6 +452,15 @@ const CreateDebatePage = () => {
 
           {step === 3 && debate && (
             <motion.div key="step3" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-1.5 text-sm font-body text-muted-foreground hover:text-foreground transition-colors mb-6 group"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                Back
+              </button>
               <h2 className="text-2xl font-display mb-6">Review Your Debate</h2>
 
               <div className="space-y-6">
