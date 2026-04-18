@@ -285,6 +285,33 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
         </div>
       )}
 
+      {/* Interested? CTA for non-owners on public debates */}
+      {showInterestedCta && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setInterestedOpen(true);
+          }}
+          className="absolute bottom-2 right-2 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/95 text-foreground border border-border text-[11px] font-body font-medium hover:bg-foreground hover:text-background transition-colors shadow-sm"
+        >
+          <HandHeart className="w-3.5 h-3.5" />
+          Interested?
+        </button>
+      )}
+
+      {showInterestedCta && (
+        <InterestedDialog
+          open={interestedOpen}
+          onOpenChange={setInterestedOpen}
+          debateId={d.id}
+          debateTopic={d.topic}
+          debateStatus={d.status}
+          createdBy={d.created_by || ""}
+        />
+      )}
+
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
