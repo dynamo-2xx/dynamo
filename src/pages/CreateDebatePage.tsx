@@ -66,6 +66,8 @@ const CreateDebatePage = () => {
   const [interestedUsers, setInterestedUsers] = useState<InterestedUser[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [tapSelectedId, setTapSelectedId] = useState<string | null>(null);
+  // Index into debate.sides — which side the creator is joining as.
+  const [creatorSideIndex, setCreatorSideIndex] = useState<number>(0);
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [location, setLocation] = useState("");
   const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string
@@ -158,6 +160,18 @@ const CreateDebatePage = () => {
       setLoadedStatus(d.status ?? null);
       setEditLoading(false);
       setStep(3);
+
+      // Load creator's existing side assignment from debate_participants
+      const { data: meAsParticipant } = await supabase
+        .from("debate_participants")
+        .select("side_id")
+        .eq("debate_id", editId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (meAsParticipant?.side_id && sds) {
+        const idx = (sds as any[]).findIndex((s: any) => s.id === meAsParticipant.side_id);
+        if (idx >= 0) setCreatorSideIndex(idx);
+      }
 
       // Load existing invitations into invitedEntries
       const { data: invs } = await supabase
@@ -531,19 +545,56 @@ const CreateDebatePage = () => {
         const { error: sideError } = await supabase.from("debate_sides").insert(sideInserts);
         if (sideError) throw sideError;
 
-        // Add creator as participant
+        // Add creator as participant on chosen side
         const { data: sides } = await supabase
           .from("debate_sides")
-          .select("id")
+          .select("id, sort_order")
           .eq("debate_id", dbDebate.id)
-          .order("sort_order")
-          .limit(1);
+          .order("sort_order");
+
+        const creatorSideId =
+          sides?.find((s: any) => s.sort_order === creatorSideIndex)?.id ??
+          sides?.[0]?.id ??
+          null;
 
         await supabase.from("debate_participants").insert({
           debate_id: dbDebate.id,
           user_id: user.id,
-          side_id: sides?.[0]?.id ?? null,
+          side_id: creatorSideId,
         });
+      }
+
+      // Edit mode: ensure creator's participant row points to chosen side after sides were re-created.
+      if (editId) {
+        const { data: freshSidesForCreator } = await supabase
+          .from("debate_sides")
+          .select("id, sort_order")
+          .eq("debate_id", dbDebate.id)
+          .order("sort_order");
+        const newCreatorSideId =
+          freshSidesForCreator?.find((s: any) => s.sort_order === creatorSideIndex)?.id ??
+          freshSidesForCreator?.[0]?.id ??
+          null;
+        if (newCreatorSideId) {
+          const { data: existingPart } = await supabase
+            .from("debate_participants")
+            .select("id")
+            .eq("debate_id", editId)
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (existingPart) {
+            await supabase
+              .from("debate_participants")
+              .update({ side_id: newCreatorSideId })
+              .eq("id", existingPart.id);
+          } else {
+            await supabase.from("debate_participants").insert({
+              debate_id: editId,
+              user_id: user.id,
+              side_id: newCreatorSideId,
+            });
+          }
+        }
       }
 
       // 5. Send invitations (usernames and emails) — with side assignments from DnD
@@ -931,6 +982,36 @@ const CreateDebatePage = () => {
                       />
                     ))}
                   </div>
+
+                  {/* Your side picker — creator chooses which side they're joining as */}
+                  <div className="mt-4">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-2">
+                      Your side
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {debate.sides.map((side, i) => {
+                        const selected = creatorSideIndex === i;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setCreatorSideIndex(i)}
+                            aria-pressed={selected}
+                            className={`flex-1 rounded-lg px-3 py-2 text-sm font-body font-medium transition-all border ${
+                              selected
+                                ? "bg-foreground text-background border-foreground"
+                                : "bg-background text-foreground border-border hover:border-foreground/40"
+                            }`}
+                          >
+                            {selected ? "✓ " : ""}{side || `Side ${i + 1}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1.5 font-body">
+                      You'll be added as a speaker on this side.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Turns & Time */}
@@ -1049,7 +1130,7 @@ const CreateDebatePage = () => {
                   {invitedEntries.length > 0 && (
                     <div className="mt-4 space-y-3">
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium">
-                        Assign to a side <span className="normal-case font-normal">(drag, or tap a person then tap a side)</span>
+                        Assign to a side <span className="normal-case font-normal">(drag on desktop, tap the → on each chip on mobile)</span>
                       </p>
 
                       {/* Unassigned tray */}
@@ -1109,6 +1190,31 @@ const CreateDebatePage = () => {
                                   </span>
                                 )}
                                 {e.username}
+                                {/* Mobile-friendly side picker */}
+                                <select
+                                  value=""
+                                  onClick={(ev) => ev.stopPropagation()}
+                                  onChange={(ev) => {
+                                    const v = ev.target.value;
+                                    if (!v) return;
+                                    assignSide(e, v);
+                                    setTapSelectedId(null);
+                                  }}
+                                  className="bg-transparent text-[10px] font-body border-0 outline-none cursor-pointer appearance-none pr-0.5"
+                                  aria-label={`Assign ${e.username} to a side`}
+                                  title="Move to side"
+                                >
+                                  <option value="">→</option>
+                                  {debate.sides.map((label, si) => {
+                                    const sid = sideIds[si];
+                                    if (!sid) return null;
+                                    return (
+                                      <option key={sid} value={sid}>
+                                        {label}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
                                 <button
                                   type="button"
                                   onClick={(ev) => {
@@ -1193,6 +1299,35 @@ const CreateDebatePage = () => {
                                           </span>
                                         )}
                                         {e.username}
+                                        {/* Mobile-friendly side picker (move or unassign) */}
+                                        <select
+                                          value=""
+                                          onClick={(ev) => ev.stopPropagation()}
+                                          onChange={(ev) => {
+                                            const v = ev.target.value;
+                                            if (v === "__unassign__") {
+                                              assignSide(e, null);
+                                            } else if (v) {
+                                              assignSide(e, v);
+                                            }
+                                            setTapSelectedId(null);
+                                          }}
+                                          className="bg-transparent text-[10px] font-body border-0 outline-none cursor-pointer appearance-none pr-0.5 text-current"
+                                          aria-label={`Move ${e.username}`}
+                                          title="Move"
+                                        >
+                                          <option value="">→</option>
+                                          <option value="__unassign__">Unassign</option>
+                                          {debate.sides.map((label, si) => {
+                                            const otherSid = sideIds[si];
+                                            if (!otherSid || otherSid === sid) return null;
+                                            return (
+                                              <option key={otherSid} value={otherSid}>
+                                                {label}
+                                              </option>
+                                            );
+                                          })}
+                                        </select>
                                         <button
                                           type="button"
                                           onClick={(ev) => {
