@@ -58,11 +58,11 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const isOwner = !!user && !!d.created_by && user.id === d.created_by;
   const showOwnerControls = isOwner && !isLive && !selectionMode && !isLiveSession;
   const selectable = !!selectionMode && isOwner;
-  // Route non-owners on a scheduled/draft public debate to the preview page;
-  // owners and live debates go straight into the room.
+  // Scheduled/draft debates always route to preview (owner sees coordination panel,
+  // non-owners see the Interested CTA). Live/completed go straight into the room.
   const linkTo = isLiveSession
     ? `/live/${d.id}`
-    : (!isOwner && isScheduled && d.is_public)
+    : isScheduled
       ? `/debate/${d.id}/preview`
       : `/debate/${d.id}`;
 

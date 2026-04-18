@@ -379,10 +379,17 @@ const CreateDebatePage = () => {
       }
 
       // Attach buffered tags
+      console.log("[CreateDebate] attaching tags", { count: selectedTags.length, tags: selectedTags.map((t: any) => t.slug) });
       if (selectedTags.length > 0) {
-        await (supabase as any)
+        const { error: tagErr } = await (supabase as any)
           .from("debate_tags")
           .insert(selectedTags.map((t: any) => ({ debate_id: dbDebate.id, tag_id: t.id })));
+        if (tagErr) {
+          console.error("[CreateDebate] debate_tags insert failed", tagErr);
+          toast.error(`Couldn't attach tags: ${tagErr.message}`);
+          setSaving(false);
+          return;
+        }
       }
 
       if (publishMode) {
