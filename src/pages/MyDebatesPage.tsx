@@ -208,6 +208,99 @@ const MyDebatesPage = () => {
       ? "You have no live session records yet."
       : "You haven't participated in any debates yet.";
 
+  const ownedSelectedItems = () =>
+    Array.from(selected)
+      .map((id) => currentList.find((x) => x.id === id))
+      .filter((x): x is DebateCoverItem => !!x && !!user && x.created_by === user.id);
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelected(new Set());
+  };
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const selectableIdsInView = () =>
+    currentList.filter((d) => user && d.created_by === user.id).map((d) => d.id);
+
+  const allSelected = (() => {
+    const ids = selectableIdsInView();
+    return ids.length > 0 && ids.every((id) => selected.has(id));
+  })();
+
+  const bulkPrivacy = async (next: boolean) => {
+    const items = ownedSelectedItems().filter((i) => i.kind !== "live_session");
+    if (items.length === 0) return;
+    setBusy(true);
+    const { error } = await supabase
+      .from("debates")
+      .update({ is_public: next })
+      .in("id", items.map((i) => i.id));
+    setBusy(false);
+    if (error) {
+      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+      return;
+    }
+    items.forEach((i) => patchInList(i.id, { is_public: next }));
+    toast({ title: `${items.length} updated`, description: next ? "Now public" : "Now private" });
+    exitSelection();
+  };
+
+  const bulkArchive = async () => {
+    const items = ownedSelectedItems().filter((i) => i.kind !== "live_session");
+    if (items.length === 0) return;
+    setBusy(true);
+    const { error } = await supabase
+      .from("debates")
+      .update({ status: "archived" })
+      .in("id", items.map((i) => i.id));
+    setBusy(false);
+    if (error) {
+      toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
+      return;
+    }
+    items.forEach((i) => {
+      setDebates((prev) => prev.filter((d) => d.id !== i.id));
+      setArchive((prev) => [{ ...i, status: "archived" }, ...prev.filter((d) => d.id !== i.id)]);
+    });
+    toast({ title: `${items.length} archived` });
+    exitSelection();
+  };
+
+  const bulkDelete = async () => {
+    const items = ownedSelectedItems();
+    if (items.length === 0) {
+      setConfirmBulkDeleteOpen(false);
+      return;
+    }
+    setBusy(true);
+    const debateIds = items.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const liveIds = items.filter((i) => i.kind === "live_session").map((i) => i.id);
+    const errors: string[] = [];
+    if (debateIds.length > 0) {
+      const { error } = await supabase.from("debates").delete().in("id", debateIds);
+      if (error) errors.push(error.message);
+    }
+    if (liveIds.length > 0) {
+      const { error } = await supabase.from("live_sessions" as any).delete().in("id", liveIds);
+      if (error) errors.push(error.message);
+    }
+    setBusy(false);
+    setConfirmBulkDeleteOpen(false);
+    if (errors.length > 0) {
+      toast({ title: "Some deletions failed", description: errors.join("; "), variant: "destructive" });
+    }
+    items.forEach((i) => removeFromList(i.id));
+    toast({ title: `${items.length} deleted` });
+    exitSelection();
+  };
+
+
   return (
     <AppLayout>
       <div
