@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import TagPicker from "@/components/tags/TagPicker";
 import type { Tag } from "@/hooks/useTags";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send, Play } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +55,7 @@ const CreateDebatePage = () => {
   const editId = searchParams.get("edit");
   const [step, setStep] = useState<1 | 2 | 3 | 4>(editId ? 2 : 1);
   const [editLoading, setEditLoading] = useState(!!editId);
+  const [loadedStatus, setLoadedStatus] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [debate, setDebate] = useState<GeneratedDebate | null>(null);
   const [isPublic, setIsPublic] = useState(false);
@@ -154,6 +155,7 @@ const CreateDebatePage = () => {
       setFeedbackEnabled(!!d.feedback_enabled);
       setDescription(d.description || "");
       setResolutionAdded(true);
+      setLoadedStatus(d.status ?? null);
       setEditLoading(false);
       setStep(3);
 
@@ -1345,24 +1347,59 @@ const CreateDebatePage = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                  <button
-                    onClick={() => handleCreateDebate(false)}
-                    disabled={saving}
-                    className="flex-1 flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
-                  >
-                    {saving ? "Saving…" : invitedEntries.length > 0 ? "Save & Invite" : "Save Debate"}
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleCreateDebate(true)}
-                    disabled={saving}
-                    className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                  >
-                    {saving ? "Publishing…" : "Publish Debate"}
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
+                {(() => {
+                  const isPublished = !!editId && loadedStatus === "scheduled";
+                  const leftLabel = saving
+                    ? "Saving…"
+                    : isPublished
+                      ? "Save Debate"
+                      : invitedEntries.length > 0
+                        ? "Save & Invite"
+                        : "Save Draft";
+                  const rightLabel = isPublished
+                    ? saving ? "Starting…" : "Start Debate"
+                    : saving ? "Publishing…" : "Publish Debate";
+                  const handleRight = async () => {
+                    if (!isPublished) {
+                      handleCreateDebate(true);
+                      return;
+                    }
+                    if (!editId) return;
+                    setSaving(true);
+                    try {
+                      const { error } = await supabase
+                        .from("debates")
+                        .update({ status: "live", started_at: new Date().toISOString() } as any)
+                        .eq("id", editId);
+                      if (error) throw error;
+                      toast.success("Debate started!");
+                      navigate(`/debate/${editId}`);
+                    } catch (err: any) {
+                      toast.error(err.message || "Failed to start debate");
+                      setSaving(false);
+                    }
+                  };
+                  return (
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <button
+                        onClick={() => handleCreateDebate(false)}
+                        disabled={saving}
+                        className="flex-1 flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
+                      >
+                        {leftLabel}
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleRight}
+                        disabled={saving}
+                        className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        {rightLabel}
+                        {isPublished ? <Play className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             </motion.div>
           )}

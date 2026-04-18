@@ -17,6 +17,13 @@ interface InterestedThread {
   unread_count: number;
 }
 
+interface JoinedParticipant {
+  user_id: string;
+  side_id: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
 interface Props {
   debateId: string;
   debateTopic: string;
@@ -31,12 +38,39 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
   const { user } = useAuth();
   const { openThread } = useFloatingDM();
   const [threads, setThreads] = useState<InterestedThread[]>([]);
+  const [joined, setJoined] = useState<JoinedParticipant[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const refresh = async () => {
     if (!user) return;
     setLoading(true);
+
+    // Fetch joined participants (excluding owner)
+    const { data: parts } = await supabase
+      .from("debate_participants")
+      .select("user_id, side_id")
+      .eq("debate_id", debateId);
+    const partList = (parts || []).filter((p: any) => p.user_id !== user.id);
+    if (partList.length > 0) {
+      const ids = partList.map((p: any) => p.user_id);
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url")
+        .in("user_id", ids);
+      const profMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+      setJoined(
+        partList.map((p: any) => ({
+          user_id: p.user_id,
+          side_id: p.side_id ?? null,
+          display_name: (profMap.get(p.user_id) as any)?.display_name ?? null,
+          avatar_url: (profMap.get(p.user_id) as any)?.avatar_url ?? null,
+        })),
+      );
+    } else {
+      setJoined([]);
+    }
+
     const { data: rows } = await (supabase as any)
       .from("dm_threads")
       .select("*")
@@ -107,6 +141,7 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
       .channel(`dm-inbox-debate-${debateId}-${user.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, () => refresh())
       .on("postgres_changes", { event: "*", schema: "public", table: "dm_threads" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${debateId}` }, () => refresh())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -116,7 +151,80 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
 
   return (
     <>
-    <div className="bg-background border border-border rounded-lg p-5">
+    <div className="bg-background border border-border rounded-lg p-5 space-y-5">
+      {joined.length > 0 && (
+        <div>
+          <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium block mb-3">
+            People who have already joined
+            <span className="text-[10px] text-muted-foreground font-body normal-case tracking-normal ml-2">
+              · {joined.length}
+            </span>
+          </label>
+          <div className="space-y-3">
+            {sides.map((s) => {
+              const members = joined.filter((j) => j.side_id === s.id);
+              if (members.length === 0) return null;
+              return (
+                <div key={s.id}>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body mb-1.5">
+                    {s.label}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {members.map((m) => (
+                      <div
+                        key={m.user_id}
+                        className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-accent text-xs font-body"
+                      >
+                        <Avatar className="w-5 h-5">
+                          <AvatarImage src={m.avatar_url ?? undefined} />
+                          <AvatarFallback className="text-[9px]">
+                            {(m.display_name || "?").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate max-w-[140px]">
+                          {m.display_name || "User"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {(() => {
+              const unassigned = joined.filter(
+                (j) => !j.side_id || !sides.some((s) => s.id === j.side_id),
+              );
+              if (unassigned.length === 0) return null;
+              return (
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body mb-1.5">
+                    Unassigned
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {unassigned.map((m) => (
+                      <div
+                        key={m.user_id}
+                        className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-accent text-xs font-body"
+                      >
+                        <Avatar className="w-5 h-5">
+                          <AvatarImage src={m.avatar_url ?? undefined} />
+                          <AvatarFallback className="text-[9px]">
+                            {(m.display_name || "?").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate max-w-[140px]">
+                          {m.display_name || "User"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-3 gap-2">
         <div className="flex items-baseline gap-2 min-w-0">
           <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium">
