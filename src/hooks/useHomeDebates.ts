@@ -57,6 +57,7 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         .from("live_sessions" as any)
         .select("id, title, status, created_at, created_by, share_token")
         .not("share_token", "is", null)
+        .neq("status", "archived")
         .limit(50);
       if (cancelled) return;
 
@@ -142,6 +143,7 @@ export function useMyRecentDebates(limit = 12) {
         .from("live_sessions" as any)
         .select("id, title, status, created_at, created_by")
         .eq("created_by", user.id)
+        .neq("status", "archived")
         .order("created_at", { ascending: false })
         .limit(limit);
 
