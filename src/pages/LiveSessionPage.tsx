@@ -4,6 +4,8 @@ import { Mic, Square, Radio, Loader2, ChevronDown } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/SessionRecordView";
 import LiveThreadView from "@/components/live/LiveThreadView";
+import TagPicker from "@/components/tags/TagPicker";
+import type { Tag } from "@/hooks/useTags";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
@@ -25,6 +27,7 @@ const LiveSessionPage = () => {
   const [sessionStatus, setSessionStatus] = useState<string>("recording");
   const [sessionData, setSessionData] = useState<any>(null);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
+  const [setupTags, setSetupTags] = useState<Tag[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -97,8 +100,16 @@ const LiveSessionPage = () => {
     setSessionId(d.id);
     setSessionStatus("recording");
     setPhase("recording");
+
+    // Attach buffered tags
+    if (setupTags.length > 0) {
+      await (supabase as any)
+        .from("live_session_tags")
+        .insert(setupTags.map((t) => ({ live_session_id: d.id, tag_id: t.id })));
+    }
+
     navigate(`/live/${d.id}`, { replace: true });
-  }, [user, title, mode, navigate]);
+  }, [user, title, mode, navigate, setupTags]);
 
   const handleEndSession = useCallback(async () => {
     await endSession();
@@ -213,6 +224,20 @@ const LiveSessionPage = () => {
                     Online
                   </button>
                 </div>
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-5">
+                <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-2 block">
+                  Tags <span className="normal-case font-normal text-[10px]">(helps people on Explore find this)</span>
+                </label>
+                <TagPicker
+                  kind="live_session"
+                  recordId={null}
+                  buffered={setupTags}
+                  onBufferedChange={setSetupTags}
+                  max={5}
+                  compact
+                />
               </div>
 
               <button
