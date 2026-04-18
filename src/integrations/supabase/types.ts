@@ -597,6 +597,7 @@ export type Database = {
           created_by: string
           ended_at: string | null
           id: string
+          is_public: boolean
           mode: string
           share_token: string | null
           speaker_names: Json
@@ -611,6 +612,7 @@ export type Database = {
           created_by: string
           ended_at?: string | null
           id?: string
+          is_public?: boolean
           mode?: string
           share_token?: string | null
           speaker_names?: Json
@@ -625,6 +627,7 @@ export type Database = {
           created_by?: string
           ended_at?: string | null
           id?: string
+          is_public?: boolean
           mode?: string
           share_token?: string | null
           speaker_names?: Json

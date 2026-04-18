@@ -235,52 +235,61 @@ const MyDebatesPage = () => {
 
   const bulkPrivacy = async (next: boolean) => {
     const all = ownedSelectedItems();
-    const items = all.filter((i) => i.kind !== "live_session");
-    if (items.length === 0) {
-      if (all.length > 0) {
-        toast({ title: "Live sessions are always shareable", description: "Public/Private only applies to debates." });
-      }
-      return;
-    }
+    if (all.length === 0) return;
     setBusy(true);
-    const { error } = await supabase
-      .from("debates")
-      .update({ is_public: next })
-      .in("id", items.map((i) => i.id));
+    const debateIds = all.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const liveIds = all.filter((i) => i.kind === "live_session").map((i) => i.id);
+    const errors: string[] = [];
+    if (debateIds.length > 0) {
+      const { error } = await supabase.from("debates").update({ is_public: next }).in("id", debateIds);
+      if (error) errors.push(error.message);
+    }
+    if (liveIds.length > 0) {
+      const { error } = await supabase
+        .from("live_sessions" as any)
+        .update({ is_public: next } as any)
+        .in("id", liveIds);
+      if (error) errors.push(error.message);
+    }
     setBusy(false);
-    if (error) {
-      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+    if (errors.length > 0) {
+      toast({ title: "Couldn't update", description: errors.join("; "), variant: "destructive" });
       return;
     }
-    items.forEach((i) => patchInList(i.id, { is_public: next }));
-    toast({ title: `${items.length} updated`, description: next ? "Now public" : "Now private" });
+    all.forEach((i) => patchInList(i.id, { is_public: next }));
+    toast({ title: `${all.length} updated`, description: next ? "Now public" : "Now private" });
     exitSelection();
   };
 
   const bulkArchive = async () => {
     const all = ownedSelectedItems();
-    const items = all.filter((i) => i.kind !== "live_session");
-    if (items.length === 0) {
-      if (all.length > 0) {
-        toast({ title: "Live sessions can't be archived", description: "Use Delete to remove them." });
-      }
-      return;
-    }
+    if (all.length === 0) return;
     setBusy(true);
-    const { error } = await supabase
-      .from("debates")
-      .update({ status: "archived" })
-      .in("id", items.map((i) => i.id));
+    const debateIds = all.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const liveIds = all.filter((i) => i.kind === "live_session").map((i) => i.id);
+    const errors: string[] = [];
+    if (debateIds.length > 0) {
+      const { error } = await supabase.from("debates").update({ status: "archived" }).in("id", debateIds);
+      if (error) errors.push(error.message);
+    }
+    if (liveIds.length > 0) {
+      const { error } = await supabase
+        .from("live_sessions" as any)
+        .update({ status: "archived" } as any)
+        .in("id", liveIds);
+      if (error) errors.push(error.message);
+    }
     setBusy(false);
-    if (error) {
-      toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
+    if (errors.length > 0) {
+      toast({ title: "Couldn't archive", description: errors.join("; "), variant: "destructive" });
       return;
     }
-    items.forEach((i) => {
+    all.forEach((i) => {
       setDebates((prev) => prev.filter((d) => d.id !== i.id));
+      setLiveSessions((prev) => prev.filter((d) => d.id !== i.id));
       setArchive((prev) => [{ ...i, status: "archived" }, ...prev.filter((d) => d.id !== i.id)]);
     });
-    toast({ title: `${items.length} archived` });
+    toast({ title: `${all.length} archived` });
     exitSelection();
   };
 
