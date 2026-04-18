@@ -27,6 +27,10 @@ import SharedLiveSessionPage from "./pages/SharedLiveSessionPage";
 import ForYouPage from "./pages/ForYouPage";
 import MyRecentPage from "./pages/MyRecentPage";
 import EditProfilePage from "./pages/EditProfilePage";
+import TopicPage from "./pages/TopicPage";
+import ConnectionsPage from "./pages/ConnectionsPage";
+import PublicProfilePage from "./pages/PublicProfilePage";
+import AdminTagsPage from "./pages/AdminTagsPage";
 
 const queryClient = new QueryClient();
 
@@ -41,7 +45,11 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/explore/topic/:slug" element={<TopicPage />} />
               <Route path="/explore/:debateId" element={<ExploreDebateDetailPage />} />
+              <Route path="/u/:userId" element={<PublicProfilePage />} />
+              <Route path="/profile/connections" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
+              <Route path="/admin/tags" element={<ProtectedRoute><AdminTagsPage /></ProtectedRoute>} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />

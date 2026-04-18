@@ -85,6 +85,24 @@ export type Database = {
           },
         ]
       }
+      connections: {
+        Row: {
+          created_at: string
+          followed_id: string
+          follower_id: string
+        }
+        Insert: {
+          created_at?: string
+          followed_id: string
+          follower_id: string
+        }
+        Update: {
+          created_at?: string
+          followed_id?: string
+          follower_id?: string
+        }
+        Relationships: []
+      }
       debate_grades: {
         Row: {
           argument_quality: number | null
@@ -311,6 +329,39 @@ export type Database = {
           },
         ]
       }
+      debate_tags: {
+        Row: {
+          created_at: string
+          debate_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_tags_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debate_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debate_templates: {
         Row: {
           created_at: string
@@ -507,6 +558,39 @@ export type Database = {
           },
         ]
       }
+      live_session_tags: {
+        Row: {
+          created_at: string
+          live_session_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          live_session_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          live_session_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_tags_live_session_id_fkey"
+            columns: ["live_session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_session_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_sessions: {
         Row: {
           created_at: string
@@ -636,6 +720,71 @@ export type Database = {
           },
         ]
       }
+      tags: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          debate_count: number
+          description: string | null
+          id: string
+          is_official: boolean
+          name: string
+          parent_tag_id: string | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          debate_count?: number
+          description?: string | null
+          id?: string
+          is_official?: boolean
+          name: string
+          parent_tag_id?: string | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          debate_count?: number
+          description?: string | null
+          id?: string
+          is_official?: boolean
+          name?: string
+          parent_tag_id?: string | null
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tags_parent_tag_id_fkey"
+            columns: ["parent_tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_presence: {
+        Row: {
+          last_seen_at: string
+          user_id: string
+          visibility: string
+        }
+        Insert: {
+          last_seen_at?: string
+          user_id: string
+          visibility?: string
+        }
+        Update: {
+          last_seen_at?: string
+          user_id?: string
+          visibility?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -666,6 +815,20 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_recommended_users: {
+        Args: { _limit?: number }
+        Returns: {
+          affiliation: string
+          avatar_url: string
+          display_name: string
+          location: string
+          mutual_count: number
+          same_location: boolean
+          score: number
+          shared_tags: string[]
+          user_id: string
+        }[]
+      }
       get_shared_live_session: {
         Args: { _token: string }
         Returns: {
@@ -681,9 +844,10 @@ export type Database = {
           transcript_entries: Json
         }[]
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "personal" | "education" | "community"
+      app_role: "personal" | "education" | "community" | "admin"
       debate_status: "draft" | "scheduled" | "live" | "completed" | "archived"
     }
     CompositeTypes: {
@@ -812,7 +976,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["personal", "education", "community"],
+      app_role: ["personal", "education", "community", "admin"],
       debate_status: ["draft", "scheduled", "live", "completed", "archived"],
     },
   },

@@ -64,6 +64,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Presence heartbeat — keeps last_seen_at fresh while signed in
+  useEffect(() => {
+    if (!user) return;
+    let stopped = false;
+    const ping = async () => {
+      if (stopped) return;
+      try {
+        await (supabase as any)
+          .from("user_presence")
+          .upsert(
+            { user_id: user.id, last_seen_at: new Date().toISOString() },
+            { onConflict: "user_id" },
+          );
+      } catch {}
+    };
+    ping();
+    const t = window.setInterval(ping, 60_000);
+    return () => {
+      stopped = true;
+      window.clearInterval(t);
+    };
+  }, [user]);
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setSession(null);

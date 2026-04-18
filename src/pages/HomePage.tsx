@@ -9,6 +9,7 @@ import AutoCarousel from "@/components/home/AutoCarousel";
 import DebateCoverCard from "@/components/home/DebateCoverCard";
 import { useForYouDebates, useMyRecentDebates } from "@/hooks/useHomeDebates";
 import LocationPrompt from "@/components/home/LocationPrompt";
+import FriendsOnlineWidget from "@/components/home/FriendsOnlineWidget";
 
 type Mode = "trending" | "local";
 
@@ -52,6 +53,8 @@ const HomePage = () => {
 
         {/* Persistent tagline */}
         <RotatingTagline className="mb-8" />
+
+        <FriendsOnlineWidget />
 
         {/* Action row: Create + Live side-by-side */}
         <div className="grid grid-cols-2 gap-3 mb-10">
