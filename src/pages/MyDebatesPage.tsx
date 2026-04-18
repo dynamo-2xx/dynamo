@@ -147,6 +147,7 @@ const MyDebatesPage = () => {
   const removeFromList = (id: string) => {
     setDebates((prev) => prev.filter((d) => d.id !== id));
     setArchive((prev) => prev.filter((d) => d.id !== id));
+    setArchivedLive((prev) => prev.filter((d) => d.id !== id));
     setLiveSessions((prev) => prev.filter((d) => d.id !== id));
   };
 
@@ -155,6 +156,7 @@ const MyDebatesPage = () => {
       arr.map((d) => (d.id === id ? { ...d, ...patch } : d));
     setDebates(upd);
     setArchive(upd);
+    setArchivedLive(upd);
     setLiveSessions(upd);
   };
 
