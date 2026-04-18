@@ -60,7 +60,11 @@ const CreateDebatePage = () => {
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
-  const [invitedUsernames, setInvitedUsernames] = useState<string[]>([]);
+  const [invitedEntries, setInvitedEntries] = useState<InvitedEntry[]>([]);
+  const [sideIds, setSideIds] = useState<string[]>([]); // parallel to debate.sides; real DB IDs in edit mode, synthetic in create mode
+  const [interestedUsers, setInterestedUsers] = useState<InterestedUser[]>([]);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [tapSelectedId, setTapSelectedId] = useState<string | null>(null);
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [location, setLocation] = useState("");
   const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string
