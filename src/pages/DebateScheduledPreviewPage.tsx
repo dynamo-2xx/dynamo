@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { gradientFromSeed } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
 import InterestedComposer from "@/components/debate/InterestedComposer";
+import InterestedInboxPanel from "@/components/debate/InterestedInboxPanel";
 
 interface Subtopic {
   id: string;
@@ -210,6 +211,9 @@ const DebateScheduledPreviewPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Owner: Interested inbox */}
+        {isOwner && <InterestedInboxPanel debateId={debate.id} />}
 
         {/* Owner panel */}
         {isOwner && (

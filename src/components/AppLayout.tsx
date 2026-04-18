@@ -6,6 +6,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUnreadDMCount } from "@/hooks/useDirectMessages";
+import { FloatingDMProvider } from "@/contexts/FloatingDMContext";
+import FloatingDMWindow from "@/components/messages/FloatingDMWindow";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
@@ -21,6 +23,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   const unread = useUnreadDMCount();
 
   return (
+    <FloatingDMProvider>
     <div className="min-h-screen flex flex-col md:flex-row">
       {/* Desktop sidebar */}
       <aside
@@ -124,7 +127,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           );
         })}
       </nav>
+      <FloatingDMWindow />
     </div>
+    </FloatingDMProvider>
   );
 };
 
