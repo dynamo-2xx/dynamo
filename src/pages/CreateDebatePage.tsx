@@ -1205,7 +1205,12 @@ const CreateDebatePage = () => {
                             }
                           }
                         }}
-                        className="border border-dashed border-border rounded-lg p-3 min-h-[56px] bg-accent/30"
+                        data-drop-zone="__unassigned__"
+                        className={`border border-dashed rounded-lg p-3 min-h-[56px] transition-colors ${
+                          hoverDropZone === "__unassigned__"
+                            ? "border-foreground bg-accent"
+                            : "border-border bg-accent/30"
+                        }`}
                       >
                         <p className="text-[10px] text-muted-foreground font-body mb-1.5">Unassigned</p>
                         <div className="flex flex-wrap gap-1.5">
