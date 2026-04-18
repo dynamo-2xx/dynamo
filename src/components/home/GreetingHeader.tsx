@@ -50,7 +50,7 @@ const GreetingHeader = () => {
     : { backgroundImage: monoGradientFromSeed(user?.id || displayName) };
 
   return (
-    <div className="relative min-h-[200px] sm:min-h-[180px] mb-2">
+    <div className="relative min-h-[160px] sm:min-h-[150px] mb-0">
       <AnimatePresence mode="wait">
         {showGreeting ? (
           <motion.div
