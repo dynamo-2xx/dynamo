@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight, Pencil } from "lucide-react";
+import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight, Pencil, Users, Hash } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
@@ -72,6 +72,14 @@ const ProfilePage = () => {
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </Link>
             <Link
+              to="/profile/connections"
+              className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
+            >
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <span className="flex-1">Connections</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
+            <Link
               to="/notifications"
               className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
             >
@@ -79,6 +87,16 @@ const ProfilePage = () => {
               <span className="flex-1">Inbox</span>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </Link>
+            {profile?.role === "admin" && (
+              <Link
+                to="/admin/tags"
+                className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
+              >
+                <Hash className="w-4 h-4 text-muted-foreground" />
+                <span className="flex-1">Tag Console</span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
+            )}
           </div>
 
           <button
