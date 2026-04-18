@@ -2,10 +2,12 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useMyRecentDebates } from "@/hooks/useHomeDebates";
-import DebateCoverCard from "@/components/home/DebateCoverCard";
+import DebateCoverCard, { type DebateCoverItem } from "@/components/home/DebateCoverCard";
+import SwipeableDebateCard from "@/components/home/SwipeableDebateCard";
 import BulkActionBar from "@/components/home/BulkActionBar";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -24,12 +26,16 @@ const INITIAL_VISIBLE = 12;
 
 const MyRecentPage = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const { items, loading, removeItem, patchItem } = useMyRecentDebates(60);
   const [showAll, setShowAll] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmSingleDeleteOpen, setConfirmSingleDeleteOpen] = useState<DebateCoverItem | null>(null);
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
+  const [closeSignal, setCloseSignal] = useState(0);
 
   const visible = showAll ? items : items.slice(0, INITIAL_VISIBLE);
   const hasMore = items.length > INITIAL_VISIBLE;
@@ -37,7 +43,7 @@ const MyRecentPage = () => {
   const ownedSelectedIds = () => {
     return Array.from(selected).filter((id) => {
       const it = items.find((x) => x.id === id);
-      return it && user && it.created_by === user.id;
+      return it && user && it.created_by === user.id && it.kind !== "live_session";
     });
   };
 
@@ -104,12 +110,60 @@ const MyRecentPage = () => {
     exitSelection();
   };
 
+  // Single-card swipe actions
+  const swipeTogglePrivacy = async (item: DebateCoverItem) => {
+    if (!item || item.kind === "live_session") return;
+    const next = !item.is_public;
+    const { error } = await supabase.from("debates").update({ is_public: next }).eq("id", item.id);
+    if (error) {
+      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+      return;
+    }
+    patchItem(item.id, { is_public: next });
+    toast({ title: next ? "Now public" : "Now private" });
+  };
+
+  const swipeArchive = async (item: DebateCoverItem) => {
+    if (!item || item.kind === "live_session") return;
+    const { error } = await supabase.from("debates").update({ status: "archived" }).eq("id", item.id);
+    if (error) {
+      toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
+      return;
+    }
+    removeItem(item.id);
+    toast({ title: "Archived" });
+  };
+
+  const swipeDelete = async () => {
+    const item = confirmSingleDeleteOpen;
+    if (!item) return;
+    const table = item.kind === "live_session" ? ("live_sessions" as any) : "debates";
+    const { error } = await supabase.from(table).delete().eq("id", item.id);
+    setConfirmSingleDeleteOpen(null);
+    if (error) {
+      toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
+      return;
+    }
+    removeItem(item.id);
+    toast({ title: "Deleted" });
+  };
+
+  const closeAllSwipes = () => {
+    setOpenSwipeId(null);
+    setCloseSignal((n) => n + 1);
+  };
+
   return (
     <AppLayout>
-      <div className={cn(
-        "max-w-5xl mx-auto px-4 py-6 md:py-10",
-        selectionMode ? "pb-44 md:pb-32" : "pb-8 md:pb-12",
-      )}>
+      <div
+        className={cn(
+          "max-w-5xl mx-auto px-4 py-6 md:py-10",
+          selectionMode ? "pb-44 md:pb-32" : "pb-8 md:pb-12",
+        )}
+        onClick={() => {
+          if (openSwipeId) closeAllSwipes();
+        }}
+      >
         <div className="flex items-center justify-between mb-6">
           <Link
             to="/"
@@ -133,13 +187,22 @@ const MyRecentPage = () => {
               {selectionMode && (
                 <button
                   onClick={() => {
-                    const allIds = visible.map((d) => d.id);
-                    const allSelected = allIds.every((id) => selected.has(id));
+                    const allIds = visible
+                      .filter((d) => user && d.created_by === user.id && d.kind !== "live_session")
+                      .map((d) => d.id);
+                    const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
                     setSelected(allSelected ? new Set() : new Set(allIds));
                   }}
                   className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
                 >
-                  {visible.length > 0 && visible.every((d) => selected.has(d.id)) ? "Deselect all" : "Select all"}
+                  {(() => {
+                    const ids = visible
+                      .filter((d) => user && d.created_by === user.id && d.kind !== "live_session")
+                      .map((d) => d.id);
+                    return ids.length > 0 && ids.every((id) => selected.has(id))
+                      ? "Deselect all"
+                      : "Select all";
+                  })()}
                 </button>
               )}
               <button
@@ -161,19 +224,44 @@ const MyRecentPage = () => {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visible.map((d) => (
-                <DebateCoverCard
-                  key={d.id}
-                  d={d}
-                  selectionMode={selectionMode}
-                  selected={selected.has(d.id)}
-                  onToggleSelected={toggle}
-                  onChanged={(action, id, patch) => {
-                    if (action === "removed") removeItem(id);
-                    else if (action === "updated" && patch) patchItem(id, patch);
-                  }}
-                />
-              ))}
+              {visible.map((d) => {
+                const isOwner = !!user && d.created_by === user.id;
+                const card = (
+                  <DebateCoverCard
+                    d={d}
+                    selectionMode={selectionMode}
+                    selected={selected.has(d.id)}
+                    onToggleSelected={toggle}
+                    onChanged={(action, id, patch) => {
+                      if (action === "removed") removeItem(id);
+                      else if (action === "updated" && patch) patchItem(id, patch);
+                    }}
+                  />
+                );
+
+                if (!isMobile || selectionMode || !isOwner) {
+                  return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
+                }
+
+                return (
+                  <SwipeableDebateCard
+                    key={`${d.kind || "debate"}-${d.id}`}
+                    enabled
+                    isPublic={!!d.is_public}
+                    busy={busy}
+                    forceClose={closeSignal}
+                    onOpen={() => {
+                      if (openSwipeId && openSwipeId !== d.id) closeAllSwipes();
+                      setOpenSwipeId(d.id);
+                    }}
+                    onTogglePrivacy={() => swipeTogglePrivacy(d)}
+                    onArchive={() => swipeArchive(d)}
+                    onDelete={() => setConfirmSingleDeleteOpen(d)}
+                  >
+                    {card}
+                  </SwipeableDebateCard>
+                );
+              })}
             </div>
 
             <div className="mt-8 flex items-center justify-center">
@@ -222,6 +310,32 @@ const MyRecentPage = () => {
                 bulkDelete();
               }}
               disabled={busy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!confirmSingleDeleteOpen}
+        onOpenChange={(open) => !open && setConfirmSingleDeleteOpen(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this {confirmSingleDeleteOpen?.kind === "live_session" ? "live session" : "debate"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes it and any related transcripts. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                swipeDelete();
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete

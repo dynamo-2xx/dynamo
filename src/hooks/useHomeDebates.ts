@@ -39,7 +39,8 @@ export function useForYouDebates(mode: Mode, limit = 12) {
       const { data } = await query.limit(50);
       if (cancelled) return;
 
-      const mapped = (data || []).map((d: any) => ({
+      const debateItems: DebateCoverItem[] = (data || []).map((d: any) => ({
+        kind: "debate",
         id: d.id,
         topic: d.topic,
         status: d.status,
@@ -48,15 +49,38 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         is_public: d.is_public,
         created_by: d.created_by,
         participant_count: d.debate_participants?.[0]?.count ?? 0,
-      })) as DebateCoverItem[];
+      }));
 
-      mapped.sort((a, b) => {
+      // Public live sessions (have a share_token AND status ended)
+      const { data: liveData } = await supabase
+        .from("live_sessions" as any)
+        .select("id, title, status, created_at, created_by, share_token")
+        .not("share_token", "is", null)
+        .limit(50);
+      if (cancelled) return;
+
+      const liveItems: DebateCoverItem[] = ((liveData as any[]) || []).map((s: any) => ({
+        kind: "live_session",
+        id: s.id,
+        topic: s.title || "Untitled Live Session",
+        status: s.status === "recording" ? "live" : "completed",
+        cover_image_url: null,
+        created_at: s.created_at,
+        is_public: true,
+        created_by: s.created_by,
+        participant_count: 0,
+      }));
+
+      const merged = [...debateItems, ...liveItems];
+      merged.sort((a, b) => {
         if (a.status === "live" && b.status !== "live") return -1;
         if (b.status === "live" && a.status !== "live") return 1;
+        const t = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        if (t !== 0) return t;
         return (b.participant_count || 0) - (a.participant_count || 0);
       });
 
-      setItems(mapped.slice(0, limit));
+      setItems(merged.slice(0, limit));
       setLoading(false);
     };
     load();
@@ -112,11 +136,20 @@ export function useMyRecentDebates(limit = 12) {
         .eq("user_id", user.id)
         .limit(limit);
 
+      // My live sessions
+      const { data: liveData } = await supabase
+        .from("live_sessions" as any)
+        .select("id, title, status, created_at, created_by")
+        .eq("created_by", user.id)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
       if (cancelled) return;
 
       const map = new Map<string, DebateCoverItem>();
       for (const d of created || []) {
-        map.set(d.id, {
+        map.set(`debate:${d.id}`, {
+          kind: "debate",
           id: d.id,
           topic: d.topic,
           status: d.status,
@@ -129,9 +162,10 @@ export function useMyRecentDebates(limit = 12) {
       }
       for (const row of parts || []) {
         const d: any = (row as any).debates;
-        if (!d || map.has(d.id)) continue;
+        if (!d || map.has(`debate:${d.id}`)) continue;
         if (d.status === "archived" || d.status === "draft") continue;
-        map.set(d.id, {
+        map.set(`debate:${d.id}`, {
+          kind: "debate",
           id: d.id,
           topic: d.topic,
           status: d.status,
@@ -140,6 +174,19 @@ export function useMyRecentDebates(limit = 12) {
           is_public: d.is_public,
           created_by: d.created_by,
           participant_count: d.debate_participants?.[0]?.count ?? 0,
+        });
+      }
+      for (const s of (liveData as any[]) || []) {
+        map.set(`live:${s.id}`, {
+          kind: "live_session",
+          id: s.id,
+          topic: s.title || "Untitled Live Session",
+          status: s.status === "recording" ? "live" : "completed",
+          cover_image_url: null,
+          created_at: s.created_at,
+          is_public: true,
+          created_by: s.created_by,
+          participant_count: 0,
         });
       }
       const all = Array.from(map.values()).sort(

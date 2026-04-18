@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Mic, Square, Radio, Loader2, ChevronDown } from "lucide-react";
+import { Mic, Square, Radio, Loader2, ChevronDown, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/SessionRecordView";
 import LiveThreadView from "@/components/live/LiveThreadView";
@@ -179,7 +180,14 @@ const LiveSessionPage = () => {
   if (phase === "setup") {
     return (
       <AppLayout>
-        <div className="max-w-lg mx-auto px-4 py-12">
+        <div className="max-w-lg mx-auto px-4 py-6 sm:py-12">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-body min-h-[44px] mb-4"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Home
+          </Link>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-2xl font-display font-bold mb-6">Start a Live Session</h1>
 
@@ -259,8 +267,15 @@ const LiveSessionPage = () => {
       <div className="flex flex-col h-[calc(100vh-4rem)] max-w-3xl mx-auto w-full">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link
+              to="/"
+              aria-label="Home"
+              className="rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground min-h-[36px] min-w-[36px] inline-flex items-center justify-center -ml-1 shrink-0"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-destructive shrink-0">
               <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
               Recording
             </span>
@@ -268,7 +283,7 @@ const LiveSessionPage = () => {
               {title || "Live Session"}
             </h1>
             {isSummarizing && (
-              <span className="flex items-center gap-1 text-[10px] text-primary font-semibold">
+              <span className="flex items-center gap-1 text-[10px] text-primary font-semibold shrink-0">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Analyzing…
               </span>
