@@ -39,7 +39,7 @@ export const useUserAverageGrade = (): AverageGrade => {
         return;
       }
 
-      const scores = (data as Array<{ overall_score: number | null }>)
+      const scores = ((data as unknown) as Array<{ overall_score: number | null }>)
         .map((r) => r.overall_score)
         .filter((s): s is number => typeof s === "number");
 
