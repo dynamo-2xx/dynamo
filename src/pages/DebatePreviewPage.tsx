@@ -44,12 +44,10 @@ const DebatePreviewPage = () => {
   useEffect(() => {
     if (!token) return;
     const load = async () => {
-      // Find invitation by token
-      const { data: inv, error: invErr } = await supabase
-        .from("debate_invitations")
-        .select("*")
-        .eq("invite_token", token)
-        .single();
+      // Find invitation by token via secure RPC (no broad anon table read)
+      const { data: invList, error: invErr } = await supabase
+        .rpc("get_invitation_by_token", { _token: token });
+      const inv = Array.isArray(invList) ? invList[0] : invList;
 
       if (invErr || !inv) {
         setError("Invalid or expired invitation link.");

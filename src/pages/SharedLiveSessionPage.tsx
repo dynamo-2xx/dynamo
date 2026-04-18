@@ -14,15 +14,13 @@ const SharedLiveSessionPage = () => {
     if (!token) return;
     const load = async () => {
       const { data, error } = await supabase
-        .from("live_sessions" as any)
-        .select("*")
-        .eq("share_token", token)
-        .single();
+        .rpc("get_shared_live_session" as any, { _token: token });
 
-      if (error || !data) {
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row) {
         setNotFound(true);
       } else {
-        setSession(data);
+        setSession({ ...row, share_token: token });
       }
       setLoading(false);
     };

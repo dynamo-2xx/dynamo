@@ -641,7 +641,46 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_invitation_by_token: {
+        Args: { _token: string }
+        Returns: {
+          created_at: string
+          debate_id: string
+          id: string
+          invited_email: string
+          invited_username: string
+          side_id: string
+          status: string
+        }[]
+      }
+      get_public_profile: {
+        Args: { _user_id: string }
+        Returns: {
+          affiliation: string
+          avatar_url: string
+          banner_url: string
+          created_at: string
+          display_name: string
+          is_public: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
+      get_shared_live_session: {
+        Args: { _token: string }
+        Returns: {
+          created_at: string
+          ended_at: string
+          id: string
+          mode: string
+          speaker_names: Json
+          status: string
+          subtopics: Json
+          summaries: Json
+          title: string
+          transcript_entries: Json
+        }[]
+      }
     }
     Enums: {
       app_role: "personal" | "education" | "community"
