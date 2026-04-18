@@ -89,7 +89,7 @@ const HomePage = () => {
         {/* For-you carousel */}
         <section className="mb-10">
           <SectionHeader
-            title="Conversations that may concern you"
+            title={formatTodayLong()}
             toRoute="/for-you"
             right={
               <div className="inline-flex border border-border rounded-full p-0.5 shrink-0">
