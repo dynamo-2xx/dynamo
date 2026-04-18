@@ -199,6 +199,12 @@ const SessionRecordView = ({
           )}
         </div>
 
+        {!readOnly && (
+          <div className="mb-6">
+            <TagPicker kind="live_session" recordId={sessionId} max={5} compact />
+          </div>
+        )}
+
         {/* Subtopic sections with TranscriptCards */}
         {groupedData.orderedSubtopics.length > 0 && (
           <div className="space-y-3 mb-8">
