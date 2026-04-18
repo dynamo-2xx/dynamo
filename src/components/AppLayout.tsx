@@ -51,7 +51,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           })}
         </nav>
         <div className="mt-auto space-y-3">
-          <p className="text-[11px] text-muted-foreground font-body">People to the Power</p>
+          <p className="text-[11px] text-muted-foreground font-body"></p>
           <div className="flex items-center justify-between">
             <ThemeToggle />
             <button
