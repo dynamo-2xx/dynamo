@@ -92,7 +92,7 @@ const HomePage = () => {
               </div>
               <div className="min-w-0 text-left">
                 <p className="font-body text-sm font-medium">Debate</p>
-                <p className="text-[11px] text-muted-foreground font-body truncate">Structure a debate</p>
+                <p className="text-[11px] text-muted-foreground font-body truncate">Structure a sincere dialogue</p>
               </div>
             </Link>
           ) : (
@@ -102,7 +102,7 @@ const HomePage = () => {
               </div>
               <div className="min-w-0 text-left">
                 <p className="font-body text-sm font-medium">Debate</p>
-                <p className="text-[11px] text-muted-foreground font-body truncate">Structure a debate</p>
+                <p className="text-[11px] text-muted-foreground font-body truncate">Structure a sincere dialogue</p>
               </div>
             </button>
           )}
