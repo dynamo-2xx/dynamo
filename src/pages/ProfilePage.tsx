@@ -17,21 +17,21 @@ const ProfilePage = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
+      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8 md:py-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex items-center justify-between mb-8 gap-3">
-            <h2 className="text-2xl font-display">Profile</h2>
+          <div className="flex items-center justify-between mb-6 sm:mb-8 gap-3">
+            <h2 className="text-xl sm:text-2xl font-display">Profile</h2>
             <Link
               to="/profile/edit"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-body font-medium border border-border rounded-md hover:bg-accent transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-body font-medium border border-border rounded-md hover:bg-accent transition-colors min-h-[36px]"
             >
               <Pencil className="w-3.5 h-3.5" />
               Edit
             </Link>
           </div>
 
-          <div className="bg-background border border-border rounded-lg p-6 mb-6 flex items-center gap-5">
-            <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center overflow-hidden">
+          <div className="bg-background border border-border rounded-lg p-4 sm:p-6 mb-6 flex items-center gap-4 sm:gap-5">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-accent flex items-center justify-center overflow-hidden shrink-0">
               {profile?.avatar_url ? (
                 <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
@@ -39,8 +39,8 @@ const ProfilePage = () => {
               )}
             </div>
             <div className="min-w-0">
-              <p className="font-body text-lg font-medium truncate">{profile?.display_name || user?.email}</p>
-              <p className="text-sm text-muted-foreground font-body truncate">{user?.email}</p>
+              <p className="font-body text-base sm:text-lg font-medium truncate">{profile?.display_name || user?.email}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground font-body truncate">{user?.email}</p>
               {profile?.affiliation && (
                 <p className="text-[11px] text-muted-foreground mt-0.5 font-body truncate">{profile.affiliation}</p>
               )}

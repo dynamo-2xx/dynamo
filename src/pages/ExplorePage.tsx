@@ -49,20 +49,20 @@ const ExplorePage = () => {
   const navigate = useNavigate();
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
+      <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8 md:py-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           {/* Header */}
-          <h2 className="text-3xl font-display mb-8">Explore</h2>
+          <h2 className="text-2xl sm:text-3xl font-display mb-6 sm:mb-8">Explore</h2>
 
           {/* Search */}
-          <div className="relative mb-10">
+          <div className="relative mb-8 sm:mb-10">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search topics, arguments, communities..."
-              className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-3 text-[13px] font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 transition-colors"
+              className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-3 text-base sm:text-[13px] font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 transition-colors"
             />
           </div>
 
@@ -117,7 +117,7 @@ const ExplorePage = () => {
 
           {/* Trending section */}
           <SectionHeader title="Trending" icon={<TrendingUp className="w-4 h-4" />} />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-12">
             {trendingDebates.map((d, i) => (
               <motion.div
                 key={i}
@@ -147,7 +147,7 @@ const ExplorePage = () => {
 
           {/* More to Explore */}
           <SectionHeader title="More to Explore" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
             {categories.map((cat) => (
               <button
                 key={cat}

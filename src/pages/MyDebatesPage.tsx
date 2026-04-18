@@ -114,13 +114,13 @@ const MyDebatesPage = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
+      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8 md:py-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center gap-3 mb-6">
-            <Link to="/profile" className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
+            <Link to="/profile" className="rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] inline-flex items-center justify-center -ml-2">
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h2 className="text-3xl font-display font-bold">My Agenda</h2>
+            <h2 className="text-2xl sm:text-3xl font-display font-bold">My Agenda</h2>
           </div>
 
           {/* Tabs */}
@@ -128,7 +128,7 @@ const MyDebatesPage = () => {
             <button
               onClick={() => setSearchParams({})}
               className={cn(
-                "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors",
+                "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
                 activeTab === "debates"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -139,7 +139,7 @@ const MyDebatesPage = () => {
             <button
               onClick={() => setSearchParams({ tab: "archive" })}
               className={cn(
-                "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors",
+                "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
                 activeTab === "archive"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -150,7 +150,7 @@ const MyDebatesPage = () => {
             <button
               onClick={() => setSearchParams({ tab: "live" })}
               className={cn(
-                "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors",
+                "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
                 activeTab === "live"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
