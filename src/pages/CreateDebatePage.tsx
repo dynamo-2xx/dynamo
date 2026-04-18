@@ -491,7 +491,10 @@ const CreateDebatePage = () => {
         }
       }
 
-      if (publishMode) {
+      if (editId) {
+        toast.success("Debate updated");
+        navigate(`/debate/${editId}/preview`);
+      } else if (publishMode) {
         const hasTags = selectedTags.length > 0;
         if (hasTags) {
           toast.success("Debate published! Find it on Explore under your tags.");
