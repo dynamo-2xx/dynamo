@@ -51,6 +51,7 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const { user } = useAuth();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [interestedOpen, setInterestedOpen] = useState(false);
 
   const isLiveSession = d.kind === "live_session";
   const isLive = d.status === "live";
@@ -59,6 +60,8 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const showOwnerControls = isOwner && !isLive && !selectionMode && !isLiveSession;
   const selectable = !!selectionMode && isOwner;
   const linkTo = isLiveSession ? `/live/${d.id}` : `/debate/${d.id}`;
+  const showInterestedCta =
+    !!user && !isOwner && !isLiveSession && !isArchived && !selectionMode && !!d.is_public;
 
   const bg = d.cover_image_url
     ? { backgroundImage: `url(${d.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
