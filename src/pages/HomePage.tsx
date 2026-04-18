@@ -80,8 +80,8 @@ const HomePage = () => {
         {/* Greeting → header swap */}
         <GreetingHeader />
 
-        {/* Persistent tagline — centered between header and action row */}
-        <div className="flex items-center justify-center py-6">
+        {/* Persistent tagline — vertically centered, left-aligned */}
+        <div className="flex items-center justify-start py-6">
           <RotatingTagline />
         </div>
 
