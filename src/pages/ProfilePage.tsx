@@ -47,21 +47,7 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          <div className="bg-background border border-border rounded-lg divide-y divide-border mb-6">
-            <div className="flex items-center gap-3 px-5 py-4 text-sm font-body">
-              <Shield className="w-4 h-4 text-muted-foreground" />
-              <span>Role: <span className="text-foreground font-medium">{roleLabels[profile?.role ?? "personal"]}</span></span>
-            </div>
-            <div className="flex items-center gap-3 px-5 py-4 text-sm font-body">
-              <Globe className="w-4 h-4 text-muted-foreground" />
-              <span>Profile Visibility: <span className="text-foreground font-medium">{profile?.is_public ? "Public" : "Private"}</span></span>
-            </div>
-            <div className="flex items-center gap-3 px-5 py-4 text-sm font-body">
-              <Lock className="w-4 h-4 text-muted-foreground" />
-              <span>Location: <span className="text-foreground font-medium">{profile?.location || "Not set"}</span></span>
-            </div>
-          </div>
-
+          {/* Activity */}
           <div className="bg-background border border-border rounded-lg divide-y divide-border mb-6">
             <Link
               to="/my-debates"
@@ -87,7 +73,27 @@ const ProfilePage = () => {
               <span className="flex-1">Inbox</span>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </Link>
-            {profile?.role === "admin" && (
+          </div>
+
+          {/* Account */}
+          <div className="bg-background border border-border rounded-lg divide-y divide-border mb-6">
+            <div className="flex items-center gap-3 px-5 py-4 text-sm font-body">
+              <Shield className="w-4 h-4 text-muted-foreground" />
+              <span>Role: <span className="text-foreground font-medium">{roleLabels[profile?.role ?? "personal"]}</span></span>
+            </div>
+            <div className="flex items-center gap-3 px-5 py-4 text-sm font-body">
+              <Globe className="w-4 h-4 text-muted-foreground" />
+              <span>Profile Visibility: <span className="text-foreground font-medium">{profile?.is_public ? "Public" : "Private"}</span></span>
+            </div>
+            <div className="flex items-center gap-3 px-5 py-4 text-sm font-body">
+              <Lock className="w-4 h-4 text-muted-foreground" />
+              <span>Location: <span className="text-foreground font-medium">{profile?.location || "Not set"}</span></span>
+            </div>
+          </div>
+
+          {/* Admin */}
+          {profile?.role === "admin" && (
+            <div className="bg-background border border-border rounded-lg mb-6">
               <Link
                 to="/admin/tags"
                 className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
@@ -96,8 +102,8 @@ const ProfilePage = () => {
                 <span className="flex-1">Tag Console</span>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </Link>
-            )}
-          </div>
+            </div>
+          )}
 
           <button
             onClick={handleSignOut}

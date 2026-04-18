@@ -54,10 +54,8 @@ const HomePage = () => {
         {/* Persistent tagline */}
         <RotatingTagline className="mb-8" />
 
-        <FriendsOnlineWidget />
-
         {/* Action row: Create + Live side-by-side */}
-        <div className="grid grid-cols-2 gap-3 mb-10">
+        <div className="grid grid-cols-2 gap-3 mb-6">
           <Link
             to="/create"
             className="flex items-center gap-3 bg-background border border-border hover:border-foreground/20 rounded-lg p-5 transition-colors group"
@@ -82,6 +80,10 @@ const HomePage = () => {
               <p className="text-[11px] text-muted-foreground font-body truncate">Capture a real conversation</p>
             </div>
           </Link>
+        </div>
+
+        <div className="mb-10">
+          <FriendsOnlineWidget />
         </div>
 
         {/* For-you carousel */}
