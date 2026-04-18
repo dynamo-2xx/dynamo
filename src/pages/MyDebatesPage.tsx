@@ -27,21 +27,26 @@ const MyDebatesPage = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const activeTab = tabParam === "drafts" ? "drafts" : tabParam === "live" ? "live" : "debates";
+  const activeTab =
+    tabParam === "archive" || tabParam === "drafts"
+      ? "archive"
+      : tabParam === "live"
+      ? "live"
+      : "debates";
   const [debates, setDebates] = useState<DebateRow[]>([]);
-  const [drafts, setDrafts] = useState<DebateRow[]>([]);
+  const [archive, setArchive] = useState<DebateRow[]>([]);
   const [liveSessions, setLiveSessions] = useState<LiveSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      // Debates I created (non-draft)
+      // Debates I created (active: not draft, not archived)
       const { data: created } = await supabase
         .from("debates")
         .select("id, topic, status, created_at, is_public")
         .eq("created_by", user.id)
-        .neq("status", "draft")
+        .not("status", "in", "(draft,archived)")
         .order("created_at", { ascending: false });
 
       // Debates I participate in
@@ -60,7 +65,7 @@ const MyDebatesPage = () => {
           .from("debates")
           .select("id, topic, status, created_at, is_public")
           .in("id", extraIds)
-          .neq("status", "draft")
+          .not("status", "in", "(draft,archived)")
           .order("created_at", { ascending: false });
         extraDebates = (data || []) as DebateRow[];
       }
@@ -69,15 +74,15 @@ const MyDebatesPage = () => {
       all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setDebates(all);
 
-      // Drafts I created
-      const { data: myDrafts } = await supabase
+      // Archive (drafts + archived) I created
+      const { data: myArchive } = await supabase
         .from("debates")
         .select("id, topic, status, created_at, is_public")
         .eq("created_by", user.id)
-        .eq("status", "draft")
+        .in("status", ["draft", "archived"])
         .order("created_at", { ascending: false });
 
-      setDrafts((myDrafts || []) as DebateRow[]);
+      setArchive((myArchive || []) as DebateRow[]);
 
       // Live sessions
       const { data: sessions } = await supabase
