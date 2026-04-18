@@ -63,7 +63,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             </button>
           </div>
           <RouterNavLink
-            to="/create"
+            to="/?highlight=actions"
             className="flex items-center justify-center gap-2 border border-border text-foreground rounded-lg py-3 font-body text-xs font-medium hover:bg-accent transition-colors whitespace-nowrap"
           >
             <PlusCircle className="w-4 h-4" />
