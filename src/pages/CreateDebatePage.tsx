@@ -264,6 +264,7 @@ const CreateDebatePage = () => {
         timePerTurn: "2 min",
         prepTime: "1 min",
       });
+      setSideIds(["new-side-0", "new-side-1"]);
       setStep(3);
       toast.error("AI generation had an issue — using a default structure. You can edit everything.");
     }
