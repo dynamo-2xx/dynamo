@@ -259,7 +259,7 @@ const CreateDebatePage = () => {
 
   const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
-  const handleCreateDebate = async () => {
+  const handleCreateDebate = async (publishMode: boolean = false) => {
     if (!debate || !user) return;
     setSaving(true);
 
