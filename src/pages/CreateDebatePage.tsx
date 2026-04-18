@@ -384,17 +384,52 @@ const CreateDebatePage = () => {
   const addInvite = () => {
     const value = inviteInput.trim();
     if (!value) return;
-    if (invitedUsernames.includes(value)) {
+    if (invitedEntries.some((e) => e.username.toLowerCase() === value.toLowerCase())) {
       toast.error("Already added");
       return;
     }
-    setInvitedUsernames((prev) => [...prev, value]);
+    setInvitedEntries((prev) => [
+      ...prev,
+      { username: value, sideId: null, source: "manual", email: isEmail(value) ? value : null },
+    ]);
     setInviteInput("");
   };
 
-  const removeInvite = (value: string) => {
-    setInvitedUsernames((prev) => prev.filter((u) => u !== value));
+  const removeInvite = (entry: InvitedEntry) => {
+    setInvitedEntries((prev) =>
+      prev.filter((e) => !(e.username === entry.username && e.userId === entry.userId)),
+    );
+    // Restore to interested pool if it came from there
+    if (entry.source === "interested" && entry.userId) {
+      // No-op: interested list is the source-of-truth view; we filter it client-side below.
+    }
   };
+
+  const addInterestedToInvite = (u: InterestedUser) => {
+    if (invitedEntries.some((e) => e.userId === u.user_id)) return;
+    setInvitedEntries((prev) => [
+      ...prev,
+      {
+        username: u.display_name || "Interested user",
+        userId: u.user_id,
+        sideId: u.side_id,
+        avatarUrl: u.avatar_url,
+        source: "interested",
+      },
+    ]);
+  };
+
+  const assignSide = (target: InvitedEntry, sideId: string | null) => {
+    setInvitedEntries((prev) =>
+      prev.map((e) =>
+        e.username === target.username && e.userId === target.userId
+          ? { ...e, sideId }
+          : e,
+      ),
+    );
+  };
+
+  const entryKey = (e: InvitedEntry) => `${e.userId ?? "x"}|${e.username}`;
 
   const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
