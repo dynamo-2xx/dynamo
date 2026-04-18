@@ -52,11 +52,11 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         participant_count: d.debate_participants?.[0]?.count ?? 0,
       }));
 
-      // Public live sessions (have a share_token AND status ended)
+      // Public live sessions only (must be marked public by owner)
       const { data: liveData } = await supabase
         .from("live_sessions" as any)
-        .select("id, title, status, created_at, created_by, share_token")
-        .not("share_token", "is", null)
+        .select("id, title, status, created_at, created_by, share_token, is_public")
+        .eq("is_public", true)
         .neq("status", "archived")
         .limit(50);
       if (cancelled) return;
