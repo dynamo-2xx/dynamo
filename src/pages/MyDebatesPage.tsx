@@ -41,6 +41,10 @@ const MyDebatesPage = () => {
   const [confirmDelete, setConfirmDelete] = useState<DebateCoverItem | null>(null);
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
   const [closeSignal, setCloseSignal] = useState(0);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
