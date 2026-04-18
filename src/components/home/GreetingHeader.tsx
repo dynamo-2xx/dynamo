@@ -50,7 +50,7 @@ const GreetingHeader = () => {
     : { backgroundImage: monoGradientFromSeed(user?.id || displayName) };
 
   return (
-    <div className="relative min-h-[180px] mb-2">
+    <div className="relative min-h-[200px] sm:min-h-[180px] mb-2">
       <AnimatePresence mode="wait">
         {showGreeting ? (
           <motion.div
@@ -61,7 +61,7 @@ const GreetingHeader = () => {
             transition={{ duration: 0.45 }}
             className="absolute inset-0 flex items-start"
           >
-            <h2 className="text-[28px] font-display leading-tight">
+            <h2 className="text-2xl sm:text-[28px] font-display leading-tight">
               {getGreeting()}, {displayName}.
             </h2>
           </motion.div>
@@ -74,25 +74,27 @@ const GreetingHeader = () => {
             className="absolute inset-0"
           >
             <div
-              className="h-[110px] w-full rounded-2xl border border-border overflow-hidden"
+              className="h-[100px] sm:h-[110px] w-full rounded-2xl border border-border overflow-hidden"
               style={bannerStyle}
               aria-hidden
             />
-            <div className="flex items-end gap-3 -mt-8 px-1">
-              <div className="w-16 h-16 rounded-full ring-4 ring-background bg-accent overflow-hidden shrink-0 flex items-center justify-center">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="font-display text-lg text-foreground">{initials}</span>
-                )}
-              </div>
-              <div className="pb-1 flex-1 min-w-0">
-                <p className="font-display text-lg leading-tight truncate">{displayName}</p>
-                <p className="font-body text-xs text-muted-foreground">@{handle}</p>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 -mt-8 px-1">
+              <div className="flex items-end gap-3 flex-1 min-w-0">
+                <div className="w-16 h-16 rounded-full ring-4 ring-background bg-accent overflow-hidden shrink-0 flex items-center justify-center">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt={displayName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-display text-lg text-foreground">{initials}</span>
+                  )}
+                </div>
+                <div className="pb-1 flex-1 min-w-0">
+                  <p className="font-display text-lg leading-tight truncate">{displayName}</p>
+                  <p className="font-body text-xs text-muted-foreground">@{handle}</p>
+                </div>
               </div>
               {average !== null && (
                 <div
-                  className="pb-1 shrink-0 flex flex-col items-end"
+                  className="shrink-0 flex items-center sm:flex-col sm:items-end gap-2 sm:gap-0 pl-[76px] sm:pl-0 sm:pb-1"
                   title={`Average overall performance across ${count} graded debate${count === 1 ? "" : "s"}`}
                 >
                   <div className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground font-body">

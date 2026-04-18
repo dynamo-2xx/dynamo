@@ -91,14 +91,14 @@ function AutoCarousel<T>({
           <button
             onClick={prev}
             aria-label="Previous"
-            className="absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/85 border border-border flex items-center justify-center hover:bg-background transition-colors backdrop-blur-sm"
+            className="hidden sm:flex absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/85 border border-border items-center justify-center hover:bg-background transition-colors backdrop-blur-sm"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={next}
             aria-label="Next"
-            className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/85 border border-border flex items-center justify-center hover:bg-background transition-colors backdrop-blur-sm"
+            className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/85 border border-border items-center justify-center hover:bg-background transition-colors backdrop-blur-sm"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
