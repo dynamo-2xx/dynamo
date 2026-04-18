@@ -3,28 +3,27 @@ import { motion } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
+import DebateCoverCard, { type DebateCoverItem } from "@/components/home/DebateCoverCard";
+import SwipeableDebateCard from "@/components/home/SwipeableDebateCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
-interface DebateRow {
-  id: string;
-  topic: string;
-  status: string;
-  created_at: string;
-  is_public: boolean;
-  participants_count?: number;
-}
-
-interface LiveSessionRow {
-  id: string;
-  title: string | null;
-  status: string;
-  created_at: string;
-}
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const MyDebatesPage = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab =
@@ -33,23 +32,26 @@ const MyDebatesPage = () => {
       : tabParam === "live"
       ? "live"
       : "debates";
-  const [debates, setDebates] = useState<DebateRow[]>([]);
-  const [archive, setArchive] = useState<DebateRow[]>([]);
-  const [liveSessions, setLiveSessions] = useState<LiveSessionRow[]>([]);
+
+  const [debates, setDebates] = useState<DebateCoverItem[]>([]);
+  const [archive, setArchive] = useState<DebateCoverItem[]>([]);
+  const [liveSessions, setLiveSessions] = useState<DebateCoverItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState<DebateCoverItem | null>(null);
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
+  const [closeSignal, setCloseSignal] = useState(0);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      // Debates I created (active: not draft, not archived)
+      // Active debates I created (not draft, not archived)
       const { data: created } = await supabase
         .from("debates")
-        .select("id, topic, status, created_at, is_public")
+        .select("id, topic, status, cover_image_url, created_at, is_public, created_by, debate_participants(count)")
         .eq("created_by", user.id)
         .not("status", "in", "(draft,archived)")
         .order("created_at", { ascending: false });
 
-      // Debates I participate in
       const { data: participated } = await supabase
         .from("debate_participants")
         .select("debate_id")
@@ -59,65 +61,162 @@ const MyDebatesPage = () => {
       const createdIds = new Set((created || []).map((d) => d.id));
       const extraIds = participatedIds.filter((id) => !createdIds.has(id));
 
-      let extraDebates: DebateRow[] = [];
+      let extraDebates: any[] = [];
       if (extraIds.length > 0) {
         const { data } = await supabase
           .from("debates")
-          .select("id, topic, status, created_at, is_public")
+          .select("id, topic, status, cover_image_url, created_at, is_public, created_by, debate_participants(count)")
           .in("id", extraIds)
           .not("status", "in", "(draft,archived)")
           .order("created_at", { ascending: false });
-        extraDebates = (data || []) as DebateRow[];
+        extraDebates = data || [];
       }
 
-      const all = [...(created || []), ...extraDebates] as DebateRow[];
+      const all = [...(created || []), ...extraDebates];
       all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setDebates(all);
+      setDebates(
+        all.map((d: any) => ({
+          kind: "debate",
+          id: d.id,
+          topic: d.topic,
+          status: d.status,
+          cover_image_url: d.cover_image_url,
+          created_at: d.created_at,
+          is_public: d.is_public,
+          created_by: d.created_by,
+          participant_count: d.debate_participants?.[0]?.count ?? 0,
+        })),
+      );
 
       // Archive (drafts + archived) I created
       const { data: myArchive } = await supabase
         .from("debates")
-        .select("id, topic, status, created_at, is_public")
+        .select("id, topic, status, cover_image_url, created_at, is_public, created_by, debate_participants(count)")
         .eq("created_by", user.id)
         .in("status", ["draft", "archived"])
         .order("created_at", { ascending: false });
 
-      setArchive((myArchive || []) as DebateRow[]);
+      setArchive(
+        ((myArchive || []) as any[]).map((d) => ({
+          kind: "debate",
+          id: d.id,
+          topic: d.topic,
+          status: d.status,
+          cover_image_url: d.cover_image_url,
+          created_at: d.created_at,
+          is_public: d.is_public,
+          created_by: d.created_by,
+          participant_count: d.debate_participants?.[0]?.count ?? 0,
+        })),
+      );
 
       // Live sessions
       const { data: sessions } = await supabase
         .from("live_sessions" as any)
-        .select("id, title, status, created_at")
+        .select("id, title, status, created_at, created_by")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false });
 
-      setLiveSessions(((sessions as any) || []) as LiveSessionRow[]);
+      setLiveSessions(
+        (((sessions as any) || []) as any[]).map((s) => ({
+          kind: "live_session",
+          id: s.id,
+          topic: s.title || "Untitled Live Session",
+          status: s.status === "recording" ? "live" : "completed",
+          cover_image_url: null,
+          created_at: s.created_at,
+          is_public: true,
+          created_by: s.created_by,
+          participant_count: 0,
+        })),
+      );
+
       setLoading(false);
     };
     load();
   }, [user]);
 
-  const statusColor = (s: string) => {
-    if (s === "live" || s === "recording") return "bg-green-500/20 text-green-400";
-    if (s === "completed" || s === "ended") return "bg-primary/20 text-primary";
-    if (s === "draft") return "bg-muted text-muted-foreground";
-    if (s === "archived") return "bg-secondary text-foreground border border-dashed border-border";
-    return "bg-secondary text-muted-foreground";
+  const removeFromList = (id: string) => {
+    setDebates((prev) => prev.filter((d) => d.id !== id));
+    setArchive((prev) => prev.filter((d) => d.id !== id));
+    setLiveSessions((prev) => prev.filter((d) => d.id !== id));
   };
 
-  const currentList = activeTab === "archive" ? archive : activeTab === "live" ? [] : debates;
-  const emptyMessage = activeTab === "archive"
-    ? "Nothing in your archive yet. Drafts and archived debates appear here."
-    : activeTab === "live"
-    ? "You have no live session records yet."
-    : "You haven't participated in any debates yet.";
+  const patchInList = (id: string, patch: Partial<DebateCoverItem>) => {
+    const upd = (arr: DebateCoverItem[]) =>
+      arr.map((d) => (d.id === id ? { ...d, ...patch } : d));
+    setDebates(upd);
+    setArchive(upd);
+    setLiveSessions(upd);
+  };
+
+  const swipeTogglePrivacy = async (item: DebateCoverItem) => {
+    if (item.kind === "live_session") return;
+    const next = !item.is_public;
+    const { error } = await supabase.from("debates").update({ is_public: next }).eq("id", item.id);
+    if (error) {
+      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+      return;
+    }
+    patchInList(item.id, { is_public: next });
+    toast({ title: next ? "Now public" : "Now private" });
+  };
+
+  const swipeArchive = async (item: DebateCoverItem) => {
+    if (item.kind === "live_session") return;
+    const { error } = await supabase.from("debates").update({ status: "archived" }).eq("id", item.id);
+    if (error) {
+      toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
+      return;
+    }
+    // Move from active to archive list
+    setDebates((prev) => prev.filter((d) => d.id !== item.id));
+    setArchive((prev) => [{ ...item, status: "archived" }, ...prev]);
+    toast({ title: "Archived" });
+  };
+
+  const swipeDelete = async () => {
+    const item = confirmDelete;
+    if (!item) return;
+    const table = item.kind === "live_session" ? ("live_sessions" as any) : "debates";
+    const { error } = await supabase.from(table).delete().eq("id", item.id);
+    setConfirmDelete(null);
+    if (error) {
+      toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
+      return;
+    }
+    removeFromList(item.id);
+    toast({ title: "Deleted" });
+  };
+
+  const closeAllSwipes = () => {
+    setOpenSwipeId(null);
+    setCloseSignal((n) => n + 1);
+  };
+
+  const currentList =
+    activeTab === "archive" ? archive : activeTab === "live" ? liveSessions : debates;
+  const emptyMessage =
+    activeTab === "archive"
+      ? "Nothing in your archive yet. Drafts and archived debates appear here."
+      : activeTab === "live"
+      ? "You have no live session records yet."
+      : "You haven't participated in any debates yet.";
 
   return (
     <AppLayout>
-      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8 md:py-12">
+      <div
+        className="max-w-5xl mx-auto px-4 py-6 sm:py-8 md:py-12"
+        onClick={() => {
+          if (openSwipeId) closeAllSwipes();
+        }}
+      >
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center gap-3 mb-6">
-            <Link to="/profile" className="rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] inline-flex items-center justify-center -ml-2">
+            <Link
+              to="/profile"
+              className="rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] inline-flex items-center justify-center -ml-2"
+            >
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <h2 className="text-2xl sm:text-3xl font-display font-bold">My Agenda</h2>
@@ -131,7 +230,7 @@ const MyDebatesPage = () => {
                 "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
                 activeTab === "debates"
                   ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               Debates
@@ -142,7 +241,7 @@ const MyDebatesPage = () => {
                 "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
                 activeTab === "archive"
                   ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               Archive
@@ -153,70 +252,91 @@ const MyDebatesPage = () => {
                 "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
                 activeTab === "live"
                   ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               Live
             </button>
           </div>
 
+          {isMobile && currentList.length > 0 && (
+            <p className="text-[11px] text-muted-foreground font-body mb-3 text-center">
+              Tip: swipe a card left for Archive/Delete, right for Public/Private.
+            </p>
+          )}
+
           {loading ? (
             <p className="text-muted-foreground text-center py-12 animate-pulse">Loading…</p>
-          ) : activeTab === "live" ? (
-            liveSessions.length === 0 ? (
-              <p className="text-muted-foreground text-center py-12">{emptyMessage}</p>
-            ) : (
-              <div className="grid gap-3">
-                {liveSessions.map((s) => (
-                  <Link
-                    key={s.id}
-                    to={`/live/${s.id}`}
-                    className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-colors block"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-display font-semibold text-foreground text-sm">
-                          {s.title || "Untitled Session"}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(s.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor(s.status)}`}>
-                        {s.status === "recording" ? "Recording" : "Ended"}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )
           ) : currentList.length === 0 ? (
             <p className="text-muted-foreground text-center py-12">{emptyMessage}</p>
           ) : (
-            <div className="grid gap-3">
-              {currentList.map((d) => (
-                <Link
-                  key={d.id}
-                  to={`/debate/${d.id}`}
-                  className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-colors block"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-display font-semibold text-foreground text-sm">{d.topic}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(d.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor(d.status)}`}>
-                      {d.status}
-                    </span>
-                  </div>
-                </Link>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {currentList.map((d) => {
+                const isOwner = !!user && d.created_by === user.id;
+                const card = (
+                  <DebateCoverCard
+                    d={d}
+                    onChanged={(action, id, patch) => {
+                      if (action === "removed") removeFromList(id);
+                      else if (action === "updated" && patch) patchInList(id, patch);
+                    }}
+                  />
+                );
+
+                if (!isMobile || !isOwner) {
+                  return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
+                }
+
+                return (
+                  <SwipeableDebateCard
+                    key={`${d.kind || "debate"}-${d.id}`}
+                    enabled
+                    isPublic={!!d.is_public}
+                    forceClose={closeSignal}
+                    onOpen={() => {
+                      if (openSwipeId && openSwipeId !== d.id) closeAllSwipes();
+                      setOpenSwipeId(d.id);
+                    }}
+                    onTogglePrivacy={() => swipeTogglePrivacy(d)}
+                    onArchive={() => swipeArchive(d)}
+                    onDelete={() => setConfirmDelete(d)}
+                  >
+                    {card}
+                  </SwipeableDebateCard>
+                );
+              })}
             </div>
           )}
         </motion.div>
       </div>
+
+      <AlertDialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete this {confirmDelete?.kind === "live_session" ? "live session" : confirmDelete?.status === "draft" ? "draft" : "debate"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes it and any related transcripts. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                swipeDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
