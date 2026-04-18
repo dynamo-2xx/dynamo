@@ -1433,6 +1433,30 @@ const CreateDebatePage = () => {
                           );
                         })}
                       </div>
+
+                      {/* Floating ghost while pointer-dragging — shows what's being moved on mobile */}
+                      {pointerDragId && pointerPos && (() => {
+                        const dragged = invitedEntries.find((en) => entryKey(en) === pointerDragId);
+                        if (!dragged) return null;
+                        return (
+                          <div
+                            className="fixed z-50 pointer-events-none inline-flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1 text-xs font-body font-medium bg-foreground text-background shadow-lg"
+                            style={{
+                              left: pointerPos.x + 12,
+                              top: pointerPos.y + 12,
+                            }}
+                          >
+                            {dragged.avatarUrl ? (
+                              <img src={dragged.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                            ) : (
+                              <span className="w-5 h-5 rounded-full bg-background/20 inline-flex items-center justify-center text-[9px]">
+                                {dragged.username.slice(0, 2).toUpperCase()}
+                              </span>
+                            )}
+                            {dragged.username}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
