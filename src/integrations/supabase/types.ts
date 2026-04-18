@@ -988,6 +988,7 @@ export type Database = {
           invite_token: string
         }[]
       }
+      debate_tag_count: { Args: { _debate_id: string }; Returns: number }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
