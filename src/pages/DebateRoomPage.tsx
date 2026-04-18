@@ -391,9 +391,21 @@ const DebateRoomPage = () => {
           );
         }
 
-        // Check bothReady BEFORE clearing prep state to avoid race condition
-        const bothReady = updated.prep_side1_ready && updated.prep_side2_ready;
-        if (bothReady && prepPhaseRoleRef.current && !prepExitRef.current) {
+        // Check readiness BEFORE clearing prep state to avoid race condition.
+        // Only require ready flags from sides that actually have speakers — this
+        // makes single-participant / single-side debates progress correctly.
+        const sortedSides = [...sidesRef.current].sort((a, b) => a.sort_order - b.sort_order);
+        const partsList = participantsRef.current;
+        const side1HasSpeaker = sortedSides[0]
+          ? partsList.some((p) => p.side_id === sortedSides[0].id && p.participant_role === "speaker")
+          : false;
+        const side2HasSpeaker = sortedSides[1]
+          ? partsList.some((p) => p.side_id === sortedSides[1].id && p.participant_role === "speaker")
+          : false;
+        const side1Ready = !side1HasSpeaker || updated.prep_side1_ready;
+        const side2Ready = !side2HasSpeaker || updated.prep_side2_ready;
+        const allReady = side1Ready && side2Ready && (side1HasSpeaker || side2HasSpeaker);
+        if (allReady && prepPhaseRoleRef.current && !prepExitRef.current) {
           void completePrepPhaseAndAdvanceRef.current();
         }
 
