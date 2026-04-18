@@ -36,6 +36,7 @@ const MyDebatesPage = () => {
 
   const [debates, setDebates] = useState<DebateCoverItem[]>([]);
   const [archive, setArchive] = useState<DebateCoverItem[]>([]);
+  const [archivedLive, setArchivedLive] = useState<DebateCoverItem[]>([]);
   const [liveSessions, setLiveSessions] = useState<DebateCoverItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<DebateCoverItem | null>(null);
@@ -118,23 +119,25 @@ const MyDebatesPage = () => {
       // Live sessions
       const { data: sessions } = await supabase
         .from("live_sessions" as any)
-        .select("id, title, status, created_at, created_by")
+        .select("id, title, status, created_at, created_by, is_public")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false });
 
-      setLiveSessions(
-        (((sessions as any) || []) as any[]).map((s) => ({
-          kind: "live_session",
-          id: s.id,
-          topic: s.title || "Untitled Live Session",
-          status: s.status === "recording" ? "live" : "completed",
-          cover_image_url: null,
-          created_at: s.created_at,
-          is_public: true,
-          created_by: s.created_by,
-          participant_count: 0,
-        })),
-      );
+      const allLive = (((sessions as any) || []) as any[]).map((s) => ({
+        kind: "live_session" as const,
+        id: s.id,
+        topic: s.title || "Untitled Live Session",
+        rawStatus: s.status as string,
+        status: s.status === "recording" ? "live" : s.status === "archived" ? "archived" : "completed",
+        cover_image_url: null,
+        created_at: s.created_at,
+        is_public: !!s.is_public,
+        created_by: s.created_by,
+        participant_count: 0,
+      }));
+
+      setLiveSessions(allLive.filter((s) => s.rawStatus !== "archived").map(({ rawStatus, ...rest }) => rest));
+      setArchivedLive(allLive.filter((s) => s.rawStatus === "archived").map(({ rawStatus, ...rest }) => rest));
 
       setLoading(false);
     };
@@ -144,6 +147,7 @@ const MyDebatesPage = () => {
   const removeFromList = (id: string) => {
     setDebates((prev) => prev.filter((d) => d.id !== id));
     setArchive((prev) => prev.filter((d) => d.id !== id));
+    setArchivedLive((prev) => prev.filter((d) => d.id !== id));
     setLiveSessions((prev) => prev.filter((d) => d.id !== id));
   };
 
@@ -152,6 +156,7 @@ const MyDebatesPage = () => {
       arr.map((d) => (d.id === id ? { ...d, ...patch } : d));
     setDebates(upd);
     setArchive(upd);
+    setArchivedLive(upd);
     setLiveSessions(upd);
   };
 
@@ -200,7 +205,11 @@ const MyDebatesPage = () => {
   };
 
   const currentList =
-    activeTab === "archive" ? archive : activeTab === "live" ? liveSessions : debates;
+    activeTab === "archive"
+      ? [...archive, ...archivedLive]
+      : activeTab === "live"
+      ? liveSessions
+      : debates;
   const emptyMessage =
     activeTab === "archive"
       ? "Nothing in your archive yet. Drafts and archived debates appear here."
@@ -287,7 +296,12 @@ const MyDebatesPage = () => {
     all.forEach((i) => {
       setDebates((prev) => prev.filter((d) => d.id !== i.id));
       setLiveSessions((prev) => prev.filter((d) => d.id !== i.id));
-      setArchive((prev) => [{ ...i, status: "archived" }, ...prev.filter((d) => d.id !== i.id)]);
+      const archived = { ...i, status: "archived" };
+      if (i.kind === "live_session") {
+        setArchivedLive((prev) => [archived, ...prev.filter((d) => d.id !== i.id)]);
+      } else {
+        setArchive((prev) => [archived, ...prev.filter((d) => d.id !== i.id)]);
+      }
     });
     toast({ title: `${all.length} archived` });
     exitSelection();
@@ -411,47 +425,76 @@ const MyDebatesPage = () => {
             <p className="text-muted-foreground text-center py-12 animate-pulse">Loading…</p>
           ) : currentList.length === 0 ? (
             <p className="text-muted-foreground text-center py-12">{emptyMessage}</p>
-          ) : (
-            <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4", selectionMode && "pb-44 md:pb-32")}>
-              {currentList.map((d) => {
-                const isOwner = !!user && d.created_by === user.id;
-                const card = (
-                  <DebateCoverCard
-                    d={d}
-                    selectionMode={selectionMode}
-                    selected={selected.has(d.id)}
-                    onToggleSelected={toggle}
-                    onChanged={(action, id, patch) => {
-                      if (action === "removed") removeFromList(id);
-                      else if (action === "updated" && patch) patchInList(id, patch);
-                    }}
-                  />
-                );
+          ) : (() => {
+            const renderCard = (d: DebateCoverItem) => {
+              const isOwner = !!user && d.created_by === user.id;
+              const card = (
+                <DebateCoverCard
+                  d={d}
+                  selectionMode={selectionMode}
+                  selected={selected.has(d.id)}
+                  onToggleSelected={toggle}
+                  onChanged={(action, id, patch) => {
+                    if (action === "removed") removeFromList(id);
+                    else if (action === "updated" && patch) patchInList(id, patch);
+                  }}
+                />
+              );
+              if (!isMobile || !isOwner || selectionMode) {
+                return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
+              }
+              return (
+                <SwipeableDebateCard
+                  key={`${d.kind || "debate"}-${d.id}`}
+                  enabled
+                  isPublic={!!d.is_public}
+                  forceClose={closeSignal}
+                  onOpen={() => {
+                    if (openSwipeId && openSwipeId !== d.id) closeAllSwipes();
+                    setOpenSwipeId(d.id);
+                  }}
+                  onTogglePrivacy={() => swipeTogglePrivacy(d)}
+                  onArchive={() => swipeArchive(d)}
+                  onDelete={() => setConfirmDelete(d)}
+                >
+                  {card}
+                </SwipeableDebateCard>
+              );
+            };
 
-                if (!isMobile || !isOwner || selectionMode) {
-                  return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
-                }
+            const gridCls = cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4", selectionMode && "pb-44 md:pb-32");
+            const sectionHeader = (label: string, count: number) => (
+              <div className="flex items-baseline gap-2 mt-2 mb-3">
+                <h3 className="text-sm font-display text-foreground">{label}</h3>
+                <span className="text-xs text-muted-foreground font-body">({count})</span>
+              </div>
+            );
 
-                return (
-                  <SwipeableDebateCard
-                    key={`${d.kind || "debate"}-${d.id}`}
-                    enabled
-                    isPublic={!!d.is_public}
-                    forceClose={closeSignal}
-                    onOpen={() => {
-                      if (openSwipeId && openSwipeId !== d.id) closeAllSwipes();
-                      setOpenSwipeId(d.id);
-                    }}
-                    onTogglePrivacy={() => swipeTogglePrivacy(d)}
-                    onArchive={() => swipeArchive(d)}
-                    onDelete={() => setConfirmDelete(d)}
-                  >
-                    {card}
-                  </SwipeableDebateCard>
-                );
-              })}
-            </div>
-          )}
+            if (activeTab === "archive") {
+              return (
+                <div className={cn(selectionMode && "pb-44 md:pb-32")}>
+                  {archive.length > 0 && (
+                    <>
+                      {sectionHeader("Debates", archive.length)}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                        {archive.map(renderCard)}
+                      </div>
+                    </>
+                  )}
+                  {archivedLive.length > 0 && (
+                    <>
+                      {sectionHeader("Live sessions", archivedLive.length)}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {archivedLive.map(renderCard)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            }
+
+            return <div className={gridCls}>{currentList.map(renderCard)}</div>;
+          })()}
         </motion.div>
       </div>
 
