@@ -1190,6 +1190,31 @@ const CreateDebatePage = () => {
                                   </span>
                                 )}
                                 {e.username}
+                                {/* Mobile-friendly side picker */}
+                                <select
+                                  value=""
+                                  onClick={(ev) => ev.stopPropagation()}
+                                  onChange={(ev) => {
+                                    const v = ev.target.value;
+                                    if (!v) return;
+                                    assignSide(e, v);
+                                    setTapSelectedId(null);
+                                  }}
+                                  className="bg-transparent text-[10px] font-body border-0 outline-none cursor-pointer appearance-none pr-0.5"
+                                  aria-label={`Assign ${e.username} to a side`}
+                                  title="Move to side"
+                                >
+                                  <option value="">→</option>
+                                  {debate.sides.map((label, si) => {
+                                    const sid = sideIds[si];
+                                    if (!sid) return null;
+                                    return (
+                                      <option key={sid} value={sid}>
+                                        {label}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
                                 <button
                                   type="button"
                                   onClick={(ev) => {
