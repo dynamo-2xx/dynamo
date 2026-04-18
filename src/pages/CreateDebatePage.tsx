@@ -1350,15 +1350,24 @@ const CreateDebatePage = () => {
                                           setDraggingId(k);
                                         }}
                                         onDragEnd={() => setDraggingId(null)}
+                                        onPointerDown={handleChipPointerDown(e)}
+                                        onPointerMove={handleChipPointerMove}
+                                        onPointerUp={handleChipPointerUp(e)}
+                                        onPointerCancel={() => {
+                                          setPointerDragId(null);
+                                          setPointerPos(null);
+                                          setHoverDropZone(null);
+                                        }}
                                         onClick={(ev) => {
                                           ev.stopPropagation();
                                           setTapSelectedId(selected ? null : k);
                                         }}
-                                        className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all ${
+                                        style={{ touchAction: "none" }}
+                                        className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all select-none ${
                                           selected
                                             ? "bg-foreground text-background ring-2 ring-foreground"
                                             : "bg-accent text-foreground"
-                                        } ${draggingId === k ? "opacity-50" : ""}`}
+                                        } ${draggingId === k || pointerDragId === k ? "opacity-50" : ""}`}
                                       >
                                         {e.avatarUrl ? (
                                           <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
