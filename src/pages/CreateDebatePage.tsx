@@ -982,6 +982,36 @@ const CreateDebatePage = () => {
                       />
                     ))}
                   </div>
+
+                  {/* Your side picker — creator chooses which side they're joining as */}
+                  <div className="mt-4">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-2">
+                      Your side
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {debate.sides.map((side, i) => {
+                        const selected = creatorSideIndex === i;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setCreatorSideIndex(i)}
+                            aria-pressed={selected}
+                            className={`flex-1 rounded-lg px-3 py-2 text-sm font-body font-medium transition-all border ${
+                              selected
+                                ? "bg-foreground text-background border-foreground"
+                                : "bg-background text-foreground border-border hover:border-foreground/40"
+                            }`}
+                          >
+                            {selected ? "✓ " : ""}{side || `Side ${i + 1}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1.5 font-body">
+                      You'll be added as a speaker on this side.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Turns & Time */}
