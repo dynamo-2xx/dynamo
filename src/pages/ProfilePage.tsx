@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight } from "lucide-react";
+import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight, Pencil } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
@@ -19,17 +19,30 @@ const ProfilePage = () => {
     <AppLayout>
       <div className="max-w-2xl mx-auto px-4 py-8 md:py-12">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-2xl font-display mb-8">Profile</h2>
+          <div className="flex items-center justify-between mb-8 gap-3">
+            <h2 className="text-2xl font-display">Profile</h2>
+            <Link
+              to="/profile/edit"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-body font-medium border border-border rounded-md hover:bg-accent transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </Link>
+          </div>
 
           <div className="bg-background border border-border rounded-lg p-6 mb-6 flex items-center gap-5">
-            <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center">
-              <User className="w-7 h-7 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center overflow-hidden">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-7 h-7 text-muted-foreground" />
+              )}
             </div>
-            <div>
-              <p className="font-body text-lg font-medium">{profile?.display_name || user?.email}</p>
-              <p className="text-sm text-muted-foreground font-body">{user?.email}</p>
+            <div className="min-w-0">
+              <p className="font-body text-lg font-medium truncate">{profile?.display_name || user?.email}</p>
+              <p className="text-sm text-muted-foreground font-body truncate">{user?.email}</p>
               {profile?.affiliation && (
-                <p className="text-[11px] text-muted-foreground mt-0.5 font-body">{profile.affiliation}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 font-body truncate">{profile.affiliation}</p>
               )}
             </div>
           </div>

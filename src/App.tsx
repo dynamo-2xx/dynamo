@@ -26,6 +26,7 @@ import LiveSessionPage from "./pages/LiveSessionPage";
 import SharedLiveSessionPage from "./pages/SharedLiveSessionPage";
 import ForYouPage from "./pages/ForYouPage";
 import MyRecentPage from "./pages/MyRecentPage";
+import EditProfilePage from "./pages/EditProfilePage";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
               <Route path="/for-you" element={<ProtectedRoute><ForYouPage /></ProtectedRoute>} />
               <Route path="/my-recent" element={<ProtectedRoute><MyRecentPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+              <Route path="/profile/edit" element={<ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
