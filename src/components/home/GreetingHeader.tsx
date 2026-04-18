@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Award } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { monoGradientFromSeed } from "@/lib/gradient";
+import { useUserAverageGrade } from "@/hooks/useUserAverageGrade";
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -10,9 +12,18 @@ const getGreeting = () => {
   return "Good evening";
 };
 
+const scoreLabel = (score: number) => {
+  if (score >= 9) return "Exceptional";
+  if (score >= 7) return "Strong";
+  if (score >= 5) return "Developing";
+  if (score >= 3) return "Needs Work";
+  return "Insufficient";
+};
+
 const GreetingHeader = () => {
   const { user, profile } = useAuth();
   const [showGreeting, setShowGreeting] = useState(true);
+  const { average, count } = useUserAverageGrade();
 
   useEffect(() => {
     const t = setTimeout(() => setShowGreeting(false), 3200);
@@ -75,10 +86,26 @@ const GreetingHeader = () => {
                   <span className="font-display text-lg text-foreground">{initials}</span>
                 )}
               </div>
-              <div className="pb-1">
-                <p className="font-display text-lg leading-tight">{displayName}</p>
+              <div className="pb-1 flex-1 min-w-0">
+                <p className="font-display text-lg leading-tight truncate">{displayName}</p>
                 <p className="font-body text-xs text-muted-foreground">@{handle}</p>
               </div>
+              {average !== null && (
+                <div
+                  className="pb-1 shrink-0 flex flex-col items-end"
+                  title={`Average overall performance across ${count} graded debate${count === 1 ? "" : "s"}`}
+                >
+                  <div className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-muted-foreground font-body">
+                    <Award className="w-3 h-3" />
+                    Avg
+                  </div>
+                  <div className="flex items-baseline gap-1 leading-none">
+                    <span className="font-display text-lg tabular-nums">{average.toFixed(1)}</span>
+                    <span className="text-[10px] font-body text-muted-foreground">/ 10</span>
+                  </div>
+                  <span className="text-[10px] font-body text-muted-foreground">{scoreLabel(average)}</span>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

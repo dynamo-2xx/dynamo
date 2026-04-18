@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap, NotebookPen
+  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap, NotebookPen, Award
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1408,6 +1408,26 @@ const DebateRoomPage = () => {
                 editWindowEndsAt={debate.edit_window_ends_at}
                 isParticipant={!!myParticipant}
               />
+            )}
+
+            {/* Persistent entry to private performance report (participants only, when feedback was enabled) */}
+            {debate.feedback_enabled && !!myParticipant && (
+              <div className="border-b border-border bg-accent/40 px-6 py-3 shrink-0">
+                <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Award className="w-4 h-4 text-foreground shrink-0" />
+                    <p className="text-xs font-body text-foreground truncate">
+                      Your private performance report is ready.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/debate/${id}/grade`)}
+                    className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
+                  >
+                    View Your Performance
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* AI closing synthesis */}
