@@ -348,16 +348,26 @@ const CreateDebatePage = () => {
 
         if (emailInvites.length > 0) {
           for (const invEmail of emailInvites) {
+            // Generate a plaintext token client-side; the DB trigger will hash it on insert
+            // and clear the plaintext column. We pass the plaintext to the email function
+            // so it can build the link — the token is never persisted as plaintext.
+            const tokenBytes = new Uint8Array(32);
+            crypto.getRandomValues(tokenBytes);
+            const inviteToken = Array.from(tokenBytes)
+              .map((b) => b.toString(16).padStart(2, "0"))
+              .join("");
+
             const { data: inv } = await supabase.from("debate_invitations").insert({
               debate_id: dbDebate.id,
               invited_user_id: user.id,
               invited_username: invEmail,
               invited_email: invEmail,
+              invite_token: inviteToken,
             }).select("id").single();
 
             if (inv) {
               supabase.functions.invoke("send-invite-email", {
-                body: { invitation_id: inv.id },
+                body: { invitation_id: inv.id, invite_token: inviteToken },
               }).catch((err) => console.error("Email send error:", err));
             }
           }
