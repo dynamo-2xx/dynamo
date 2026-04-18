@@ -95,7 +95,7 @@ const PublicProfilePage = () => {
     <AppLayout>
       <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" /> Back
