@@ -225,7 +225,7 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
         </div>
       )}
 
-      <div>
+      <div className="flex items-center justify-between mb-3 gap-2">
         <div className="flex items-baseline gap-2 min-w-0">
           <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium">
             Interested
