@@ -292,7 +292,12 @@ const MyDebatesPage = () => {
     all.forEach((i) => {
       setDebates((prev) => prev.filter((d) => d.id !== i.id));
       setLiveSessions((prev) => prev.filter((d) => d.id !== i.id));
-      setArchive((prev) => [{ ...i, status: "archived" }, ...prev.filter((d) => d.id !== i.id)]);
+      const archived = { ...i, status: "archived" };
+      if (i.kind === "live_session") {
+        setArchivedLive((prev) => [archived, ...prev.filter((d) => d.id !== i.id)]);
+      } else {
+        setArchive((prev) => [archived, ...prev.filter((d) => d.id !== i.id)]);
+      }
     });
     toast({ title: `${all.length} archived` });
     exitSelection();
