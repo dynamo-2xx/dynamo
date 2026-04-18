@@ -1,58 +1,42 @@
 
 
-## Replace ping flow with Direct Messages + Inbox
+## Add "Interested" inbox to publisher preview + floating DM window
 
-### Preview page change
-- Non-owner sees one button: **"Interested?"** → opens composer dialog.
-- Composer:
-  - Three role chips at top: each side label + "Spectator". Selecting one fills the textarea with editable default: `I would like to participate as a [Role]. What time shall we meet?`
-  - Editable textarea, "Send message" button.
-- On send: create/find DM thread with publisher → insert message → toast → button becomes "Open conversation" linking to `/messages/:threadId`.
-- Remove floating coordination chat button and any owner-side pending-interest panel.
+### What I'm building
 
-### New DM system
-New tables:
-```
-dm_threads (id, user_a, user_b, debate_id nullable, last_message_at, created_at)
-  -- unique on (LEAST(user_a,user_b), GREATEST(user_a,user_b), COALESCE(debate_id,'00...'))
-dm_messages (id, thread_id, sender_id, body, created_at, read_at nullable)
-```
-RLS: only the two participants of a thread can SELECT/INSERT. Realtime enabled on both.
+**1. Owner-only "Interested" panel on preview page**
+- On `/debate/:id/preview`, when viewer is the debate owner, show a new section above (or alongside) the existing owner controls.
+- Lists users who sent a DM tied to this debate (`dm_threads` where `debate_id = this debate` AND owner is `user_a` or `user_b`, sorted by `last_message_at desc`).
+- Each row: avatar + display name + last message snippet + timestamp + unread dot.
+- Click row → opens the floating DM window (below) preloaded to that thread.
+- Empty state: same visual language as Home's "Find People" empty hint — soft icon, single-line copy: *"No one has reached out yet. Share your debate to get interest."*
 
-RPC `get_or_create_dm_thread(_other_user uuid, _debate_id uuid)` → returns thread id (handles the sorted-pair lookup atomically).
+**2. Floating draggable DM window** (Instagram-style)
+- Fixed-position card, bottom-right by default, ~360×500px.
+- Header: other user's avatar + name, expand button (→ goes to `/messages/:threadId`), close button. Drag handle on header (mouse + touch, clamped to viewport).
+- Body: reuses thread-view content from `MessagesPage` (message bubbles + composer at bottom).
+- Single global instance: state managed via a small context (`FloatingDMContext`) so any component can call `openThread(threadId)`.
+- Mounted once in `AppLayout` so it persists across route changes.
+- Mobile (<768px): falls back to full-screen overlay (no drag) — don't try to fit a draggable window on small screens.
 
-### Messages tab in sidebar (NEW)
-- Add **Messages** entry in `AppLayout.tsx` sidebar nav, placed directly **below Profile**, icon `MessageCircle`.
-- Also add to mobile bottom nav (replace or squeeze in — keep 4 items: Home, Explore, Messages, Profile).
-- Unread badge (red dot + count) sourced from `dm_messages` where `recipient = me AND read_at IS NULL`, via realtime subscription.
-
-### `/messages` page
-- Two-pane layout (desktop) / stacked (mobile):
-  - **Left**: thread list — other user's avatar + display name, last message preview, timestamp, unread dot. Sorted by `last_message_at desc`.
-  - **Right**: active thread — message bubbles (sender right, other left), composer at bottom. Marks messages read on view.
-- Route `/messages` (list) and `/messages/:threadId` (auto-opens that thread).
-
-### Notifications
-- Add `direct_message` notification type. On send, insert notification for recipient with deep-link to `/messages/:threadId`.
-- Drop `interest_received` going forward (keep type for legacy rows).
+**3. Reuse existing pieces**
+- Extract the active-thread pane from `MessagesPage.tsx` into `src/components/messages/ThreadView.tsx` so both the full page and the floating window render the same UI.
+- Use existing `useDirectMessages` hook for thread + message data.
 
 ### Files
 
 ```text
-NEW  supabase migration                            — dm_threads, dm_messages, RLS, realtime, RPC
-NEW  src/pages/MessagesPage.tsx                    — inbox + active thread
-NEW  src/hooks/useDirectMessages.ts                — threads, messages, send, unread count, realtime
-NEW  src/components/debate/InterestedComposer.tsx  — role chips + editable textarea + send
-EDIT src/components/AppLayout.tsx                  — Messages nav entry (desktop + mobile) with unread badge
-EDIT src/pages/DebateScheduledPreviewPage.tsx     — swap to InterestedComposer; remove interest panel + floating chat
-EDIT src/App.tsx                                  — add /messages and /messages/:threadId routes
-EDIT src/lib/notifications.ts                     — add direct_message type
-DEL  src/components/debate/InterestThreadChat.tsx
-DEL  src/components/debate/InterestedDialog.tsx
+NEW  src/contexts/FloatingDMContext.tsx           — open/close/active thread state
+NEW  src/components/messages/FloatingDMWindow.tsx — draggable card, mobile-fullscreen fallback
+NEW  src/components/messages/ThreadView.tsx       — extracted thread bubbles + composer
+NEW  src/components/debate/InterestedInboxPanel.tsx — owner panel: list + empty state
+EDIT src/components/AppLayout.tsx                 — wrap children in FloatingDMProvider, mount FloatingDMWindow once
+EDIT src/pages/MessagesPage.tsx                   — use shared ThreadView
+EDIT src/pages/DebateScheduledPreviewPage.tsx     — render InterestedInboxPanel for owner
 ```
 
 ### Confidence
-- Composer + DM tables + send: 95%
-- Inbox page + realtime + unread badge: 90%
-- Sidebar Messages entry (desktop + mobile): 98%
+- Owner inbox panel + empty state: 95%
+- Floating draggable window (desktop) + mobile fallback: 90%
+- Shared ThreadView extraction: 95%
 
