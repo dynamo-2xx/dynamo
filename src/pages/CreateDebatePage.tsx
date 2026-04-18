@@ -1180,7 +1180,7 @@ const CreateDebatePage = () => {
                   {invitedEntries.length > 0 && (
                     <div className="mt-4 space-y-3">
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium">
-                        Assign to a side <span className="normal-case font-normal">(drag on desktop, tap the → on each chip on mobile)</span>
+                        Assign to a side <span className="normal-case font-normal">(drag chips with finger or mouse, or use the → menu)</span>
                       </p>
 
                       {/* Unassigned tray */}
