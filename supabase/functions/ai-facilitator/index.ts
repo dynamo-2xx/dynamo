@@ -34,11 +34,11 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userError } = await userClient.auth.getUser();
+    const token = authHeader.replace("Bearer ", "").trim();
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: userData, error: userError } = await userClient.auth.getUser(token);
     if (userError || !userData?.user?.id) {
+      console.error("auth.getUser failed", userError?.message, "tokenLen:", token.length);
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
