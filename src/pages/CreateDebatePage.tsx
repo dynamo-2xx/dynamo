@@ -7,7 +7,7 @@ import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 interface GeneratedDebate {
@@ -34,7 +34,10 @@ const PREP_TIME_OPTIONS = ["0s", "15s", "30s", "45s", "1 min", "1.5 min", "2 min
 const CreateDebatePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(editId ? 2 : 1);
+  const [editLoading, setEditLoading] = useState(!!editId);
   const [prompt, setPrompt] = useState("");
   const [debate, setDebate] = useState<GeneratedDebate | null>(null);
   const [isPublic, setIsPublic] = useState(false);
