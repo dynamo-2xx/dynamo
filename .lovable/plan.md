@@ -1,62 +1,95 @@
 
 
-# Plan: Home page redesign (revised)
+## Goal
+Add an **Edit Profile** experience accessible from the Profile page, built responsive-first from the largest layout shells down to the smallest controls, with explicit verification at each breakpoint.
 
-## A. Schema (one migration)
-- `profiles.banner_url text null`
-- `debates.cover_image_url text null`
+## Scope of editable fields
+Based on `profiles` schema already in use on the Profile page:
+- `display_name`
+- `affiliation`
+- `role` (personal / education / community)
+- `is_public` (visibility toggle)
+- `location`
+- `banner_url` (already in schema for home header)
+- `avatar_url` (if present; otherwise add to migration)
 
-## B. Top section — greeting + persistent tagline
-Single fixed-height slot:
-1. **Greeting `h2`** "Good evening, {display_name}." — fades out after 3.2s and is **replaced in place** by the X-style header (banner + avatar + display name + @handle). `[p]` tagline stays visible the entire time, never fades.
-2. **Tagline `[p]`** rotates every 5s through:
-   - "What's the story today?"
-   - "What do you want to debate today?"
-   - "People to the power!"
-   - "Got a take? Put it to the test."
-   Persists below greeting, then below header. Crossfade between messages only (the `<p>` slot itself never disappears).
+No new tables. One small migration only if `avatar_url` doesn't exist yet — confirmed during Phase 0.
 
-## C. Action row
-2-column grid: **Create** (PlusCircle → `/create`) + **Live** (Radio → `/live`). Same card style as today.
+---
 
-## D. Two carousels
+## Phased plan (largest → smallest)
 
-### 1. "Conversations that may concern you"
-- Header row: title left · `Trending | Local` toggle pill · **"Open" arrow button top-right** → navigates to `/for-you`.
-- Source: live public debates first, then most-engaged public debates (participant count desc). `Local` filters by `profile.location`.
+### Phase 0 — Audit & schema check (no UI yet)
+- Read `src/integrations/supabase/types.ts` to confirm which `profiles` columns already exist (`avatar_url`, `banner_url`, etc.).
+- Read `AuthContext` to confirm how `profile` is loaded/refreshed after an update.
+- Decide: add `avatar_url text null` migration only if missing.
+- Deliverable: confirmed field list + refresh mechanism.
 
-### 2. "My Recent" (NEW, replaces old Recent list)
-- Header row: title left · **"Open" arrow button top-right** → navigates to `/my-recent`.
-- Source: debates where the current user is creator or participant, ordered by `updated_at` desc.
+### Phase 1 — Page shell & route (largest container)
+- New route `/profile/edit` (protected), registered in `src/App.tsx`.
+- New `src/pages/EditProfilePage.tsx` wrapped in `AppLayout` so it inherits the existing sidebar/bottom-nav responsive shell (already handles md+ sidebar vs mobile bottom nav).
+- Page container: `max-w-2xl mx-auto px-4 py-8 md:py-12` to match `ProfilePage` exactly — guarantees parity at every breakpoint we already support.
+- Add an **Edit** button on `ProfilePage` (top-right of the avatar card) linking to `/profile/edit`.
+- **Test**: navigate at 320, 375, 414, 768, 1024, 1366, 1920. Confirm no horizontal scroll, sidebar/bottom-nav switch at md (768), content stays centered.
 
-### Carousel mechanics (shared)
-- Cards: aspect 16/10, rounded-xl, 0.5px border. Background = `cover_image_url` else gradient hashed from topic. LIVE chip with pulsing green dot, participant count pill, topic in Instrument Serif (clamp-2).
-- Auto-advance 1 card every 5s, wraps. Arrow buttons at edges. Any user interaction (arrow, drag, scroll, focus) pauses auto-advance; resumes after **10s of inactivity**. Honors `prefers-reduced-motion`.
-- 1 card on mobile, 2 on md, 3 on lg.
+### Phase 2 — Section layout (large blocks inside the shell)
+Three stacked sections, each a bordered card matching the ProfilePage style:
+1. **Banner + Avatar** (visual identity)
+2. **Basic info** (display name, affiliation, location)
+3. **Account settings** (role, visibility)
+Plus a sticky-on-mobile / inline-on-desktop **Save / Cancel** action bar.
 
-## E. Two new expanded pages
-- `/for-you` — full catalogue of the trending/local set. Top bar: back arrow (left) · page title · **"Explore →" link top-right** (this is where the Explore link lives now). Same Trending/Local toggle. Grid layout (responsive 1/2/3 columns).
-- `/my-recent` — same shell, lists user's debates. Top-right also shows "Explore →".
+- Sections stack vertically at all sizes (single column) — keeps layout trivially responsive and matches the read-only ProfilePage.
+- Save bar: `sticky bottom-0` on mobile (above the bottom nav, so `bottom-16`), `static` from `md:` upward.
+- **Test**: at 320/375 confirm sticky bar doesn't overlap bottom nav; at 768+ confirm it sits inline at the end of the form.
 
-Both pages reuse the same card component as the carousel.
+### Phase 3 — Banner + Avatar block (medium components)
+- Banner: full-width `aspect-[3/1]` image area with upload overlay button. Falls back to a gradient (reuse `src/lib/gradient.ts` deterministic util seeded by `display_name`).
+- Avatar: 96px circle, overlapping the banner bottom by 50% (`-mt-12 ml-4`). Upload button as a small floating camera icon on the avatar.
+- Upload flow: file picker → upload to Supabase Storage bucket `avatars` (and `banners`) → write returned public URL into local form state. Buckets created in the migration if missing, with public read + authenticated write RLS.
+- **Test**:
+  - Mobile (≤414): banner aspect stays 3/1, avatar doesn't clip card edges, upload buttons remain tappable (≥40px hit target).
+  - Tablet (768): same proportions, avatar overlap still visually balanced.
+  - Desktop (≥1024): banner caps at the `max-w-2xl` container width, no stretching artifacts.
 
-## F. Files
-- **Migration**: 2 nullable columns.
-- **NEW** `src/components/home/GreetingHeader.tsx` — greeting → X-style header swap (tagline lives outside, in HomePage).
-- **NEW** `src/components/home/RotatingTagline.tsx` — 4-message crossfade.
-- **NEW** `src/components/home/DebateCoverCard.tsx` — shared card (carousel + grid pages).
-- **NEW** `src/components/home/AutoCarousel.tsx` — fetch-agnostic carousel shell with auto-advance + pause-on-interaction.
-- **NEW** `src/pages/ForYouPage.tsx`, `src/pages/MyRecentPage.tsx`.
-- **NEW** `src/lib/gradient.ts` — deterministic gradient util.
-- **EDIT** `src/pages/HomePage.tsx` — compose new sections.
-- **EDIT** `src/App.tsx` — register `/for-you` and `/my-recent` routes (protected).
+### Phase 4 — Form fields (small components)
+- Use existing `@/components/ui/{input,label,textarea,switch,radio-group}` for full token consistency.
+- `display_name` — Input.
+- `affiliation` — Input.
+- `location` — Input with a small "Use my current location" ghost button (reuses geolocation pattern from `LocationPrompt`).
+- `role` — RadioGroup (3 options) laid out as `grid-cols-1 sm:grid-cols-3` so they stack on mobile and sit side-by-side from `sm` (640px) up.
+- `is_public` — Switch with label + helper text.
+- All inputs `w-full`; labels above inputs; 16px gap between fields.
+- **Test**:
+  - 320px: every label fully visible, no input overflow, role radios stacked.
+  - 640px+: role radios in a 3-up row.
+  - Touch targets ≥40px on mobile.
 
-## G. Self-check
-- [ ] Only `h2` fades; `[p]` tagline never disappears and keeps cycling.
-- [ ] Header (banner + avatar + name + @handle) replaces greeting in place, no layout jump.
-- [ ] Create + Live side-by-side.
-- [ ] Two carousels, each with top-right "Open" button to a dedicated catalogue page.
-- [ ] Catalogue pages have back arrow + Explore link top-right.
-- [ ] Auto-rotate 5s, pause on interaction, resume after 10s.
-- [ ] Build passes; routes work; gradient fallback renders when cover/banner null.
+### Phase 5 — Save / Cancel + state handling (smallest interactions)
+- Local form state seeded from `profile`. `isDirty` derived by shallow compare.
+- Save: `supabase.from('profiles').update(...).eq('id', user.id)` → on success refresh `AuthContext` profile (call its existing refresh, or refetch) → toast → navigate back to `/profile`.
+- Cancel: if dirty, show `AlertDialog` confirm; else navigate back.
+- Disable Save while pristine or while saving; show spinner inside the button.
+- **Test**: dirty/clean states, error toast on failed update, that the new values show up immediately on `/profile` and in the home header (`GreetingHeader`).
+
+### Phase 6 — Cross-breakpoint QA pass
+- Walk through 320 / 375 / 414 / 640 / 768 / 1024 / 1366 / 1920 with the user, on both light and dark themes.
+- Verify keyboard nav order, focus rings (already token-driven), and that the sticky save bar never traps content.
+
+---
+
+## Files
+- **NEW** `src/pages/EditProfilePage.tsx`
+- **EDIT** `src/pages/ProfilePage.tsx` — add Edit button linking to `/profile/edit`
+- **EDIT** `src/App.tsx` — register `/profile/edit` (protected)
+- **EDIT** `src/contexts/AuthContext.tsx` — only if no profile-refresh helper exists yet (expose `refreshProfile`)
+- **MIGRATION** (conditional) — add `profiles.avatar_url text null` if missing; create `avatars` and `banners` storage buckets with public read + owner-write RLS
+
+## Self-check
+- [ ] Largest shell first (route + AppLayout container), smallest last (individual inputs)
+- [ ] Each phase has explicit breakpoint test list
+- [ ] No new tables; minimal schema delta
+- [ ] Reuses existing UI primitives + gradient util for full token consistency
+- [ ] Updated profile reflects on `/profile` and home header without page reload
+- [ ] Sticky mobile save bar respects bottom nav height
 
