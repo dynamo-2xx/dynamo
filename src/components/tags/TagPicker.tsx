@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X, Hash, Loader2 } from "lucide-react";
 import { useAllTags, useRecordTags, useTagMutations, type Tag } from "@/hooks/useTags";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,31 @@ const TagPicker = ({
 
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Collapse on outside click / escape
+  useEffect(() => {
+    if (!expanded) return;
+    const handleClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+        setQuery("");
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setExpanded(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [expanded]);
 
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -95,33 +120,50 @@ const TagPicker = ({
     }
   };
 
-  return (
-    <div className={cn("space-y-2", compact && "space-y-1.5")}>
-      {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {selected.map((t) => (
-            <span
-              key={t.id}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-foreground text-background text-[11px] font-body"
-            >
-              <Hash className="w-3 h-3" />
-              {t.name}
-              <button
-                onClick={() => removeTag(t)}
-                disabled={busy}
-                className="ml-0.5 hover:opacity-80"
-                aria-label={`Remove ${t.name}`}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+  const canAddMore = selected.length < max;
 
-      {selected.length < max && (
+  return (
+    <div ref={wrapRef} className={cn("space-y-2", compact && "space-y-1.5")}>
+      {/* Compact chip row — always visible */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {selected.map((t) => (
+          <span
+            key={t.id}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-foreground text-background text-[11px] font-body"
+          >
+            <Hash className="w-3 h-3" />
+            {t.name}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeTag(t);
+              }}
+              disabled={busy}
+              className="ml-0.5 hover:opacity-80"
+              aria-label={`Remove ${t.name}`}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+        {canAddMore && !expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-dashed border-border text-[11px] font-body text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            {selected.length === 0 ? "Add tags" : "Add"}
+          </button>
+        )}
+      </div>
+
+      {/* Expanded picker */}
+      {expanded && canAddMore && (
         <div className="relative">
           <input
+            autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -131,7 +173,7 @@ const TagPicker = ({
                 else handleCreate();
               }
             }}
-            placeholder="Add a tag (e.g. Politics)…"
+            placeholder="Search or create a tag (e.g. Politics)…"
             className="w-full bg-accent rounded-lg px-3 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
           />
           {(query.trim() || suggestions.length > 0) && (
@@ -170,6 +212,7 @@ const TagPicker = ({
           )}
         </div>
       )}
+
       <p className="text-[10px] text-muted-foreground font-body">
         {selected.length}/{max} tags · helps people on Explore find this
       </p>
