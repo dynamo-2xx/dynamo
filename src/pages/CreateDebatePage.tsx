@@ -545,19 +545,56 @@ const CreateDebatePage = () => {
         const { error: sideError } = await supabase.from("debate_sides").insert(sideInserts);
         if (sideError) throw sideError;
 
-        // Add creator as participant
+        // Add creator as participant on chosen side
         const { data: sides } = await supabase
           .from("debate_sides")
-          .select("id")
+          .select("id, sort_order")
           .eq("debate_id", dbDebate.id)
-          .order("sort_order")
-          .limit(1);
+          .order("sort_order");
+
+        const creatorSideId =
+          sides?.find((s: any) => s.sort_order === creatorSideIndex)?.id ??
+          sides?.[0]?.id ??
+          null;
 
         await supabase.from("debate_participants").insert({
           debate_id: dbDebate.id,
           user_id: user.id,
-          side_id: sides?.[0]?.id ?? null,
+          side_id: creatorSideId,
         });
+      }
+
+      // Edit mode: ensure creator's participant row points to chosen side after sides were re-created.
+      if (editId) {
+        const { data: freshSidesForCreator } = await supabase
+          .from("debate_sides")
+          .select("id, sort_order")
+          .eq("debate_id", dbDebate.id)
+          .order("sort_order");
+        const newCreatorSideId =
+          freshSidesForCreator?.find((s: any) => s.sort_order === creatorSideIndex)?.id ??
+          freshSidesForCreator?.[0]?.id ??
+          null;
+        if (newCreatorSideId) {
+          const { data: existingPart } = await supabase
+            .from("debate_participants")
+            .select("id")
+            .eq("debate_id", editId)
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (existingPart) {
+            await supabase
+              .from("debate_participants")
+              .update({ side_id: newCreatorSideId })
+              .eq("id", existingPart.id);
+          } else {
+            await supabase.from("debate_participants").insert({
+              debate_id: editId,
+              user_id: user.id,
+              side_id: newCreatorSideId,
+            });
+          }
+        }
       }
 
       // 5. Send invitations (usernames and emails) — with side assignments from DnD
