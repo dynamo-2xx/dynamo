@@ -490,37 +490,35 @@ const ParticipantSharedView = ({
               >
                 <Send className="w-5 h-5" />
               </button>
-              {/* Right cluster: argument-map sits horizontally beside the d./notebook stack */}
-              <div className="flex items-center gap-1.5 shrink-0 self-end">
-                {overlayArgs.length > 0 && (
+              {/* Desktop right cluster: d. / map / notebook horizontally (mobile uses the docked row above) */}
+              <div className="hidden sm:flex items-center gap-1.5 shrink-0 self-end">
+                {onToggleAiMessage && (
+                  <DLogoButton
+                    onClick={onToggleAiMessage}
+                    active={!aiMessageCollapsed}
+                    pulse={aiMessagePulse}
+                    disabled={!aiMessage}
+                  />
+                )}
+                <IconCircleButton
+                  onClick={() => setArgumentMapOpen((v) => !v)}
+                  active={argumentMapOpen}
+                  disabled={overlayArgs.length === 0}
+                  title="Argument map"
+                  ariaLabel="Toggle argument map overlay"
+                >
+                  <MapIcon className="w-3.5 h-3.5" />
+                </IconCircleButton>
+                {onOpenNotebook && isSpeaker && (
                   <IconCircleButton
-                    onClick={() => setArgumentMapOpen((v) => !v)}
-                    active={argumentMapOpen}
-                    title="Argument map"
-                    ariaLabel="Toggle argument map overlay"
+                    onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
+                    active={notebookOpen}
+                    title="My notes"
+                    ariaLabel="Toggle notebook"
                   >
-                    <MapIcon className="w-3.5 h-3.5" />
+                    <NotebookPen className="w-3.5 h-3.5" />
                   </IconCircleButton>
                 )}
-                <div className="flex flex-col items-center gap-1.5">
-                  {aiMessage && onToggleAiMessage && (
-                    <DLogoButton
-                      onClick={onToggleAiMessage}
-                      active={!aiMessageCollapsed}
-                      pulse={aiMessagePulse}
-                    />
-                  )}
-                  {onOpenNotebook && isSpeaker && (
-                    <IconCircleButton
-                      onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
-                      active={notebookOpen}
-                      title="My notes"
-                      ariaLabel="Toggle notebook"
-                    >
-                      <NotebookPen className="w-3.5 h-3.5" />
-                    </IconCircleButton>
-                  )}
-                </div>
               </div>
             </div>
           </div>
