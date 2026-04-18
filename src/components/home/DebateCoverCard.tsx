@@ -32,6 +32,7 @@ export interface DebateCoverItem {
   created_at?: string;
   created_by?: string;
   is_public?: boolean;
+  kind?: "debate" | "live_session";
 }
 
 interface Props {
@@ -50,11 +51,13 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const isLiveSession = d.kind === "live_session";
   const isLive = d.status === "live";
   const isArchived = d.status === "archived";
   const isOwner = !!user && !!d.created_by && user.id === d.created_by;
-  const showOwnerControls = isOwner && !isLive && !selectionMode;
-  const selectable = !!selectionMode && isOwner;
+  const showOwnerControls = isOwner && !isLive && !selectionMode && !isLiveSession;
+  const selectable = !!selectionMode && isOwner && !isLiveSession;
+  const linkTo = isLiveSession ? `/live/${d.id}` : `/debate/${d.id}`;
 
   const bg = d.cover_image_url
     ? { backgroundImage: `url(${d.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -102,6 +105,17 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   };
 
   const renderStatusPill = () => {
+    if (isLiveSession) {
+      const isRec = d.status === "live";
+      return (
+        <span className={cn(PILL_BASE, "bg-background/95 text-foreground")}>
+          {isRec ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] animate-pulse" />
+          ) : null}
+          {isRec ? "Live · Recording" : "Live · Recorded"}
+        </span>
+      );
+    }
     if (isLive) {
       return (
         <span className={cn(PILL_BASE, "bg-background/95 text-foreground")}>
@@ -206,7 +220,7 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
           {cardInner}
         </button>
       ) : (
-        <Link to={`/debate/${d.id}`} className={cardClasses} style={bg}>
+        <Link to={linkTo} className={cardClasses} style={bg}>
           {cardInner}
         </Link>
       )}
