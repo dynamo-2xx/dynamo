@@ -54,6 +54,7 @@ const HomePage = () => {
   const actionRowRef = useRef<HTMLDivElement>(null);
   const forYouHint = useEmptyStateHint<HTMLDivElement>();
   const myRecentHint = useEmptyStateHint<HTMLDivElement>();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const handleProtectedAction = (e: React.MouseEvent) => {
     if (!user) {
@@ -67,6 +68,16 @@ const HomePage = () => {
     setHighlightActions(true);
     window.setTimeout(() => setHighlightActions(false), 1500);
   };
+
+  // Triggered from sidebar "Get Started" via ?highlight=actions
+  useEffect(() => {
+    if (searchParams.get("highlight") === "actions") {
+      handleScrollToActions();
+      searchParams.delete("highlight");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const actionCardClass = `flex items-center gap-3 bg-background border rounded-lg p-5 transition-all duration-500 group ${
     highlightActions
