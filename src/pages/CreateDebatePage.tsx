@@ -161,6 +161,18 @@ const CreateDebatePage = () => {
       setEditLoading(false);
       setStep(3);
 
+      // Load creator's existing side assignment from debate_participants
+      const { data: meAsParticipant } = await supabase
+        .from("debate_participants")
+        .select("side_id")
+        .eq("debate_id", editId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (meAsParticipant?.side_id && sds) {
+        const idx = (sds as any[]).findIndex((s: any) => s.id === meAsParticipant.side_id);
+        if (idx >= 0) setCreatorSideIndex(idx);
+      }
+
       // Load existing invitations into invitedEntries
       const { data: invs } = await supabase
         .from("debate_invitations")
