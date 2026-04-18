@@ -17,6 +17,13 @@ interface InterestedThread {
   unread_count: number;
 }
 
+interface JoinedParticipant {
+  user_id: string;
+  side_id: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
 interface Props {
   debateId: string;
   debateTopic: string;
