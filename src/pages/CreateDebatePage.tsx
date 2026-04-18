@@ -7,7 +7,7 @@ import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 interface GeneratedDebate {
@@ -34,7 +34,10 @@ const PREP_TIME_OPTIONS = ["0s", "15s", "30s", "45s", "1 min", "1.5 min", "2 min
 const CreateDebatePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(editId ? 2 : 1);
+  const [editLoading, setEditLoading] = useState(!!editId);
   const [prompt, setPrompt] = useState("");
   const [debate, setDebate] = useState<GeneratedDebate | null>(null);
   const [isPublic, setIsPublic] = useState(false);
@@ -91,6 +94,51 @@ const CreateDebatePage = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Edit mode: load existing debate template and jump straight to step 3.
+  useEffect(() => {
+    if (!editId || !user) return;
+    let cancelled = false;
+    (async () => {
+      const [{ data: d }, { data: subs }, { data: sds }] = await Promise.all([
+        supabase.from("debates").select("*").eq("id", editId).maybeSingle(),
+        supabase.from("debate_subtopics").select("*").eq("debate_id", editId).order("sort_order"),
+        supabase.from("debate_sides").select("*").eq("debate_id", editId).order("sort_order"),
+      ]);
+      if (cancelled) return;
+      if (!d) {
+        toast.error("Debate not found");
+        navigate("/", { replace: true });
+        return;
+      }
+      if (d.created_by !== user.id) {
+        toast.error("You can't edit this debate");
+        navigate(`/debate/${editId}/preview`, { replace: true });
+        return;
+      }
+      setDebate({
+        topic: d.topic,
+        subtopics: (subs || []).map((s: any) => s.title),
+        sides: (sds || []).map((s: any) => s.label),
+        turnsPerSubtopic: d.turns_per_subtopic,
+        timePerTurn: d.time_per_turn,
+        prepTime: d.prep_time_min || "30s",
+      });
+      setIsPublic(d.is_public);
+      setLocation(d.location || "");
+      setScheduledAt(
+        d.scheduled_at ? new Date(d.scheduled_at).toISOString().slice(0, 16) : "",
+      );
+      setFeedbackEnabled(!!d.feedback_enabled);
+      setDescription(d.description || "");
+      setResolutionAdded(true);
+      setEditLoading(false);
+      setStep(3);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editId, user, navigate]);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
@@ -266,60 +314,111 @@ const CreateDebatePage = () => {
     setSaving(true);
 
     try {
-      // 1. Create the debate
-      const { data: dbDebate, error: debateError } = await supabase
-        .from("debates")
-        .insert({
-          topic: debate.topic,
-          created_by: user.id,
-          is_public: isPublic,
-          turns_per_subtopic: debate.turnsPerSubtopic,
-          time_per_turn: debate.timePerTurn,
-          prep_time_min: debate.prepTime,
-          prep_time_max: debate.prepTime,
-          facilitator_type: "ai",
-          status: publishMode ? "scheduled" : (scheduledAt ? "scheduled" : "draft"),
-          location: location.trim() || null,
-          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-          feedback_enabled: feedbackEnabled,
-          description: description.trim() || null,
-        } as any)
-        .select()
-        .single();
+      let dbDebate: any;
 
-      if (debateError) throw debateError;
+      if (editId) {
+        // EDIT MODE: update existing debate, replace its subtopics + sides
+        const { data: updated, error: updErr } = await supabase
+          .from("debates")
+          .update({
+            topic: debate.topic,
+            is_public: isPublic,
+            turns_per_subtopic: debate.turnsPerSubtopic,
+            time_per_turn: debate.timePerTurn,
+            prep_time_min: debate.prepTime,
+            prep_time_max: debate.prepTime,
+            status: publishMode ? "scheduled" : (scheduledAt ? "scheduled" : "draft"),
+            location: location.trim() || null,
+            scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+            feedback_enabled: feedbackEnabled,
+            description: description.trim() || null,
+          } as any)
+          .eq("id", editId)
+          .select()
+          .single();
+        if (updErr) throw updErr;
+        dbDebate = updated;
 
-      // 2. Create subtopics
-      const subtopicInserts = debate.subtopics.map((title, i) => ({
-        debate_id: dbDebate.id,
-        title,
-        sort_order: i,
-      }));
-      const { error: subError } = await supabase.from("debate_subtopics").insert(subtopicInserts);
-      if (subError) throw subError;
+        // Replace subtopics + sides (delete then re-insert to preserve sort order)
+        await supabase.from("debate_subtopics").delete().eq("debate_id", editId);
+        await supabase.from("debate_sides").delete().eq("debate_id", editId);
 
-      // 3. Create sides
-      const sideInserts = debate.sides.map((label, i) => ({
-        debate_id: dbDebate.id,
-        label,
-        sort_order: i,
-      }));
-      const { error: sideError } = await supabase.from("debate_sides").insert(sideInserts);
-      if (sideError) throw sideError;
+        const subtopicInserts = debate.subtopics.map((title, i) => ({
+          debate_id: editId,
+          title,
+          sort_order: i,
+        }));
+        if (subtopicInserts.length > 0) {
+          const { error: subError } = await supabase.from("debate_subtopics").insert(subtopicInserts);
+          if (subError) throw subError;
+        }
 
-      // 4. Add creator as participant
-      const { data: sides } = await supabase
-        .from("debate_sides")
-        .select("id")
-        .eq("debate_id", dbDebate.id)
-        .order("sort_order")
-        .limit(1);
+        const sideInserts = debate.sides.map((label, i) => ({
+          debate_id: editId,
+          label,
+          sort_order: i,
+        }));
+        if (sideInserts.length > 0) {
+          const { error: sideError } = await supabase.from("debate_sides").insert(sideInserts);
+          if (sideError) throw sideError;
+        }
+      } else {
+        // CREATE MODE: insert new debate + children
+        const { data: created, error: debateError } = await supabase
+          .from("debates")
+          .insert({
+            topic: debate.topic,
+            created_by: user.id,
+            is_public: isPublic,
+            turns_per_subtopic: debate.turnsPerSubtopic,
+            time_per_turn: debate.timePerTurn,
+            prep_time_min: debate.prepTime,
+            prep_time_max: debate.prepTime,
+            facilitator_type: "ai",
+            status: publishMode ? "scheduled" : (scheduledAt ? "scheduled" : "draft"),
+            location: location.trim() || null,
+            scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+            feedback_enabled: feedbackEnabled,
+            description: description.trim() || null,
+          } as any)
+          .select()
+          .single();
 
-      await supabase.from("debate_participants").insert({
-        debate_id: dbDebate.id,
-        user_id: user.id,
-        side_id: sides?.[0]?.id ?? null,
-      });
+        if (debateError) throw debateError;
+        dbDebate = created;
+
+        // Create subtopics
+        const subtopicInserts = debate.subtopics.map((title, i) => ({
+          debate_id: dbDebate.id,
+          title,
+          sort_order: i,
+        }));
+        const { error: subError } = await supabase.from("debate_subtopics").insert(subtopicInserts);
+        if (subError) throw subError;
+
+        // Create sides
+        const sideInserts = debate.sides.map((label, i) => ({
+          debate_id: dbDebate.id,
+          label,
+          sort_order: i,
+        }));
+        const { error: sideError } = await supabase.from("debate_sides").insert(sideInserts);
+        if (sideError) throw sideError;
+
+        // Add creator as participant
+        const { data: sides } = await supabase
+          .from("debate_sides")
+          .select("id")
+          .eq("debate_id", dbDebate.id)
+          .order("sort_order")
+          .limit(1);
+
+        await supabase.from("debate_participants").insert({
+          debate_id: dbDebate.id,
+          user_id: user.id,
+          side_id: sides?.[0]?.id ?? null,
+        });
+      }
 
       // 5. Send invitations (usernames and emails)
       if (invitedUsernames.length > 0) {
@@ -392,7 +491,10 @@ const CreateDebatePage = () => {
         }
       }
 
-      if (publishMode) {
+      if (editId) {
+        toast.success("Debate updated");
+        navigate(`/debate/${editId}/preview`);
+      } else if (publishMode) {
         const hasTags = selectedTags.length > 0;
         if (hasTags) {
           toast.success("Debate published! Find it on Explore under your tags.");
