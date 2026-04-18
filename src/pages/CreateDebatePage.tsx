@@ -382,8 +382,19 @@ const CreateDebatePage = () => {
           .insert(selectedTags.map((t: any) => ({ debate_id: dbDebate.id, tag_id: t.id })));
       }
 
-      toast.success("Debate created!");
-      navigate(`/debate/${dbDebate.id}`);
+      if (publishMode) {
+        const hasTags = selectedTags.length > 0;
+        if (hasTags) {
+          toast.success("Debate published! Find it on Explore under your tags.");
+          navigate(`/explore/topic/${selectedTags[0].slug}`);
+        } else {
+          toast.success("Debate published! Find it under My Recent on your profile.");
+          navigate(`/my-recent`);
+        }
+      } else {
+        toast.success("Debate created!");
+        navigate(`/debate/${dbDebate.id}`);
+      }
     } catch (err: any) {
       console.error("Create debate error:", err);
       toast.error(err.message || "Failed to create debate");
@@ -839,20 +850,22 @@ const CreateDebatePage = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button
-                    onClick={() => { setStep(1); setDebate(null); setInvitedUsernames([]); setInviteInput(""); setLocation(""); setScheduledAt(""); setMode("adversarial"); setResolutionPreview(""); setResolutionAdded(false); setHoveringCollab(false); setFeedbackEnabled(false); setFeedbackExplainerOpen(false); }}
-                    className="flex-1 border border-border rounded-lg py-3 text-sm font-body font-medium text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+                    onClick={() => handleCreateDebate(false)}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
                   >
-                    Start Over
+                    {saving ? "Saving…" : invitedUsernames.length > 0 ? "Save & Invite" : "Save Debate"}
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={handleCreateDebate}
+                    onClick={() => handleCreateDebate(true)}
                     disabled={saving}
                     className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
-                    {saving ? "Creating…" : invitedUsernames.length > 0 ? "Create & Invite" : "Create Debate"}
-                    <ArrowRight className="w-4 h-4" />
+                    {saving ? "Publishing…" : "Publish Debate"}
+                    <Send className="w-4 h-4" />
                   </button>
                 </div>
               </div>
