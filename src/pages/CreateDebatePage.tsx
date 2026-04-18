@@ -66,6 +66,10 @@ const CreateDebatePage = () => {
   const [interestedUsers, setInterestedUsers] = useState<InterestedUser[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [tapSelectedId, setTapSelectedId] = useState<string | null>(null);
+  // Pointer-based drag state for cross-device (touch + mouse) drag-and-drop.
+  const [pointerDragId, setPointerDragId] = useState<string | null>(null);
+  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoverDropZone, setHoverDropZone] = useState<string | null>(null);
   // Index into debate.sides — which side the creator is joining as.
   const [creatorSideIndex, setCreatorSideIndex] = useState<number>(0);
   const [taglineIndex, setTaglineIndex] = useState(0);
@@ -449,6 +453,52 @@ const CreateDebatePage = () => {
 
   const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
+  // Pointer-based drag handlers — work for both mouse and touch.
+  // Drop targets are identified by the `data-drop-zone` attribute (value: side id or "__unassigned__").
+  const handleChipPointerDown = (entry: InvitedEntry) => (ev: React.PointerEvent<HTMLDivElement>) => {
+    // Ignore if interaction starts on an interactive child (button/select/option).
+    const target = ev.target as HTMLElement;
+    if (target.closest("button, select, option, input, a")) return;
+    const k = entryKey(entry);
+    setPointerDragId(k);
+    setPointerPos({ x: ev.clientX, y: ev.clientY });
+    setHoverDropZone(null);
+    try {
+      (ev.currentTarget as Element).setPointerCapture(ev.pointerId);
+    } catch {
+      /* noop */
+    }
+  };
+
+  const handleChipPointerMove = (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerDragId) return;
+    setPointerPos({ x: ev.clientX, y: ev.clientY });
+    // Hide the floating ghost momentarily to detect the underlying element.
+    const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+    const zone = el?.closest("[data-drop-zone]") as HTMLElement | null;
+    setHoverDropZone(zone?.getAttribute("data-drop-zone") ?? null);
+  };
+
+  const handleChipPointerUp = (entry: InvitedEntry) => (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerDragId) return;
+    const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+    const zone = el?.closest("[data-drop-zone]") as HTMLElement | null;
+    const zoneId = zone?.getAttribute("data-drop-zone");
+    if (zoneId) {
+      if (zoneId === "__unassigned__") assignSide(entry, null);
+      else assignSide(entry, zoneId);
+    }
+    setPointerDragId(null);
+    setPointerPos(null);
+    setHoverDropZone(null);
+    try {
+      (ev.currentTarget as Element).releasePointerCapture(ev.pointerId);
+    } catch {
+      /* noop */
+    }
+  };
+
+
   const handleCreateDebate = async (publishMode: boolean = false) => {
     if (!debate || !user) return;
     setSaving(true);
@@ -736,7 +786,7 @@ const CreateDebatePage = () => {
             <motion.div key="step1" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
                 className="inline-flex items-center gap-1.5 text-sm font-body text-muted-foreground hover:text-foreground transition-colors mb-6 group"
                 aria-label="Go back"
               >
@@ -790,7 +840,7 @@ const CreateDebatePage = () => {
             <motion.div key="step3" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
                 className="inline-flex items-center gap-1.5 text-sm font-body text-muted-foreground hover:text-foreground transition-colors mb-6 group"
                 aria-label="Go back"
               >
@@ -1130,7 +1180,7 @@ const CreateDebatePage = () => {
                   {invitedEntries.length > 0 && (
                     <div className="mt-4 space-y-3">
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium">
-                        Assign to a side <span className="normal-case font-normal">(drag on desktop, tap the → on each chip on mobile)</span>
+                        Assign to a side <span className="normal-case font-normal">(drag chips with finger or mouse, or use the → menu)</span>
                       </p>
 
                       {/* Unassigned tray */}
@@ -1155,7 +1205,12 @@ const CreateDebatePage = () => {
                             }
                           }
                         }}
-                        className="border border-dashed border-border rounded-lg p-3 min-h-[56px] bg-accent/30"
+                        data-drop-zone="__unassigned__"
+                        className={`border border-dashed rounded-lg p-3 min-h-[56px] transition-colors ${
+                          hoverDropZone === "__unassigned__"
+                            ? "border-foreground bg-accent"
+                            : "border-border bg-accent/30"
+                        }`}
                       >
                         <p className="text-[10px] text-muted-foreground font-body mb-1.5">Unassigned</p>
                         <div className="flex flex-wrap gap-1.5">
@@ -1172,15 +1227,24 @@ const CreateDebatePage = () => {
                                   setDraggingId(k);
                                 }}
                                 onDragEnd={() => setDraggingId(null)}
+                                onPointerDown={handleChipPointerDown(e)}
+                                onPointerMove={handleChipPointerMove}
+                                onPointerUp={handleChipPointerUp(e)}
+                                onPointerCancel={() => {
+                                  setPointerDragId(null);
+                                  setPointerPos(null);
+                                  setHoverDropZone(null);
+                                }}
                                 onClick={(ev) => {
                                   ev.stopPropagation();
                                   setTapSelectedId(selected ? null : k);
                                 }}
-                                className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all ${
+                                style={{ touchAction: "none" }}
+                                className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all select-none ${
                                   selected
                                     ? "bg-foreground text-background ring-2 ring-foreground"
                                     : "bg-background border border-border text-foreground"
-                                } ${draggingId === k ? "opacity-50" : ""}`}
+                                } ${draggingId === k || pointerDragId === k ? "opacity-50" : ""}`}
                               >
                                 {e.avatarUrl ? (
                                   <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
@@ -1262,11 +1326,16 @@ const CreateDebatePage = () => {
                                     }
                                   }
                                 }}
-                                className="flex-1 p-3 min-h-[120px] bg-background"
+                                data-drop-zone={sid}
+                                className={`flex-1 p-3 min-h-[120px] transition-colors ${
+                                  hoverDropZone === sid ? "bg-accent" : "bg-background"
+                                }`}
                               >
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-1.5 truncate">
-                                  {label}
-                                </p>
+                                <div className="overflow-x-auto mb-1.5">
+                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium whitespace-nowrap">
+                                    {label}
+                                  </p>
+                                </div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {invitedEntries.filter((e) => e.sideId === sid).map((e) => {
                                     const k = entryKey(e);
@@ -1281,15 +1350,24 @@ const CreateDebatePage = () => {
                                           setDraggingId(k);
                                         }}
                                         onDragEnd={() => setDraggingId(null)}
+                                        onPointerDown={handleChipPointerDown(e)}
+                                        onPointerMove={handleChipPointerMove}
+                                        onPointerUp={handleChipPointerUp(e)}
+                                        onPointerCancel={() => {
+                                          setPointerDragId(null);
+                                          setPointerPos(null);
+                                          setHoverDropZone(null);
+                                        }}
                                         onClick={(ev) => {
                                           ev.stopPropagation();
                                           setTapSelectedId(selected ? null : k);
                                         }}
-                                        className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all ${
+                                        style={{ touchAction: "none" }}
+                                        className={`inline-flex items-center gap-1.5 rounded-full pl-1 pr-1.5 py-1 text-xs font-body font-medium cursor-grab active:cursor-grabbing transition-all select-none ${
                                           selected
                                             ? "bg-foreground text-background ring-2 ring-foreground"
                                             : "bg-accent text-foreground"
-                                        } ${draggingId === k ? "opacity-50" : ""}`}
+                                        } ${draggingId === k || pointerDragId === k ? "opacity-50" : ""}`}
                                       >
                                         {e.avatarUrl ? (
                                           <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
@@ -1355,6 +1433,30 @@ const CreateDebatePage = () => {
                           );
                         })}
                       </div>
+
+                      {/* Floating ghost while pointer-dragging — shows what's being moved on mobile */}
+                      {pointerDragId && pointerPos && (() => {
+                        const dragged = invitedEntries.find((en) => entryKey(en) === pointerDragId);
+                        if (!dragged) return null;
+                        return (
+                          <div
+                            className="fixed z-50 pointer-events-none inline-flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1 text-xs font-body font-medium bg-foreground text-background shadow-lg"
+                            style={{
+                              left: pointerPos.x + 12,
+                              top: pointerPos.y + 12,
+                            }}
+                          >
+                            {dragged.avatarUrl ? (
+                              <img src={dragged.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                            ) : (
+                              <span className="w-5 h-5 rounded-full bg-background/20 inline-flex items-center justify-center text-[9px]">
+                                {dragged.username.slice(0, 2).toUpperCase()}
+                              </span>
+                            )}
+                            {dragged.username}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
