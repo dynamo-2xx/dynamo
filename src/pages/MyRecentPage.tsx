@@ -129,12 +129,26 @@ const MyRecentPage = () => {
         <div className="flex items-end justify-between mb-5 gap-3 flex-wrap">
           <h1 className="text-[22px] sm:text-[24px] font-display">My Recent</h1>
           {items.length > 0 && (
-            <button
-              onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
-              className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
-            >
-              {selectionMode ? "Done" : "Select"}
-            </button>
+            <div className="flex items-center gap-2">
+              {selectionMode && (
+                <button
+                  onClick={() => {
+                    const allIds = visible.map((d) => d.id);
+                    const allSelected = allIds.every((id) => selected.has(id));
+                    setSelected(allSelected ? new Set() : new Set(allIds));
+                  }}
+                  className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
+                >
+                  {visible.length > 0 && visible.every((d) => selected.has(d.id)) ? "Deselect all" : "Select all"}
+                </button>
+              )}
+              <button
+                onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+                className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
+              >
+                {selectionMode ? "Done" : "Select"}
+              </button>
+            </div>
           )}
         </div>
 
