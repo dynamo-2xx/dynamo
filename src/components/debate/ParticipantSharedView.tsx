@@ -266,7 +266,7 @@ const ParticipantSharedView = ({
         </div>
       </div>
 
-      {/* Publisher facilitator controls */}
+      {/* Publisher facilitator controls — on mobile, the d./map/notebook trio docks to the right of this row */}
       {isPublisher && (
         <div className="border-b border-border bg-card/50 px-4 py-2 flex items-center gap-2 shrink-0 overflow-x-auto">
           <button onClick={onToggleTimer} title={timerRunning ? "Pause" : "Resume"} aria-label={timerRunning ? "Pause" : "Resume"} className="flex items-center gap-1.5 bg-secondary rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
@@ -282,6 +282,72 @@ const ParticipantSharedView = ({
           <button onClick={onNextSubtopic} title="Next Subtopic" aria-label="Next Subtopic" className="flex items-center gap-1.5 bg-secondary rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
             <ChevronRight className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Next Subtopic</span>
           </button>
+
+          {/* Mobile-only: d. / map / notebook docked to the right of publisher controls */}
+          {canSpeak && (
+            <div className="sm:hidden ml-auto flex items-center gap-1.5 shrink-0">
+              {onToggleAiMessage && (
+                <DLogoButton
+                  onClick={onToggleAiMessage}
+                  active={!aiMessageCollapsed}
+                  pulse={aiMessagePulse}
+                  disabled={!aiMessage}
+                />
+              )}
+              <IconCircleButton
+                onClick={() => setArgumentMapOpen((v) => !v)}
+                active={argumentMapOpen}
+                disabled={overlayArgs.length === 0}
+                title="Argument map"
+                ariaLabel="Toggle argument map overlay"
+              >
+                <MapIcon className="w-3.5 h-3.5" />
+              </IconCircleButton>
+              {onOpenNotebook && isSpeaker && (
+                <IconCircleButton
+                  onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
+                  active={notebookOpen}
+                  title="My notes"
+                  ariaLabel="Toggle notebook"
+                >
+                  <NotebookPen className="w-3.5 h-3.5" />
+                </IconCircleButton>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mobile-only thin row for non-publishers — sits directly above the input */}
+      {canSpeak && !isPublisher && (
+        <div className="sm:hidden border-b border-border bg-card/50 px-4 py-2 flex items-center justify-end gap-1.5 shrink-0">
+          {onToggleAiMessage && (
+            <DLogoButton
+              onClick={onToggleAiMessage}
+              active={!aiMessageCollapsed}
+              pulse={aiMessagePulse}
+              disabled={!aiMessage}
+            />
+          )}
+          <IconCircleButton
+            onClick={() => setArgumentMapOpen((v) => !v)}
+            active={argumentMapOpen}
+            disabled={overlayArgs.length === 0}
+            title="Argument map"
+            ariaLabel="Toggle argument map overlay"
+          >
+            <MapIcon className="w-3.5 h-3.5" />
+          </IconCircleButton>
+          {onOpenNotebook && isSpeaker && (
+            <IconCircleButton
+              onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
+              active={notebookOpen}
+              title="My notes"
+              ariaLabel="Toggle notebook"
+            >
+              <NotebookPen className="w-3.5 h-3.5" />
+            </IconCircleButton>
+          )}
         </div>
       )}
 
@@ -424,37 +490,35 @@ const ParticipantSharedView = ({
               >
                 <Send className="w-5 h-5" />
               </button>
-              {/* Right cluster: argument-map sits horizontally beside the d./notebook stack */}
-              <div className="flex items-center gap-1.5 shrink-0 self-end">
-                {overlayArgs.length > 0 && (
+              {/* Desktop right cluster: d. / map / notebook horizontally (mobile uses the docked row above) */}
+              <div className="hidden sm:flex items-center gap-1.5 shrink-0 self-end">
+                {onToggleAiMessage && (
+                  <DLogoButton
+                    onClick={onToggleAiMessage}
+                    active={!aiMessageCollapsed}
+                    pulse={aiMessagePulse}
+                    disabled={!aiMessage}
+                  />
+                )}
+                <IconCircleButton
+                  onClick={() => setArgumentMapOpen((v) => !v)}
+                  active={argumentMapOpen}
+                  disabled={overlayArgs.length === 0}
+                  title="Argument map"
+                  ariaLabel="Toggle argument map overlay"
+                >
+                  <MapIcon className="w-3.5 h-3.5" />
+                </IconCircleButton>
+                {onOpenNotebook && isSpeaker && (
                   <IconCircleButton
-                    onClick={() => setArgumentMapOpen((v) => !v)}
-                    active={argumentMapOpen}
-                    title="Argument map"
-                    ariaLabel="Toggle argument map overlay"
+                    onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
+                    active={notebookOpen}
+                    title="My notes"
+                    ariaLabel="Toggle notebook"
                   >
-                    <MapIcon className="w-3.5 h-3.5" />
+                    <NotebookPen className="w-3.5 h-3.5" />
                   </IconCircleButton>
                 )}
-                <div className="flex flex-col items-center gap-1.5">
-                  {aiMessage && onToggleAiMessage && (
-                    <DLogoButton
-                      onClick={onToggleAiMessage}
-                      active={!aiMessageCollapsed}
-                      pulse={aiMessagePulse}
-                    />
-                  )}
-                  {onOpenNotebook && isSpeaker && (
-                    <IconCircleButton
-                      onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
-                      active={notebookOpen}
-                      title="My notes"
-                      ariaLabel="Toggle notebook"
-                    >
-                      <NotebookPen className="w-3.5 h-3.5" />
-                    </IconCircleButton>
-                  )}
-                </div>
               </div>
             </div>
           </div>
