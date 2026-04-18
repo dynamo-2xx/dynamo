@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { PlusCircle, Radio, ArrowUpRight } from "lucide-react";
+import { PlusCircle, Radio, ArrowUpRight, Compass, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -87,6 +87,39 @@ const HomePage = () => {
           <FriendsOnlineWidget />
         </div>
 
+        {/* New-user welcome (both empty) */}
+        {forYou.length === 0 && myRecent.length === 0 && (
+          <section className="mb-10">
+            <div className="border border-border rounded-xl p-6 md:p-8 bg-background">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-foreground" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-display text-xl mb-1">Welcome to Dynamo</h3>
+                  <p className="text-sm text-muted-foreground font-body">
+                    Start a structured debate, or browse what people are debating today.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  to="/create"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-sm font-body hover:opacity-90 transition-opacity"
+                >
+                  <PlusCircle className="w-4 h-4" /> Create a debate
+                </Link>
+                <Link
+                  to="/explore"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border text-sm font-body hover:border-foreground/30 transition-colors"
+                >
+                  <Compass className="w-4 h-4" /> Explore
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* For-you carousel */}
         <section className="mb-10">
           <SectionHeader
@@ -112,21 +145,59 @@ const HomePage = () => {
               </div>
             }
           />
-          <AutoCarousel
-            items={forYou}
-            getKey={(d) => d.id}
-            renderItem={(d) => <DebateCoverCard d={d} />}
-          />
+          {forYou.length === 0 ? (
+            <div className="border border-dashed border-border rounded-xl p-6 text-center">
+              <p className="text-sm text-muted-foreground font-body mb-3">
+                {mode === "local"
+                  ? "No local conversations yet. Try Trending."
+                  : "No conversations yet today."}
+              </p>
+              <Link
+                to="/explore"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs font-body hover:border-foreground/30 transition-colors"
+              >
+                <Compass className="w-3.5 h-3.5" /> Explore
+              </Link>
+            </div>
+          ) : (
+            <AutoCarousel
+              items={forYou}
+              getKey={(d) => d.id}
+              renderItem={(d) => <DebateCoverCard d={d} />}
+            />
+          )}
         </section>
 
         {/* My Recent carousel */}
         <section>
           <SectionHeader title="My Recent" toRoute="/my-recent" />
-          <AutoCarousel
-            items={myRecent}
-            getKey={(d) => d.id}
-            renderItem={(d) => <DebateCoverCard d={d} />}
-          />
+          {myRecent.length === 0 ? (
+            <div className="border border-dashed border-border rounded-xl p-6 text-center">
+              <p className="text-sm text-muted-foreground font-body mb-3">
+                You haven't joined a debate yet.
+              </p>
+              <div className="flex justify-center gap-2 flex-wrap">
+                <Link
+                  to="/create"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body hover:opacity-90 transition-opacity"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" /> Create
+                </Link>
+                <Link
+                  to="/explore"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs font-body hover:border-foreground/30 transition-colors"
+                >
+                  <Compass className="w-3.5 h-3.5" /> Explore
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <AutoCarousel
+              items={myRecent}
+              getKey={(d) => d.id}
+              renderItem={(d) => <DebateCoverCard d={d} />}
+            />
+          )}
         </section>
       </motion.div>
 
