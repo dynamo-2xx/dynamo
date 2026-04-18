@@ -19,6 +19,23 @@ interface GeneratedDebate {
   prepTime: string;
 }
 
+interface InvitedEntry {
+  username: string;
+  userId?: string | null;
+  sideId?: string | null; // null = unassigned; matches a side id from sideIds[] or a synthetic index
+  avatarUrl?: string | null;
+  source: "manual" | "interested";
+  email?: string | null;
+}
+
+interface InterestedUser {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  side_id: string | null;
+  role: string;
+}
+
 const TAGLINES = [
   "People to the Power!",
   "Your voice. Your power.",
