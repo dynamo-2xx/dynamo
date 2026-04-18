@@ -38,6 +38,32 @@ const NotificationsPage = () => {
   const [availableSides, setAvailableSides] = useState<Side[]>([]);
   const [selectedSide, setSelectedSide] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
+  const { items: notifications, markRead, markAllRead, unreadCount } = useNotifications();
+
+  const handleNotificationClick = async (n: AppNotification) => {
+    if (!n.is_read) await markRead(n.id);
+    if (n.type === "interest_received" && n.debate_id) {
+      // Publisher engages → send back to debate room/template to update time
+      navigate(`/debate/${n.debate_id}`);
+      return;
+    }
+    if (n.type === "time_proposed" && n.debate_id && user) {
+      // Requester confirms with thumbs up
+      await createNotification({
+        recipient_id: (n.metadata as any)?.publisher_id || n.actor_id || "",
+        actor_id: user.id,
+        debate_id: n.debate_id,
+        type: "interest_confirmed",
+        title: "👍 Confirmed attendance",
+        body: `Thumbs up for the new time.`,
+        metadata: { debate_topic: (n.metadata as any)?.debate_topic },
+      });
+      toast.success("Confirmation sent");
+      navigate(`/debate/${n.debate_id}`);
+      return;
+    }
+    if (n.debate_id) navigate(`/debate/${n.debate_id}`);
+  };
 
   useEffect(() => {
     if (!user) return;
