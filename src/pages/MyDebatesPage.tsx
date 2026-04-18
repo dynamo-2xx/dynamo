@@ -391,12 +391,15 @@ const MyDebatesPage = () => {
           ) : currentList.length === 0 ? (
             <p className="text-muted-foreground text-center py-12">{emptyMessage}</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4", selectionMode && "pb-44 md:pb-32")}>
               {currentList.map((d) => {
                 const isOwner = !!user && d.created_by === user.id;
                 const card = (
                   <DebateCoverCard
                     d={d}
+                    selectionMode={selectionMode}
+                    selected={selected.has(d.id)}
+                    onToggleSelected={toggle}
                     onChanged={(action, id, patch) => {
                       if (action === "removed") removeFromList(id);
                       else if (action === "updated" && patch) patchInList(id, patch);
@@ -404,7 +407,7 @@ const MyDebatesPage = () => {
                   />
                 );
 
-                if (!isMobile || !isOwner) {
+                if (!isMobile || !isOwner || selectionMode) {
                   return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
                 }
 
