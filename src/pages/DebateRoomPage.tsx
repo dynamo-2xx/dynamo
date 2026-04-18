@@ -113,6 +113,8 @@ const DebateRoomPage = () => {
   const prepPhaseRoleRef = useRef<"incoming" | "outgoing" | null>(null);
   const enterPrepPhaseFromRealtimeRef = useRef<(updated: DebateData) => void>(() => {});
   const advanceTurnRef = useRef<() => Promise<void>>(async () => {});
+  const sidesRef = useRef<Side[]>([]);
+  const participantsRef = useRef<Participant[]>([]);
   const [showCompletionOverlay, setShowCompletionOverlay] = useState(false);
   const [roundSummaries, setRoundSummaries] = useState<Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>>({});
   const [prepPhaseRole, setPrepPhaseRole] = useState<"incoming" | "outgoing" | null>(null);
@@ -925,6 +927,9 @@ const DebateRoomPage = () => {
   useEffect(() => {
     prepPhaseRoleRef.current = prepPhaseRole;
   }, [prepPhaseRole]);
+
+  useEffect(() => { sidesRef.current = sides; }, [sides]);
+  useEffect(() => { participantsRef.current = participants; }, [participants]);
 
   useEffect(() => {
     enterPrepPhaseFromRealtimeRef.current = enterPrepPhaseFromRealtime;
