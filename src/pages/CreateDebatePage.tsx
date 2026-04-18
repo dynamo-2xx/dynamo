@@ -155,6 +155,7 @@ const CreateDebatePage = () => {
       setFeedbackEnabled(!!d.feedback_enabled);
       setDescription(d.description || "");
       setResolutionAdded(true);
+      setLoadedStatus(d.status ?? null);
       setEditLoading(false);
       setStep(3);
 
