@@ -205,7 +205,11 @@ const MyDebatesPage = () => {
   };
 
   const currentList =
-    activeTab === "archive" ? archive : activeTab === "live" ? liveSessions : debates;
+    activeTab === "archive"
+      ? [...archive, ...archivedLive]
+      : activeTab === "live"
+      ? liveSessions
+      : debates;
   const emptyMessage =
     activeTab === "archive"
       ? "Nothing in your archive yet. Drafts and archived debates appear here."
