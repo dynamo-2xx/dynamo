@@ -4,6 +4,7 @@ import { Home, Compass, PlusCircle, User, PanelLeftClose, PanelLeft } from "luci
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
@@ -13,6 +14,7 @@ const navItems = [
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -63,7 +65,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             </button>
           </div>
           <RouterNavLink
-            to="/?highlight=actions"
+            to={user ? "/?highlight=actions" : "/auth"}
             className="flex items-center justify-center gap-2 border border-border text-foreground rounded-lg py-3 font-body text-xs font-medium hover:bg-accent transition-colors whitespace-nowrap"
           >
             <PlusCircle className="w-4 h-4" />
