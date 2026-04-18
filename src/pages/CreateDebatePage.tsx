@@ -840,7 +840,7 @@ const CreateDebatePage = () => {
             <motion.div key="step3" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}>
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
                 className="inline-flex items-center gap-1.5 text-sm font-body text-muted-foreground hover:text-foreground transition-colors mb-6 group"
                 aria-label="Go back"
               >
