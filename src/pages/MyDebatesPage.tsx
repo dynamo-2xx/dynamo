@@ -425,47 +425,76 @@ const MyDebatesPage = () => {
             <p className="text-muted-foreground text-center py-12 animate-pulse">Loading…</p>
           ) : currentList.length === 0 ? (
             <p className="text-muted-foreground text-center py-12">{emptyMessage}</p>
-          ) : (
-            <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4", selectionMode && "pb-44 md:pb-32")}>
-              {currentList.map((d) => {
-                const isOwner = !!user && d.created_by === user.id;
-                const card = (
-                  <DebateCoverCard
-                    d={d}
-                    selectionMode={selectionMode}
-                    selected={selected.has(d.id)}
-                    onToggleSelected={toggle}
-                    onChanged={(action, id, patch) => {
-                      if (action === "removed") removeFromList(id);
-                      else if (action === "updated" && patch) patchInList(id, patch);
-                    }}
-                  />
-                );
+          ) : (() => {
+            const renderCard = (d: DebateCoverItem) => {
+              const isOwner = !!user && d.created_by === user.id;
+              const card = (
+                <DebateCoverCard
+                  d={d}
+                  selectionMode={selectionMode}
+                  selected={selected.has(d.id)}
+                  onToggleSelected={toggle}
+                  onChanged={(action, id, patch) => {
+                    if (action === "removed") removeFromList(id);
+                    else if (action === "updated" && patch) patchInList(id, patch);
+                  }}
+                />
+              );
+              if (!isMobile || !isOwner || selectionMode) {
+                return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
+              }
+              return (
+                <SwipeableDebateCard
+                  key={`${d.kind || "debate"}-${d.id}`}
+                  enabled
+                  isPublic={!!d.is_public}
+                  forceClose={closeSignal}
+                  onOpen={() => {
+                    if (openSwipeId && openSwipeId !== d.id) closeAllSwipes();
+                    setOpenSwipeId(d.id);
+                  }}
+                  onTogglePrivacy={() => swipeTogglePrivacy(d)}
+                  onArchive={() => swipeArchive(d)}
+                  onDelete={() => setConfirmDelete(d)}
+                >
+                  {card}
+                </SwipeableDebateCard>
+              );
+            };
 
-                if (!isMobile || !isOwner || selectionMode) {
-                  return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
-                }
+            const gridCls = cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4", selectionMode && "pb-44 md:pb-32");
+            const sectionHeader = (label: string, count: number) => (
+              <div className="flex items-baseline gap-2 mt-2 mb-3">
+                <h3 className="text-sm font-display text-foreground">{label}</h3>
+                <span className="text-xs text-muted-foreground font-body">({count})</span>
+              </div>
+            );
 
-                return (
-                  <SwipeableDebateCard
-                    key={`${d.kind || "debate"}-${d.id}`}
-                    enabled
-                    isPublic={!!d.is_public}
-                    forceClose={closeSignal}
-                    onOpen={() => {
-                      if (openSwipeId && openSwipeId !== d.id) closeAllSwipes();
-                      setOpenSwipeId(d.id);
-                    }}
-                    onTogglePrivacy={() => swipeTogglePrivacy(d)}
-                    onArchive={() => swipeArchive(d)}
-                    onDelete={() => setConfirmDelete(d)}
-                  >
-                    {card}
-                  </SwipeableDebateCard>
-                );
-              })}
-            </div>
-          )}
+            if (activeTab === "archive") {
+              return (
+                <div className={cn(selectionMode && "pb-44 md:pb-32")}>
+                  {archive.length > 0 && (
+                    <>
+                      {sectionHeader("Debates", archive.length)}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                        {archive.map(renderCard)}
+                      </div>
+                    </>
+                  )}
+                  {archivedLive.length > 0 && (
+                    <>
+                      {sectionHeader("Live sessions", archivedLive.length)}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {archivedLive.map(renderCard)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            }
+
+            return <div className={gridCls}>{currentList.map(renderCard)}</div>;
+          })()}
         </motion.div>
       </div>
 
