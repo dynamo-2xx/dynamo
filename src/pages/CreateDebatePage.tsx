@@ -55,6 +55,7 @@ const CreateDebatePage = () => {
   const editId = searchParams.get("edit");
   const [step, setStep] = useState<1 | 2 | 3 | 4>(editId ? 2 : 1);
   const [editLoading, setEditLoading] = useState(!!editId);
+  const [loadedStatus, setLoadedStatus] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [debate, setDebate] = useState<GeneratedDebate | null>(null);
   const [isPublic, setIsPublic] = useState(false);
