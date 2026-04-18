@@ -13,7 +13,14 @@ serve(async (req) => {
   }
 
   try {
-    const { invitation_id } = await req.json();
+    const { invitation_id, invite_token } = await req.json();
+
+    if (!invitation_id || !invite_token || typeof invite_token !== "string") {
+      return new Response(
+        JSON.stringify({ error: "invitation_id and invite_token are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -28,10 +35,11 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Fetch invitation with debate details
+    // Fetch invitation with debate details (invite_token column is always NULL post-trigger;
+    // we use the plaintext token passed in by the caller to build the link).
     const { data: invitation, error: invErr } = await supabase
       .from("debate_invitations")
-      .select("*")
+      .select("id, debate_id, side_id, invited_email, invite_token_hash")
       .eq("id", invitation_id)
       .single();
 
@@ -39,6 +47,19 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Invitation not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify the supplied plaintext token matches the stored hash before sending the email.
+    const enc = new TextEncoder();
+    const digest = await crypto.subtle.digest("SHA-256", enc.encode(invite_token));
+    const hash = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    if (hash !== invitation.invite_token_hash) {
+      return new Response(
+        JSON.stringify({ error: "Token does not match invitation" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -77,9 +98,9 @@ serve(async (req) => {
       sideLabel = side?.label || "";
     }
 
-    // Build preview URL
+    // Build preview URL with the plaintext token
     const appUrl = Deno.env.get("APP_URL") || supabaseUrl.replace(".supabase.co", ".lovable.app");
-    const previewUrl = `${appUrl}/preview/${invitation.invite_token}`;
+    const previewUrl = `${appUrl}/preview/${invite_token}`;
 
     // Send email via Resend
     const emailResponse = await fetch("https://api.resend.com/emails", {
