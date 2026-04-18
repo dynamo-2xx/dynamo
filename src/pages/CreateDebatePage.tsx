@@ -52,6 +52,36 @@ const CreateDebatePage = () => {
   const [feedbackEnabled, setFeedbackEnabled] = useState(false);
   const [feedbackExplainerOpen, setFeedbackExplainerOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  // Stable IDs for subtopic editor rows — prevents input remount on every keystroke.
+  const [subtopicItems, setSubtopicItems] = useState<{ id: string; title: string }[]>([]);
+
+  // Sync editor items whenever the underlying debate.subtopics changes from outside
+  // (initial generation, collaborative-mode add/remove). We preserve existing IDs by title match
+  // so user keystrokes don't trigger a re-sync that wipes focus.
+  useEffect(() => {
+    if (!debate) return;
+    setSubtopicItems((prev) => {
+      // If lengths and titles already match, do nothing (avoids stomping on edits in progress).
+      if (
+        prev.length === debate.subtopics.length &&
+        prev.every((it, i) => it.title === debate.subtopics[i])
+      ) {
+        return prev;
+      }
+      // Try to keep existing IDs where titles still match.
+      const usedIds = new Set<string>();
+      const next = debate.subtopics.map((title, i) => {
+        const match = prev.find((p) => p.title === title && !usedIds.has(p.id));
+        if (match) {
+          usedIds.add(match.id);
+          return match;
+        }
+        return { id: `st-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`, title };
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debate?.subtopics]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -182,19 +212,34 @@ const CreateDebatePage = () => {
 
   const updateSubtopic = (index: number, value: string) => {
     if (!debate) return;
-    const updated = [...debate.subtopics];
-    updated[index] = value;
-    setDebate({ ...debate, subtopics: updated });
+    setSubtopicItems((prev) => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], title: value };
+      // Sync titles back to debate.subtopics
+      setDebate({ ...debate, subtopics: next.map((it) => it.title) });
+      return next;
+    });
   };
 
   const addSubtopic = () => {
     if (!debate || debate.subtopics.length >= 6) return;
-    setDebate({ ...debate, subtopics: [...debate.subtopics, ""] });
+    const newItem = { id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: "" };
+    const nextItems = [...subtopicItems, newItem];
+    setSubtopicItems(nextItems);
+    setDebate({ ...debate, subtopics: nextItems.map((it) => it.title) });
   };
 
   const removeSubtopic = (index: number) => {
     if (!debate || debate.subtopics.length <= 1) return;
-    setDebate({ ...debate, subtopics: debate.subtopics.filter((_, i) => i !== index) });
+    const nextItems = subtopicItems.filter((_, i) => i !== index);
+    setSubtopicItems(nextItems);
+    setDebate({ ...debate, subtopics: nextItems.map((it) => it.title) });
+  };
+
+  const reorderSubtopics = (newOrder: { id: string; title: string }[]) => {
+    if (!debate) return;
+    setSubtopicItems(newOrder);
+    setDebate({ ...debate, subtopics: newOrder.map((it) => it.title) });
   };
 
   const addInvite = () => {
