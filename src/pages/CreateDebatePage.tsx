@@ -508,7 +508,7 @@ const CreateDebatePage = () => {
                 {/* Sides */}
                 <div className="bg-background border border-border rounded-lg p-5">
                   <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Participant Sides</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     {debate.sides.map((side, i) => (
                       <input
                         key={i}
@@ -518,7 +518,7 @@ const CreateDebatePage = () => {
                           updated[i] = e.target.value;
                           setDebate({ ...debate, sides: updated });
                         }}
-                        className="flex-1 bg-accent rounded-lg px-3 py-2 text-sm text-center font-body font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                        className="w-full sm:flex-1 min-w-0 bg-accent rounded-lg px-3 py-2 text-base sm:text-sm text-center font-body font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
                       />
                     ))}
                   </div>
