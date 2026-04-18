@@ -1,21 +1,24 @@
 import { ReactNode, useState } from "react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
-import { Home, Compass, PlusCircle, User, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Home, Compass, PlusCircle, User, MessageCircle, PanelLeftClose, PanelLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUnreadDMCount } from "@/hooks/useDirectMessages";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/explore", icon: Compass, label: "Explore" },
   { to: "/profile", icon: User, label: "Profile" },
+  { to: "/messages", icon: MessageCircle, label: "Messages" },
 ];
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const unread = useUnreadDMCount();
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -34,7 +37,8 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         </div>
         <nav className="flex flex-col gap-0.5 flex-1">
           {navItems.map((item) => {
-            const active = location.pathname === item.to;
+            const active = location.pathname === item.to || (item.to === "/messages" && location.pathname.startsWith("/messages"));
+            const showBadge = item.to === "/messages" && unread > 0;
             return (
               <RouterNavLink
                 key={item.to}
@@ -47,7 +51,12 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                 )}
               >
                 <item.icon className="w-5 h-5" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {showBadge && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-foreground text-background text-[10px] font-medium flex items-center justify-center">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
               </RouterNavLink>
             );
           })}
@@ -93,18 +102,24 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       {/* Mobile bottom nav — fixed h-16, ≥44px tap targets */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border flex justify-around z-40 pb-[env(safe-area-inset-bottom)]">
         {navItems.map((item) => {
-          const active = location.pathname === item.to;
+          const active = location.pathname === item.to || (item.to === "/messages" && location.pathname.startsWith("/messages"));
+          const showBadge = item.to === "/messages" && unread > 0;
           return (
             <RouterNavLink
               key={item.to}
               to={item.to}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 text-[10px] font-body transition-colors flex-1 min-h-[44px]",
+                "relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-body transition-colors flex-1 min-h-[44px]",
                 active ? "text-foreground font-medium" : "text-muted-foreground"
               )}
             >
               <item.icon className="w-5 h-5" />
               <span>{item.label}</span>
+              {showBadge && (
+                <span className="absolute top-1 right-[28%] min-w-[16px] h-[16px] px-1 rounded-full bg-foreground text-background text-[9px] font-medium flex items-center justify-center">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
             </RouterNavLink>
           );
         })}

@@ -635,6 +635,68 @@ export type Database = {
           },
         ]
       }
+      dm_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+          thread_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+          thread_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "dm_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_threads: {
+        Row: {
+          created_at: string
+          debate_id: string | null
+          id: string
+          last_message_at: string
+          user_a: string
+          user_b: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id?: string | null
+          id?: string
+          last_message_at?: string
+          user_a: string
+          user_b: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string | null
+          id?: string
+          last_message_at?: string
+          user_a?: string
+          user_b?: string
+        }
+        Relationships: []
+      }
       live_session_tags: {
         Row: {
           created_at: string
@@ -938,6 +1000,10 @@ export type Database = {
           status: string
         }[]
       }
+      get_or_create_dm_thread: {
+        Args: { _debate_id?: string; _other_user: string }
+        Returns: string
+      }
       get_public_profile: {
         Args: { _user_id: string }
         Returns: {
@@ -987,6 +1053,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_dm_thread_party: { Args: { _thread_id: string }; Returns: boolean }
       is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
       realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
     }
