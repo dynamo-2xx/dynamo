@@ -848,6 +848,12 @@ export type Database = {
           transcript_entries: Json
         }[]
       }
+      invitation_is_visible: {
+        Args: {
+          _inv: Database["public"]["Tables"]["debate_invitations"]["Row"]
+        }
+        Returns: boolean
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
