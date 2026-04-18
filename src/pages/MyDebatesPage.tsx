@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DebateCoverCard, { type DebateCoverItem } from "@/components/home/DebateCoverCard";
 import SwipeableDebateCard from "@/components/home/SwipeableDebateCard";
+import BulkActionBar from "@/components/home/BulkActionBar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
