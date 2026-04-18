@@ -130,6 +130,7 @@ export function useMyRecentDebates(limit = 12) {
       for (const row of parts || []) {
         const d: any = (row as any).debates;
         if (!d || map.has(d.id)) continue;
+        if (d.status === "archived" || d.status === "draft") continue;
         map.set(d.id, {
           id: d.id,
           topic: d.topic,
