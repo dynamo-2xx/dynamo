@@ -453,6 +453,52 @@ const CreateDebatePage = () => {
 
   const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
+  // Pointer-based drag handlers — work for both mouse and touch.
+  // Drop targets are identified by the `data-drop-zone` attribute (value: side id or "__unassigned__").
+  const handleChipPointerDown = (entry: InvitedEntry) => (ev: React.PointerEvent<HTMLDivElement>) => {
+    // Ignore if interaction starts on an interactive child (button/select/option).
+    const target = ev.target as HTMLElement;
+    if (target.closest("button, select, option, input, a")) return;
+    const k = entryKey(entry);
+    setPointerDragId(k);
+    setPointerPos({ x: ev.clientX, y: ev.clientY });
+    setHoverDropZone(null);
+    try {
+      (ev.currentTarget as Element).setPointerCapture(ev.pointerId);
+    } catch {
+      /* noop */
+    }
+  };
+
+  const handleChipPointerMove = (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerDragId) return;
+    setPointerPos({ x: ev.clientX, y: ev.clientY });
+    // Hide the floating ghost momentarily to detect the underlying element.
+    const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+    const zone = el?.closest("[data-drop-zone]") as HTMLElement | null;
+    setHoverDropZone(zone?.getAttribute("data-drop-zone") ?? null);
+  };
+
+  const handleChipPointerUp = (entry: InvitedEntry) => (ev: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointerDragId) return;
+    const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+    const zone = el?.closest("[data-drop-zone]") as HTMLElement | null;
+    const zoneId = zone?.getAttribute("data-drop-zone");
+    if (zoneId) {
+      if (zoneId === "__unassigned__") assignSide(entry, null);
+      else assignSide(entry, zoneId);
+    }
+    setPointerDragId(null);
+    setPointerPos(null);
+    setHoverDropZone(null);
+    try {
+      (ev.currentTarget as Element).releasePointerCapture(ev.pointerId);
+    } catch {
+      /* noop */
+    }
+  };
+
+
   const handleCreateDebate = async (publishMode: boolean = false) => {
     if (!debate || !user) return;
     setSaving(true);
