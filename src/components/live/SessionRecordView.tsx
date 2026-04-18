@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import SpeakerBubble from "./SpeakerBubble";
 import LiveThreadView from "./LiveThreadView";
 import RecordQAChat from "./RecordQAChat";
+import TagPicker from "@/components/tags/TagPicker";
 
 interface SessionRecordViewProps {
   sessionId: string;
