@@ -412,8 +412,62 @@ const EditProfilePage = () => {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save changes"}
             </Button>
           </div>
+
+          {/* Legal links */}
+          <div className="mt-8 flex items-center justify-center gap-4 text-[11px] font-body text-muted-foreground">
+            <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <span>·</span>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          </div>
+
+          {/* Danger zone */}
+          <section className="mt-8 border border-destructive/30 rounded-lg p-5">
+            <h3 className="font-display text-base mb-1 text-destructive">Delete account</h3>
+            <p className="text-xs text-muted-foreground font-body mb-4">
+              Permanently remove your account, profile, debates you created, live sessions,
+              participations, and notifications. This cannot be undone.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setConfirmDelete(true); setDeleteConfirmText(""); }}
+              className="font-body border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="w-4 h-4 mr-1.5" />
+              Delete my account
+            </Button>
+          </section>
         </motion.div>
       </div>
+
+      <AlertDialog open={confirmDelete} onOpenChange={(o) => { setConfirmDelete(o); if (!o) setDeleteConfirmText(""); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes your profile and all debates, live sessions, participations,
+              and notifications tied to your account. Type <span className="font-semibold text-foreground">DELETE</span> to confirm.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder="Type DELETE to confirm"
+            className="font-body"
+            autoFocus
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={deleting || deleteConfirmText !== "DELETE"}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete forever"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
         <AlertDialogContent>

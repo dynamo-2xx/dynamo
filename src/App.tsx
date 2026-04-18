@@ -31,6 +31,8 @@ import TopicPage from "./pages/TopicPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import AdminTagsPage from "./pages/AdminTagsPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +70,8 @@ const App = () => (
               <Route path="/my-recent" element={<ProtectedRoute><MyRecentPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="/profile/edit" element={<ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
