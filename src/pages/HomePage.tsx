@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { PlusCircle, Radio, ArrowUpRight, Compass } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import GreetingHeader from "@/components/home/GreetingHeader";
 import RotatingTagline from "@/components/home/RotatingTagline";
