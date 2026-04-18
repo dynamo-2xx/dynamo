@@ -8,6 +8,7 @@ import { gradientFromSeed } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
 import InterestedComposer from "@/components/debate/InterestedComposer";
 import InterestedInboxPanel from "@/components/debate/InterestedInboxPanel";
+import TagPicker from "@/components/tags/TagPicker";
 
 interface Subtopic {
   id: string;
