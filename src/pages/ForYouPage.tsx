@@ -9,12 +9,17 @@ import LocationPrompt from "@/components/home/LocationPrompt";
 
 type Mode = "trending" | "local";
 
+const INITIAL_VISIBLE = 12;
+
 const ForYouPage = () => {
   const [mode, setMode] = useState<Mode>("trending");
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const { profile } = useAuth();
-  const { items, loading } = useForYouDebates(mode, 60);
+  const { items, loading, removeItem, patchItem } = useForYouDebates(mode, 60);
   const hasLocation = !!profile?.location;
+  const visible = showAll ? items : items.slice(0, INITIAL_VISIBLE);
+  const hasMore = items.length > INITIAL_VISIBLE;
 
   return (
     <AppLayout>
@@ -39,7 +44,10 @@ const ForYouPage = () => {
           <h1 className="text-[24px] font-display">Conversations that may concern you</h1>
           <div className="inline-flex border border-border rounded-full p-0.5">
             <button
-              onClick={() => setMode("trending")}
+              onClick={() => {
+                setShowAll(false);
+                setMode("trending");
+              }}
               className={`px-3 py-1 rounded-full text-xs font-body transition-colors ${mode === "trending" ? "bg-foreground text-background" : "text-muted-foreground"}`}
             >
               Trending
@@ -47,7 +55,10 @@ const ForYouPage = () => {
             <button
               onClick={() => {
                 if (!hasLocation) setLocationPromptOpen(true);
-                else setMode("local");
+                else {
+                  setShowAll(false);
+                  setMode("local");
+                }
               }}
               className={`px-3 py-1 rounded-full text-xs font-body transition-colors ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
             >
@@ -63,11 +74,35 @@ const ForYouPage = () => {
             {mode === "local" ? "No local debates yet in your area." : "No debates yet."}
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((d) => (
-              <DebateCoverCard key={d.id} d={d} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visible.map((d) => (
+                <DebateCoverCard
+                  key={d.id}
+                  d={d}
+                  onChanged={(action, id, patch) => {
+                    if (action === "removed") removeItem(id);
+                    else if (action === "updated" && patch) patchItem(id, patch);
+                  }}
+                />
+              ))}
+            </div>
+
+            <div className="mt-8 flex items-center justify-center">
+              {hasMore && !showAll ? (
+                <button
+                  onClick={() => setShowAll(true)}
+                  className="text-sm font-body px-4 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors"
+                >
+                  See all ({items.length})
+                </button>
+              ) : (
+                <span className="text-xs text-muted-foreground font-body">
+                  Showing {visible.length} of {items.length}
+                </span>
+              )}
+            </div>
+          </>
         )}
       </div>
       <LocationPrompt
