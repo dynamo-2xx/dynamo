@@ -57,6 +57,9 @@ const EditProfilePage = () => {
   const [uploading, setUploading] = useState<"avatar" | "banner" | null>(null);
   const [locating, setLocating] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -183,6 +186,24 @@ const EditProfilePage = () => {
       setConfirmCancel(true);
     } else {
       navigate("/profile");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+      await supabase.auth.signOut();
+      toast({ title: "Account deleted" });
+      navigate("/auth");
+    } catch (err: any) {
+      setDeleting(false);
+      toast({
+        title: "Couldn't delete account",
+        description: err?.message ?? "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
