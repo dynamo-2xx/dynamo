@@ -66,6 +66,10 @@ const CreateDebatePage = () => {
   const [interestedUsers, setInterestedUsers] = useState<InterestedUser[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [tapSelectedId, setTapSelectedId] = useState<string | null>(null);
+  // Pointer-based drag state for cross-device (touch + mouse) drag-and-drop.
+  const [pointerDragId, setPointerDragId] = useState<string | null>(null);
+  const [pointerPos, setPointerPos] = useState<{ x: number; y: number } | null>(null);
+  const [hoverDropZone, setHoverDropZone] = useState<string | null>(null);
   // Index into debate.sides — which side the creator is joining as.
   const [creatorSideIndex, setCreatorSideIndex] = useState<number>(0);
   const [taglineIndex, setTaglineIndex] = useState(0);
