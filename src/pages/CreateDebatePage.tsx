@@ -1326,11 +1326,16 @@ const CreateDebatePage = () => {
                                     }
                                   }
                                 }}
-                                className="flex-1 p-3 min-h-[120px] bg-background"
+                                data-drop-zone={sid}
+                                className={`flex-1 p-3 min-h-[120px] transition-colors ${
+                                  hoverDropZone === sid ? "bg-accent" : "bg-background"
+                                }`}
                               >
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-1.5 truncate">
-                                  {label}
-                                </p>
+                                <div className="overflow-x-auto mb-1.5">
+                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium whitespace-nowrap">
+                                    {label}
+                                  </p>
+                                </div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {invitedEntries.filter((e) => e.sideId === sid).map((e) => {
                                     const k = entryKey(e);
