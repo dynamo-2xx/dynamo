@@ -172,6 +172,41 @@ export type Database = {
         }
         Relationships: []
       }
+      debate_interest_messages: {
+        Row: {
+          body: string
+          created_at: string
+          debate_id: string
+          id: string
+          interest_id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          debate_id: string
+          id?: string
+          interest_id: string
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          debate_id?: string
+          id?: string
+          interest_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_interest_messages_interest_id_fkey"
+            columns: ["interest_id"]
+            isOneToOne: false
+            referencedRelation: "debate_interests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debate_interests: {
         Row: {
           created_at: string
@@ -487,6 +522,7 @@ export type Database = {
           current_speaker_side_id: string | null
           current_subtopic_index: number
           current_turn: number
+          description: string | null
           edit_window_ends_at: string | null
           ended_at: string | null
           facilitator_type: string
@@ -523,6 +559,7 @@ export type Database = {
           current_speaker_side_id?: string | null
           current_subtopic_index?: number
           current_turn?: number
+          description?: string | null
           edit_window_ends_at?: string | null
           ended_at?: string | null
           facilitator_type?: string
@@ -559,6 +596,7 @@ export type Database = {
           current_speaker_side_id?: string | null
           current_subtopic_index?: number
           current_turn?: number
+          description?: string | null
           edit_window_ends_at?: string | null
           ended_at?: string | null
           facilitator_type?: string
@@ -949,6 +987,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
       realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
     }
     Enums: {
