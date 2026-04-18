@@ -19,7 +19,7 @@ const RotatingTagline = ({ className = "" }: { className?: string }) => {
   }, []);
 
   return (
-    <div className={`relative h-5 ${className}`}>
+    <div className={`relative h-5 w-full ${className}`}>
       <AnimatePresence mode="wait">
         <motion.p
           key={index}
@@ -27,7 +27,7 @@ const RotatingTagline = ({ className = "" }: { className?: string }) => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.4 }}
-          className="text-muted-foreground font-body text-sm absolute inset-0"
+          className="text-muted-foreground font-body text-sm absolute inset-0 whitespace-nowrap overflow-hidden text-ellipsis"
         >
           {MESSAGES[index]}
         </motion.p>
