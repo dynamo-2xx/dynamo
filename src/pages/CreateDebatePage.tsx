@@ -66,6 +66,8 @@ const CreateDebatePage = () => {
   const [interestedUsers, setInterestedUsers] = useState<InterestedUser[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [tapSelectedId, setTapSelectedId] = useState<string | null>(null);
+  // Index into debate.sides — which side the creator is joining as.
+  const [creatorSideIndex, setCreatorSideIndex] = useState<number>(0);
   const [taglineIndex, setTaglineIndex] = useState(0);
   const [location, setLocation] = useState("");
   const [scheduledAt, setScheduledAt] = useState(""); // datetime-local string
