@@ -36,6 +36,7 @@ const MyDebatesPage = () => {
 
   const [debates, setDebates] = useState<DebateCoverItem[]>([]);
   const [archive, setArchive] = useState<DebateCoverItem[]>([]);
+  const [archivedLive, setArchivedLive] = useState<DebateCoverItem[]>([]);
   const [liveSessions, setLiveSessions] = useState<DebateCoverItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<DebateCoverItem | null>(null);
@@ -118,23 +119,25 @@ const MyDebatesPage = () => {
       // Live sessions
       const { data: sessions } = await supabase
         .from("live_sessions" as any)
-        .select("id, title, status, created_at, created_by")
+        .select("id, title, status, created_at, created_by, is_public")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false });
 
-      setLiveSessions(
-        (((sessions as any) || []) as any[]).map((s) => ({
-          kind: "live_session",
-          id: s.id,
-          topic: s.title || "Untitled Live Session",
-          status: s.status === "recording" ? "live" : "completed",
-          cover_image_url: null,
-          created_at: s.created_at,
-          is_public: true,
-          created_by: s.created_by,
-          participant_count: 0,
-        })),
-      );
+      const allLive = (((sessions as any) || []) as any[]).map((s) => ({
+        kind: "live_session" as const,
+        id: s.id,
+        topic: s.title || "Untitled Live Session",
+        rawStatus: s.status as string,
+        status: s.status === "recording" ? "live" : s.status === "archived" ? "archived" : "completed",
+        cover_image_url: null,
+        created_at: s.created_at,
+        is_public: !!s.is_public,
+        created_by: s.created_by,
+        participant_count: 0,
+      }));
+
+      setLiveSessions(allLive.filter((s) => s.rawStatus !== "archived").map(({ rawStatus, ...rest }) => rest));
+      setArchivedLive(allLive.filter((s) => s.rawStatus === "archived").map(({ rawStatus, ...rest }) => rest));
 
       setLoading(false);
     };
