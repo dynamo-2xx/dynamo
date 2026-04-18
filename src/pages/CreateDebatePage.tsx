@@ -1299,6 +1299,35 @@ const CreateDebatePage = () => {
                                           </span>
                                         )}
                                         {e.username}
+                                        {/* Mobile-friendly side picker (move or unassign) */}
+                                        <select
+                                          value=""
+                                          onClick={(ev) => ev.stopPropagation()}
+                                          onChange={(ev) => {
+                                            const v = ev.target.value;
+                                            if (v === "__unassign__") {
+                                              assignSide(e, null);
+                                            } else if (v) {
+                                              assignSide(e, v);
+                                            }
+                                            setTapSelectedId(null);
+                                          }}
+                                          className="bg-transparent text-[10px] font-body border-0 outline-none cursor-pointer appearance-none pr-0.5 text-current"
+                                          aria-label={`Move ${e.username}`}
+                                          title="Move"
+                                        >
+                                          <option value="">→</option>
+                                          <option value="__unassign__">Unassign</option>
+                                          {debate.sides.map((label, si) => {
+                                            const otherSid = sideIds[si];
+                                            if (!otherSid || otherSid === sid) return null;
+                                            return (
+                                              <option key={otherSid} value={otherSid}>
+                                                {label}
+                                              </option>
+                                            );
+                                          })}
+                                        </select>
                                         <button
                                           type="button"
                                           onClick={(ev) => {
