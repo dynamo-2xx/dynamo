@@ -95,6 +95,51 @@ const CreateDebatePage = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Edit mode: load existing debate template and jump straight to step 3.
+  useEffect(() => {
+    if (!editId || !user) return;
+    let cancelled = false;
+    (async () => {
+      const [{ data: d }, { data: subs }, { data: sds }] = await Promise.all([
+        supabase.from("debates").select("*").eq("id", editId).maybeSingle(),
+        supabase.from("debate_subtopics").select("*").eq("debate_id", editId).order("sort_order"),
+        supabase.from("debate_sides").select("*").eq("debate_id", editId).order("sort_order"),
+      ]);
+      if (cancelled) return;
+      if (!d) {
+        toast.error("Debate not found");
+        navigate("/", { replace: true });
+        return;
+      }
+      if (d.created_by !== user.id) {
+        toast.error("You can't edit this debate");
+        navigate(`/debate/${editId}/preview`, { replace: true });
+        return;
+      }
+      setDebate({
+        topic: d.topic,
+        subtopics: (subs || []).map((s: any) => s.title),
+        sides: (sds || []).map((s: any) => s.label),
+        turnsPerSubtopic: d.turns_per_subtopic,
+        timePerTurn: d.time_per_turn,
+        prepTime: d.prep_time_min || "30s",
+      });
+      setIsPublic(d.is_public);
+      setLocation(d.location || "");
+      setScheduledAt(
+        d.scheduled_at ? new Date(d.scheduled_at).toISOString().slice(0, 16) : "",
+      );
+      setFeedbackEnabled(!!d.feedback_enabled);
+      setDescription(d.description || "");
+      setResolutionAdded(true);
+      setEditLoading(false);
+      setStep(3);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editId, user, navigate]);
+
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
     setStep(2);
