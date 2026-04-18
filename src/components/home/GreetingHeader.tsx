@@ -49,6 +49,29 @@ const GreetingHeader = () => {
     ? { backgroundImage: `url(${profile.banner_url})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { backgroundImage: monoGradientFromSeed(user?.id || displayName) };
 
+  // Logged-out: show a welcome banner where the avatar/banner would be.
+  if (!user) {
+    return (
+      <div className="relative min-h-[160px] sm:min-h-[150px] mb-0">
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="absolute inset-0"
+        >
+          <div
+            className="h-[100px] sm:h-[110px] w-full rounded-2xl border border-border overflow-hidden flex items-center justify-center"
+            style={{ backgroundImage: monoGradientFromSeed("dynamo-welcome") }}
+          >
+            <h2 className="font-display text-2xl sm:text-3xl text-background tracking-tight">
+              Welcome to DYNAMO!
+            </h2>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-[160px] sm:min-h-[150px] mb-0">
       <AnimatePresence mode="wait">
