@@ -1351,7 +1351,7 @@ const CreateDebatePage = () => {
                     disabled={saving}
                     className="flex-1 flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
                   >
-                    {saving ? "Saving…" : invitedUsernames.length > 0 ? "Save & Invite" : "Save Debate"}
+                    {saving ? "Saving…" : invitedEntries.length > 0 ? "Save & Invite" : "Save Debate"}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                   <button
