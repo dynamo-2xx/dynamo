@@ -115,6 +115,7 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
   }, [debateId, user?.id]);
 
   return (
+    <>
     <div className="bg-background border border-border rounded-lg p-5">
       <div className="flex items-center justify-between mb-3 gap-2">
         <div className="flex items-baseline gap-2 min-w-0">
