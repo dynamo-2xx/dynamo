@@ -172,6 +172,42 @@ export type Database = {
         }
         Relationships: []
       }
+      debate_interests: {
+        Row: {
+          created_at: string
+          debate_id: string
+          id: string
+          proposed_time: string | null
+          role: string
+          side_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          id?: string
+          proposed_time?: string | null
+          role?: string
+          side_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          id?: string
+          proposed_time?: string | null
+          role?: string
+          side_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       debate_invitations: {
         Row: {
           created_at: string
@@ -639,6 +675,48 @@ export type Database = {
           summaries?: Json
           title?: string | null
           transcript_entries?: Json
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          body: string | null
+          created_at: string
+          debate_id: string | null
+          id: string
+          interest_id: string | null
+          is_read: boolean
+          metadata: Json
+          recipient_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          actor_id?: string | null
+          body?: string | null
+          created_at?: string
+          debate_id?: string | null
+          id?: string
+          interest_id?: string | null
+          is_read?: boolean
+          metadata?: Json
+          recipient_id: string
+          title: string
+          type: string
+        }
+        Update: {
+          actor_id?: string | null
+          body?: string | null
+          created_at?: string
+          debate_id?: string | null
+          id?: string
+          interest_id?: string | null
+          is_read?: boolean
+          metadata?: Json
+          recipient_id?: string
+          title?: string
+          type?: string
         }
         Relationships: []
       }
