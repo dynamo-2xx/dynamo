@@ -4,8 +4,21 @@ import { useState } from "react";
 import { useForYouDebates } from "@/hooks/useHomeDebates";
 import { useAuth } from "@/contexts/AuthContext";
 import DebateCoverCard from "@/components/home/DebateCoverCard";
+import BulkActionBar from "@/components/home/BulkActionBar";
 import AppLayout from "@/components/AppLayout";
 import LocationPrompt from "@/components/home/LocationPrompt";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Mode = "trending" | "local";
 
@@ -15,15 +28,106 @@ const ForYouPage = () => {
   const [mode, setMode] = useState<Mode>("trending");
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { items, loading, removeItem, patchItem } = useForYouDebates(mode, 60);
   const hasLocation = !!profile?.location;
   const visible = showAll ? items : items.slice(0, INITIAL_VISIBLE);
   const hasMore = items.length > INITIAL_VISIBLE;
 
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  const ownedSelectedIds = () =>
+    Array.from(selected).filter((id) => {
+      const it = items.find((x) => x.id === id);
+      return it && user && it.created_by === user.id;
+    });
+
+  const exitSelection = () => {
+    setSelectionMode(false);
+    setSelected(new Set());
+  };
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const reportSkipped = (acted: number, total: number) => {
+    const skipped = total - acted;
+    if (skipped > 0) toast({ title: `${skipped} skipped`, description: "You can only manage debates you created." });
+  };
+
+  const bulkPrivacy = async (next: boolean) => {
+    const ids = ownedSelectedIds();
+    if (ids.length === 0) {
+      reportSkipped(0, selected.size);
+      exitSelection();
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.from("debates").update({ is_public: next }).in("id", ids);
+    setBusy(false);
+    if (error) {
+      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+      return;
+    }
+    ids.forEach((id) => patchItem(id, { is_public: next }));
+    toast({ title: `${ids.length} updated`, description: next ? "Now public" : "Now private" });
+    reportSkipped(ids.length, selected.size);
+    exitSelection();
+  };
+
+  const bulkArchive = async () => {
+    const ids = ownedSelectedIds();
+    if (ids.length === 0) {
+      reportSkipped(0, selected.size);
+      exitSelection();
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.from("debates").update({ status: "archived" }).in("id", ids);
+    setBusy(false);
+    if (error) {
+      toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
+      return;
+    }
+    ids.forEach((id) => removeItem(id));
+    toast({ title: `${ids.length} archived`, description: "Find them in My Agenda → Archive" });
+    reportSkipped(ids.length, selected.size);
+    exitSelection();
+  };
+
+  const bulkDelete = async () => {
+    const ids = ownedSelectedIds();
+    setConfirmDeleteOpen(false);
+    if (ids.length === 0) {
+      reportSkipped(0, selected.size);
+      exitSelection();
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.from("debates").delete().in("id", ids);
+    setBusy(false);
+    if (error) {
+      toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
+      return;
+    }
+    ids.forEach((id) => removeItem(id));
+    toast({ title: `${ids.length} deleted` });
+    reportSkipped(ids.length, selected.size);
+    exitSelection();
+  };
+
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto px-4 py-6 md:py-10">
+      <div className="max-w-5xl mx-auto px-4 py-6 md:py-10 pb-32">
         <div className="flex items-center justify-between mb-6">
           <Link
             to="/"
@@ -42,28 +146,38 @@ const ForYouPage = () => {
 
         <div className="flex items-end justify-between mb-5 gap-3 flex-wrap">
           <h1 className="text-[24px] font-display">Conversations that may concern you</h1>
-          <div className="inline-flex border border-border rounded-full p-0.5">
-            <button
-              onClick={() => {
-                setShowAll(false);
-                setMode("trending");
-              }}
-              className={`px-3 py-1 rounded-full text-xs font-body transition-colors ${mode === "trending" ? "bg-foreground text-background" : "text-muted-foreground"}`}
-            >
-              Trending
-            </button>
-            <button
-              onClick={() => {
-                if (!hasLocation) setLocationPromptOpen(true);
-                else {
+          <div className="flex items-center gap-2">
+            {items.length > 0 && (
+              <button
+                onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+                className="text-xs font-body px-3 py-1 rounded-full border border-border hover:border-foreground/40 transition-colors"
+              >
+                {selectionMode ? "Done" : "Select"}
+              </button>
+            )}
+            <div className="inline-flex border border-border rounded-full p-0.5">
+              <button
+                onClick={() => {
                   setShowAll(false);
-                  setMode("local");
-                }
-              }}
-              className={`px-3 py-1 rounded-full text-xs font-body transition-colors ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
-            >
-              Local
-            </button>
+                  setMode("trending");
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-body transition-colors ${mode === "trending" ? "bg-foreground text-background" : "text-muted-foreground"}`}
+              >
+                Trending
+              </button>
+              <button
+                onClick={() => {
+                  if (!hasLocation) setLocationPromptOpen(true);
+                  else {
+                    setShowAll(false);
+                    setMode("local");
+                  }
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-body transition-colors ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
+              >
+                Local
+              </button>
+            </div>
           </div>
         </div>
 
@@ -80,6 +194,9 @@ const ForYouPage = () => {
                 <DebateCoverCard
                   key={d.id}
                   d={d}
+                  selectionMode={selectionMode}
+                  selected={selected.has(d.id)}
+                  onToggleSelected={toggle}
                   onChanged={(action, id, patch) => {
                     if (action === "removed") removeItem(id);
                     else if (action === "updated" && patch) patchItem(id, patch);
@@ -105,6 +222,43 @@ const ForYouPage = () => {
           </>
         )}
       </div>
+
+      {selectionMode && (
+        <BulkActionBar
+          count={selected.size}
+          busy={busy}
+          onCancel={exitSelection}
+          onMakePublic={() => bulkPrivacy(true)}
+          onMakePrivate={() => bulkPrivacy(false)}
+          onArchive={bulkArchive}
+          onDelete={() => setConfirmDeleteOpen(true)}
+        />
+      )}
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {ownedSelectedIds().length} debates?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the selected debates, their transcripts, and any participant grades. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                bulkDelete();
+              }}
+              disabled={busy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <LocationPrompt
         open={locationPromptOpen}
         onOpenChange={setLocationPromptOpen}
