@@ -461,6 +461,42 @@ const MyDebatesPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {selectionMode && (
+        <BulkActionBar
+          count={selected.size}
+          busy={busy}
+          onCancel={exitSelection}
+          onMakePublic={() => bulkPrivacy(true)}
+          onMakePrivate={() => bulkPrivacy(false)}
+          onArchive={bulkArchive}
+          onDelete={() => setConfirmBulkDeleteOpen(true)}
+        />
+      )}
+
+      <AlertDialog open={confirmBulkDeleteOpen} onOpenChange={setConfirmBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {ownedSelectedItems().length} item{ownedSelectedItems().length === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the selected items and any related transcripts. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                bulkDelete();
+              }}
+              disabled={busy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 };
