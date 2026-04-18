@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Inbox, Loader2 } from "lucide-react";
+import { Inbox, Loader2, UserPlus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFloatingDM } from "@/contexts/FloatingDMContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import InviteFriendsDialog from "./InviteFriendsDialog";
 
 interface InterestedThread {
   id: string;
@@ -18,17 +19,20 @@ interface InterestedThread {
 
 interface Props {
   debateId: string;
+  debateTopic: string;
+  sides: { id: string; label: string }[];
 }
 
 /**
  * Owner-only panel on the preview page showing users who DM'd about this debate.
  * Click a row → opens the global FloatingDMWindow preloaded to that thread.
  */
-const InterestedInboxPanel = ({ debateId }: Props) => {
+const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
   const { user } = useAuth();
   const { openThread } = useFloatingDM();
   const [threads, setThreads] = useState<InterestedThread[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const refresh = async () => {
     if (!user) return;
@@ -111,16 +115,27 @@ const InterestedInboxPanel = ({ debateId }: Props) => {
   }, [debateId, user?.id]);
 
   return (
-    <div className="bg-background border border-border rounded-lg p-5 mt-6">
-      <div className="flex items-center justify-between mb-3">
-        <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium">
-          Interested
-        </label>
-        {threads.length > 0 && (
-          <span className="text-[10px] text-muted-foreground font-body">
-            {threads.length} {threads.length === 1 ? "person" : "people"}
-          </span>
-        )}
+    <>
+    <div className="bg-background border border-border rounded-lg p-5">
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="flex items-baseline gap-2 min-w-0">
+          <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium">
+            Interested
+          </label>
+          {threads.length > 0 && (
+            <span className="text-[10px] text-muted-foreground font-body">
+              · {threads.length} {threads.length === 1 ? "person" : "people"}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setInviteOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body font-medium hover:opacity-90 transition-opacity shrink-0"
+        >
+          <UserPlus className="w-3 h-3" />
+          Invite people
+        </button>
       </div>
 
       {loading ? (
@@ -176,6 +191,14 @@ const InterestedInboxPanel = ({ debateId }: Props) => {
         </ul>
       )}
     </div>
+    <InviteFriendsDialog
+      open={inviteOpen}
+      onOpenChange={setInviteOpen}
+      debateId={debateId}
+      debateTopic={debateTopic}
+      sides={sides}
+    />
+    </>
   );
 };
 

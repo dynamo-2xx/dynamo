@@ -8,6 +8,7 @@ import { gradientFromSeed } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
 import InterestedComposer from "@/components/debate/InterestedComposer";
 import InterestedInboxPanel from "@/components/debate/InterestedInboxPanel";
+import TagPicker from "@/components/tags/TagPicker";
 
 interface Subtopic {
   id: string;
@@ -31,6 +32,7 @@ const DebateScheduledPreviewPage = () => {
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [publisherName, setPublisherName] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"overview" | "tags" | "interested">("overview");
 
   useEffect(() => {
     if (!id) return;
@@ -162,75 +164,112 @@ const DebateScheduledPreviewPage = () => {
           </div>
         )}
 
-        {/* Template */}
-        <div className="space-y-4">
-          {sides.length > 0 && (
+        {/* Owner tabs */}
+        {isOwner && (
+          <div className="flex items-center gap-1 border-b border-border mb-5">
+            {([
+              { key: "overview", label: "Overview" },
+              { key: "tags", label: "Tags" },
+              { key: "interested", label: "Interested" },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setActiveTab(t.key)}
+                className={cn(
+                  "px-3 py-2 text-sm font-body font-medium border-b-2 -mb-px transition-colors",
+                  activeTab === t.key
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Tab content (or always overview for non-owners) */}
+        {(!isOwner || activeTab === "overview") && (
+          <div className="space-y-4">
+            {sides.length > 0 && (
+              <div className="bg-background border border-border rounded-lg p-5">
+                <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium block mb-3">
+                  Sides
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {sides.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex-1 bg-accent rounded-lg px-3 py-2 text-sm font-body font-medium text-center"
+                    >
+                      {s.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="bg-background border border-border rounded-lg p-5">
               <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium block mb-3">
-                Sides
+                Subtopics
               </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                {sides.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex-1 bg-accent rounded-lg px-3 py-2 text-sm font-body font-medium text-center"
-                  >
-                    {s.label}
-                  </div>
+              <ol className="space-y-2">
+                {subtopics.map((s, i) => (
+                  <li key={s.id} className="flex items-center gap-3 text-sm font-body">
+                    <span className="text-xs text-muted-foreground w-5">{i + 1}.</span>
+                    <span className="flex-1 bg-accent rounded-lg px-3 py-2">{s.title}</span>
+                  </li>
                 ))}
+              </ol>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-background border border-border rounded-lg p-4">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body mb-1">
+                  <Users className="w-3 h-3 inline mr-1" /> Turns / subtopic
+                </p>
+                <p className="text-xl font-display">{debate.turns_per_subtopic}</p>
+              </div>
+              <div className="bg-background border border-border rounded-lg p-4">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body mb-1">
+                  <Clock className="w-3 h-3 inline mr-1" /> Time / turn
+                </p>
+                <p className="text-xl font-display">{debate.time_per_turn}</p>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
+        {isOwner && activeTab === "tags" && (
           <div className="bg-background border border-border rounded-lg p-5">
             <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium block mb-3">
-              Subtopics
+              Tags
             </label>
-            <ol className="space-y-2">
-              {subtopics.map((s, i) => (
-                <li key={s.id} className="flex items-center gap-3 text-sm font-body">
-                  <span className="text-xs text-muted-foreground w-5">{i + 1}.</span>
-                  <span className="flex-1 bg-accent rounded-lg px-3 py-2">{s.title}</span>
-                </li>
-              ))}
-            </ol>
+            <p className="text-xs font-body text-muted-foreground mb-3">
+              Tags help people on Explore find this debate.
+            </p>
+            <TagPicker kind="debate" recordId={debate.id} max={5} />
           </div>
+        )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-background border border-border rounded-lg p-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body mb-1">
-                <Users className="w-3 h-3 inline mr-1" /> Turns / subtopic
-              </p>
-              <p className="text-xl font-display">{debate.turns_per_subtopic}</p>
-            </div>
-            <div className="bg-background border border-border rounded-lg p-4">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body mb-1">
-                <Clock className="w-3 h-3 inline mr-1" /> Time / turn
-              </p>
-              <p className="text-xl font-display">{debate.time_per_turn}</p>
-            </div>
-          </div>
-        </div>
+        {isOwner && activeTab === "interested" && (
+          <InterestedInboxPanel
+            debateId={debate.id}
+            debateTopic={debate.topic}
+            sides={sides.map((s) => ({ id: s.id, label: s.label }))}
+          />
+        )}
 
-        {/* Owner: Interested inbox */}
-        {isOwner && <InterestedInboxPanel debateId={debate.id} />}
-
-        {/* Owner panel */}
+        {/* Owner edit action */}
         {isOwner && (
-          <div className="mt-8 sticky bottom-4 z-10 flex flex-col sm:flex-row gap-2">
+          <div className="mt-8 sticky bottom-4 z-10">
             <button
               type="button"
               onClick={() => navigate(`/create?edit=${debate.id}`)}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-border bg-background text-sm font-body font-medium hover:bg-accent transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-border bg-background text-sm font-body font-medium hover:bg-accent transition-colors shadow-lg"
             >
-              Edit / Set time
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(`/debate/${debate.id}`)}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-foreground text-background text-sm font-body font-medium hover:opacity-90 transition-opacity shadow-lg"
-            >
-              Open debate room
+              Edit debate
             </button>
           </div>
         )}
