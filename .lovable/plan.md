@@ -1,95 +1,79 @@
 
 
 ## Goal
-Add an **Edit Profile** experience accessible from the Profile page, built responsive-first from the largest layout shells down to the smallest controls, with explicit verification at each breakpoint.
+Three changes:
+1. **MyRecentPage**: swap "Explore →" link for "My Agenda →".
+2. **AutoCarousel**: change resume-after-interaction delay from 10s → 5s.
+3. **DebateCoverCard** (home + carousel + expanded pages): for cards owned by the current user, replace the generic status pill with a **Public/Private** pill, and add an inline action menu (Switch Public/Private, Archive, Delete). Also add a "See more" CTA at the top of `MyRecentPage` and `ForYouPage`.
 
-## Scope of editable fields
-Based on `profiles` schema already in use on the Profile page:
-- `display_name`
-- `affiliation`
-- `role` (personal / education / community)
-- `is_public` (visibility toggle)
-- `location`
-- `banner_url` (already in schema for home header)
-- `avatar_url` (if present; otherwise add to migration)
+## Scope details
 
-No new tables. One small migration only if `avatar_url` doesn't exist yet — confirmed during Phase 0.
+### 1. `src/pages/MyRecentPage.tsx`
+- Replace the `<Link to="/explore">Explore →</Link>` with `<Link to="/my-debates">My Agenda →</Link>` (the route used by `MyDebatesPage`).
 
----
+### 2. `src/components/home/AutoCarousel.tsx`
+- Change default `resumeAfterMs` from `10000` → `5000`. (`intervalMs` already 5000 — no change.)
 
-## Phased plan (largest → smallest)
+### 3. `DebateCoverCard` — owner controls + Public/Private pill
+File: `src/components/home/DebateCoverCard.tsx`
 
-### Phase 0 — Audit & schema check (no UI yet)
-- Read `src/integrations/supabase/types.ts` to confirm which `profiles` columns already exist (`avatar_url`, `banner_url`, etc.).
-- Read `AuthContext` to confirm how `profile` is loaded/refreshed after an update.
-- Decide: add `avatar_url text null` migration only if missing.
-- Deliverable: confirmed field list + refresh mechanism.
+- Extend `DebateCoverItem` interface with `created_by?: string` and `is_public?: boolean` (both optional so existing call sites that don't pass them keep working).
+- Inside the card, get `user` from `useAuth()`. Compute `isOwner = user?.id === d.created_by`.
+- **Status pill logic**:
+  - If `isLive` → keep existing live pill.
+  - Else if `isOwner` → render a **Public** or **Private** pill based on `d.is_public` (e.g. green dot for public, gray dot for private).
+  - Else → keep existing `{d.status}` pill (Completed / Archived / etc.).
+- **Action menu (owner only, non-live)**: small ⋯ button in the top-right corner inside the cover card, anchored next to the participant count. Opens a `DropdownMenu` (existing primitive) with three items:
+  1. **Make Public / Make Private** — toggles `debates.is_public`.
+  2. **Archive** — sets `status` to `'archived'` (enum value already exists).
+  3. **Delete** — opens an `AlertDialog` confirm, then deletes the debate row (RLS already allows `created_by` to delete).
+- The ⋯ button uses `e.preventDefault(); e.stopPropagation();` so clicking it doesn't follow the card's `<Link>` navigation. Same for menu items.
+- After a successful mutation, call an optional `onChanged?: () => void` callback so parent lists can refresh. Hooks (`useMyRecentDebates`, `useForYouDebates`) get a small refetch trigger (bump a version state in the hook + expose `refresh`). For Delete/Archive we also locally remove the item from the parent's items state via callback for instant feedback.
 
-### Phase 1 — Page shell & route (largest container)
-- New route `/profile/edit` (protected), registered in `src/App.tsx`.
-- New `src/pages/EditProfilePage.tsx` wrapped in `AppLayout` so it inherits the existing sidebar/bottom-nav responsive shell (already handles md+ sidebar vs mobile bottom nav).
-- Page container: `max-w-2xl mx-auto px-4 py-8 md:py-12` to match `ProfilePage` exactly — guarantees parity at every breakpoint we already support.
-- Add an **Edit** button on `ProfilePage` (top-right of the avatar card) linking to `/profile/edit`.
-- **Test**: navigate at 320, 375, 414, 768, 1024, 1366, 1920. Confirm no horizontal scroll, sidebar/bottom-nav switch at md (768), content stays centered.
+### 4. Hook updates (`src/hooks/useHomeDebates.ts`)
+- Select `is_public, created_by` in both `useForYouDebates` and `useMyRecentDebates` queries; pass them through into the `DebateCoverItem` mapping.
+- Expose a `refresh()` function from each hook (just bumps an internal `version` state included in the `useEffect` deps).
 
-### Phase 2 — Section layout (large blocks inside the shell)
-Three stacked sections, each a bordered card matching the ProfilePage style:
-1. **Banner + Avatar** (visual identity)
-2. **Basic info** (display name, affiliation, location)
-3. **Account settings** (role, visibility)
-Plus a sticky-on-mobile / inline-on-desktop **Save / Cancel** action bar.
+### 5. "See more / all" CTA on expanded carousel pages
+- `src/pages/MyRecentPage.tsx` and `src/pages/ForYouPage.tsx`:
+  - Currently both already fetch up to 60 items in a single grid. Add a client-side **pagination chunk** — show 12 by default, and a `See all` button at the bottom (centered, ghost style) that reveals the rest. Once expanded, the button is replaced by `Showing N of N`.
+  - This satisfies "include a select more/all button" without changing data fetching.
+- Live sessions: this change is for **debates only** (which is what the carousels show today). Live session ownership controls live on `MyDebatesPage` and are out of scope per "change nothing else."
 
-- Sections stack vertically at all sizes (single column) — keeps layout trivially responsive and matches the read-only ProfilePage.
-- Save bar: `sticky bottom-0` on mobile (above the bottom nav, so `bottom-16`), `static` from `md:` upward.
-- **Test**: at 320/375 confirm sticky bar doesn't overlap bottom nav; at 768+ confirm it sits inline at the end of the form.
+## Files to edit
+- `src/pages/MyRecentPage.tsx` — link swap + "See all" pagination.
+- `src/pages/ForYouPage.tsx` — "See all" pagination.
+- `src/components/home/AutoCarousel.tsx` — default `resumeAfterMs` → 5000.
+- `src/components/home/DebateCoverCard.tsx` — owner pill + ⋯ action menu (uses existing `dropdown-menu` and `alert-dialog` UI primitives).
+- `src/hooks/useHomeDebates.ts` — select `is_public, created_by`; add `refresh()`.
 
-### Phase 3 — Banner + Avatar block (medium components)
-- Banner: full-width `aspect-[3/1]` image area with upload overlay button. Falls back to a gradient (reuse `src/lib/gradient.ts` deterministic util seeded by `display_name`).
-- Avatar: 96px circle, overlapping the banner bottom by 50% (`-mt-12 ml-4`). Upload button as a small floating camera icon on the avatar.
-- Upload flow: file picker → upload to Supabase Storage bucket `avatars` (and `banners`) → write returned public URL into local form state. Buckets created in the migration if missing, with public read + authenticated write RLS.
-- **Test**:
-  - Mobile (≤414): banner aspect stays 3/1, avatar doesn't clip card edges, upload buttons remain tappable (≥40px hit target).
-  - Tablet (768): same proportions, avatar overlap still visually balanced.
-  - Desktop (≥1024): banner caps at the `max-w-2xl` container width, no stretching artifacts.
-
-### Phase 4 — Form fields (small components)
-- Use existing `@/components/ui/{input,label,textarea,switch,radio-group}` for full token consistency.
-- `display_name` — Input.
-- `affiliation` — Input.
-- `location` — Input with a small "Use my current location" ghost button (reuses geolocation pattern from `LocationPrompt`).
-- `role` — RadioGroup (3 options) laid out as `grid-cols-1 sm:grid-cols-3` so they stack on mobile and sit side-by-side from `sm` (640px) up.
-- `is_public` — Switch with label + helper text.
-- All inputs `w-full`; labels above inputs; 16px gap between fields.
-- **Test**:
-  - 320px: every label fully visible, no input overflow, role radios stacked.
-  - 640px+: role radios in a 3-up row.
-  - Touch targets ≥40px on mobile.
-
-### Phase 5 — Save / Cancel + state handling (smallest interactions)
-- Local form state seeded from `profile`. `isDirty` derived by shallow compare.
-- Save: `supabase.from('profiles').update(...).eq('id', user.id)` → on success refresh `AuthContext` profile (call its existing refresh, or refetch) → toast → navigate back to `/profile`.
-- Cancel: if dirty, show `AlertDialog` confirm; else navigate back.
-- Disable Save while pristine or while saving; show spinner inside the button.
-- **Test**: dirty/clean states, error toast on failed update, that the new values show up immediately on `/profile` and in the home header (`GreetingHeader`).
-
-### Phase 6 — Cross-breakpoint QA pass
-- Walk through 320 / 375 / 414 / 640 / 768 / 1024 / 1366 / 1920 with the user, on both light and dark themes.
-- Verify keyboard nav order, focus rings (already token-driven), and that the sticky save bar never traps content.
-
----
-
-## Files
-- **NEW** `src/pages/EditProfilePage.tsx`
-- **EDIT** `src/pages/ProfilePage.tsx` — add Edit button linking to `/profile/edit`
-- **EDIT** `src/App.tsx` — register `/profile/edit` (protected)
-- **EDIT** `src/contexts/AuthContext.tsx` — only if no profile-refresh helper exists yet (expose `refreshProfile`)
-- **MIGRATION** (conditional) — add `profiles.avatar_url text null` if missing; create `avatars` and `banners` storage buckets with public read + owner-write RLS
+No DB migration needed: `is_public` and the `archived` enum value already exist; RLS already permits update + delete by `created_by`.
 
 ## Self-check
-- [ ] Largest shell first (route + AppLayout container), smallest last (individual inputs)
-- [ ] Each phase has explicit breakpoint test list
-- [ ] No new tables; minimal schema delta
-- [ ] Reuses existing UI primitives + gradient util for full token consistency
-- [ ] Updated profile reflects on `/profile` and home header without page reload
-- [ ] Sticky mobile save bar respects bottom nav height
+- [x] Owner-only controls — gated by `user.id === d.created_by`, also enforced server-side by existing RLS.
+- [x] Click-through to debate not broken — menu button stops event propagation.
+- [x] Public/Private replaces status pill **only for owner** non-live cards; other viewers still see the original status.
+- [x] Live status pill preserved (no toggle/menu shown while live to avoid mid-debate disruption).
+- [x] "See all" applies to both expanded pages (`/my-recent`, `/for-you`).
+- [x] Resume-after delay reduced to 5s as requested.
+- [x] No other UI/UX changes.
+
+## Clarifying questions
+
+1. **Action menu placement & trigger style** — preferred look?
+   - (A) Small ⋯ icon button in the top-right corner of the cover card (inline with the participant count chip), opens a dropdown menu.
+   - (B) Long-press / right-click only (cleaner card, less discoverable).
+   - (C) Hover-reveal ⋯ button on desktop, always-visible on mobile.
+
+2. **Archive behavior** — when an owner archives a debate, where should it still appear?
+   - (A) Hidden from "My Recent" carousel and `/my-recent`; still visible under My Agenda → Debates with an "Archived" pill.
+   - (B) Stays in My Recent but greyed out with an "Archived" pill.
+   - (C) Hidden everywhere except a new "Archived" tab on My Agenda.
+
+3. **"See all" pagination size** — initial visible count on `/my-recent` and `/for-you`?
+   - (A) Show 12 → expand to all (up to 60 already fetched).
+   - (B) Show 24 → expand to all.
+   - (C) Show 12 → "Show 12 more" stepped pagination.
+
+4. **Delete confirmation copy** — Delete is permanent (RLS hard-deletes the row). Should the confirm dialog warn that this also removes the transcript and any participant grades, or keep it short ("Delete this debate? This can't be undone.")?
 
