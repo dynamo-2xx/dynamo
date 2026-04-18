@@ -790,6 +790,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
