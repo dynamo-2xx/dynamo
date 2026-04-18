@@ -1,29 +1,58 @@
 
 
-## Issues & Confidence
+## Replace ping flow with Direct Messages + Inbox
 
-**1. Tags not bucketing debates (95% confident in fix)**
-- Cause: `debate_tags` insert in `CreateDebatePage.tsx:382-386` is awaited but errors are silently dropped — also no log if `selectedTags` is empty at submit. DB confirms `tag_count=0` for all recent debates including the published one.
-- Fix: capture `{ error }` from the insert, `toast.error` + `console.error`, and short-circuit the success navigation if tagging fails. Verify `selectedTags.length` at submit time with a log.
+### Preview page change
+- Non-owner sees one button: **"Interested?"** → opens composer dialog.
+- Composer:
+  - Three role chips at top: each side label + "Spectator". Selecting one fills the textarea with editable default: `I would like to participate as a [Role]. What time shall we meet?`
+  - Editable textarea, "Send message" button.
+- On send: create/find DM thread with publisher → insert message → toast → button becomes "Open conversation" linking to `/messages/:threadId`.
+- Remove floating coordination chat button and any owner-side pending-interest panel.
 
-**2. Preview page "not working" (98% confident)**
-- Cause: `DebateCoverCard` only routes **non-owners** to `/debate/:id/preview`. Owners (the user testing) are sent to `/debate/:id` — the dark debate room shown in the screenshot. Preview page itself renders correctly when reached directly.
-- Fix in `DebateCoverCard.tsx`: route to `/preview` for `scheduled` or `draft` status regardless of owner. In preview page, when `isOwner`, replace the "Interested?" CTA with an "Edit / Set time" button + a small list of pending interest pings.
+### New DM system
+New tables:
+```
+dm_threads (id, user_a, user_b, debate_id nullable, last_message_at, created_at)
+  -- unique on (LEAST(user_a,user_b), GREATEST(user_a,user_b), COALESCE(debate_id,'00...'))
+dm_messages (id, thread_id, sender_id, body, created_at, read_at nullable)
+```
+RLS: only the two participants of a thread can SELECT/INSERT. Realtime enabled on both.
 
-**3. Archived debates leaking into Home/Explore (99% confident)**
-- Cause: `useFeaturedDebates`, `useTrendingDebates`, `useLatestDebates`, `useDebatesByTag` in `useExplore.ts` only filter `is_public=true`, never exclude `status='archived'`.
-- Fix: add `.neq("status","archived")` to all four queries. `useForYouDebates` and `useMyRecentDebates` already exclude archived correctly.
+RPC `get_or_create_dm_thread(_other_user uuid, _debate_id uuid)` → returns thread id (handles the sorted-pair lookup atomically).
 
-**4. Debate-room flow verification**
-- Static review only (read-only mode). Will sanity-check `DebateRoomPage` timer, prep, ready-state, and turn-progression branches end-to-end on the next default-mode pass and report a confidence %.
+### Messages tab in sidebar (NEW)
+- Add **Messages** entry in `AppLayout.tsx` sidebar nav, placed directly **below Profile**, icon `MessageCircle`.
+- Also add to mobile bottom nav (replace or squeeze in — keep 4 items: Home, Explore, Messages, Profile).
+- Unread badge (red dot + count) sourced from `dm_messages` where `recipient = me AND read_at IS NULL`, via realtime subscription.
 
-## Files to edit
+### `/messages` page
+- Two-pane layout (desktop) / stacked (mobile):
+  - **Left**: thread list — other user's avatar + display name, last message preview, timestamp, unread dot. Sorted by `last_message_at desc`.
+  - **Right**: active thread — message bubbles (sender right, other left), composer at bottom. Marks messages read on view.
+- Route `/messages` (list) and `/messages/:threadId` (auto-opens that thread).
+
+### Notifications
+- Add `direct_message` notification type. On send, insert notification for recipient with deep-link to `/messages/:threadId`.
+- Drop `interest_received` going forward (keep type for legacy rows).
+
+### Files
+
 ```text
-src/pages/CreateDebatePage.tsx          — await + error-handle debate_tags insert
-src/components/home/DebateCoverCard.tsx — route owners to /preview for scheduled/draft
-src/pages/DebateScheduledPreviewPage.tsx — owner panel (edit + interest list)
-src/hooks/useExplore.ts                  — exclude archived from 4 queries
+NEW  supabase migration                            — dm_threads, dm_messages, RLS, realtime, RPC
+NEW  src/pages/MessagesPage.tsx                    — inbox + active thread
+NEW  src/hooks/useDirectMessages.ts                — threads, messages, send, unread count, realtime
+NEW  src/components/debate/InterestedComposer.tsx  — role chips + editable textarea + send
+EDIT src/components/AppLayout.tsx                  — Messages nav entry (desktop + mobile) with unread badge
+EDIT src/pages/DebateScheduledPreviewPage.tsx     — swap to InterestedComposer; remove interest panel + floating chat
+EDIT src/App.tsx                                  — add /messages and /messages/:threadId routes
+EDIT src/lib/notifications.ts                     — add direct_message type
+DEL  src/components/debate/InterestThreadChat.tsx
+DEL  src/components/debate/InterestedDialog.tsx
 ```
 
-No DB migration. After the fixes I'll walk the debate room flow and post a confidence % per leg (publish → preview → start → prep → turn → next subtopic → completion).
+### Confidence
+- Composer + DM tables + send: 95%
+- Inbox page + realtime + unread badge: 90%
+- Sidebar Messages entry (desktop + mobile): 98%
 
