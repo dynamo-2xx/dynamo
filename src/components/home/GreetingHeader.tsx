@@ -26,7 +26,7 @@ const GreetingHeader = () => {
   const { average, count } = useUserAverageGrade();
 
   useEffect(() => {
-    const t = setTimeout(() => setShowGreeting(false), 3200);
+    const t = setTimeout(() => setShowGreeting(false), 1000);
     return () => clearTimeout(t);
   }, []);
 
