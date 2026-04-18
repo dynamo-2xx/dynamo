@@ -276,7 +276,7 @@ const CreateDebatePage = () => {
           prep_time_min: debate.prepTime,
           prep_time_max: debate.prepTime,
           facilitator_type: "ai",
-          status: scheduledAt ? "scheduled" : "draft",
+          status: publishMode ? "scheduled" : (scheduledAt ? "scheduled" : "draft"),
           location: location.trim() || null,
           scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
           feedback_enabled: feedbackEnabled,
