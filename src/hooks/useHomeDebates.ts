@@ -99,6 +99,8 @@ export function useMyRecentDebates(limit = 12) {
           "id, topic, status, cover_image_url, created_at, updated_at, is_public, created_by, debate_participants(count)",
         )
         .eq("created_by", user.id)
+        .neq("status", "archived")
+        .neq("status", "draft")
         .order("updated_at", { ascending: false })
         .limit(limit);
 
@@ -128,6 +130,7 @@ export function useMyRecentDebates(limit = 12) {
       for (const row of parts || []) {
         const d: any = (row as any).debates;
         if (!d || map.has(d.id)) continue;
+        if (d.status === "archived" || d.status === "draft") continue;
         map.set(d.id, {
           id: d.id,
           topic: d.topic,

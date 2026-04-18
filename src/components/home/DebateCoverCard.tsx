@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2 } from "lucide-react";
+import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,25 +37,28 @@ export interface DebateCoverItem {
 interface Props {
   d: DebateCoverItem;
   onChanged?: (action: "removed" | "updated", id: string, patch?: Partial<DebateCoverItem>) => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelected?: (id: string) => void;
 }
 
-const DebateCoverCard = ({ d, onChanged }: Props) => {
+const PILL_BASE =
+  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-body font-medium uppercase tracking-wider border border-border";
+
+const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelected }: Props) => {
   const { user } = useAuth();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const isLive = d.status === "live";
+  const isArchived = d.status === "archived";
   const isOwner = !!user && !!d.created_by && user.id === d.created_by;
-  const showOwnerControls = isOwner && !isLive;
+  const showOwnerControls = isOwner && !isLive && !selectionMode;
+  const selectable = !!selectionMode && isOwner;
 
   const bg = d.cover_image_url
     ? { backgroundImage: `url(${d.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
     : { backgroundImage: gradientFromSeed(d.topic) };
-
-  const stop = (e: React.SyntheticEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
 
   const togglePrivacy = async () => {
     if (busy) return;
@@ -79,7 +83,7 @@ const DebateCoverCard = ({ d, onChanged }: Props) => {
       toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Archived" });
+    toast({ title: "Archived", description: "Find it in My Agenda → Archive" });
     onChanged?.("removed", d.id);
   };
 
@@ -97,78 +101,127 @@ const DebateCoverCard = ({ d, onChanged }: Props) => {
     onChanged?.("removed", d.id);
   };
 
-  return (
-    <div className="relative group">
-      <Link
-        to={`/debate/${d.id}`}
-        className="relative block w-full aspect-[16/10] rounded-xl overflow-hidden border border-border hover:border-foreground/30 transition-colors"
-        style={bg}
-      >
-        {/* Bottom gradient for legibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+  const renderStatusPill = () => {
+    if (isLive) {
+      return (
+        <span className={cn(PILL_BASE, "bg-background/95 text-foreground")}>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] animate-pulse" />
+          Live
+        </span>
+      );
+    }
+    if (isArchived) {
+      return (
+        <span className={cn(PILL_BASE, "bg-background/95 text-foreground border-dashed")}>
+          <Archive className="w-2.5 h-2.5" />
+          Archived
+        </span>
+      );
+    }
+    if (isOwner) {
+      return d.is_public ? (
+        <span className={cn(PILL_BASE, "bg-background/95 text-foreground")}>
+          <Globe className="w-2.5 h-2.5" />
+          Public
+        </span>
+      ) : (
+        <span className={cn(PILL_BASE, "bg-background/90 text-muted-foreground")}>
+          <Lock className="w-2.5 h-2.5" />
+          Private
+        </span>
+      );
+    }
+    return (
+      <span className={cn(PILL_BASE, "bg-background/90 text-muted-foreground")}>
+        {d.status}
+      </span>
+    );
+  };
 
-        {/* Top-left status pill */}
-        <div className="absolute top-3 left-3">
-          {isLive ? (
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-body font-medium uppercase tracking-wider bg-white/90 text-foreground">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] animate-pulse" />
-              Live
-            </span>
-          ) : showOwnerControls ? (
-            d.is_public ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-body font-medium uppercase tracking-wider bg-white/90 text-foreground">
-                <Globe className="w-2.5 h-2.5" />
-                Public
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-body font-medium uppercase tracking-wider bg-white/85 text-muted-foreground">
-                <Lock className="w-2.5 h-2.5" />
-                Private
-              </span>
-            )
-          ) : (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-body font-medium uppercase tracking-wider bg-white/80 text-muted-foreground">
-              {d.status}
-            </span>
-          )}
-        </div>
+  const cardInner = (
+    <>
+      {/* Bottom gradient for legibility */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Participant count (left of menu) */}
-        {typeof d.participant_count === "number" && d.participant_count > 0 && (
-          <div
-            className={`absolute top-3 ${showOwnerControls ? "right-12" : "right-3"}`}
+      {/* Top-left: status pill OR selection checkbox */}
+      <div className="absolute top-3 left-3">
+        {selectable ? (
+          <span
+            className={cn(
+              "w-6 h-6 rounded-full border flex items-center justify-center transition-colors",
+              selected
+                ? "bg-foreground text-background border-foreground"
+                : "bg-background/95 text-transparent border-border",
+            )}
           >
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-body bg-white/85 text-foreground">
-              <Users className="w-3 h-3" />
-              {d.participant_count}
-            </span>
-          </div>
+            <Check className="w-3.5 h-3.5" strokeWidth={3} />
+          </span>
+        ) : (
+          renderStatusPill()
         )}
+      </div>
 
-        {/* Bottom topic */}
-        <div className="absolute bottom-3 left-3 right-3">
-          <h4 className="font-display text-white text-base leading-snug line-clamp-2 drop-shadow">
-            {d.topic}
-          </h4>
+      {/* Participant count */}
+      {typeof d.participant_count === "number" && d.participant_count > 0 && (
+        <div className={cn("absolute top-3", showOwnerControls ? "right-12" : "right-3")}>
+          <span className={cn(PILL_BASE, "bg-background/90 text-foreground normal-case tracking-normal")}>
+            <Users className="w-3 h-3" />
+            {d.participant_count}
+          </span>
         </div>
-      </Link>
+      )}
 
-      {/* Owner action menu — sibling of <Link>, not a child, so clicks don't navigate */}
+      {/* Bottom topic */}
+      <div className="absolute bottom-3 left-3 right-3">
+        <h4 className="font-display text-white text-base leading-snug line-clamp-2 drop-shadow">
+          {d.topic}
+        </h4>
+      </div>
+    </>
+  );
+
+  const cardClasses = cn(
+    "relative block w-full aspect-[16/10] rounded-xl overflow-hidden border transition-colors",
+    selected ? "border-foreground ring-2 ring-foreground" : "border-border hover:border-foreground/30",
+  );
+
+  return (
+    <div className="relative">
+      {selectionMode ? (
+        <button
+          type="button"
+          onClick={() => selectable && onToggleSelected?.(d.id)}
+          disabled={!selectable}
+          className={cn(cardClasses, "text-left", !selectable && "opacity-60 cursor-not-allowed")}
+          style={bg}
+          aria-pressed={selected}
+        >
+          {cardInner}
+        </button>
+      ) : (
+        <Link to={`/debate/${d.id}`} className={cardClasses} style={bg}>
+          {cardInner}
+        </Link>
+      )}
+
+      {/* Owner action menu — sibling of <Link>, absolutely positioned with high z-index */}
       {showOwnerControls && (
-        <div className="absolute top-3 right-3 z-10">
+        <div
+          className="absolute top-3 right-3 z-20"
+          onClick={(e) => e.stopPropagation()}
+        >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                onClick={stop}
-                onPointerDown={stop}
+                onClick={(e) => e.stopPropagation()}
                 aria-label="More actions"
-                className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-foreground flex items-center justify-center transition-colors shadow-sm"
+                className="w-7 h-7 rounded-full bg-background/95 hover:bg-background text-foreground flex items-center justify-center transition-colors shadow-sm border border-border"
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 z-50">
               <DropdownMenuItem
                 onSelect={(e) => {
                   e.preventDefault();

@@ -27,21 +27,26 @@ const MyDebatesPage = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const activeTab = tabParam === "drafts" ? "drafts" : tabParam === "live" ? "live" : "debates";
+  const activeTab =
+    tabParam === "archive" || tabParam === "drafts"
+      ? "archive"
+      : tabParam === "live"
+      ? "live"
+      : "debates";
   const [debates, setDebates] = useState<DebateRow[]>([]);
-  const [drafts, setDrafts] = useState<DebateRow[]>([]);
+  const [archive, setArchive] = useState<DebateRow[]>([]);
   const [liveSessions, setLiveSessions] = useState<LiveSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      // Debates I created (non-draft)
+      // Debates I created (active: not draft, not archived)
       const { data: created } = await supabase
         .from("debates")
         .select("id, topic, status, created_at, is_public")
         .eq("created_by", user.id)
-        .neq("status", "draft")
+        .not("status", "in", "(draft,archived)")
         .order("created_at", { ascending: false });
 
       // Debates I participate in
@@ -60,7 +65,7 @@ const MyDebatesPage = () => {
           .from("debates")
           .select("id, topic, status, created_at, is_public")
           .in("id", extraIds)
-          .neq("status", "draft")
+          .not("status", "in", "(draft,archived)")
           .order("created_at", { ascending: false });
         extraDebates = (data || []) as DebateRow[];
       }
@@ -69,15 +74,15 @@ const MyDebatesPage = () => {
       all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setDebates(all);
 
-      // Drafts I created
-      const { data: myDrafts } = await supabase
+      // Archive (drafts + archived) I created
+      const { data: myArchive } = await supabase
         .from("debates")
         .select("id, topic, status, created_at, is_public")
         .eq("created_by", user.id)
-        .eq("status", "draft")
+        .in("status", ["draft", "archived"])
         .order("created_at", { ascending: false });
 
-      setDrafts((myDrafts || []) as DebateRow[]);
+      setArchive((myArchive || []) as DebateRow[]);
 
       // Live sessions
       const { data: sessions } = await supabase
@@ -96,12 +101,13 @@ const MyDebatesPage = () => {
     if (s === "live" || s === "recording") return "bg-green-500/20 text-green-400";
     if (s === "completed" || s === "ended") return "bg-primary/20 text-primary";
     if (s === "draft") return "bg-muted text-muted-foreground";
+    if (s === "archived") return "bg-secondary text-foreground border border-dashed border-border";
     return "bg-secondary text-muted-foreground";
   };
 
-  const currentList = activeTab === "drafts" ? drafts : activeTab === "live" ? [] : debates;
-  const emptyMessage = activeTab === "drafts"
-    ? "You have no unpublished drafts."
+  const currentList = activeTab === "archive" ? archive : activeTab === "live" ? [] : debates;
+  const emptyMessage = activeTab === "archive"
+    ? "Nothing in your archive yet. Drafts and archived debates appear here."
     : activeTab === "live"
     ? "You have no live session records yet."
     : "You haven't participated in any debates yet.";
@@ -131,15 +137,15 @@ const MyDebatesPage = () => {
               Debates
             </button>
             <button
-              onClick={() => setSearchParams({ tab: "drafts" })}
+              onClick={() => setSearchParams({ tab: "archive" })}
               className={cn(
                 "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors",
-                activeTab === "drafts"
+                activeTab === "archive"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Drafts
+              Archive
             </button>
             <button
               onClick={() => setSearchParams({ tab: "live" })}
