@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useParams, Link, Navigate, useLocation } from "react-router-dom";
+import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Mic, MicOff, Loader2, LogIn } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
