@@ -697,6 +697,94 @@ export type Database = {
         }
         Relationships: []
       }
+      live_session_entries: {
+        Row: {
+          client_ts: string
+          created_at: string
+          device_id: string
+          id: string
+          session_id: string
+          speaker_name: string
+          speaker_slot: number
+          text: string
+          user_id: string | null
+          words: Json
+        }
+        Insert: {
+          client_ts: string
+          created_at?: string
+          device_id: string
+          id?: string
+          session_id: string
+          speaker_name: string
+          speaker_slot: number
+          text: string
+          user_id?: string | null
+          words?: Json
+        }
+        Update: {
+          client_ts?: string
+          created_at?: string
+          device_id?: string
+          id?: string
+          session_id?: string
+          speaker_name?: string
+          speaker_slot?: number
+          text?: string
+          user_id?: string | null
+          words?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_entries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_session_participants: {
+        Row: {
+          avatar_url: string | null
+          device_id: string
+          display_name: string
+          joined_at: string
+          last_seen_at: string
+          session_id: string
+          speaker_slot: number
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          device_id: string
+          display_name: string
+          joined_at?: string
+          last_seen_at?: string
+          session_id: string
+          speaker_slot: number
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          device_id?: string
+          display_name?: string
+          joined_at?: string
+          last_seen_at?: string
+          session_id?: string
+          speaker_slot?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_session_tags: {
         Row: {
           created_at: string
@@ -737,6 +825,7 @@ export type Database = {
           ended_at: string | null
           id: string
           is_public: boolean
+          join_code: string | null
           mode: string
           share_token: string | null
           speaker_names: Json
@@ -752,6 +841,7 @@ export type Database = {
           ended_at?: string | null
           id?: string
           is_public?: boolean
+          join_code?: string | null
           mode?: string
           share_token?: string | null
           speaker_names?: Json
@@ -767,6 +857,7 @@ export type Database = {
           ended_at?: string | null
           id?: string
           is_public?: boolean
+          join_code?: string | null
           mode?: string
           share_token?: string | null
           speaker_names?: Json
@@ -975,6 +1066,7 @@ export type Database = {
     }
     Functions: {
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
+      can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
       create_debate_invitation: {
         Args: {
           _debate_id: string
@@ -1056,6 +1148,26 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_dm_thread_party: { Args: { _thread_id: string }; Returns: boolean }
       is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
+      is_live_session_host: { Args: { _session_id: string }; Returns: boolean }
+      join_live_session: {
+        Args: {
+          _avatar_url?: string
+          _code: string
+          _device_id: string
+          _display_name: string
+        }
+        Returns: {
+          host_user_id: string
+          mode: string
+          session_id: string
+          speaker_slot: number
+          title: string
+        }[]
+      }
+      live_session_heartbeat: {
+        Args: { _device_id: string; _session_id: string }
+        Returns: undefined
+      }
       realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
     }
     Enums: {

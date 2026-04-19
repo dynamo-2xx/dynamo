@@ -12,7 +12,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useLiveTranscription, LiveTranscriptEntry } from "@/hooks/useLiveTranscription";
+import { useMergedLiveTranscript } from "@/hooks/useMergedLiveTranscript";
+import { useLiveSessionPresence } from "@/hooks/useLiveSessionPresence";
+import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
+import JoinCodeCard from "@/components/live/JoinCodeCard";
+import PresenceList from "@/components/live/PresenceList";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+const getDeviceId = () => {
+  let id = localStorage.getItem("dyn_device_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("dyn_device_id", id);
+  }
+  return id;
+};
 
 type SessionPhase = "setup" | "recording" | "ended";
 
@@ -29,23 +43,43 @@ const LiveSessionPage = () => {
   const [sessionData, setSessionData] = useState<any>(null);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [setupTags, setSetupTags] = useState<Tag[]>([]);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const {
-    transcriptEntries,
-    summaries,
-    subtopics,
-    threads,
-    interimText,
-    isConnected,
-    micError,
-    connectionError,
-    isSummarizing,
-    endSession,
-  } = useLiveTranscription({
+  const deviceId = useMemo(() => getDeviceId(), []);
+  const isMulti = mode === "multi_device";
+  const isRecordingActive = phase === "recording" && sessionStatus === "recording";
+
+  // Single-device path
+  const single = useLiveTranscription({
     sessionId,
-    isActive: phase === "recording" && sessionStatus === "recording",
+    isActive: isRecordingActive && !isMulti,
   });
+
+  // Multi-device path: host runs its own mic AND merges all device entries
+  const hostDevice = useDeviceTranscription({
+    sessionId,
+    deviceId,
+    speakerSlot: 1,
+    speakerName: "Host",
+    isActive: isRecordingActive && isMulti,
+  });
+  const merged = useMergedLiveTranscript(sessionId, isRecordingActive && isMulti);
+  const presenceParticipants = useLiveSessionPresence(
+    isMulti ? sessionId : null,
+    { deviceId, heartbeat: isMulti && isRecordingActive },
+  );
+
+  const transcriptEntries = isMulti ? merged.entries : single.transcriptEntries;
+  const summaries = isMulti ? [] : single.summaries;
+  const subtopics = isMulti ? [] : single.subtopics;
+  const threads = isMulti ? {} : single.threads;
+  const interimText = isMulti ? "" : single.interimText;
+  const isConnected = isMulti ? hostDevice.isConnected : single.isConnected;
+  const micError = isMulti ? hostDevice.error : single.micError;
+  const connectionError = isMulti ? null : single.connectionError;
+  const isSummarizing = isMulti ? false : single.isSummarizing;
+  const endSession = single.endSession;
 
   // Load existing session if navigating to /live/:id
   useEffect(() => {
@@ -63,6 +97,7 @@ const LiveSessionPage = () => {
         setSessionStatus(d.status);
         setSessionData(d);
         setSpeakerNames(d.speaker_names || {});
+        setJoinCode(d.join_code || null);
         if (d.status === "ended") {
           setPhase("ended");
         } else {
@@ -100,6 +135,7 @@ const LiveSessionPage = () => {
     const d = data as any;
     setSessionId(d.id);
     setSessionStatus("recording");
+    setJoinCode(d.join_code || null);
     setPhase("recording");
 
     // Attach buffered tags
@@ -109,11 +145,30 @@ const LiveSessionPage = () => {
         .insert(setupTags.map((t) => ({ live_session_id: d.id, tag_id: t.id })));
     }
 
+    // Multi-device: register the host as Speaker 1 via join RPC
+    if (mode === "multi_device" && d.join_code) {
+      const hostName = user.email?.split("@")[0] || "Host";
+      await (supabase as any).rpc("join_live_session", {
+        _code: d.join_code,
+        _device_id: deviceId,
+        _display_name: hostName,
+        _avatar_url: null,
+      });
+    }
+
     navigate(`/live/${d.id}`, { replace: true });
-  }, [user, title, mode, navigate, setupTags]);
+  }, [user, title, mode, navigate, setupTags, deviceId]);
 
   const handleEndSession = useCallback(async () => {
-    await endSession();
+    if (!isMulti) {
+      await endSession();
+    } else if (sessionId) {
+      // Multi-device: just mark ended
+      await (supabase as any)
+        .from("live_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", sessionId);
+    }
     setSessionStatus("ended");
     if (sessionId) {
       const { data } = await supabase
@@ -124,7 +179,7 @@ const LiveSessionPage = () => {
       if (data) setSessionData(data);
     }
     setPhase("ended");
-  }, [endSession, sessionId]);
+  }, [endSession, sessionId, isMulti]);
 
   // Group entries by subtopic for the recording view
   const groupedEntries = useMemo(() => {
@@ -298,8 +353,18 @@ const LiveSessionPage = () => {
           </button>
         </div>
 
+        {/* Multi-device: presence strip */}
+        {isMulti && (
+          <div className="px-4 pt-3 pb-2 shrink-0 border-b border-border/60">
+            <PresenceList participants={presenceParticipants} />
+          </div>
+        )}
+
         {/* Subtopic-grouped transcript cards */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {isMulti && joinCode && (
+            <JoinCodeCard code={joinCode} sessionTitle={title} />
+          )}
           {micError && (
             <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
               {micError}
