@@ -114,6 +114,8 @@ export function useDeviceTranscription({
           setIsConnected(true);
           processor.onaudioprocess = (ev) => {
             if (ws.readyState !== WebSocket.OPEN) return;
+            // Hard mute: don't send audio while mic is toggled off
+            if (!micEnabledRef.current) return;
             const input = ev.inputBuffer.getChannelData(0);
             const buf = new Int16Array(input.length);
             for (let i = 0; i < input.length; i++) {
@@ -131,6 +133,8 @@ export function useDeviceTranscription({
             const msg = JSON.parse(ev.data);
             const alt = msg?.channel?.alternatives?.[0];
             if (!alt?.transcript) return;
+            // Drop any results that arrive while mic is off
+            if (!micEnabledRef.current) return;
             const transcript: string = alt.transcript;
             const isFinal: boolean = !!msg.is_final;
             if (!isFinal) {
