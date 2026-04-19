@@ -205,45 +205,46 @@ const LiveJoinPage = () => {
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="flex flex-col items-center"
-          >
-            <div className="text-6xl mb-3">{emoji}</div>
-            <p className="text-lg font-display font-bold">{displayName}</p>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+        <div className="flex-1 flex flex-col px-4 py-4 gap-4 overflow-y-auto">
+          <VideoGrid
+            localStream={rtc.localStream}
+            localName={displayName}
+            cameraOn={rtc.cameraOn}
+            micOn={rtc.micOn}
+            remotePeers={rtc.remotePeers}
+            onToggleCamera={rtc.toggleCamera}
+            onToggleMic={rtc.toggleMic}
+          />
+
+          <div className="flex flex-col items-center text-center gap-1">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
               You are Speaker {speakerSlot}
             </p>
-
-            <div className="mt-8 flex items-center gap-2">
-              {isConnected ? (
-                <span className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-                  <Mic className="w-4 h-4" />
-                  Mic active
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Connecting…
-                </span>
-              )}
-            </div>
-
-            {micError && (
-              <p className="mt-4 text-sm text-destructive max-w-xs">{micError}</p>
+            {isConnected ? (
+              <span className="flex items-center gap-1.5 text-xs text-primary font-semibold">
+                <Mic className="w-3.5 h-3.5" />
+                Mic active
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Connecting…
+              </span>
             )}
-
+            {(micError || rtc.error) && (
+              <p className="mt-2 text-xs text-destructive max-w-xs">
+                {micError || rtc.error}
+              </p>
+            )}
             {interimText && (
-              <p className="mt-6 text-sm text-foreground/80 italic max-w-sm leading-relaxed">
+              <p className="mt-3 text-sm text-foreground/80 italic max-w-sm leading-relaxed">
                 "{interimText}"
               </p>
             )}
-          </motion.div>
+          </div>
         </div>
 
-        <div className="px-6 pb-8 pt-4 text-center">
+        <div className="px-6 pb-6 pt-2 text-center">
           <p className="text-[11px] text-muted-foreground">
             Keep this tab open. Your speech is captured here.
           </p>
