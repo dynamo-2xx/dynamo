@@ -25,10 +25,17 @@ export function useDeviceTranscription({
   speakerSlot,
   speakerName,
   isActive,
+  isMicEnabled = true,
 }: Options) {
   const [interimText, setInterimText] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const micEnabledRef = useRef(isMicEnabled);
+  useEffect(() => {
+    micEnabledRef.current = isMicEnabled;
+    if (!isMicEnabled) setInterimText("");
+  }, [isMicEnabled]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
