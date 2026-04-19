@@ -96,6 +96,12 @@ const LiveJoinPage = () => {
     speakerName: displayName,
     isActive: isRecording,
   });
+  const rtc = useLiveSessionRTC({
+    sessionId,
+    deviceId,
+    displayName,
+    isActive: isRecording,
+  });
 
   // Heartbeat
   useEffect(() => {
