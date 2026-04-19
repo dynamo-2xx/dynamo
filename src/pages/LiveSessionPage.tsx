@@ -71,6 +71,13 @@ const LiveSessionPage = () => {
     isMulti ? sessionId : null,
     { deviceId, heartbeat: isMulti && isRecordingActive },
   );
+  const hostName = user?.email?.split("@")[0] || "Host";
+  const rtc = useLiveSessionRTC({
+    sessionId: isMulti ? sessionId : null,
+    deviceId,
+    displayName: hostName,
+    isActive: isRecordingActive && isMulti,
+  });
 
   const transcriptEntries = isMulti ? merged.entries : single.transcriptEntries;
   const summaries = isMulti ? [] : single.summaries;
