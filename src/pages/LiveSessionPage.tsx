@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Mic, Square, Radio, Loader2, ChevronDown, ArrowLeft } from "lucide-react";
+import { Mic, Square, Radio, Loader2, ChevronDown, ArrowLeft, UserPlus } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/SessionRecordView";
@@ -46,11 +47,27 @@ const LiveSessionPage = () => {
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [setupTags, setSetupTags] = useState<Tag[]>([]);
   const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [hostDisplayName, setHostDisplayName] = useState<string>("");
+  const [hostSpeakerSlot, setHostSpeakerSlot] = useState<number>(1);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const deviceId = useMemo(() => getDeviceId(), []);
   const isMulti = mode === "multi_device";
   const isRecordingActive = phase === "recording" && sessionStatus === "recording";
+
+  // Load host's display name from profile
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const name = data?.display_name || user.email?.split("@")[0] || "Host";
+      setHostDisplayName(name);
+    })();
+  }, [user]);
 
   // Single-device path
   const single = useLiveTranscription({
@@ -59,11 +76,12 @@ const LiveSessionPage = () => {
   });
 
   // Multi-device path: host runs its own mic AND merges all device entries
+  const hostName = hostDisplayName || "Host";
   const hostDevice = useDeviceTranscription({
     sessionId,
     deviceId,
-    speakerSlot: 1,
-    speakerName: "Host",
+    speakerSlot: hostSpeakerSlot,
+    speakerName: hostName,
     isActive: isRecordingActive && isMulti,
   });
   const merged = useMergedLiveTranscript(sessionId, isRecordingActive && isMulti);
@@ -71,7 +89,6 @@ const LiveSessionPage = () => {
     isMulti ? sessionId : null,
     { deviceId, heartbeat: isMulti && isRecordingActive },
   );
-  const hostName = user?.email?.split("@")[0] || "Host";
   const rtc = useLiveSessionRTC({
     sessionId: isMulti ? sessionId : null,
     deviceId,
