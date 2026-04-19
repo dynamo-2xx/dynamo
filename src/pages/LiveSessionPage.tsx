@@ -299,6 +299,16 @@ const LiveSessionPage = () => {
     return speakerNames[String(speakerId)] || `Speaker ${speakerId}`;
   };
 
+  // Avatar lookup by speaker_slot, derived from current presence rows.
+  const avatarBySlot = useMemo(() => {
+    const m: Record<number, string | null> = {};
+    presenceParticipants.forEach((p) => {
+      m[p.speaker_slot] = p.avatar_url;
+    });
+    return m;
+  }, [presenceParticipants]);
+  const getSpeakerAvatar = (speakerId: number) => avatarBySlot[speakerId] ?? null;
+
   // ── ENDED → Full record page ──
   if (phase === "ended") {
     const sd = sessionData || {};
