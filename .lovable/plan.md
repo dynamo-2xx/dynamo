@@ -1,103 +1,87 @@
 
 
-## Understanding
+## Plan: Minimal status bar + Full Display Options (A–E) + Floating Transcript
 
-Five distinct issues to fix in Live multi-device sessions:
+### 1. Shrink "Connected" status bar
+Single ~24px row pinned at the bottom of the live panel:
+- `h-6 px-3 py-0.5 flex items-center gap-1.5 bg-background/60 backdrop-blur-md border-t border-foreground/10`
+- Tiny mic icon + status text at `text-[11px]`
+- Strip the wrapper padding that's creating today's empty band
 
-1. **Persistent video tiles** — every connected participant should always have a tile, even with camera off (show avatar/initials placeholder). Tile only disappears when the participant actually leaves.
-2. **Real names everywhere** — joiners are showing as "Speaker 2/3" instead of the display name they entered. Host's `speaker_names` map isn't being updated when joiners arrive, so transcripts also fall back to "Speaker N".
-3. **Accurate presence list** — currently shows phantom speakers when host is alone. Stale `live_session_participants` rows must be culled aggressively, and the presence list must filter to only currently-active devices.
-4. **Display name defaults + fallback chain** — on join: use entered name → profile `display_name` → `Speaker #` (numbered slot) as last resort. Apply consistently to presence, video tiles, and transcripts.
-5. **Translucent transcript bubbles + avatar** — match the debate room argument-map/notebook style. Each entry shows the speaker's avatar inline; hovering expands the avatar and reveals the display name in a small label.
+### 2. Display Options menu (all of A–E)
 
-## Investigation needed (during implementation)
+**Trigger:** small Sliders icon button in the live panel header, opens a translucent popover.
 
-- `useLiveSessionRTC.ts` — how `remotePeers` is shaped; need to merge with presence so tiles exist before/after a stream arrives.
-- `useLiveSessionPresence.ts` — confirm the heartbeat threshold and stale-row filter; tighten to ~15s.
-- `useMergedLiveTranscript.ts` — verify it joins entries with `live_session_participants.display_name` (not just `speaker_names` jsonb).
-- `LiveThreadView` / live transcript card component — current markup, to swap in translucent bubble + avatar.
-- `LiveJoinPage.tsx` — ensure joiner submits a real display name (prefill from profile if signed in).
+**A. Layout preset**
+- Stacked (video top, transcript below) — default
+- Side-by-side (video left, transcript right) — desktop only, falls back to Stacked on mobile
+- Transcript-first (large transcript, video as small thumbnails on top)
+- Video-only (transcript hidden; reveals a floating transcript button — see §3)
 
-## Plan
+**B. Tile style**
+- Grid (equal tiles) — default
+- Speaker focus (active speaker large, others as thumbnails along the side)
+- Compact (smaller tiles, more fit on screen)
 
-### 1. Always-present video tiles, identity-keyed
-- Drive the `VideoGrid` from a **merged participant list** (presence rows ∪ self), not from `remotePeers` alone.
-- Each tile is keyed by `device_id`. Tile renders:
-  - Live `<video>` when a stream + cameraOn is true
-  - Otherwise an avatar circle (profile `avatar_url` or initials of display name)
-  - Mic-muted / cam-off badges on the tile (bottom-right)
-- Tile disappears only when the participant's presence row is gone (heartbeat lapsed > 15s **or** explicit leave on unmount).
-- Add a `beforeunload` + cleanup effect that deletes the joiner's `live_session_participants` row so leaves are immediate.
+**C. Transcript density**
+- Comfortable (current) — default
+- Compact (tight padding, smaller avatars, smaller text)
+- Cinema (large text, high contrast — for projection / accessibility)
 
-### 2. Display name propagation (joiner → host → transcripts)
-- `LiveJoinPage`: prefill the join form's name field from the user's profile `display_name`. Require non-empty before allowing join.
-- `join_live_session` already stores `display_name` on the participant row — good. Use that as the source of truth everywhere.
-- **Update `live_sessions.speaker_names`** automatically whenever a new participant joins or changes name:
-  - Host page subscribes to `live_session_participants` realtime changes.
-  - On any insert/update, host merges `{ [speaker_slot]: display_name }` into `live_sessions.speaker_names` (host has UPDATE permission).
-- `useMergedLiveTranscript`: resolution order for the label =
-  1. `live_session_participants.display_name` for that `device_id`
-  2. `live_sessions.speaker_names[slot]`
-  3. `Speaker {slot}` fallback
+**D. Show/hide toggles**
+- Show timestamps on bubbles
+- Show speaker name labels on video tiles
+- Show interim (in-progress) transcript text
+- Show subtopic dropdowns vs flat transcript
 
-### 3. Accurate presence (no phantom speakers)
-- Tighten heartbeat: client pings every 5s; server considers anything older than 15s stale.
-- `useLiveSessionPresence`: filter out rows where `last_seen_at < now - 15s` on the client too (don't trust the table alone).
-- `join_live_session` already purges stale rows on entry — extend the same purge logic to a small periodic cleanup triggered by the host page (every 20s, host-only).
-- Result: if only the host is heartbeating, only the host shows up.
+**E. Theme override (this session only)**
+- Auto / Light / Dark / High-contrast
+- High-contrast = boosted borders + opaque bubbles for readability
 
-### 4. Display-name fallback chain
-Single helper `resolveSpeakerName({ entered, profileName, slot })`:
-```
-entered?.trim() || profileName?.trim() || `Speaker ${slot}`
-```
-Used on:
-- `LiveJoinPage` submit
-- `LiveSessionPage` host self-registration
-- Presence list rendering
-- Video tile labels
-- Transcript bubble labels
+**Persistence:** all selections stored in `localStorage` under `dynamo:live:display-prefs`. No DB changes.
 
-### 5. Translucent transcript bubbles + hoverable avatars
-- New component `LiveTranscriptBubble` (or refactor existing) styled to match argument-map/notebook:
-  - `bg-background/70 backdrop-blur-xl border border-foreground/10 rounded-2xl`
-  - Soft shadow, subtle inner padding, body text in DM Sans
-- Layout per entry: small circular avatar (28px) on the left, message text on the right.
-- Hover behavior on the avatar:
-  - Expands smoothly (28 → 44px) via `transition-all`
-  - Reveals a small chip label with the display name to the right of the avatar (fade/slide in)
-  - Pure CSS (`group-hover:`) — no JS state needed
-- Apply to both `LiveSessionPage` host transcript and `LiveJoinPage` joiner transcript.
+### 3. Floating draggable transcript (Video-only mode)
 
-### Files to edit
+When layout = Video-only, a small "Transcript" pill button appears (bottom-right of the video area). Clicking it opens a draggable translucent bubble:
 
+- Reuses the existing `FloatingOverlay` component (same one powering NotebookOverlay / ArgumentMapOverlay)
+- ~320×400px, drag handle at top, close button
+- Body = `LiveThreadView` in `bubble` mode + `compact` density
+- Position persisted via `FloatingOverlay`'s built-in `storageKey` ("live-transcript")
+- Same translucent treatment as the rest of the live UI
+
+### Files to touch
 ```text
-src/hooks/useLiveSessionPresence.ts        — 15s stale filter, faster heartbeat
-src/hooks/useLiveSessionRTC.ts             — expose merged tile list keyed by device_id
-src/hooks/useMergedLiveTranscript.ts       — name resolution order + participant join
-src/pages/LiveSessionPage.tsx              — sync speaker_names on participant changes, periodic stale purge, wire new bubbles, persistent tiles
-src/pages/LiveJoinPage.tsx                 — prefill name from profile, leave-on-unmount, persistent tiles, new bubbles
-src/components/live/VideoGrid.tsx          — render placeholder tile when no stream / cam off
-src/components/live/PresenceList.tsx       — strict filter on live participants only
-src/components/live/LiveTranscriptBubble.tsx (NEW) — translucent bubble + hoverable avatar
-src/lib/liveNames.ts (NEW)                 — resolveSpeakerName helper
+src/pages/LiveSessionPage.tsx                     — shrink status bar, add Display button + apply layout/prefs
+src/pages/LiveJoinPage.tsx                        — same status bar + Display button + apply prefs
+src/components/live/DisplayOptionsMenu.tsx (NEW)  — popover with A/B/C/D/E controls
+src/hooks/useLiveDisplayPrefs.ts (NEW)            — localStorage prefs hook (typed prefs object + setter)
+src/components/live/VideoGrid.tsx                 — accept tileStyle, showLabels props; speaker-focus layout
+src/components/live/LiveThreadView.tsx            — accept density, showTimestamps, showInterim, flat-vs-grouped props
+src/components/live/LiveTranscriptBubble.tsx      — density variants (comfortable/compact/cinema), conditional timestamp
+src/components/live/FloatingTranscript.tsx (NEW)  — wraps FloatingOverlay + LiveThreadView for Video-only mode
 ```
 
-No new tables. No edge function changes. RLS untouched.
+No DB migrations. No edge function changes. RLS untouched.
 
-### Verification checklist
-1. Host alone → presence list shows only host; one video tile (host).
-2. Joiner enters "Alex" → host sees a second tile labeled "Alex" instantly; transcripts attribute lines to "Alex," not "Speaker 2."
-3. Joiner turns camera off → tile stays, shows avatar + "Camera off" badge.
-4. Joiner closes the tab → tile and presence chip disappear within ~15s (or instantly via unmount).
-5. Hover any avatar in the transcript → it grows and the display name chip appears.
-6. Joiner without a typed name + no profile name → shown as "Speaker 2" everywhere consistently.
+### Verification
+1. Status bar is a thin strip flush at the bottom — no empty band.
+2. Display button opens popover; each control updates live without reload.
+3. Side-by-side splits the panel 50/50 on desktop; collapses to Stacked under 768px.
+4. Speaker-focus enlarges the tile of whoever is currently speaking (uses interim-text presence as the signal).
+5. Cinema density scales transcript text to ~18px with stronger contrast.
+6. Toggling Hide timestamps / Hide labels / Hide interim works instantly.
+7. Theme override flips just the live panel's color tokens, not the whole app.
+8. Video-only hides the transcript area and reveals the Transcript pill; clicking it opens a draggable bubble that remembers position.
+9. Refreshing the page restores all prefs.
 
 ### Confidence
-- Persistent tiles + identity model: **94%**
-- Name propagation via realtime + speaker_names sync: **92%**
-- Stale-row culling / accurate presence: **93%**
-- Translucent bubbles + hover avatar: **97%**
+- Status bar fix: **99%**
+- Prefs framework + persistence: **96%**
+- A (layouts) + B (tile styles) rendering correctly across viewports: **91%**
+- C/D toggles: **97%**
+- E (theme override scoped to live panel only): **88%** — moderate risk; will scope via a CSS class wrapper rather than touching global theme context
+- Floating draggable transcript (reusing FloatingOverlay): **96%**
 
-Overall: **~94%**. The architecture is straightforward; the only moderate risk is host-side write-back of `speaker_names` racing with concurrent transcript inserts, which we handle via fetch-and-merge (already a project-wide pattern).
+Overall: **~94%**.
 
