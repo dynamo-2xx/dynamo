@@ -97,6 +97,7 @@ const LiveSessionPage = () => {
         setSessionStatus(d.status);
         setSessionData(d);
         setSpeakerNames(d.speaker_names || {});
+        setJoinCode(d.join_code || null);
         if (d.status === "ended") {
           setPhase("ended");
         } else {
