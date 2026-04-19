@@ -157,10 +157,18 @@ const LiveSessionPage = () => {
     }
 
     navigate(`/live/${d.id}`, { replace: true });
-  }, [user, title, mode, navigate, setupTags]);
+  }, [user, title, mode, navigate, setupTags, deviceId]);
 
   const handleEndSession = useCallback(async () => {
-    await endSession();
+    if (!isMulti) {
+      await endSession();
+    } else if (sessionId) {
+      // Multi-device: just mark ended
+      await (supabase as any)
+        .from("live_sessions")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", sessionId);
+    }
     setSessionStatus("ended");
     if (sessionId) {
       const { data } = await supabase
@@ -171,7 +179,7 @@ const LiveSessionPage = () => {
       if (data) setSessionData(data);
     }
     setPhase("ended");
-  }, [endSession, sessionId]);
+  }, [endSession, sessionId, isMulti]);
 
   // Group entries by subtopic for the recording view
   const groupedEntries = useMemo(() => {
