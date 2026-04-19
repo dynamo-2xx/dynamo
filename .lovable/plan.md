@@ -1,65 +1,103 @@
 
+
+## Understanding
+
+Five distinct issues to fix in Live multi-device sessions:
+
+1. **Persistent video tiles** — every connected participant should always have a tile, even with camera off (show avatar/initials placeholder). Tile only disappears when the participant actually leaves.
+2. **Real names everywhere** — joiners are showing as "Speaker 2/3" instead of the display name they entered. Host's `speaker_names` map isn't being updated when joiners arrive, so transcripts also fall back to "Speaker N".
+3. **Accurate presence list** — currently shows phantom speakers when host is alone. Stale `live_session_participants` rows must be culled aggressively, and the presence list must filter to only currently-active devices.
+4. **Display name defaults + fallback chain** — on join: use entered name → profile `display_name` → `Speaker #` (numbered slot) as last resort. Apply consistently to presence, video tiles, and transcripts.
+5. **Translucent transcript bubbles + avatar** — match the debate room argument-map/notebook style. Each entry shows the speaker's avatar inline; hovering expands the avatar and reveals the display name in a small label.
+
+## Investigation needed (during implementation)
+
+- `useLiveSessionRTC.ts` — how `remotePeers` is shaped; need to merge with presence so tiles exist before/after a stream arrives.
+- `useLiveSessionPresence.ts` — confirm the heartbeat threshold and stale-row filter; tighten to ~15s.
+- `useMergedLiveTranscript.ts` — verify it joins entries with `live_session_participants.display_name` (not just `speaker_names` jsonb).
+- `LiveThreadView` / live transcript card component — current markup, to swap in translucent bubble + avatar.
+- `LiveJoinPage.tsx` — ensure joiner submits a real display name (prefill from profile if signed in).
+
 ## Plan
 
-### What’s actually broken
-1. **Mic button** only toggles the WebRTC call audio in `useLiveSessionRTC`.  
-   The transcript is still being captured by a separate mic stream inside `useDeviceTranscription`, so speech keeps getting recorded.
+### 1. Always-present video tiles, identity-keyed
+- Drive the `VideoGrid` from a **merged participant list** (presence rows ∪ self), not from `remotePeers` alone.
+- Each tile is keyed by `device_id`. Tile renders:
+  - Live `<video>` when a stream + cameraOn is true
+  - Otherwise an avatar circle (profile `avatar_url` or initials of display name)
+  - Mic-muted / cam-off badges on the tile (bottom-right)
+- Tile disappears only when the participant's presence row is gone (heartbeat lapsed > 15s **or** explicit leave on unmount).
+- Add a `beforeunload` + cleanup effect that deletes the joiner's `live_session_participants` row so leaves are immediate.
 
-2. **Camera button** only hides/disables the preview track in the video grid path.  
-   It does not fully stop the camera capture lifecycle, and it does not control transcription at all.
+### 2. Display name propagation (joiner → host → transcripts)
+- `LiveJoinPage`: prefill the join form's name field from the user's profile `display_name`. Require non-empty before allowing join.
+- `join_live_session` already stores `display_name` on the participant row — good. Use that as the source of truth everywhere.
+- **Update `live_sessions.speaker_names`** automatically whenever a new participant joins or changes name:
+  - Host page subscribes to `live_session_participants` realtime changes.
+  - On any insert/update, host merges `{ [speaker_slot]: display_name }` into `live_sessions.speaker_names` (host has UPDATE permission).
+- `useMergedLiveTranscript`: resolution order for the label =
+  1. `live_session_participants.display_name` for that `device_id`
+  2. `live_sessions.speaker_names[slot]`
+  3. `Speaker {slot}` fallback
 
-3. **Host still appears as Speaker 2** because slot assignment is based on `live_session_participants`, and stale participant rows / reused device joins can leave slot 1 occupied. The host page currently trusts whatever row exists for the current `deviceId`.
+### 3. Accurate presence (no phantom speakers)
+- Tighten heartbeat: client pings every 5s; server considers anything older than 15s stale.
+- `useLiveSessionPresence`: filter out rows where `last_seen_at < now - 15s` on the client too (don't trust the table alone).
+- `join_live_session` already purges stale rows on entry — extend the same purge logic to a small periodic cleanup triggered by the host page (every 20s, host-only).
+- Result: if only the host is heartbeating, only the host shows up.
 
-### Fix approach
+### 4. Display-name fallback chain
+Single helper `resolveSpeakerName({ entered, profileName, slot })`:
+```
+entered?.trim() || profileName?.trim() || `Speaker ${slot}`
+```
+Used on:
+- `LiveJoinPage` submit
+- `LiveSessionPage` host self-registration
+- Presence list rendering
+- Video tile labels
+- Transcript bubble labels
 
-#### 1) Make mic/camera toggles control the real capture source
-Refactor Online mode so the call UI and transcription share one media-control source instead of opening unrelated streams.
+### 5. Translucent transcript bubbles + hoverable avatars
+- New component `LiveTranscriptBubble` (or refactor existing) styled to match argument-map/notebook:
+  - `bg-background/70 backdrop-blur-xl border border-foreground/10 rounded-2xl`
+  - Soft shadow, subtle inner padding, body text in DM Sans
+- Layout per entry: small circular avatar (28px) on the left, message text on the right.
+- Hover behavior on the avatar:
+  - Expands smoothly (28 → 44px) via `transition-all`
+  - Reveals a small chip label with the display name to the right of the avatar (fade/slide in)
+  - Pure CSS (`group-hover:`) — no JS state needed
+- Apply to both `LiveSessionPage` host transcript and `LiveJoinPage` joiner transcript.
 
-- Update `useLiveSessionRTC` so:
-  - **Mic off** fully disables the local audio capture for the session:
-    - stop/remove the active audio track
-    - expose `micOn = false`
-    - provide a way to re-request mic **directly from the button click**
-  - **Camera off** fully disables camera capture:
-    - stop/remove the active video track
-    - replace/remove the sender track on peer connections
-    - restore only from a direct click handler
+### Files to edit
 
-- Update `useDeviceTranscription` so it no longer independently owns a permanent hidden mic path.
-  - It should accept either:
-    - a shared audio stream/track from the RTC/media layer, or
-    - an explicit `isMicEnabled` gate that hard-pauses sending audio and suppresses transcript writes/interim updates.
-  - When mic is off, Deepgram input must stop and no new transcript rows should be inserted.
+```text
+src/hooks/useLiveSessionPresence.ts        — 15s stale filter, faster heartbeat
+src/hooks/useLiveSessionRTC.ts             — expose merged tile list keyed by device_id
+src/hooks/useMergedLiveTranscript.ts       — name resolution order + participant join
+src/pages/LiveSessionPage.tsx              — sync speaker_names on participant changes, periodic stale purge, wire new bubbles, persistent tiles
+src/pages/LiveJoinPage.tsx                 — prefill name from profile, leave-on-unmount, persistent tiles, new bubbles
+src/components/live/VideoGrid.tsx          — render placeholder tile when no stream / cam off
+src/components/live/PresenceList.tsx       — strict filter on live participants only
+src/components/live/LiveTranscriptBubble.tsx (NEW) — translucent bubble + hoverable avatar
+src/lib/liveNames.ts (NEW)                 — resolveSpeakerName helper
+```
 
-Result: the UI button and the actual recording state finally match.
+No new tables. No edge function changes. RLS untouched.
 
-#### 2) Fix host speaker slot deterministically
-The host should not “discover” their slot from whatever participant row happens to exist.
-
-- On host session start/load, explicitly ensure the host has the canonical participant row for the current device.
-- If the current user is the session creator, force transcript display to use the host’s assigned slot from the authoritative participant record.
-- Add a backend fix so `join_live_session` prefers/reuses the host row correctly and does not let stale rows keep slot 1 forever.
-- Clean up stale participant handling so disconnected old devices don’t permanently steal early slots.
-
-Result: if you are the host and only person present, you show as **Speaker 1**.
-
-### Files to update
-- `src/hooks/useLiveSessionRTC.ts` — real media enable/disable, track stop/restart, peer sender replacement
-- `src/hooks/useDeviceTranscription.ts` — stop separate hidden recording path; bind to actual mic-enabled state/shared stream
-- `src/pages/LiveSessionPage.tsx` — host slot resolution and wiring transcript capture to real media state
-- `src/pages/LiveJoinPage.tsx` — same media-control wiring for joiners
-- `supabase/migrations/...` — fix participant slot allocation / stale host-slot behavior in `join_live_session`
-
-### Small related cleanup
-- `src/components/live/JoinCodeCard.tsx` should be wrapped with `forwardRef` or wrapped in a normal container in the popover, to remove the current ref warning seen in console.
-
-### What I’ll verify after implementation
-1. Mic off: no one hears you **and** no new transcript text is created.
-2. Mic on again: permission/restart works from the button.
-3. Camera off: video track truly stops, not just hides.
-4. Camera on again: feed resumes correctly.
-5. Host alone in a fresh session: shown as **Speaker 1** everywhere.
-6. Host with joiners: each device keeps the correct speaker slot.
+### Verification checklist
+1. Host alone → presence list shows only host; one video tile (host).
+2. Joiner enters "Alex" → host sees a second tile labeled "Alex" instantly; transcripts attribute lines to "Alex," not "Speaker 2."
+3. Joiner turns camera off → tile stays, shows avatar + "Camera off" badge.
+4. Joiner closes the tab → tile and presence chip disappear within ~15s (or instantly via unmount).
+5. Hover any avatar in the transcript → it grows and the display name chip appears.
+6. Joiner without a typed name + no profile name → shown as "Speaker 2" everywhere consistently.
 
 ### Confidence
-High. The media issue is clearly caused by split capture paths, and the speaker issue is clearly tied to participant-slot persistence rather than transcript rendering alone.
+- Persistent tiles + identity model: **94%**
+- Name propagation via realtime + speaker_names sync: **92%**
+- Stale-row culling / accurate presence: **93%**
+- Translucent bubbles + hover avatar: **97%**
+
+Overall: **~94%**. The architecture is straightforward; the only moderate risk is host-side write-back of `speaker_names` racing with concurrent transcript inserts, which we handle via fetch-and-merge (already a project-wide pattern).
+
