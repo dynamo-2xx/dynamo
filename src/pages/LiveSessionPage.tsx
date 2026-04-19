@@ -97,6 +97,48 @@ const LiveSessionPage = () => {
     { deviceId, heartbeat: isMulti && isRecordingActive },
   );
 
+  // Host-side: when participants change, merge their {slot: display_name} into
+  // live_sessions.speaker_names so transcripts show real names.
+  useEffect(() => {
+    if (!isMulti || !sessionId || !user) return;
+    if (presenceParticipants.length === 0) return;
+    const next = { ...speakerNames };
+    let changed = false;
+    presenceParticipants.forEach((p) => {
+      const key = String(p.speaker_slot);
+      const name = p.display_name?.trim();
+      if (name && next[key] !== name) {
+        next[key] = name;
+        changed = true;
+      }
+    });
+    if (!changed) return;
+    setSpeakerNames(next);
+    (supabase as any)
+      .from("live_sessions")
+      .update({ speaker_names: next })
+      .eq("id", sessionId)
+      .then(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presenceParticipants, isMulti, sessionId, user]);
+
+  // Host-side: leave-on-unmount so the host's row disappears when navigating away.
+  useEffect(() => {
+    if (!isMulti || !sessionId) return;
+    const onLeave = () => {
+      // Best-effort delete; host has DELETE permission via is_live_session_host RLS.
+      (supabase as any)
+        .from("live_session_participants")
+        .delete()
+        .eq("session_id", sessionId)
+        .eq("device_id", deviceId);
+    };
+    window.addEventListener("beforeunload", onLeave);
+    return () => {
+      window.removeEventListener("beforeunload", onLeave);
+    };
+  }, [isMulti, sessionId, deviceId]);
+
   const transcriptEntries = isMulti ? merged.entries : single.transcriptEntries;
   const summaries = isMulti ? [] : single.summaries;
   const subtopics = isMulti ? [] : single.subtopics;
@@ -433,6 +475,8 @@ const LiveSessionPage = () => {
               cameraOn={rtc.cameraOn}
               micOn={rtc.micOn}
               remotePeers={rtc.remotePeers}
+              participants={presenceParticipants}
+              deviceId={deviceId}
               onToggleCamera={rtc.toggleCamera}
               onToggleMic={rtc.toggleMic}
             />

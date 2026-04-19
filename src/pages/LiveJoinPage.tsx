@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
 import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
+import { useLiveSessionPresence } from "@/hooks/useLiveSessionPresence";
 import VideoGrid from "@/components/live/VideoGrid";
 import { toast } from "sonner";
 
@@ -104,18 +105,29 @@ const LiveJoinPage = () => {
     isMicEnabled: rtc.micOn,
   });
 
-  // Heartbeat
+  // Presence (also sends heartbeat every 5s and gives us the participant list
+  // so we can render persistent video tiles).
+  const presenceParticipants = useLiveSessionPresence(sessionId, {
+    deviceId,
+    heartbeat: isRecording,
+  });
+
+  // Leave-on-unmount: drop our participant row immediately so other devices
+  // see us disappear without waiting for the staleness timeout.
   useEffect(() => {
     if (!isRecording || !sessionId) return;
-    const beat = () => {
-      (supabase as any).rpc("live_session_heartbeat", {
-        _session_id: sessionId,
-        _device_id: deviceId,
-      });
+    const leave = () => {
+      (supabase as any)
+        .from("live_session_participants")
+        .delete()
+        .eq("session_id", sessionId)
+        .eq("device_id", deviceId);
     };
-    beat();
-    const t = setInterval(beat, 15000);
-    return () => clearInterval(t);
+    window.addEventListener("beforeunload", leave);
+    return () => {
+      window.removeEventListener("beforeunload", leave);
+      leave();
+    };
   }, [isRecording, sessionId, deviceId]);
 
   // Auth gate — joining requires an account so the device can call deepgram-token
@@ -211,9 +223,12 @@ const LiveJoinPage = () => {
           <VideoGrid
             localStream={rtc.localStream}
             localName={displayName}
+            localAvatar={emoji}
             cameraOn={rtc.cameraOn}
             micOn={rtc.micOn}
             remotePeers={rtc.remotePeers}
+            participants={presenceParticipants}
+            deviceId={deviceId}
             onToggleCamera={rtc.toggleCamera}
             onToggleMic={rtc.toggleMic}
           />
