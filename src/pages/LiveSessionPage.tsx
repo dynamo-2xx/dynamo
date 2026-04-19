@@ -173,17 +173,28 @@ const LiveSessionPage = () => {
 
     // Multi-device: register the host as Speaker 1 via join RPC
     if (mode === "multi_device" && d.join_code) {
-      const hostName = user.email?.split("@")[0] || "Host";
-      await (supabase as any).rpc("join_live_session", {
+      const name = hostDisplayName || user.email?.split("@")[0] || "Host";
+      const { data: joinData } = await (supabase as any).rpc("join_live_session", {
         _code: d.join_code,
         _device_id: deviceId,
-        _display_name: hostName,
+        _display_name: name,
         _avatar_url: null,
       });
+      const row = Array.isArray(joinData) ? joinData[0] : joinData;
+      const slot = row?.speaker_slot ?? 1;
+      setHostSpeakerSlot(slot);
+
+      // Seed speaker_names so transcripts show real name not "Speaker N"
+      const seeded = { ...(d.speaker_names || {}), [String(slot)]: name };
+      setSpeakerNames(seeded);
+      await (supabase as any)
+        .from("live_sessions")
+        .update({ speaker_names: seeded })
+        .eq("id", d.id);
     }
 
     navigate(`/live/${d.id}`, { replace: true });
-  }, [user, title, mode, navigate, setupTags, deviceId]);
+  }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName]);
 
   const handleEndSession = useCallback(async () => {
     if (!isMulti) {
@@ -231,7 +242,7 @@ const LiveSessionPage = () => {
   }, [transcriptEntries, subtopics]);
 
   const getSpeakerName = (speakerId: number) => {
-    return speakerNames[String(speakerId)] || `Speaker ${speakerId + 1}`;
+    return speakerNames[String(speakerId)] || `Speaker ${speakerId}`;
   };
 
   // ── ENDED → Full record page ──
