@@ -12,7 +12,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useLiveTranscription, LiveTranscriptEntry } from "@/hooks/useLiveTranscription";
+import { useMergedLiveTranscript } from "@/hooks/useMergedLiveTranscript";
+import { useLiveSessionPresence } from "@/hooks/useLiveSessionPresence";
+import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
+import JoinCodeCard from "@/components/live/JoinCodeCard";
+import PresenceList from "@/components/live/PresenceList";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+const getDeviceId = () => {
+  let id = localStorage.getItem("dyn_device_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("dyn_device_id", id);
+  }
+  return id;
+};
 
 type SessionPhase = "setup" | "recording" | "ended";
 
