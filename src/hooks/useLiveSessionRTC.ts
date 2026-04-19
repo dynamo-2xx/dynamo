@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 /**
  * WebRTC mesh for Live Sessions, signaled via Supabase Realtime broadcast.
  *
- * Each device joins a channel keyed by sessionId, announces itself via presence,
- * and runs the standard "polite peer" handshake against every other peer.
+ * Toggling mic/camera fully stops the underlying capture track (not just
+ * `enabled = false`), so the OS-level mic/camera indicators turn off and
+ * any consumer of the same stream (e.g. transcription) sees the change.
  */
 
 export interface RemotePeer {
@@ -38,7 +39,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const makingOfferRef = useRef<Map<string, boolean>>(new Map());
 
-  // ── Acquire local media ──
+  // ── Acquire initial local media (camera + mic both on) ──
   useEffect(() => {
     if (!isActive || !sessionId) return;
     let cancelled = false;
@@ -55,6 +56,8 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
         }
         localStreamRef.current = stream;
         setLocalStream(stream);
+        setCameraOn(true);
+        setMicOn(true);
       } catch (e: any) {
         console.error("[rtc] getUserMedia failed", e);
         setError(e?.message || "Could not access camera/microphone");
@@ -79,15 +82,18 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
     });
     channelRef.current = channel;
 
-    const createPeer = (otherId: string, polite: boolean): RTCPeerConnection => {
+    const createPeer = (otherId: string, _polite: boolean): RTCPeerConnection => {
       const existing = pcsRef.current.get(otherId);
       if (existing) return existing;
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcsRef.current.set(otherId, pc);
 
-      // Add local tracks
-      localStream.getTracks().forEach((t) => pc.addTrack(t, localStream));
+      // Add current local tracks (may be just video or just audio if one was stopped)
+      const stream = localStreamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      }
 
       pc.onicecandidate = (ev) => {
         if (ev.candidate) {
@@ -161,7 +167,6 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
       .on("broadcast", { event: "signal" }, async ({ payload }) => {
         const { to, from, sdp, candidate } = payload || {};
         if (to !== deviceId || !from) return;
-        // We are the polite peer if our id sorts higher
         const polite = deviceId > from;
         const pc = createPeer(from, polite);
 
@@ -184,7 +189,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
           } else if (candidate) {
             try {
               await pc.addIceCandidate(candidate);
-            } catch (e) {
+            } catch {
               // ignore stray candidates
             }
           }
@@ -196,7 +201,6 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
         const state = channel.presenceState() as Record<string, Array<{ displayName: string }>>;
         const presentIds = Object.keys(state).filter((id) => id !== deviceId);
 
-        // Update names
         setRemotePeers((prev) => {
           const next = new Map(prev);
           for (const id of presentIds) {
@@ -206,7 +210,6 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
               next.set(id, { ...existing, displayName: meta.displayName });
             }
           }
-          // Remove peers no longer present
           for (const id of Array.from(next.keys())) {
             if (!presentIds.includes(id)) {
               closePeer(id);
@@ -215,13 +218,10 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
           return next;
         });
 
-        // Initiate connection to anyone we don't have yet — only the lower id calls
         for (const otherId of presentIds) {
           if (pcsRef.current.has(otherId)) continue;
           if (deviceId < otherId) {
-            // We are the "impolite" caller; create offer
             const pc = createPeer(otherId, false);
-            // negotiationneeded will fire from addTrack already done inside createPeer
             (async () => {
               try {
                 makingOfferRef.current.set(otherId, true);
@@ -239,7 +239,6 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
               }
             })();
           } else {
-            // Pre-create peer so incoming offer finds it
             createPeer(otherId, true);
           }
         }
@@ -259,23 +258,91 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
     };
   }, [isActive, sessionId, localStream, deviceId, displayName]);
 
-  // ── Toggles ──
-  const toggleCamera = useCallback(() => {
-    const stream = localStreamRef.current;
-    if (!stream) return;
-    const next = !cameraOn;
-    stream.getVideoTracks().forEach((t) => (t.enabled = next));
-    setCameraOn(next);
-  }, [cameraOn]);
+  // ── Helpers: stop/replace a track on every peer connection ──
+  const replaceSenderTrack = useCallback(
+    (kind: "audio" | "video", newTrack: MediaStreamTrack | null) => {
+      pcsRef.current.forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track?.kind === kind);
+        if (sender) {
+          sender.replaceTrack(newTrack).catch((e) =>
+            console.warn("[rtc] replaceTrack failed", e),
+          );
+        } else if (newTrack) {
+          // No existing sender (track was removed earlier) — add it back.
+          if (localStreamRef.current) {
+            pc.addTrack(newTrack, localStreamRef.current);
+          }
+        }
+      });
+    },
+    [],
+  );
 
-  const toggleMic = useCallback(() => {
+  // ── Toggles ── (fully stop the capture, not just `enabled = false`)
+  const toggleCamera = useCallback(async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
-    const next = !micOn;
-    // Only mute the WebRTC outgoing track — Deepgram has its own getUserMedia
-    stream.getAudioTracks().forEach((t) => (t.enabled = next));
-    setMicOn(next);
-  }, [micOn]);
+
+    if (cameraOn) {
+      // Turn OFF: stop video track entirely
+      stream.getVideoTracks().forEach((t) => {
+        t.stop();
+        stream.removeTrack(t);
+      });
+      replaceSenderTrack("video", null);
+      setLocalStream(new MediaStream(stream.getTracks()));
+      setCameraOn(false);
+    } else {
+      // Turn ON: re-acquire video
+      try {
+        const fresh = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+        });
+        const newTrack = fresh.getVideoTracks()[0];
+        if (!newTrack) return;
+        stream.addTrack(newTrack);
+        replaceSenderTrack("video", newTrack);
+        setLocalStream(new MediaStream(stream.getTracks()));
+        setCameraOn(true);
+      } catch (e: any) {
+        console.error("[rtc] camera restart failed", e);
+        setError(e?.message || "Could not access camera");
+      }
+    }
+  }, [cameraOn, replaceSenderTrack]);
+
+  const toggleMic = useCallback(async () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+
+    if (micOn) {
+      // Turn OFF: stop audio track entirely so the OS mic indicator goes off
+      // and any other consumer (transcription) sees the track end.
+      stream.getAudioTracks().forEach((t) => {
+        t.stop();
+        stream.removeTrack(t);
+      });
+      replaceSenderTrack("audio", null);
+      setLocalStream(new MediaStream(stream.getTracks()));
+      setMicOn(false);
+    } else {
+      // Turn ON: re-acquire mic
+      try {
+        const fresh = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        const newTrack = fresh.getAudioTracks()[0];
+        if (!newTrack) return;
+        stream.addTrack(newTrack);
+        replaceSenderTrack("audio", newTrack);
+        setLocalStream(new MediaStream(stream.getTracks()));
+        setMicOn(true);
+      } catch (e: any) {
+        console.error("[rtc] mic restart failed", e);
+        setError(e?.message || "Could not access microphone");
+      }
+    }
+  }, [micOn, replaceSenderTrack]);
 
   return {
     localStream,

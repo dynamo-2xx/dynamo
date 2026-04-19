@@ -89,18 +89,19 @@ const LiveJoinPage = () => {
 
   // ── Recording phase ──
   const isRecording = phase === "recording";
+  const rtc = useLiveSessionRTC({
+    sessionId,
+    deviceId,
+    displayName,
+    isActive: isRecording,
+  });
   const { interimText, isConnected, error: micError } = useDeviceTranscription({
     sessionId,
     deviceId,
     speakerSlot,
     speakerName: displayName,
     isActive: isRecording,
-  });
-  const rtc = useLiveSessionRTC({
-    sessionId,
-    deviceId,
-    displayName,
-    isActive: isRecording,
+    isMicEnabled: rtc.micOn,
   });
 
   // Heartbeat

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Copy, Share2, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ interface Props {
   sessionTitle?: string | null;
 }
 
-const JoinCodeCard = ({ code, sessionTitle }: Props) => {
+const JoinCodeCard = forwardRef<HTMLDivElement, Props>(({ code, sessionTitle }, ref) => {
   const [qrSrc, setQrSrc] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
@@ -46,7 +46,7 @@ const JoinCodeCard = ({ code, sessionTitle }: Props) => {
   };
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 space-y-4">
+    <div ref={ref} className="bg-card border border-border rounded-2xl p-4 sm:p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
@@ -88,6 +88,8 @@ const JoinCodeCard = ({ code, sessionTitle }: Props) => {
       </p>
     </div>
   );
-};
+});
+
+JoinCodeCard.displayName = "JoinCodeCard";
 
 export default JoinCodeCard;

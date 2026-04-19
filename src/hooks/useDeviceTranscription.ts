@@ -7,6 +7,11 @@ interface Options {
   speakerSlot: number;
   speakerName: string;
   isActive: boolean;
+  /**
+   * External mic-enabled gate. When false, audio is not sent to Deepgram and
+   * no transcript rows are inserted. Defaults to true for backwards compat.
+   */
+  isMicEnabled?: boolean;
 }
 
 /**
@@ -20,10 +25,17 @@ export function useDeviceTranscription({
   speakerSlot,
   speakerName,
   isActive,
+  isMicEnabled = true,
 }: Options) {
   const [interimText, setInterimText] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const micEnabledRef = useRef(isMicEnabled);
+  useEffect(() => {
+    micEnabledRef.current = isMicEnabled;
+    if (!isMicEnabled) setInterimText("");
+  }, [isMicEnabled]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -102,6 +114,8 @@ export function useDeviceTranscription({
           setIsConnected(true);
           processor.onaudioprocess = (ev) => {
             if (ws.readyState !== WebSocket.OPEN) return;
+            // Hard mute: don't send audio while mic is toggled off
+            if (!micEnabledRef.current) return;
             const input = ev.inputBuffer.getChannelData(0);
             const buf = new Int16Array(input.length);
             for (let i = 0; i < input.length; i++) {
@@ -119,6 +133,8 @@ export function useDeviceTranscription({
             const msg = JSON.parse(ev.data);
             const alt = msg?.channel?.alternatives?.[0];
             if (!alt?.transcript) return;
+            // Drop any results that arrive while mic is off
+            if (!micEnabledRef.current) return;
             const transcript: string = alt.transcript;
             const isFinal: boolean = !!msg.is_final;
             if (!isFinal) {

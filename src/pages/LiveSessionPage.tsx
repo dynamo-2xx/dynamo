@@ -77,24 +77,25 @@ const LiveSessionPage = () => {
 
   // Multi-device path: host runs its own mic AND merges all device entries
   const hostName = hostDisplayName || "Host";
-  const hostDevice = useDeviceTranscription({
-    sessionId,
-    deviceId,
-    speakerSlot: hostSpeakerSlot,
-    speakerName: hostName,
-    isActive: isRecordingActive && isMulti,
-  });
-  const merged = useMergedLiveTranscript(sessionId, isRecordingActive && isMulti);
-  const presenceParticipants = useLiveSessionPresence(
-    isMulti ? sessionId : null,
-    { deviceId, heartbeat: isMulti && isRecordingActive },
-  );
   const rtc = useLiveSessionRTC({
     sessionId: isMulti ? sessionId : null,
     deviceId,
     displayName: hostName,
     isActive: isRecordingActive && isMulti,
   });
+  const hostDevice = useDeviceTranscription({
+    sessionId,
+    deviceId,
+    speakerSlot: hostSpeakerSlot,
+    speakerName: hostName,
+    isActive: isRecordingActive && isMulti,
+    isMicEnabled: rtc.micOn,
+  });
+  const merged = useMergedLiveTranscript(sessionId, isRecordingActive && isMulti);
+  const presenceParticipants = useLiveSessionPresence(
+    isMulti ? sessionId : null,
+    { deviceId, heartbeat: isMulti && isRecordingActive },
+  );
 
   const transcriptEntries = isMulti ? merged.entries : single.transcriptEntries;
   const summaries = isMulti ? [] : single.summaries;
