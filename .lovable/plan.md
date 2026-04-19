@@ -1,65 +1,65 @@
 
+## Plan
 
-## Plan: Fix auth redirect, host = Speaker 1, restructure live UI
+### What’s actually broken
+1. **Mic button** only toggles the WebRTC call audio in `useLiveSessionRTC`.  
+   The transcript is still being captured by a separate mic stream inside `useDeviceTranscription`, so speech keeps getting recorded.
 
-### 1. Auth redirect after sign-in/sign-up
-**Problem:** `LiveJoinPage` passes `?redirect=/live/join/CODE` to `/auth`, but `AuthPage` ignores it and always pushes to `/`.
+2. **Camera button** only hides/disables the preview track in the video grid path.  
+   It does not fully stop the camera capture lifecycle, and it does not control transcription at all.
 
-**Fix:** In `src/pages/AuthPage.tsx`, read `redirect` from `useSearchParams()` and navigate there on successful sign-in / sign-up / Google OAuth instead of `/`. Validate it starts with `/` (no open-redirects).
+3. **Host still appears as Speaker 2** because slot assignment is based on `live_session_participants`, and stale participant rows / reused device joins can leave slot 1 occupied. The host page currently trusts whatever row exists for the current `deviceId`.
 
-### 2. Host always = Speaker 1
-**Problem:** Per the screenshot, the host's own merged transcript labels them "Speaker 2." In multi-device mode the host runs `useDeviceTranscription` with a `speakerSlot` derived from local state — currently hardcoded or off-by-one.
+### Fix approach
 
-**Fix:**
-- In `LiveSessionPage.tsx`, when the host starts a multi-device session, immediately call `join_live_session` for the host too (or read back their participant row) and use the returned `speaker_slot` (which is `1` because they're first). Pass that exact slot into `useDeviceTranscription`.
-- Seed `live_sessions.speaker_names` with `{ "1": "<host display_name>" }` so the merged transcript renders the host's real name, not "Speaker 2."
-- Confirm `useMergedLiveTranscript` resolves labels via `speaker_names[slot]` first, falling back to `Speaker ${slot}`.
+#### 1) Make mic/camera toggles control the real capture source
+Refactor Online mode so the call UI and transcription share one media-control source instead of opening unrelated streams.
 
-### 3. Restructure live UI like a Zoom call
-Current layout (host, multi-device, recording): presence strip → VideoGrid → transcript → invite block (somewhere above).
+- Update `useLiveSessionRTC` so:
+  - **Mic off** fully disables the local audio capture for the session:
+    - stop/remove the active audio track
+    - expose `micOn = false`
+    - provide a way to re-request mic **directly from the button click**
+  - **Camera off** fully disables camera capture:
+    - stop/remove the active video track
+    - replace/remove the sender track on peer connections
+    - restore only from a direct click handler
 
-**New layout (mobile-first, applies at current 833px viewport too):**
+- Update `useDeviceTranscription` so it no longer independently owns a permanent hidden mic path.
+  - It should accept either:
+    - a shared audio stream/track from the RTC/media layer, or
+    - an explicit `isMicEnabled` gate that hard-pauses sending audio and suppresses transcript writes/interim updates.
+  - When mic is off, Deepgram input must stop and no new transcript rows should be inserted.
 
-```text
-┌──────────────────────────────────────────────┐
-│ [back] ● Recording  title           [End]   │
-├──────────────────────────────────────────────┤
-│ ┌──────────────┐  ┌────────────────────────┐ │
-│ │ [+ Invite ▾] │  │ presence avatar strip  │ │
-│ └──────────────┘  └────────────────────────┘ │
-├──────────────────────────────────────────────┤
-│                                              │
-│            VIDEO GRID (own space)            │
-│         own + remote tiles + mic/cam         │
-│                                              │
-├──────────────────────────────────────────────┤
-│            TRANSCRIPT (own space)            │
-│             scrollable, below video          │
-│                                              │
-└──────────────────────────────────────────────┘
-```
+Result: the UI button and the actual recording state finally match.
 
-- **Video block**: dedicated section, not interleaved with transcript. Keep mic/cam toggles directly under it.
-- **Transcript block**: separate scroll region beneath the video. Stops the current "video sandwiched in scroll" feel.
-- **Invite control**: replace the existing always-visible JoinCodeCard with a compact `[+ Invite ▾]` button **pinned to the left of the presence strip**. Clicking it opens a `Popover` (anchored, not modal) showing the existing JoinCodeCard contents (code, copy, share, QR). Closes on outside click.
-- Same restructure on `LiveJoinPage` recording phase: video on top in its own space, "Connected / mic active" status pill below — joiners don't get the invite button.
+#### 2) Fix host speaker slot deterministically
+The host should not “discover” their slot from whatever participant row happens to exist.
 
-### Files
+- On host session start/load, explicitly ensure the host has the canonical participant row for the current device.
+- If the current user is the session creator, force transcript display to use the host’s assigned slot from the authoritative participant record.
+- Add a backend fix so `join_live_session` prefers/reuses the host row correctly and does not let stale rows keep slot 1 forever.
+- Clean up stale participant handling so disconnected old devices don’t permanently steal early slots.
 
-```text
-EDIT src/pages/AuthPage.tsx                — honor ?redirect=/... after auth (email + Google)
-EDIT src/pages/LiveSessionPage.tsx         — fix host slot via join RPC, seed speaker_names, restructure layout, wrap JoinCodeCard in Popover
-EDIT src/pages/LiveJoinPage.tsx            — restructure recording phase (video block / status block)
-EDIT src/components/live/PresenceList.tsx  — accept optional left-side slot for the Invite button (or compose in parent)
-EDIT src/hooks/useMergedLiveTranscript.ts  — ensure speaker label resolution prefers session.speaker_names[slot]
-```
+Result: if you are the host and only person present, you show as **Speaker 1**.
 
-No DB migrations. No edge function changes. WebRTC, Deepgram, analysis, RLS untouched.
+### Files to update
+- `src/hooks/useLiveSessionRTC.ts` — real media enable/disable, track stop/restart, peer sender replacement
+- `src/hooks/useDeviceTranscription.ts` — stop separate hidden recording path; bind to actual mic-enabled state/shared stream
+- `src/pages/LiveSessionPage.tsx` — host slot resolution and wiring transcript capture to real media state
+- `src/pages/LiveJoinPage.tsx` — same media-control wiring for joiners
+- `supabase/migrations/...` — fix participant slot allocation / stale host-slot behavior in `join_live_session`
+
+### Small related cleanup
+- `src/components/live/JoinCodeCard.tsx` should be wrapped with `forwardRef` or wrapped in a normal container in the popover, to remove the current ref warning seen in console.
+
+### What I’ll verify after implementation
+1. Mic off: no one hears you **and** no new transcript text is created.
+2. Mic on again: permission/restart works from the button.
+3. Camera off: video track truly stops, not just hides.
+4. Camera on again: feed resumes correctly.
+5. Host alone in a fresh session: shown as **Speaker 1** everywhere.
+6. Host with joiners: each device keeps the correct speaker slot.
 
 ### Confidence
-- Auth redirect: **97%**
-- Host = Speaker 1 via RPC slot + name seed: **93%**
-- Layout restructure + Invite popover: **95%**
-
-Overall: **~95%**.
-
+High. The media issue is clearly caused by split capture paths, and the speaker issue is clearly tied to participant-slot persistence rather than transcript rendering alone.
