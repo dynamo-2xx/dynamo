@@ -7,6 +7,11 @@ interface Options {
   speakerSlot: number;
   speakerName: string;
   isActive: boolean;
+  /**
+   * External mic-enabled gate. When false, audio is not sent to Deepgram and
+   * no transcript rows are inserted. Defaults to true for backwards compat.
+   */
+  isMicEnabled?: boolean;
 }
 
 /**
