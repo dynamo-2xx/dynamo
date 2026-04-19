@@ -21,6 +21,9 @@ import PresenceList from "@/components/live/PresenceList";
 import VideoGrid from "@/components/live/VideoGrid";
 import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
+import FloatingTranscript from "@/components/live/FloatingTranscript";
+import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 
 const getDeviceId = () => {
   let id = localStorage.getItem("dyn_device_id");
