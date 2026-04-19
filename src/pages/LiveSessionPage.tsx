@@ -43,23 +43,43 @@ const LiveSessionPage = () => {
   const [sessionData, setSessionData] = useState<any>(null);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [setupTags, setSetupTags] = useState<Tag[]>([]);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const {
-    transcriptEntries,
-    summaries,
-    subtopics,
-    threads,
-    interimText,
-    isConnected,
-    micError,
-    connectionError,
-    isSummarizing,
-    endSession,
-  } = useLiveTranscription({
+  const deviceId = useMemo(() => getDeviceId(), []);
+  const isMulti = mode === "multi_device";
+  const isRecordingActive = phase === "recording" && sessionStatus === "recording";
+
+  // Single-device path
+  const single = useLiveTranscription({
     sessionId,
-    isActive: phase === "recording" && sessionStatus === "recording",
+    isActive: isRecordingActive && !isMulti,
   });
+
+  // Multi-device path: host runs its own mic AND merges all device entries
+  const hostDevice = useDeviceTranscription({
+    sessionId,
+    deviceId,
+    speakerSlot: 1,
+    speakerName: "Host",
+    isActive: isRecordingActive && isMulti,
+  });
+  const merged = useMergedLiveTranscript(sessionId, isRecordingActive && isMulti);
+  const presenceParticipants = useLiveSessionPresence(
+    isMulti ? sessionId : null,
+    { deviceId, heartbeat: isMulti && isRecordingActive },
+  );
+
+  const transcriptEntries = isMulti ? merged.entries : single.transcriptEntries;
+  const summaries = isMulti ? [] : single.summaries;
+  const subtopics = isMulti ? [] : single.subtopics;
+  const threads = isMulti ? {} : single.threads;
+  const interimText = isMulti ? "" : single.interimText;
+  const isConnected = isMulti ? hostDevice.isConnected : single.isConnected;
+  const micError = isMulti ? hostDevice.error : single.micError;
+  const connectionError = isMulti ? null : single.connectionError;
+  const isSummarizing = isMulti ? false : single.isSummarizing;
+  const endSession = single.endSession;
 
   // Load existing session if navigating to /live/:id
   useEffect(() => {
