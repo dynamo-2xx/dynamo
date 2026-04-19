@@ -135,6 +135,7 @@ const LiveSessionPage = () => {
     const d = data as any;
     setSessionId(d.id);
     setSessionStatus("recording");
+    setJoinCode(d.join_code || null);
     setPhase("recording");
 
     // Attach buffered tags
@@ -142,6 +143,17 @@ const LiveSessionPage = () => {
       await (supabase as any)
         .from("live_session_tags")
         .insert(setupTags.map((t) => ({ live_session_id: d.id, tag_id: t.id })));
+    }
+
+    // Multi-device: register the host as Speaker 1 via join RPC
+    if (mode === "multi_device" && d.join_code) {
+      const hostName = user.email?.split("@")[0] || "Host";
+      await (supabase as any).rpc("join_live_session", {
+        _code: d.join_code,
+        _device_id: deviceId,
+        _display_name: hostName,
+        _avatar_url: null,
+      });
     }
 
     navigate(`/live/${d.id}`, { replace: true });
