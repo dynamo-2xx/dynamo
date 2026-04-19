@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Copy, Share2, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ interface Props {
   sessionTitle?: string | null;
 }
 
-const JoinCodeCard = ({ code, sessionTitle }: Props) => {
+const JoinCodeCard = forwardRef<HTMLDivElement, Props>(({ code, sessionTitle }, ref) => {
   const [qrSrc, setQrSrc] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
