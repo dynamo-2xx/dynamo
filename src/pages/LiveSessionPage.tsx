@@ -422,9 +422,140 @@ const LiveSessionPage = () => {
   }
 
   // ── RECORDING SCREEN ──
+  const layout = prefs.layout;
+  const isVideoOnly = isMulti && layout === "video-only";
+  const isSideBySide = isMulti && layout === "side-by-side";
+  const isTranscriptFirst = isMulti && layout === "transcript-first";
+
+  const transcriptBlock = (
+    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-background/70 backdrop-blur-xl">
+      {micError && (
+        <div className="bg-destructive/10 backdrop-blur-sm text-destructive text-sm rounded-lg p-3 border border-destructive/20">
+          {micError}
+        </div>
+      )}
+      {connectionError && (
+        <div className="bg-destructive/10 backdrop-blur-sm text-destructive text-sm rounded-lg p-3 border border-destructive/20">
+          {connectionError}
+        </div>
+      )}
+
+      {transcriptEntries.length === 0 && !interimText && (
+        <div className="text-center text-muted-foreground text-sm py-12">
+          {isConnected ? "Listening... Start speaking." : "Connecting to microphone..."}
+        </div>
+      )}
+
+      {prefs.groupBySubtopic ? (
+        <>
+          {groupedEntries.ordered.map((topic) => {
+            const topicEntries = groupedEntries.groups[topic] || [];
+            if (topicEntries.length === 0) return null;
+            return (
+              <Collapsible key={topic} defaultOpen>
+                <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-foreground/10 bg-background/60 backdrop-blur-xl px-4 py-3 text-left hover:bg-background/80 transition-colors">
+                  <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                  <h3 className="text-sm font-display font-semibold text-foreground flex-1 truncate">
+                    {topic}
+                  </h3>
+                  <span className="text-[10px] bg-background/70 backdrop-blur-sm rounded-full px-2 py-0.5 text-muted-foreground border border-foreground/10">
+                    {topicEntries.length} {topicEntries.length === 1 ? "statement" : "statements"}
+                  </span>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="pt-2 pl-2">
+                    <LiveThreadView
+                      entries={topicEntries}
+                      threadTitles={threads}
+                      getSpeakerName={getSpeakerName}
+                      getSpeakerAvatar={getSpeakerAvatar}
+                      bubble={isMulti}
+                      compact
+                      density={prefs.density}
+                      showTimestamps={prefs.showTimestamps}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+
+          {groupedEntries.uncategorized.length > 0 && (
+            <div className="space-y-2">
+              {groupedEntries.ordered.length > 0 && (
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Uncategorized
+                </h3>
+              )}
+              <LiveThreadView
+                entries={groupedEntries.uncategorized}
+                threadTitles={threads}
+                getSpeakerName={getSpeakerName}
+                getSpeakerAvatar={getSpeakerAvatar}
+                bubble={isMulti}
+                compact
+                density={prefs.density}
+                showTimestamps={prefs.showTimestamps}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <LiveThreadView
+          entries={transcriptEntries}
+          threadTitles={threads}
+          getSpeakerName={getSpeakerName}
+          getSpeakerAvatar={getSpeakerAvatar}
+          bubble={isMulti}
+          compact
+          density={prefs.density}
+          showTimestamps={prefs.showTimestamps}
+        />
+      )}
+
+      {prefs.showInterim && interimText && (
+        <div className="text-sm text-foreground/80 italic px-3 py-2 rounded-lg bg-background/70 backdrop-blur-sm border border-foreground/10">
+          {interimText}...
+        </div>
+      )}
+    </div>
+  );
+
+  const videoBlock = isMulti && (
+    <div className={`shrink-0 px-4 pt-4 pb-2 ${isVideoOnly ? "flex-1 flex flex-col" : "border-b border-border/60"} relative`}>
+      <VideoGrid
+        localStream={rtc.localStream}
+        localName={hostName}
+        cameraOn={rtc.cameraOn}
+        micOn={rtc.micOn}
+        remotePeers={rtc.remotePeers}
+        participants={presenceParticipants}
+        deviceId={deviceId}
+        onToggleCamera={rtc.toggleCamera}
+        onToggleMic={rtc.toggleMic}
+        tileStyle={prefs.tileStyle}
+        showLabels={prefs.showTileLabels}
+      />
+      {rtc.error && (
+        <div className="mt-2 bg-destructive/10 text-destructive text-xs rounded-lg p-2">
+          {rtc.error}
+        </div>
+      )}
+      {isVideoOnly && (
+        <FloatingTranscript
+          entries={transcriptEntries}
+          threadTitles={threads}
+          getSpeakerName={getSpeakerName}
+          getSpeakerAvatar={getSpeakerAvatar}
+          showTimestamps={prefs.showTimestamps}
+        />
+      )}
+    </div>
+  );
+
   return (
     <AppLayout>
-      <div className="flex flex-col h-[calc(100vh-4rem)] max-w-3xl mx-auto w-full">
+      <div className={`flex flex-col h-[calc(100vh-4rem)] max-w-3xl mx-auto w-full ${themeWrapperClass(prefs.theme)}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -449,16 +580,19 @@ const LiveSessionPage = () => {
               </span>
             )}
           </div>
-          <button
-            onClick={handleEndSession}
-            className="flex items-center gap-1.5 bg-destructive text-destructive-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            <Square className="w-3.5 h-3.5" />
-            End
-          </button>
+          <div className="flex items-center gap-2">
+            <DisplayOptionsMenu prefs={prefs} update={updatePrefs} />
+            <button
+              onClick={handleEndSession}
+              className="flex items-center gap-1.5 bg-destructive text-destructive-foreground px-3 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
+            >
+              <Square className="w-3.5 h-3.5" />
+              End
+            </button>
+          </div>
         </div>
 
-        {/* Multi-device: Invite button + presence strip */}
+        {/* Multi-device: Invite + presence strip */}
         {isMulti && (
           <div className="px-4 pt-3 pb-2 shrink-0 border-b border-border/60 flex items-center gap-2">
             {joinCode && (
@@ -480,118 +614,39 @@ const LiveSessionPage = () => {
           </div>
         )}
 
-        {/* Multi-device: Video block (own space, not in transcript scroll) */}
-        {isMulti && (
-          <div className="shrink-0 px-4 pt-4 pb-2 border-b border-border/60">
-            <VideoGrid
-              localStream={rtc.localStream}
-              localName={hostName}
-              cameraOn={rtc.cameraOn}
-              micOn={rtc.micOn}
-              remotePeers={rtc.remotePeers}
-              participants={presenceParticipants}
-              deviceId={deviceId}
-              onToggleCamera={rtc.toggleCamera}
-              onToggleMic={rtc.toggleMic}
-            />
-            {rtc.error && (
-              <div className="mt-2 bg-destructive/10 text-destructive text-xs rounded-lg p-2">
-                {rtc.error}
-              </div>
-            )}
+        {/* Body — layout-driven */}
+        {isVideoOnly ? (
+          videoBlock
+        ) : isSideBySide ? (
+          <div className="flex-1 flex min-h-0">
+            <div className="w-1/2 border-r border-border/60 flex flex-col min-h-0">{videoBlock}</div>
+            <div className="w-1/2 flex flex-col min-h-0">{transcriptBlock}</div>
           </div>
+        ) : isTranscriptFirst ? (
+          <>
+            {videoBlock}
+            {transcriptBlock}
+          </>
+        ) : (
+          <>
+            {videoBlock}
+            {transcriptBlock}
+          </>
         )}
 
-        {/* Subtopic-grouped transcript cards (own scroll area below video) */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-background/70 backdrop-blur-xl">
-          {micError && (
-            <div className="bg-destructive/10 backdrop-blur-sm text-destructive text-sm rounded-lg p-3 border border-destructive/20">
-              {micError}
-            </div>
+        {/* Minimal status bar */}
+        <div className="h-6 px-3 flex items-center gap-1.5 shrink-0 bg-background/60 backdrop-blur-md border-t border-foreground/10">
+          {isConnected ? (
+            <>
+              <Mic className="w-3 h-3 text-primary" />
+              <span className="text-[11px] text-muted-foreground">Connected</span>
+            </>
+          ) : (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">Connecting…</span>
+            </>
           )}
-          {connectionError && (
-            <div className="bg-destructive/10 backdrop-blur-sm text-destructive text-sm rounded-lg p-3 border border-destructive/20">
-              {connectionError}
-            </div>
-          )}
-
-          {transcriptEntries.length === 0 && !interimText && (
-            <div className="text-center text-muted-foreground text-sm py-12">
-              {isConnected ? "Listening... Start speaking." : "Connecting to microphone..."}
-            </div>
-          )}
-
-          {/* Subtopic sections — each contains collapsible argument threads */}
-          {groupedEntries.ordered.map((topic) => {
-            const topicEntries = groupedEntries.groups[topic] || [];
-            if (topicEntries.length === 0) return null;
-
-            return (
-              <Collapsible key={topic} defaultOpen>
-                <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-foreground/10 bg-background/60 backdrop-blur-xl px-4 py-3 text-left hover:bg-background/80 transition-colors">
-                  <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
-                  <h3 className="text-sm font-display font-semibold text-foreground flex-1 truncate">
-                    {topic}
-                  </h3>
-                  <span className="text-[10px] bg-background/70 backdrop-blur-sm rounded-full px-2 py-0.5 text-muted-foreground border border-foreground/10">
-                    {topicEntries.length} {topicEntries.length === 1 ? "statement" : "statements"}
-                  </span>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="pt-2 pl-2">
-                    <LiveThreadView
-                      entries={topicEntries}
-                      threadTitles={threads}
-                      getSpeakerName={getSpeakerName}
-                      getSpeakerAvatar={getSpeakerAvatar}
-                      bubble={isMulti}
-                      compact
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
-
-          {/* Uncategorized entries */}
-          {groupedEntries.uncategorized.length > 0 && (
-            <div className="space-y-2">
-              {groupedEntries.ordered.length > 0 && (
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Uncategorized
-                </h3>
-              )}
-              <LiveThreadView
-                entries={groupedEntries.uncategorized}
-                threadTitles={threads}
-                getSpeakerName={getSpeakerName}
-                getSpeakerAvatar={getSpeakerAvatar}
-                bubble={isMulti}
-                compact
-              />
-            </div>
-          )}
-
-          {/* Interim text indicator */}
-          {interimText && (
-            <div className="text-sm text-foreground/80 italic px-3 py-2 rounded-lg bg-background/70 backdrop-blur-sm border border-foreground/10">
-              {interimText}...
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Bar — simplified */}
-        <div className="border-t border-border px-4 py-3 shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {isConnected && (
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Mic className="w-3.5 h-3.5 text-primary" />
-                  Connected
-                </span>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </AppLayout>
