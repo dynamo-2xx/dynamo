@@ -353,8 +353,18 @@ const LiveSessionPage = () => {
           </button>
         </div>
 
+        {/* Multi-device: presence strip */}
+        {isMulti && (
+          <div className="px-4 pt-3 pb-2 shrink-0 border-b border-border/60">
+            <PresenceList participants={presenceParticipants} />
+          </div>
+        )}
+
         {/* Subtopic-grouped transcript cards */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {isMulti && joinCode && (
+            <JoinCodeCard code={joinCode} sessionTitle={title} />
+          )}
           {micError && (
             <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
               {micError}
