@@ -109,6 +109,57 @@ const LiveJoinPage = () => {
     return () => clearInterval(t);
   }, [isRecording, sessionId, deviceId]);
 
+  // Auth gate — joining requires an account so the device can call deepgram-token
+  // and so the participant has a stable identity.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    const returnPath = `${location.pathname}${location.search}`;
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-sm w-full"
+        >
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <LogIn className="w-5 h-5 text-primary" />
+          </div>
+          <h1 className="font-display text-2xl font-bold mb-2">Sign in to join</h1>
+          <p className="text-sm text-muted-foreground mb-2">
+            You need an account to join this live session.
+          </p>
+          <p className="text-xs text-muted-foreground mb-6">
+            Joining code{" "}
+            <span className="font-mono tracking-widest font-semibold text-foreground">
+              {code}
+            </span>
+          </p>
+          <div className="flex flex-col gap-2">
+            <Link
+              to={`/auth?mode=signup&redirect=${encodeURIComponent(returnPath)}`}
+              className="w-full min-h-[48px] inline-flex items-center justify-center bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              Create account
+            </Link>
+            <Link
+              to={`/auth?redirect=${encodeURIComponent(returnPath)}`}
+              className="w-full min-h-[48px] inline-flex items-center justify-center border border-border rounded-xl text-sm font-semibold hover:border-foreground/30 transition-colors"
+            >
+              Log in
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (phase === "error") {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center">
