@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface LiveParticipant {
@@ -12,15 +12,20 @@ export interface LiveParticipant {
   last_seen_at: string;
 }
 
+const STALE_MS = 15_000;
+const HEARTBEAT_MS = 5_000;
+
 /**
- * Subscribes to live_session_participants for a session and (optionally) sends a
- * heartbeat for the local device every 15s.
+ * Subscribes to live_session_participants and (optionally) sends a 5s heartbeat.
+ * Filters out rows whose last_seen_at is older than 15s so phantom speakers
+ * never appear in the UI even if the row hasn't been purged yet.
  */
 export function useLiveSessionPresence(
   sessionId: string | null,
   opts?: { deviceId?: string; heartbeat?: boolean },
 ) {
   const [participants, setParticipants] = useState<LiveParticipant[]>([]);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -46,8 +51,12 @@ export function useLiveSessionPresence(
       )
       .subscribe();
 
+    // Re-evaluate stale filter every 5s so disappearances don't lag.
+    const tick = setInterval(() => setTick((n) => n + 1), 5000);
+
     return () => {
       cancelled = true;
+      clearInterval(tick);
       supabase.removeChannel(channel);
     };
   }, [sessionId]);
@@ -61,9 +70,20 @@ export function useLiveSessionPresence(
       });
     };
     beat();
-    const t = setInterval(beat, 15000);
+    const t = setInterval(beat, HEARTBEAT_MS);
     return () => clearInterval(t);
   }, [sessionId, opts?.heartbeat, opts?.deviceId]);
 
-  return participants;
+  // Filter stale rows on the client (defensive)
+  const live = useMemo(() => {
+    const cutoff = Date.now() - STALE_MS;
+    return participants.filter((p) => {
+      // Always trust the local device row; otherwise apply staleness filter.
+      if (opts?.deviceId && p.device_id === opts.deviceId) return true;
+      const seen = new Date(p.last_seen_at).getTime();
+      return seen >= cutoff;
+    });
+  }, [participants, opts?.deviceId]);
+
+  return live;
 }
