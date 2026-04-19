@@ -445,14 +445,14 @@ const LiveSessionPage = () => {
         )}
 
         {/* Subtopic-grouped transcript cards (own scroll area below video) */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-background/70 backdrop-blur-xl">
           {micError && (
-            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
+            <div className="bg-destructive/10 backdrop-blur-sm text-destructive text-sm rounded-lg p-3 border border-destructive/20">
               {micError}
             </div>
           )}
           {connectionError && (
-            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
+            <div className="bg-destructive/10 backdrop-blur-sm text-destructive text-sm rounded-lg p-3 border border-destructive/20">
               {connectionError}
             </div>
           )}
@@ -470,12 +470,12 @@ const LiveSessionPage = () => {
 
             return (
               <Collapsible key={topic} defaultOpen>
-                <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-accent/50 transition-colors">
+                <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-foreground/10 bg-background/60 backdrop-blur-xl px-4 py-3 text-left hover:bg-background/80 transition-colors">
                   <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
                   <h3 className="text-sm font-display font-semibold text-foreground flex-1 truncate">
                     {topic}
                   </h3>
-                  <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
+                  <span className="text-[10px] bg-background/70 backdrop-blur-sm rounded-full px-2 py-0.5 text-muted-foreground border border-foreground/10">
                     {topicEntries.length} {topicEntries.length === 1 ? "statement" : "statements"}
                   </span>
                 </CollapsibleTrigger>
@@ -512,7 +512,7 @@ const LiveSessionPage = () => {
 
           {/* Interim text indicator */}
           {interimText && (
-            <div className="text-sm text-muted-foreground italic px-3 py-1.5">
+            <div className="text-sm text-foreground/80 italic px-3 py-2 rounded-lg bg-background/70 backdrop-blur-sm border border-foreground/10">
               {interimText}...
             </div>
           )}

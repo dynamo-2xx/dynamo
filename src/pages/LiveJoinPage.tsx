@@ -220,28 +220,30 @@ const LiveJoinPage = () => {
         </div>
 
         {/* Status / transcript block — own space below */}
-        <div className="flex-1 flex flex-col items-center text-center gap-1 px-4 py-6 overflow-y-auto">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">
-            You are Speaker {speakerSlot}
-          </p>
-          {isConnected ? (
-            <span className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-              <Mic className="w-3.5 h-3.5" />
-              Mic active
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Connecting…
-            </span>
-          )}
+        <div className="flex-1 flex flex-col items-center text-center gap-2 px-4 py-6 overflow-y-auto bg-background/70 backdrop-blur-xl">
+          <div className="inline-flex flex-col items-center gap-1 px-4 py-2 rounded-xl bg-background/70 backdrop-blur-sm border border-foreground/10">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              You are Speaker {speakerSlot}
+            </p>
+            {isConnected ? (
+              <span className="flex items-center gap-1.5 text-xs text-primary font-semibold">
+                <Mic className="w-3.5 h-3.5" />
+                Mic active
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Connecting…
+              </span>
+            )}
+          </div>
           {(micError || rtc.error) && (
-            <p className="mt-2 text-xs text-destructive max-w-xs">
+            <p className="mt-2 text-xs text-destructive max-w-xs px-3 py-2 rounded-lg bg-destructive/10 backdrop-blur-sm border border-destructive/20">
               {micError || rtc.error}
             </p>
           )}
           {interimText && (
-            <p className="mt-3 text-sm text-foreground/80 italic max-w-sm leading-relaxed">
+            <p className="mt-3 text-sm text-foreground/80 italic max-w-sm leading-relaxed px-3 py-2 rounded-lg bg-background/70 backdrop-blur-sm border border-foreground/10">
               "{interimText}"
             </p>
           )}
