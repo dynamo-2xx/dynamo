@@ -3,6 +3,7 @@ import { ChevronDown, CornerDownRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { LiveTranscriptEntry, LiveThreadMeta } from "@/hooks/useLiveTranscription";
 import TranscriptCard from "@/components/debate/TranscriptCard";
+import LiveTranscriptBubble from "@/components/live/LiveTranscriptBubble";
 import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
 
 interface LiveThreadViewProps {
@@ -12,8 +13,13 @@ interface LiveThreadViewProps {
   threadTitles: Record<string, LiveThreadMeta>;
   /** Resolves speaker_id -> display name */
   getSpeakerName: (speakerId: number) => string;
+  /** Optional avatar lookup by speaker_id (slot) */
+  getSpeakerAvatar?: (speakerId: number) => string | null | undefined;
   /** Compact transcript cards (for live recording view) */
   compact?: boolean;
+  /** When true, renders translucent chat bubbles with hoverable avatars
+   *  instead of flippable transcript cards. Used for live multi-device. */
+  bubble?: boolean;
 }
 
 interface ThreadGroup {
@@ -32,7 +38,9 @@ const LiveThreadView = ({
   entries,
   threadTitles,
   getSpeakerName,
+  getSpeakerAvatar,
   compact = false,
+  bubble = false,
 }: LiveThreadViewProps) => {
   const { threads, unthreaded } = useMemo(() => {
     const threadMap: Record<string, LiveTranscriptEntry[]> = {};
@@ -65,18 +73,28 @@ const LiveThreadView = ({
   if (threads.length === 0 && unthreaded.length > 0) {
     return (
       <div className="space-y-2">
-        {groupConsecutiveEntries(unthreaded).map((entry) => (
-          <TranscriptCard
-            key={entry.id}
-            speakerSide={getSpeakerName(entry.speaker_id)}
-            sideOrder={entry.speaker_id % 2}
-            text={entry.text}
-            aiSummary={entry.ai_summary}
-            timestamp={entry.timestamp}
-            autoFlip
-            compact={compact}
-          />
-        ))}
+        {groupConsecutiveEntries(unthreaded).map((entry) =>
+          bubble ? (
+            <LiveTranscriptBubble
+              key={entry.id}
+              speakerName={getSpeakerName(entry.speaker_id)}
+              avatarUrl={getSpeakerAvatar?.(entry.speaker_id)}
+              text={entry.text}
+              timestamp={entry.timestamp}
+            />
+          ) : (
+            <TranscriptCard
+              key={entry.id}
+              speakerSide={getSpeakerName(entry.speaker_id)}
+              sideOrder={entry.speaker_id % 2}
+              text={entry.text}
+              aiSummary={entry.ai_summary}
+              timestamp={entry.timestamp}
+              autoFlip
+              compact={compact}
+            />
+          ),
+        )}
       </div>
     );
   }
