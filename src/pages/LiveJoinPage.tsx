@@ -205,7 +205,8 @@ const LiveJoinPage = () => {
           </button>
         </div>
 
-        <div className="flex-1 flex flex-col px-4 py-4 gap-4 overflow-y-auto">
+        {/* Video block — own space */}
+        <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border/60">
           <VideoGrid
             localStream={rtc.localStream}
             localName={displayName}
@@ -215,33 +216,34 @@ const LiveJoinPage = () => {
             onToggleCamera={rtc.toggleCamera}
             onToggleMic={rtc.toggleMic}
           />
+        </div>
 
-          <div className="flex flex-col items-center text-center gap-1">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">
-              You are Speaker {speakerSlot}
+        {/* Status / transcript block — own space below */}
+        <div className="flex-1 flex flex-col items-center text-center gap-1 px-4 py-6 overflow-y-auto">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            You are Speaker {speakerSlot}
+          </p>
+          {isConnected ? (
+            <span className="flex items-center gap-1.5 text-xs text-primary font-semibold">
+              <Mic className="w-3.5 h-3.5" />
+              Mic active
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Connecting…
+            </span>
+          )}
+          {(micError || rtc.error) && (
+            <p className="mt-2 text-xs text-destructive max-w-xs">
+              {micError || rtc.error}
             </p>
-            {isConnected ? (
-              <span className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-                <Mic className="w-3.5 h-3.5" />
-                Mic active
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Connecting…
-              </span>
-            )}
-            {(micError || rtc.error) && (
-              <p className="mt-2 text-xs text-destructive max-w-xs">
-                {micError || rtc.error}
-              </p>
-            )}
-            {interimText && (
-              <p className="mt-3 text-sm text-foreground/80 italic max-w-sm leading-relaxed">
-                "{interimText}"
-              </p>
-            )}
-          </div>
+          )}
+          {interimText && (
+            <p className="mt-3 text-sm text-foreground/80 italic max-w-sm leading-relaxed">
+              "{interimText}"
+            </p>
+          )}
         </div>
 
         <div className="px-6 pb-6 pt-2 text-center">

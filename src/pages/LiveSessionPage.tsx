@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Mic, Square, Radio, Loader2, ChevronDown, ArrowLeft } from "lucide-react";
+import { Mic, Square, Radio, Loader2, ChevronDown, ArrowLeft, UserPlus } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/SessionRecordView";
@@ -46,11 +47,27 @@ const LiveSessionPage = () => {
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [setupTags, setSetupTags] = useState<Tag[]>([]);
   const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [hostDisplayName, setHostDisplayName] = useState<string>("");
+  const [hostSpeakerSlot, setHostSpeakerSlot] = useState<number>(1);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const deviceId = useMemo(() => getDeviceId(), []);
   const isMulti = mode === "multi_device";
   const isRecordingActive = phase === "recording" && sessionStatus === "recording";
+
+  // Load host's display name from profile
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const name = data?.display_name || user.email?.split("@")[0] || "Host";
+      setHostDisplayName(name);
+    })();
+  }, [user]);
 
   // Single-device path
   const single = useLiveTranscription({
@@ -59,11 +76,12 @@ const LiveSessionPage = () => {
   });
 
   // Multi-device path: host runs its own mic AND merges all device entries
+  const hostName = hostDisplayName || "Host";
   const hostDevice = useDeviceTranscription({
     sessionId,
     deviceId,
-    speakerSlot: 1,
-    speakerName: "Host",
+    speakerSlot: hostSpeakerSlot,
+    speakerName: hostName,
     isActive: isRecordingActive && isMulti,
   });
   const merged = useMergedLiveTranscript(sessionId, isRecordingActive && isMulti);
@@ -71,7 +89,6 @@ const LiveSessionPage = () => {
     isMulti ? sessionId : null,
     { deviceId, heartbeat: isMulti && isRecordingActive },
   );
-  const hostName = user?.email?.split("@")[0] || "Host";
   const rtc = useLiveSessionRTC({
     sessionId: isMulti ? sessionId : null,
     deviceId,
@@ -112,10 +129,21 @@ const LiveSessionPage = () => {
         } else {
           setPhase("recording");
         }
+
+        // Multi-device: look up this device's speaker_slot
+        if (d.mode === "multi_device" && d.status === "recording") {
+          const { data: part } = await (supabase as any)
+            .from("live_session_participants")
+            .select("speaker_slot")
+            .eq("session_id", d.id)
+            .eq("device_id", deviceId)
+            .maybeSingle();
+          if (part?.speaker_slot) setHostSpeakerSlot(part.speaker_slot);
+        }
       }
     };
     load();
-  }, [id]);
+  }, [id, deviceId]);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -156,17 +184,28 @@ const LiveSessionPage = () => {
 
     // Multi-device: register the host as Speaker 1 via join RPC
     if (mode === "multi_device" && d.join_code) {
-      const hostName = user.email?.split("@")[0] || "Host";
-      await (supabase as any).rpc("join_live_session", {
+      const name = hostDisplayName || user.email?.split("@")[0] || "Host";
+      const { data: joinData } = await (supabase as any).rpc("join_live_session", {
         _code: d.join_code,
         _device_id: deviceId,
-        _display_name: hostName,
+        _display_name: name,
         _avatar_url: null,
       });
+      const row = Array.isArray(joinData) ? joinData[0] : joinData;
+      const slot = row?.speaker_slot ?? 1;
+      setHostSpeakerSlot(slot);
+
+      // Seed speaker_names so transcripts show real name not "Speaker N"
+      const seeded = { ...(d.speaker_names || {}), [String(slot)]: name };
+      setSpeakerNames(seeded);
+      await (supabase as any)
+        .from("live_sessions")
+        .update({ speaker_names: seeded })
+        .eq("id", d.id);
     }
 
     navigate(`/live/${d.id}`, { replace: true });
-  }, [user, title, mode, navigate, setupTags, deviceId]);
+  }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName]);
 
   const handleEndSession = useCallback(async () => {
     if (!isMulti) {
@@ -214,7 +253,7 @@ const LiveSessionPage = () => {
   }, [transcriptEntries, subtopics]);
 
   const getSpeakerName = (speakerId: number) => {
-    return speakerNames[String(speakerId)] || `Speaker ${speakerId + 1}`;
+    return speakerNames[String(speakerId)] || `Speaker ${speakerId}`;
   };
 
   // ── ENDED → Full record page ──
@@ -362,19 +401,31 @@ const LiveSessionPage = () => {
           </button>
         </div>
 
-        {/* Multi-device: presence strip */}
+        {/* Multi-device: Invite button + presence strip */}
         {isMulti && (
-          <div className="px-4 pt-3 pb-2 shrink-0 border-b border-border/60">
-            <PresenceList participants={presenceParticipants} />
+          <div className="px-4 pt-3 pb-2 shrink-0 border-b border-border/60 flex items-center gap-2">
+            {joinCode && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="shrink-0 inline-flex items-center gap-1.5 px-3 h-9 rounded-full border border-border bg-card hover:bg-secondary transition-colors text-xs font-semibold">
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Invite
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[320px] p-0 border-0 bg-transparent shadow-none">
+                  <JoinCodeCard code={joinCode} sessionTitle={title} />
+                </PopoverContent>
+              </Popover>
+            )}
+            <div className="flex-1 min-w-0">
+              <PresenceList participants={presenceParticipants} />
+            </div>
           </div>
         )}
 
-        {/* Subtopic-grouped transcript cards */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {isMulti && joinCode && (
-            <JoinCodeCard code={joinCode} sessionTitle={title} />
-          )}
-          {isMulti && (
+        {/* Multi-device: Video block (own space, not in transcript scroll) */}
+        {isMulti && (
+          <div className="shrink-0 px-4 pt-4 pb-2 border-b border-border/60">
             <VideoGrid
               localStream={rtc.localStream}
               localName={hostName}
@@ -384,12 +435,16 @@ const LiveSessionPage = () => {
               onToggleCamera={rtc.toggleCamera}
               onToggleMic={rtc.toggleMic}
             />
-          )}
-          {isMulti && rtc.error && (
-            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
-              {rtc.error}
-            </div>
-          )}
+            {rtc.error && (
+              <div className="mt-2 bg-destructive/10 text-destructive text-xs rounded-lg p-2">
+                {rtc.error}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Subtopic-grouped transcript cards (own scroll area below video) */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {micError && (
             <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
               {micError}
