@@ -21,6 +21,16 @@ export function useMergedLiveTranscript(sessionId: string | null, isActive: bool
     seenIds.current = new Set();
     setEntries([]);
 
+    const toEntry = (r: any): LiveTranscriptEntry => ({
+      id: r.id,
+      speaker_id: r.speaker_slot,
+      speaker_label: r.speaker_name,
+      text: r.text,
+      words: r.words,
+      timestamp: new Date(r.client_ts).getTime(),
+      is_final: true,
+    });
+
     const load = async () => {
       const { data } = await (supabase as any)
         .from("live_session_entries")
@@ -28,15 +38,7 @@ export function useMergedLiveTranscript(sessionId: string | null, isActive: bool
         .eq("session_id", sessionId)
         .order("client_ts", { ascending: true });
       if (data) {
-        const mapped: LiveTranscriptEntry[] = (data as any[]).map((r) => ({
-          id: r.id,
-          speakerId: r.speaker_slot,
-          speakerName: r.speaker_name,
-          text: r.text,
-          timestamp: new Date(r.client_ts).getTime(),
-          subtopic: null,
-          threadId: null,
-        }));
+        const mapped = (data as any[]).map(toEntry);
         mapped.forEach((m) => seenIds.current.add(m.id));
         setEntries(mapped);
       }
