@@ -374,6 +374,22 @@ const LiveSessionPage = () => {
           {isMulti && joinCode && (
             <JoinCodeCard code={joinCode} sessionTitle={title} />
           )}
+          {isMulti && (
+            <VideoGrid
+              localStream={rtc.localStream}
+              localName={hostName}
+              cameraOn={rtc.cameraOn}
+              micOn={rtc.micOn}
+              remotePeers={rtc.remotePeers}
+              onToggleCamera={rtc.toggleCamera}
+              onToggleMic={rtc.toggleMic}
+            />
+          )}
+          {isMulti && rtc.error && (
+            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
+              {rtc.error}
+            </div>
+          )}
           {micError && (
             <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
               {micError}
