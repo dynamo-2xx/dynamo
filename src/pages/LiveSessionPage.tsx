@@ -17,6 +17,8 @@ import { useLiveSessionPresence } from "@/hooks/useLiveSessionPresence";
 import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
 import JoinCodeCard from "@/components/live/JoinCodeCard";
 import PresenceList from "@/components/live/PresenceList";
+import VideoGrid from "@/components/live/VideoGrid";
+import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const getDeviceId = () => {
