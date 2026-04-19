@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Mic, MicOff, Loader2 } from "lucide-react";
+import { ArrowLeft, Mic, MicOff, Loader2, LogIn } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
@@ -23,9 +23,11 @@ type Phase = "loading" | "setup" | "recording" | "error";
 const LiveJoinPage = () => {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { user, loading: authLoading } = useAuth();
 
   const deviceId = useMemo(() => getDeviceId(), []);
+
   const [phase, setPhase] = useState<Phase>("setup");
   const [errorMsg, setErrorMsg] = useState<string>("");
 
@@ -106,6 +108,57 @@ const LiveJoinPage = () => {
     const t = setInterval(beat, 15000);
     return () => clearInterval(t);
   }, [isRecording, sessionId, deviceId]);
+
+  // Auth gate — joining requires an account so the device can call deepgram-token
+  // and so the participant has a stable identity.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    const returnPath = `${location.pathname}${location.search}`;
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-sm w-full"
+        >
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <LogIn className="w-5 h-5 text-primary" />
+          </div>
+          <h1 className="font-display text-2xl font-bold mb-2">Sign in to join</h1>
+          <p className="text-sm text-muted-foreground mb-2">
+            You need an account to join this live session.
+          </p>
+          <p className="text-xs text-muted-foreground mb-6">
+            Joining code{" "}
+            <span className="font-mono tracking-widest font-semibold text-foreground">
+              {code}
+            </span>
+          </p>
+          <div className="flex flex-col gap-2">
+            <Link
+              to={`/auth?mode=signup&redirect=${encodeURIComponent(returnPath)}`}
+              className="w-full min-h-[48px] inline-flex items-center justify-center bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              Create account
+            </Link>
+            <Link
+              to={`/auth?redirect=${encodeURIComponent(returnPath)}`}
+              className="w-full min-h-[48px] inline-flex items-center justify-center border border-border rounded-xl text-sm font-semibold hover:border-foreground/30 transition-colors"
+            >
+              Log in
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (phase === "error") {
     return (
