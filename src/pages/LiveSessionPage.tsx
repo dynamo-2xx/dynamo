@@ -129,10 +129,21 @@ const LiveSessionPage = () => {
         } else {
           setPhase("recording");
         }
+
+        // Multi-device: look up this device's speaker_slot
+        if (d.mode === "multi_device" && d.status === "recording") {
+          const { data: part } = await (supabase as any)
+            .from("live_session_participants")
+            .select("speaker_slot")
+            .eq("session_id", d.id)
+            .eq("device_id", deviceId)
+            .maybeSingle();
+          if (part?.speaker_slot) setHostSpeakerSlot(part.speaker_slot);
+        }
       }
     };
     load();
-  }, [id]);
+  }, [id, deviceId]);
 
   // Auto-scroll transcript
   useEffect(() => {
