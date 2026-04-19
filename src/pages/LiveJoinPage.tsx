@@ -5,6 +5,8 @@ import { ArrowLeft, Mic, MicOff, Loader2, LogIn } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
+import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
+import VideoGrid from "@/components/live/VideoGrid";
 import { toast } from "sonner";
 
 const AVATAR_EMOJIS = ["🦊", "🐼", "🐙", "🦉", "🐝", "🦄", "🐯", "🐳", "🦁", "🐧", "🐢", "🐬"];
