@@ -17,6 +17,8 @@ import { useLiveSessionPresence } from "@/hooks/useLiveSessionPresence";
 import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
 import JoinCodeCard from "@/components/live/JoinCodeCard";
 import PresenceList from "@/components/live/PresenceList";
+import VideoGrid from "@/components/live/VideoGrid";
+import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const getDeviceId = () => {
@@ -69,6 +71,13 @@ const LiveSessionPage = () => {
     isMulti ? sessionId : null,
     { deviceId, heartbeat: isMulti && isRecordingActive },
   );
+  const hostName = user?.email?.split("@")[0] || "Host";
+  const rtc = useLiveSessionRTC({
+    sessionId: isMulti ? sessionId : null,
+    deviceId,
+    displayName: hostName,
+    isActive: isRecordingActive && isMulti,
+  });
 
   const transcriptEntries = isMulti ? merged.entries : single.transcriptEntries;
   const summaries = isMulti ? [] : single.summaries;
@@ -364,6 +373,22 @@ const LiveSessionPage = () => {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {isMulti && joinCode && (
             <JoinCodeCard code={joinCode} sessionTitle={title} />
+          )}
+          {isMulti && (
+            <VideoGrid
+              localStream={rtc.localStream}
+              localName={hostName}
+              cameraOn={rtc.cameraOn}
+              micOn={rtc.micOn}
+              remotePeers={rtc.remotePeers}
+              onToggleCamera={rtc.toggleCamera}
+              onToggleMic={rtc.toggleMic}
+            />
+          )}
+          {isMulti && rtc.error && (
+            <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
+              {rtc.error}
+            </div>
           )}
           {micError && (
             <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3">
