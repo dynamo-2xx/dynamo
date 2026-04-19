@@ -539,6 +539,8 @@ const LiveSessionPage = () => {
                       entries={topicEntries}
                       threadTitles={threads}
                       getSpeakerName={getSpeakerName}
+                      getSpeakerAvatar={getSpeakerAvatar}
+                      bubble={isMulti}
                       compact
                     />
                   </div>
@@ -559,6 +561,8 @@ const LiveSessionPage = () => {
                 entries={groupedEntries.uncategorized}
                 threadTitles={threads}
                 getSpeakerName={getSpeakerName}
+                getSpeakerAvatar={getSpeakerAvatar}
+                bubble={isMulti}
                 compact
               />
             </div>
