@@ -54,15 +54,7 @@ export function useMergedLiveTranscript(sessionId: string | null, isActive: bool
           const r: any = payload.new;
           if (!r || seenIds.current.has(r.id)) return;
           seenIds.current.add(r.id);
-          const newEntry: LiveTranscriptEntry = {
-            id: r.id,
-            speakerId: r.speaker_slot,
-            speakerName: r.speaker_name,
-            text: r.text,
-            timestamp: new Date(r.client_ts).getTime(),
-            subtopic: null,
-            threadId: null,
-          };
+          const newEntry: LiveTranscriptEntry = toEntry(r);
           setEntries((prev) => {
             const next = [...prev, newEntry];
             next.sort((a, b) => a.timestamp - b.timestamp);
