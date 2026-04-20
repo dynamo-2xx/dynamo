@@ -88,7 +88,12 @@ const VideoTile = forwardRef<HTMLDivElement, VideoTileProps>(({
     <div ref={ref} className="relative aspect-video bg-secondary border border-border rounded-xl overflow-hidden">
       {showVideo ? (
         <video
-          ref={videoRef}
+          ref={(el) => {
+            videoRef.current = el;
+            if (el && stream && el.srcObject !== stream) {
+              el.srcObject = stream;
+            }
+          }}
           autoPlay
           playsInline
           muted={isLocal}
