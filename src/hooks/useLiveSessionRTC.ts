@@ -42,6 +42,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const makingOfferRef = useRef<Map<string, boolean>>(new Map());
+  const mediaStateRef = useRef({ cameraOn: true, micOn: true });
   const [streamReady, setStreamReady] = useState(false);
 
   // ── Acquire initial local media (camera + mic both on) ──
