@@ -87,9 +87,11 @@ const VideoTile = forwardRef<HTMLDivElement, VideoTileProps>(({
     };
   }, [stream]);
 
-  // For the local user, trust the explicit cameraOn flag (which we own).
-  // For remote users, derive purely from the live-track signal.
-  const showVideo = isLocal ? (cameraOn !== false && hasLiveVideo) : hasLiveVideo;
+  // For both local and remote, trust the explicit cameraOn flag (signaled
+  // peer-to-peer via the broadcast channel for remotes). Only show video
+  // when both the flag is true AND a live track exists. This guarantees the
+  // avatar replaces the tile instantly on toggle-off — no frozen last frame.
+  const showVideo = cameraOn !== false && hasLiveVideo;
 
   const initials = (name || "?")
     .split(/\s+/)
