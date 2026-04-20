@@ -5,21 +5,17 @@ import { LiveTranscriptEntry, LiveThreadMeta } from "@/hooks/useLiveTranscriptio
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import LiveTranscriptBubble from "@/components/live/LiveTranscriptBubble";
 import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
+import type { TranscriptDensity } from "@/hooks/useLiveDisplayPrefs";
 
 interface LiveThreadViewProps {
-  /** Entries scoped to a single subtopic */
   entries: LiveTranscriptEntry[];
-  /** Map of thread_id -> { title, subtopic } */
   threadTitles: Record<string, LiveThreadMeta>;
-  /** Resolves speaker_id -> display name */
   getSpeakerName: (speakerId: number) => string;
-  /** Optional avatar lookup by speaker_id (slot) */
   getSpeakerAvatar?: (speakerId: number) => string | null | undefined;
-  /** Compact transcript cards (for live recording view) */
   compact?: boolean;
-  /** When true, renders translucent chat bubbles with hoverable avatars
-   *  instead of flippable transcript cards. Used for live multi-device. */
   bubble?: boolean;
+  density?: TranscriptDensity;
+  showTimestamps?: boolean;
 }
 
 interface ThreadGroup {
@@ -41,6 +37,8 @@ const LiveThreadView = ({
   getSpeakerAvatar,
   compact = false,
   bubble = false,
+  density = "comfortable",
+  showTimestamps = true,
 }: LiveThreadViewProps) => {
   const { threads, unthreaded } = useMemo(() => {
     const threadMap: Record<string, LiveTranscriptEntry[]> = {};
@@ -81,6 +79,8 @@ const LiveThreadView = ({
               avatarUrl={getSpeakerAvatar?.(entry.speaker_id)}
               text={entry.text}
               timestamp={entry.timestamp}
+              density={density}
+              showTimestamp={showTimestamps}
             />
           ) : (
             <TranscriptCard
