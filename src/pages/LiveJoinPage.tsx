@@ -261,20 +261,6 @@ const LiveJoinPage = () => {
           )}
         </div>
 
-        {/* Minimal status bar */}
-        <div className="h-6 px-3 flex items-center gap-1.5 shrink-0 bg-background/60 backdrop-blur-md border-t border-foreground/10">
-          {isConnected ? (
-            <>
-              <Mic className="w-3 h-3 text-primary" />
-              <span className="text-[11px] text-muted-foreground">Mic active</span>
-            </>
-          ) : (
-            <>
-              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground">Connecting…</span>
-            </>
-          )}
-        </div>
       </div>
     );
   }
