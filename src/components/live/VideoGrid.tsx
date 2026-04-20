@@ -38,27 +38,45 @@ const VideoTile = forwardRef<HTMLDivElement, VideoTileProps>(({
       return;
     }
 
+    let trackListeners: Array<{ t: MediaStreamTrack; fn: () => void }> = [];
+
     const compute = () => {
       const v = stream.getVideoTracks()[0];
       setHasLiveVideo(!!v && v.readyState === "live" && !v.muted);
     };
-    compute();
 
-    const onChange = () => compute();
+    const attachTrackListeners = () => {
+      trackListeners.forEach(({ t, fn }) => {
+        t.removeEventListener("mute", fn);
+        t.removeEventListener("unmute", fn);
+        t.removeEventListener("ended", fn);
+      });
+      trackListeners = [];
+      stream.getVideoTracks().forEach((t) => {
+        const fn = () => compute();
+        t.addEventListener("mute", fn);
+        t.addEventListener("unmute", fn);
+        t.addEventListener("ended", fn);
+        trackListeners.push({ t, fn });
+      });
+    };
+
+    const onChange = () => {
+      attachTrackListeners();
+      compute();
+    };
+
+    attachTrackListeners();
+    compute();
     stream.addEventListener("addtrack", onChange);
     stream.addEventListener("removetrack", onChange);
 
-    // Per-track mute/unmute fires when remote sender replaces track with null.
-    const trackListeners: Array<{ t: MediaStreamTrack; fn: () => void }> = [];
-    stream.getVideoTracks().forEach((t) => {
-      const fn = () => compute();
-      t.addEventListener("mute", fn);
-      t.addEventListener("unmute", fn);
-      t.addEventListener("ended", fn);
-      trackListeners.push({ t, fn });
-    });
+    // Safety-net poll for browsers that don't reliably fire addtrack/unmute
+    // when a remote sender swaps tracks via replaceTrack.
+    const poll = setInterval(compute, 1000);
 
     return () => {
+      clearInterval(poll);
       stream.removeEventListener("addtrack", onChange);
       stream.removeEventListener("removetrack", onChange);
       trackListeners.forEach(({ t, fn }) => {
