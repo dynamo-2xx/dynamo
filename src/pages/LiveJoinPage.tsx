@@ -8,6 +8,8 @@ import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
 import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
 import { useLiveSessionPresence } from "@/hooks/useLiveSessionPresence";
 import VideoGrid from "@/components/live/VideoGrid";
+import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
+import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 import { toast } from "sonner";
 
 const AVATAR_EMOJIS = ["🦊", "🐼", "🐙", "🦉", "🐝", "🦄", "🐯", "🐳", "🦁", "🐧", "🐢", "🐬"];
@@ -33,6 +35,7 @@ const LiveJoinPage = () => {
 
   const [phase, setPhase] = useState<Phase>("setup");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const { prefs, update: updatePrefs } = useLiveDisplayPrefs();
 
   const [displayName, setDisplayName] = useState("");
   const [emoji, setEmoji] = useState(AVATAR_EMOJIS[0]);
@@ -201,7 +204,7 @@ const LiveJoinPage = () => {
 
   if (phase === "recording") {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className={`min-h-screen bg-background flex flex-col ${themeWrapperClass(prefs.theme)}`}>
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <span className="flex items-center gap-1.5 text-[11px] font-semibold text-destructive shrink-0">
@@ -210,16 +213,19 @@ const LiveJoinPage = () => {
             </span>
             <p className="font-display font-bold text-base truncate">{sessionTitle}</p>
           </div>
-          <button
-            onClick={() => navigate("/")}
-            className="text-xs text-muted-foreground hover:text-foreground min-h-[36px] px-2"
-          >
-            Leave
-          </button>
+          <div className="flex items-center gap-2">
+            <DisplayOptionsMenu prefs={prefs} update={updatePrefs} />
+            <button
+              onClick={() => navigate("/")}
+              className="text-xs text-muted-foreground hover:text-foreground min-h-[36px] px-2"
+            >
+              Leave
+            </button>
+          </div>
         </div>
 
-        {/* Video block — own space */}
-        <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border/60">
+        {/* Video block */}
+        <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border/60 relative">
           <VideoGrid
             localStream={rtc.localStream}
             localName={displayName}
@@ -231,43 +237,43 @@ const LiveJoinPage = () => {
             deviceId={deviceId}
             onToggleCamera={rtc.toggleCamera}
             onToggleMic={rtc.toggleMic}
+            tileStyle={prefs.tileStyle}
+            showLabels={prefs.showTileLabels}
           />
         </div>
 
-        {/* Status / transcript block — own space below */}
+        {/* Status / interim block */}
         <div className="flex-1 flex flex-col items-center text-center gap-2 px-4 py-6 overflow-y-auto bg-background/70 backdrop-blur-xl">
           <div className="inline-flex flex-col items-center gap-1 px-4 py-2 rounded-xl bg-background/70 backdrop-blur-sm border border-foreground/10">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">
-              You are Speaker {speakerSlot}
+              You are {displayName || `Speaker ${speakerSlot}`}
             </p>
-            {isConnected ? (
-              <span className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-                <Mic className="w-3.5 h-3.5" />
-                Mic active
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Connecting…
-              </span>
-            )}
           </div>
           {(micError || rtc.error) && (
             <p className="mt-2 text-xs text-destructive max-w-xs px-3 py-2 rounded-lg bg-destructive/10 backdrop-blur-sm border border-destructive/20">
               {micError || rtc.error}
             </p>
           )}
-          {interimText && (
+          {prefs.showInterim && interimText && (
             <p className="mt-3 text-sm text-foreground/80 italic max-w-sm leading-relaxed px-3 py-2 rounded-lg bg-background/70 backdrop-blur-sm border border-foreground/10">
               "{interimText}"
             </p>
           )}
         </div>
 
-        <div className="px-6 pb-6 pt-2 text-center">
-          <p className="text-[11px] text-muted-foreground">
-            Keep this tab open. Your speech is captured here.
-          </p>
+        {/* Minimal status bar */}
+        <div className="h-6 px-3 flex items-center gap-1.5 shrink-0 bg-background/60 backdrop-blur-md border-t border-foreground/10">
+          {isConnected ? (
+            <>
+              <Mic className="w-3 h-3 text-primary" />
+              <span className="text-[11px] text-muted-foreground">Mic active</span>
+            </>
+          ) : (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">Connecting…</span>
+            </>
+          )}
         </div>
       </div>
     );
