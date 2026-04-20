@@ -13,6 +13,8 @@ export interface RemotePeer {
   deviceId: string;
   displayName: string;
   stream: MediaStream;
+  cameraOn: boolean;
+  micOn: boolean;
 }
 
 interface Options {
