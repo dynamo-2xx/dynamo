@@ -106,6 +106,8 @@ const LiveJoinPage = () => {
     speakerName: displayName,
     isActive: isRecording,
     isMicEnabled: rtc.micOn,
+    externalStream: rtc.localStream,
+    streamVersion: rtc.streamVersion,
   });
 
   // Presence (also sends heartbeat every 5s and gives us the participant list
@@ -126,9 +128,16 @@ const LiveJoinPage = () => {
         .eq("session_id", sessionId)
         .eq("device_id", deviceId);
     };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") leave();
+    };
     window.addEventListener("beforeunload", leave);
+    window.addEventListener("pagehide", leave);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("beforeunload", leave);
+      window.removeEventListener("pagehide", leave);
+      document.removeEventListener("visibilitychange", onVisibility);
       leave();
     };
   }, [isRecording, sessionId, deviceId]);
@@ -234,6 +243,7 @@ const LiveJoinPage = () => {
             micOn={rtc.micOn}
             remotePeers={rtc.remotePeers}
             participants={presenceParticipants}
+            activeRtcDeviceIds={rtc.activeRtcDeviceIds}
             deviceId={deviceId}
             onToggleCamera={rtc.toggleCamera}
             onToggleMic={rtc.toggleMic}

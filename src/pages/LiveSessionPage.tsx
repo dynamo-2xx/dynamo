@@ -94,6 +94,8 @@ const LiveSessionPage = () => {
     speakerName: hostName,
     isActive: isRecordingActive && isMulti,
     isMicEnabled: rtc.micOn,
+    externalStream: rtc.localStream,
+    streamVersion: rtc.streamVersion,
   });
   const merged = useMergedLiveTranscript(sessionId, isRecordingActive && isMulti);
   const presenceParticipants = useLiveSessionPresence(
@@ -137,9 +139,17 @@ const LiveSessionPage = () => {
         .eq("session_id", sessionId)
         .eq("device_id", deviceId);
     };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") onLeave();
+    };
     window.addEventListener("beforeunload", onLeave);
+    window.addEventListener("pagehide", onLeave);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.removeEventListener("beforeunload", onLeave);
+      window.removeEventListener("pagehide", onLeave);
+      document.removeEventListener("visibilitychange", onVisibility);
+      onLeave();
     };
   }, [isMulti, sessionId, deviceId]);
 
@@ -530,6 +540,7 @@ const LiveSessionPage = () => {
         micOn={rtc.micOn}
         remotePeers={rtc.remotePeers}
         participants={presenceParticipants}
+        activeRtcDeviceIds={rtc.activeRtcDeviceIds}
         deviceId={deviceId}
         onToggleCamera={rtc.toggleCamera}
         onToggleMic={rtc.toggleMic}

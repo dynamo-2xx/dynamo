@@ -1168,6 +1168,10 @@ export type Database = {
         Args: { _device_id: string; _session_id: string }
         Returns: undefined
       }
+      purge_stale_live_participants: {
+        Args: { _session_id: string }
+        Returns: undefined
+      }
       realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
     }
     Enums: {
