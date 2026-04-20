@@ -87,9 +87,11 @@ const VideoTile = forwardRef<HTMLDivElement, VideoTileProps>(({
     };
   }, [stream]);
 
-  // For the local user, trust the explicit cameraOn flag (which we own).
-  // For remote users, derive purely from the live-track signal.
-  const showVideo = isLocal ? (cameraOn !== false && hasLiveVideo) : hasLiveVideo;
+  // For both local and remote, trust the explicit cameraOn flag (signaled
+  // peer-to-peer via the broadcast channel for remotes). Only show video
+  // when both the flag is true AND a live track exists. This guarantees the
+  // avatar replaces the tile instantly on toggle-off — no frozen last frame.
+  const showVideo = cameraOn !== false && hasLiveVideo;
 
   const initials = (name || "?")
     .split(/\s+/)
@@ -220,8 +222,10 @@ const VideoGrid = ({
         name: p.display_name || `Speaker ${p.speaker_slot}`,
         avatar: p.avatar_url,
         stream: peer?.stream ?? null,
-        cameraOn: !!peer?.stream && peer.stream.getVideoTracks().length > 0,
-        micOn: true,
+        // Trust the explicit signaled state from the peer; fall back to
+        // track presence only when no signal has arrived yet.
+        cameraOn: peer ? peer.cameraOn : false,
+        micOn: peer ? peer.micOn : true,
       };
     });
 
@@ -231,8 +235,8 @@ const VideoGrid = ({
         deviceId: p.deviceId,
         name: p.displayName || "Participant",
         stream: p.stream,
-        cameraOn: p.stream.getVideoTracks().length > 0,
-        micOn: true,
+        cameraOn: p.cameraOn,
+        micOn: p.micOn,
       });
     }
   });
