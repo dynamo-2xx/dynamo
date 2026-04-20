@@ -58,10 +58,6 @@ const VideoTile = forwardRef<HTMLDivElement, VideoTileProps>(({
       trackListeners.push({ t, fn });
     });
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-    }
-
     return () => {
       stream.removeEventListener("addtrack", onChange);
       stream.removeEventListener("removetrack", onChange);
