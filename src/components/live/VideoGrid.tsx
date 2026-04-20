@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, forwardRef } from "react";
 import { Mic, MicOff, Video, VideoOff } from "lucide-react";
 import type { RemotePeer } from "@/hooks/useLiveSessionRTC";
 import type { LiveParticipant } from "@/hooks/useLiveSessionPresence";
@@ -17,25 +17,66 @@ interface VideoTileProps {
   size?: "thumb" | "normal" | "large";
 }
 
-const VideoTile = ({
+const VideoTile = forwardRef<HTMLDivElement, VideoTileProps>(({
   stream,
   name,
   avatar,
   isLocal,
-  cameraOn = true,
+  cameraOn,
   micOn = true,
   showLabel = true,
   size = "normal",
-}: VideoTileProps) => {
-  const ref = useRef<HTMLVideoElement>(null);
+}, ref) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  // Live-track presence state for remote streams (reacts to track add/remove
+  // and mute/unmute, since MediaStream mutations don't trigger React re-renders).
+  const [hasLiveVideo, setHasLiveVideo] = useState(false);
 
   useEffect(() => {
-    if (ref.current && stream) {
-      ref.current.srcObject = stream;
+    if (!stream) {
+      setHasLiveVideo(false);
+      return;
     }
+
+    const compute = () => {
+      const v = stream.getVideoTracks()[0];
+      setHasLiveVideo(!!v && v.readyState === "live" && !v.muted);
+    };
+    compute();
+
+    const onChange = () => compute();
+    stream.addEventListener("addtrack", onChange);
+    stream.addEventListener("removetrack", onChange);
+
+    // Per-track mute/unmute fires when remote sender replaces track with null.
+    const trackListeners: Array<{ t: MediaStreamTrack; fn: () => void }> = [];
+    stream.getVideoTracks().forEach((t) => {
+      const fn = () => compute();
+      t.addEventListener("mute", fn);
+      t.addEventListener("unmute", fn);
+      t.addEventListener("ended", fn);
+      trackListeners.push({ t, fn });
+    });
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+
+    return () => {
+      stream.removeEventListener("addtrack", onChange);
+      stream.removeEventListener("removetrack", onChange);
+      trackListeners.forEach(({ t, fn }) => {
+        t.removeEventListener("mute", fn);
+        t.removeEventListener("unmute", fn);
+        t.removeEventListener("ended", fn);
+      });
+    };
   }, [stream]);
 
-  const hasVideo = stream && stream.getVideoTracks().length > 0 && cameraOn;
+  // For the local user, trust the explicit cameraOn flag (which we own).
+  // For remote users, derive purely from the live-track signal.
+  const showVideo = isLocal ? (cameraOn !== false && hasLiveVideo) : hasLiveVideo;
+
   const initials = (name || "?")
     .split(/\s+/)
     .map((s) => s[0])
@@ -48,10 +89,10 @@ const VideoTile = ({
     size === "large" ? "w-20 h-20" : size === "thumb" ? "w-9 h-9" : "w-14 h-14";
 
   return (
-    <div className="relative aspect-video bg-secondary border border-border rounded-xl overflow-hidden">
-      {hasVideo ? (
+    <div ref={ref} className="relative aspect-video bg-secondary border border-border rounded-xl overflow-hidden">
+      {showVideo ? (
         <video
-          ref={ref}
+          ref={videoRef}
           autoPlay
           playsInline
           muted={isLocal}
@@ -76,7 +117,7 @@ const VideoTile = ({
       {showLabel && (
         <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 bg-background/85 backdrop-blur-sm rounded-md px-1.5 py-0.5 border border-border max-w-[calc(100%-12px)]">
           {!micOn && <MicOff className="w-3 h-3 text-destructive shrink-0" />}
-          {!cameraOn && <VideoOff className="w-3 h-3 text-muted-foreground shrink-0" />}
+          {!showVideo && <VideoOff className="w-3 h-3 text-muted-foreground shrink-0" />}
           <span className="text-[10px] font-semibold truncate">
             {name}
             {isLocal && " (you)"}
@@ -85,7 +126,8 @@ const VideoTile = ({
       )}
     </div>
   );
-};
+});
+VideoTile.displayName = "VideoTile";
 
 export interface VideoGridParticipant {
   deviceId: string;
