@@ -133,6 +133,18 @@ const VideoTile = forwardRef<HTMLDivElement, VideoTileProps>(({
           </div>
         </div>
       )}
+      {!isLocal && stream && (
+        <audio
+          autoPlay
+          playsInline
+          ref={(el) => {
+            if (el && el.srcObject !== stream) {
+              el.srcObject = stream;
+            }
+          }}
+          className="hidden"
+        />
+      )}
       {showLabel && (
         <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 bg-background/85 backdrop-blur-sm rounded-md px-1.5 py-0.5 border border-border max-w-[calc(100%-12px)]">
           {!micOn && <MicOff className="w-3 h-3 text-destructive shrink-0" />}
