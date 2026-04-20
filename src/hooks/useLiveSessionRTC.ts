@@ -38,6 +38,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const makingOfferRef = useRef<Map<string, boolean>>(new Map());
+  const [streamReady, setStreamReady] = useState(false);
 
   // ── Acquire initial local media (camera + mic both on) ──
   useEffect(() => {
@@ -56,6 +57,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
         }
         localStreamRef.current = stream;
         setLocalStream(stream);
+        setStreamReady(true);
         setCameraOn(true);
         setMicOn(true);
       } catch (e: any) {
@@ -69,12 +71,16 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       setLocalStream(null);
+      setStreamReady(false);
     };
   }, [isActive, sessionId]);
 
   // ── Signaling channel + peer connections ──
+  // IMPORTANT: this effect must NOT depend on `localStream` identity, otherwise
+  // every mic/camera toggle (which re-creates the MediaStream wrapper) tears
+  // down all peer connections and the remote user's tile disappears.
   useEffect(() => {
-    if (!isActive || !sessionId || !localStream) return;
+    if (!isActive || !sessionId || !streamReady) return;
 
     const channelName = `live-rtc-${sessionId}`;
     const channel = supabase.channel(channelName, {
@@ -256,7 +262,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [isActive, sessionId, localStream, deviceId, displayName]);
+  }, [isActive, sessionId, streamReady, deviceId, displayName]);
 
   // ── Helpers: stop/replace a track on every peer connection ──
   const replaceSenderTrack = useCallback(
@@ -278,22 +284,28 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
     [],
   );
 
+  // Force VideoTile to re-read tracks WITHOUT changing the MediaStream
+  // identity that the signaling effect depends on.
+  const bumpStream = useCallback(() => {
+    const s = localStreamRef.current;
+    if (!s) return;
+    setLocalStream(new MediaStream(s.getTracks()));
+  }, []);
+
   // ── Toggles ── (fully stop the capture, not just `enabled = false`)
   const toggleCamera = useCallback(async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
 
     if (cameraOn) {
-      // Turn OFF: stop video track entirely
       stream.getVideoTracks().forEach((t) => {
         t.stop();
         stream.removeTrack(t);
       });
       replaceSenderTrack("video", null);
-      setLocalStream(new MediaStream(stream.getTracks()));
+      bumpStream();
       setCameraOn(false);
     } else {
-      // Turn ON: re-acquire video
       try {
         const fresh = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
@@ -302,31 +314,28 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
         if (!newTrack) return;
         stream.addTrack(newTrack);
         replaceSenderTrack("video", newTrack);
-        setLocalStream(new MediaStream(stream.getTracks()));
+        bumpStream();
         setCameraOn(true);
       } catch (e: any) {
         console.error("[rtc] camera restart failed", e);
         setError(e?.message || "Could not access camera");
       }
     }
-  }, [cameraOn, replaceSenderTrack]);
+  }, [cameraOn, replaceSenderTrack, bumpStream]);
 
   const toggleMic = useCallback(async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
 
     if (micOn) {
-      // Turn OFF: stop audio track entirely so the OS mic indicator goes off
-      // and any other consumer (transcription) sees the track end.
       stream.getAudioTracks().forEach((t) => {
         t.stop();
         stream.removeTrack(t);
       });
       replaceSenderTrack("audio", null);
-      setLocalStream(new MediaStream(stream.getTracks()));
+      bumpStream();
       setMicOn(false);
     } else {
-      // Turn ON: re-acquire mic
       try {
         const fresh = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -335,14 +344,14 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
         if (!newTrack) return;
         stream.addTrack(newTrack);
         replaceSenderTrack("audio", newTrack);
-        setLocalStream(new MediaStream(stream.getTracks()));
+        bumpStream();
         setMicOn(true);
       } catch (e: any) {
         console.error("[rtc] mic restart failed", e);
         setError(e?.message || "Could not access microphone");
       }
     }
-  }, [micOn, replaceSenderTrack]);
+  }, [micOn, replaceSenderTrack, bumpStream]);
 
   return {
     localStream,
