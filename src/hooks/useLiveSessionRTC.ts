@@ -269,19 +269,29 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
   }, [isActive, sessionId, streamReady, deviceId, displayName]);
 
   // ── Helpers: stop/replace a track on every peer connection ──
+  // We track senders by transceiver mid/kind we set up at peer creation,
+  // since `sender.track` becomes null after replaceTrack(null) and a kind-by-track
+  // lookup would silently miss the existing transceiver, causing a duplicate
+  // m-line on re-add.
   const replaceSenderTrack = useCallback(
     (kind: "audio" | "video", newTrack: MediaStreamTrack | null) => {
       pcsRef.current.forEach((pc) => {
-        const sender = pc.getSenders().find((s) => s.track?.kind === kind);
-        if (sender) {
-          sender.replaceTrack(newTrack).catch((e) =>
+        // Find a transceiver whose sender is for this kind. We seeded these
+        // when the peer was created with addTrack(audio) and addTrack(video).
+        const transceiver = pc.getTransceivers().find((tr) => {
+          // Prefer matching by current track kind, then by receiver track kind
+          // (the receiver kind is stable even when sender track is null).
+          if (tr.sender.track?.kind === kind) return true;
+          if (tr.receiver.track?.kind === kind) return true;
+          return false;
+        });
+        if (transceiver) {
+          transceiver.sender.replaceTrack(newTrack).catch((e) =>
             console.warn("[rtc] replaceTrack failed", e),
           );
-        } else if (newTrack) {
-          // No existing sender (track was removed earlier) — add it back.
-          if (localStreamRef.current) {
-            pc.addTrack(newTrack, localStreamRef.current);
-          }
+        } else if (newTrack && localStreamRef.current) {
+          // No transceiver yet for this kind — create one.
+          pc.addTrack(newTrack, localStreamRef.current);
         }
       });
     },
