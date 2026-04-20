@@ -279,6 +279,19 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ displayName, deviceId });
+          // Ask everyone for their current camera/mic state so we render
+          // the correct icon/avatar immediately on join.
+          channel.send({
+            type: "broadcast",
+            event: "media-state-request",
+            payload: { from: deviceId },
+          });
+          // Also announce ours.
+          channel.send({
+            type: "broadcast",
+            event: "media-state",
+            payload: { from: deviceId, cameraOn: mediaStateRef.current.cameraOn, micOn: mediaStateRef.current.micOn },
+          });
         }
       });
 
