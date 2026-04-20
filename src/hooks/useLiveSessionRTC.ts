@@ -210,6 +210,25 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
           console.error("[rtc] signal handling failed", e);
         }
       })
+      .on("broadcast", { event: "media-state" }, ({ payload }) => {
+        const { from, cameraOn, micOn } = payload || {};
+        if (!from || from === deviceId) return;
+        setRemotePeers((prev) => {
+          const existing = prev.get(from);
+          if (!existing) return prev;
+          const next = new Map(prev);
+          next.set(from, { ...existing, cameraOn: !!cameraOn, micOn: !!micOn });
+          return next;
+        });
+      })
+      .on("broadcast", { event: "media-state-request" }, () => {
+        // Someone joined and asked for current states — reply with ours.
+        channel.send({
+          type: "broadcast",
+          event: "media-state",
+          payload: { from: deviceId, cameraOn: mediaStateRef.current.cameraOn, micOn: mediaStateRef.current.micOn },
+        });
+      })
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState() as Record<string, Array<{ displayName: string }>>;
         const presentIds = Object.keys(state).filter((id) => id !== deviceId);
