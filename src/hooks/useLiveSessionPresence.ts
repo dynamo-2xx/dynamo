@@ -12,8 +12,8 @@ export interface LiveParticipant {
   last_seen_at: string;
 }
 
-const STALE_MS = 15_000;
-const HEARTBEAT_MS = 5_000;
+const STALE_MS = 8_000;
+const HEARTBEAT_MS = 3_000;
 
 /**
  * Subscribes to live_session_participants and (optionally) sends a 5s heartbeat.

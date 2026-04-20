@@ -30,8 +30,10 @@ const ICE_SERVERS: RTCIceServer[] = [
 export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }: Options) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<Map<string, RemotePeer>>(new Map());
+  const [activeRtcDeviceIds, setActiveRtcDeviceIds] = useState<Set<string>>(new Set());
   const [cameraOn, setCameraOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
+  const [streamVersion, setStreamVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
