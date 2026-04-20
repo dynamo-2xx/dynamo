@@ -540,6 +540,7 @@ const LiveSessionPage = () => {
         micOn={rtc.micOn}
         remotePeers={rtc.remotePeers}
         participants={presenceParticipants}
+        activeRtcDeviceIds={rtc.activeRtcDeviceIds}
         deviceId={deviceId}
         onToggleCamera={rtc.toggleCamera}
         onToggleMic={rtc.toggleMic}
