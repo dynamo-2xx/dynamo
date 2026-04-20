@@ -73,7 +73,7 @@ const VideoTile = forwardRef<HTMLDivElement, VideoTileProps>(({
 
     // Safety-net poll for browsers that don't reliably fire addtrack/unmute
     // when a remote sender swaps tracks via replaceTrack.
-    const poll = setInterval(compute, 1000);
+    const poll = setInterval(compute, 500);
 
     return () => {
       clearInterval(poll);
