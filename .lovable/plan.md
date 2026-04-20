@@ -1,87 +1,54 @@
 
 
-## Plan: Minimal status bar + Full Display Options (A–E) + Floating Transcript
+## Plan: Fix mic-after-unmute + lingering tile bugs
 
-### 1. Shrink "Connected" status bar
-Single ~24px row pinned at the bottom of the live panel:
-- `h-6 px-3 py-0.5 flex items-center gap-1.5 bg-background/60 backdrop-blur-md border-t border-foreground/10`
-- Tiny mic icon + status text at `text-[11px]`
-- Strip the wrapper padding that's creating today's empty band
+### Bug 1 — Host mic dies after unmute
+**Root cause:** Two independent mic captures running:
+- `useLiveSessionRTC` calls `getUserMedia({audio,video})` for peer streaming
+- `useDeviceTranscription` calls `getUserMedia({audio})` for Deepgram
 
-### 2. Display Options menu (all of A–E)
+When RTC's `toggleMic` does `track.stop()` + new `getUserMedia({audio})`, browsers can revoke/disturb the other concurrent capture. Also, the new track is only piped to RTC senders, never to the Deepgram `ScriptProcessor` graph (which is still bound to the original — now-stopped — track).
 
-**Trigger:** small Sliders icon button in the live panel header, opens a translucent popover.
+**Fix:** Make RTC the single owner of the mic, and have transcription consume RTC's stream.
+1. Add `getAudioTrack()` accessor + a `localStream` that always reflects current tracks to `useLiveSessionRTC`.
+2. Refactor `useDeviceTranscription` to accept an optional `externalStream: MediaStream | null` prop. When provided, skip `getUserMedia` entirely and build the Web Audio graph from the external stream.
+3. Rebuild the Deepgram audio graph whenever the active audio track changes (listen for `addtrack`/`removetrack` on the stream, OR re-run effect on a `streamVersion` counter that bumps in `toggleMic`).
+4. In `LiveSessionPage`, pass `rtc.localStream` to `useDeviceTranscription` for multi-device mode.
 
-**A. Layout preset**
-- Stacked (video top, transcript below) — default
-- Side-by-side (video left, transcript right) — desktop only, falls back to Stacked on mobile
-- Transcript-first (large transcript, video as small thumbnails on top)
-- Video-only (transcript hidden; reveals a floating transcript button — see §3)
+### Bug 2 — Tile remains after user leaves
+**Root cause:** `VideoGrid` builds `remoteTiles` from the presence list (DB rows), which lingers up to 15s after a tab close (and forever on best-effort `beforeunload` failures). RTC peer disconnect already cleans `remotePeers`, but the presence row keeps the tile alive with an avatar fallback.
 
-**B. Tile style**
-- Grid (equal tiles) — default
-- Speaker focus (active speaker large, others as thumbnails along the side)
-- Compact (smaller tiles, more fit on screen)
-
-**C. Transcript density**
-- Comfortable (current) — default
-- Compact (tight padding, smaller avatars, smaller text)
-- Cinema (large text, high contrast — for projection / accessibility)
-
-**D. Show/hide toggles**
-- Show timestamps on bubbles
-- Show speaker name labels on video tiles
-- Show interim (in-progress) transcript text
-- Show subtopic dropdowns vs flat transcript
-
-**E. Theme override (this session only)**
-- Auto / Light / Dark / High-contrast
-- High-contrast = boosted borders + opaque bubbles for readability
-
-**Persistence:** all selections stored in `localStorage` under `dynamo:live:display-prefs`. No DB changes.
-
-### 3. Floating draggable transcript (Video-only mode)
-
-When layout = Video-only, a small "Transcript" pill button appears (bottom-right of the video area). Clicking it opens a draggable translucent bubble:
-
-- Reuses the existing `FloatingOverlay` component (same one powering NotebookOverlay / ArgumentMapOverlay)
-- ~320×400px, drag handle at top, close button
-- Body = `LiveThreadView` in `bubble` mode + `compact` density
-- Position persisted via `FloatingOverlay`'s built-in `storageKey` ("live-transcript")
-- Same translucent treatment as the rest of the live UI
+**Fix:** Tighten leave detection to two complementary signals:
+1. **RTC presence channel disconnect** (already tracked in `useLiveSessionRTC` via Supabase channel `presence` events) — when a `deviceId` drops from the RTC presence state, treat them as gone *immediately*.
+2. In `VideoGrid`, only render remote tiles for participants who are EITHER in `remotePeers` OR present in the RTC presence list within the last ~3s. Drop the "show every DB participant" behavior for the live tile grid.
+3. Reduce stale cutoff for `useLiveSessionPresence` from 15s → 8s and heartbeat from 5s → 3s so DB cleanup catches up faster.
+4. Add `pagehide` + `visibilitychange=hidden` listeners alongside `beforeunload` (more reliable on mobile/Safari) that call the delete.
+5. Add a server-side cleanup: a Postgres function `purge_stale_live_participants(_session_id)` invoked from the heartbeat RPC that deletes rows older than 10s, so the DB self-heals.
 
 ### Files to touch
-```text
-src/pages/LiveSessionPage.tsx                     — shrink status bar, add Display button + apply layout/prefs
-src/pages/LiveJoinPage.tsx                        — same status bar + Display button + apply prefs
-src/components/live/DisplayOptionsMenu.tsx (NEW)  — popover with A/B/C/D/E controls
-src/hooks/useLiveDisplayPrefs.ts (NEW)            — localStorage prefs hook (typed prefs object + setter)
-src/components/live/VideoGrid.tsx                 — accept tileStyle, showLabels props; speaker-focus layout
-src/components/live/LiveThreadView.tsx            — accept density, showTimestamps, showInterim, flat-vs-grouped props
-src/components/live/LiveTranscriptBubble.tsx      — density variants (comfortable/compact/cinema), conditional timestamp
-src/components/live/FloatingTranscript.tsx (NEW)  — wraps FloatingOverlay + LiveThreadView for Video-only mode
+```
+src/hooks/useLiveSessionRTC.ts        — expose live audio track + version bump on toggleMic
+src/hooks/useDeviceTranscription.ts   — accept externalStream; rebuild graph on track change
+src/hooks/useLiveSessionPresence.ts   — 8s cutoff, 3s heartbeat
+src/pages/LiveSessionPage.tsx         — pass rtc.localStream into useDeviceTranscription;
+                                        add pagehide/visibilitychange leave hooks
+src/pages/LiveJoinPage.tsx            — same leave hooks
+src/components/live/VideoGrid.tsx     — only show tiles for active RTC peers (intersect with presence)
 ```
 
-No DB migrations. No edge function changes. RLS untouched.
+### Migration
+One small migration adding `purge_stale_live_participants` and updating `live_session_heartbeat` to call it.
 
 ### Verification
-1. Status bar is a thin strip flush at the bottom — no empty band.
-2. Display button opens popover; each control updates live without reload.
-3. Side-by-side splits the panel 50/50 on desktop; collapses to Stacked under 768px.
-4. Speaker-focus enlarges the tile of whoever is currently speaking (uses interim-text presence as the signal).
-5. Cinema density scales transcript text to ~18px with stronger contrast.
-6. Toggling Hide timestamps / Hide labels / Hide interim works instantly.
-7. Theme override flips just the live panel's color tokens, not the whole app.
-8. Video-only hides the transcript area and reveals the Transcript pill; clicking it opens a draggable bubble that remembers position.
-9. Refreshing the page restores all prefs.
+1. Mute/unmute the host mic 5×; words spoken after each unmute appear in the transcript.
+2. Guest closes tab → host's tile for guest disappears within ≤3s (RTC signal) and DB row purges within ≤10s.
+3. Guest navigates away via in-app nav → tile disappears immediately.
+4. Both users' camera/mic toggles continue to only affect their own tile.
 
 ### Confidence
-- Status bar fix: **99%**
-- Prefs framework + persistence: **96%**
-- A (layouts) + B (tile styles) rendering correctly across viewports: **91%**
-- C/D toggles: **97%**
-- E (theme override scoped to live panel only): **88%** — moderate risk; will scope via a CSS class wrapper rather than touching global theme context
-- Floating draggable transcript (reusing FloatingOverlay): **96%**
+- Bug 1 fix (single mic owner): **92%**
+- Bug 2 fix (intersect peers + presence + faster cleanup): **94%**
+- Server-side purge migration: **97%**
 
-Overall: **~94%**.
+Overall: **~93%**.
 
