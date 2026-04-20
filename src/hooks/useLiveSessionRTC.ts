@@ -125,6 +125,8 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
             deviceId: otherId,
             displayName: existing?.displayName || "Participant",
             stream,
+            cameraOn: existing?.cameraOn ?? true,
+            micOn: existing?.micOn ?? true,
           });
           return next;
         });
