@@ -12,6 +12,14 @@ interface Options {
    * no transcript rows are inserted. Defaults to true for backwards compat.
    */
   isMicEnabled?: boolean;
+  /**
+   * Optional external MediaStream to consume audio from. When provided, this
+   * hook will NOT call getUserMedia itself — preventing conflicts with another
+   * owner (e.g. WebRTC). The Web Audio graph is rebuilt whenever the underlying
+   * audio track changes (signaled via `streamVersion`).
+   */
+  externalStream?: MediaStream | null;
+  streamVersion?: number;
 }
 
 /**
@@ -26,6 +34,8 @@ export function useDeviceTranscription({
   speakerName,
   isActive,
   isMicEnabled = true,
+  externalStream = null,
+  streamVersion = 0,
 }: Options) {
   const [interimText, setInterimText] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -38,28 +48,36 @@ export function useDeviceTranscription({
   }, [isMicEnabled]);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const ownedStreamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const broadcastRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  const cleanup = useCallback(() => {
+  const tearDownAudioGraph = useCallback(() => {
+    try { sourceRef.current?.disconnect(); } catch {}
     try { processorRef.current?.disconnect(); } catch {}
+    sourceRef.current = null;
+    processorRef.current = null;
+  }, []);
+
+  const cleanup = useCallback(() => {
+    tearDownAudioGraph();
     try { audioCtxRef.current?.close(); } catch {}
-    try { mediaStreamRef.current?.getTracks().forEach((t) => t.stop()); } catch {}
+    try { ownedStreamRef.current?.getTracks().forEach((t) => t.stop()); } catch {}
     try { wsRef.current?.close(); } catch {}
     if (broadcastRef.current) {
       supabase.removeChannel(broadcastRef.current);
       broadcastRef.current = null;
     }
-    processorRef.current = null;
     audioCtxRef.current = null;
-    mediaStreamRef.current = null;
+    ownedStreamRef.current = null;
     wsRef.current = null;
     setIsConnected(false);
     setInterimText("");
-  }, []);
+  }, [tearDownAudioGraph]);
 
+  // Main lifecycle: open WS + (optionally) own a mic, then build the audio graph.
   useEffect(() => {
     if (!isActive || !sessionId) return;
 
@@ -76,24 +94,22 @@ export function useDeviceTranscription({
         const dgKey = (tokenData as any)?.key;
         if (!dgKey) throw new Error("Deepgram key unavailable");
 
-        // 2) Mic
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+        // 2) Audio source: external stream if provided, else own one
+        if (!externalStream) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+          });
+          if (cancelled) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          ownedStreamRef.current = stream;
         }
-        mediaStreamRef.current = stream;
 
         const AudioCtx =
           (window as any).AudioContext || (window as any).webkitAudioContext;
         const audioCtx: AudioContext = new AudioCtx({ sampleRate: 16000 });
         audioCtxRef.current = audioCtx;
-
-        const source = audioCtx.createMediaStreamSource(stream);
-        const processor = audioCtx.createScriptProcessor(4096, 1, 1);
-        processorRef.current = processor;
 
         // 3) Open WS
         const url =
@@ -112,20 +128,6 @@ export function useDeviceTranscription({
         ws.onopen = () => {
           if (cancelled) return;
           setIsConnected(true);
-          processor.onaudioprocess = (ev) => {
-            if (ws.readyState !== WebSocket.OPEN) return;
-            // Hard mute: don't send audio while mic is toggled off
-            if (!micEnabledRef.current) return;
-            const input = ev.inputBuffer.getChannelData(0);
-            const buf = new Int16Array(input.length);
-            for (let i = 0; i < input.length; i++) {
-              const s = Math.max(-1, Math.min(1, input[i]));
-              buf[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-            }
-            ws.send(buf.buffer);
-          };
-          source.connect(processor);
-          processor.connect(audioCtx.destination);
         };
 
         ws.onmessage = async (ev) => {
@@ -176,7 +178,52 @@ export function useDeviceTranscription({
       cancelled = true;
       cleanup();
     };
+    // NOTE: externalStream IDENTITY changes (e.g. bumpStream) shouldn't tear
+    // down the WS/context. Track changes are handled by the second effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, sessionId, deviceId, speakerSlot, speakerName, cleanup]);
+
+  // Build / rebuild the Web Audio graph whenever the active source changes.
+  // Keyed on streamVersion so toggleMic restarts produce a fresh graph bound
+  // to the new audio track.
+  useEffect(() => {
+    if (!isActive || !sessionId) return;
+    const audioCtx = audioCtxRef.current;
+    const ws = wsRef.current;
+    if (!audioCtx || !ws) return;
+
+    const sourceStream = externalStream ?? ownedStreamRef.current;
+    if (!sourceStream) return;
+    if (sourceStream.getAudioTracks().length === 0) {
+      tearDownAudioGraph();
+      return;
+    }
+
+    tearDownAudioGraph();
+    try {
+      const source = audioCtx.createMediaStreamSource(sourceStream);
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      sourceRef.current = source;
+      processorRef.current = processor;
+
+      processor.onaudioprocess = (ev) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        if (!micEnabledRef.current) return;
+        const input = ev.inputBuffer.getChannelData(0);
+        const buf = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i++) {
+          const s = Math.max(-1, Math.min(1, input[i]));
+          buf[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        }
+        wsRef.current.send(buf.buffer);
+      };
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+    } catch (e) {
+      console.warn("[device-transcription] audio graph build failed", e);
+    }
+    // streamVersion ensures we rebuild after toggleMic acquires a new track.
+  }, [isActive, sessionId, externalStream, streamVersion, isConnected, tearDownAudioGraph]);
 
   return { interimText, isConnected, error };
 }
