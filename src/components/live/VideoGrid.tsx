@@ -147,6 +147,8 @@ interface VideoGridProps {
   micOn: boolean;
   remotePeers: RemotePeer[];
   participants?: LiveParticipant[];
+  /** Set of device IDs currently present in the RTC signaling channel. */
+  activeRtcDeviceIds?: Set<string>;
   deviceId?: string;
   onToggleCamera: () => void;
   onToggleMic: () => void;
@@ -162,6 +164,7 @@ const VideoGrid = ({
   micOn,
   remotePeers,
   participants = [],
+  activeRtcDeviceIds,
   deviceId,
   onToggleCamera,
   onToggleMic,
@@ -170,8 +173,15 @@ const VideoGrid = ({
 }: VideoGridProps) => {
   const peerById = new Map(remotePeers.map((p) => [p.deviceId, p]));
 
+  // Only render tiles for participants who are actively connected via RTC
+  // (either streaming OR present in the signaling channel). This avoids
+  // ghost tiles for DB rows that haven't been purged yet.
   const remoteTiles: VideoGridParticipant[] = participants
     .filter((p) => !deviceId || p.device_id !== deviceId)
+    .filter((p) => {
+      if (!activeRtcDeviceIds) return true; // backwards compat
+      return activeRtcDeviceIds.has(p.device_id) || peerById.has(p.device_id);
+    })
     .map((p) => {
       const peer = peerById.get(p.device_id);
       return {
