@@ -522,7 +522,7 @@ const LiveSessionPage = () => {
   );
 
   const videoBlock = isMulti && (
-    <div className={`shrink-0 px-4 pt-4 pb-2 ${isVideoOnly ? "flex-1 flex flex-col" : "border-b border-border/60"} relative`}>
+    <div className={`shrink-0 px-4 pt-3 pb-2 ${isVideoOnly ? "flex-1 flex flex-col" : "border-b border-border/60 max-h-[40vh] overflow-hidden"} relative`}>
       <VideoGrid
         localStream={rtc.localStream}
         localName={hostName}
