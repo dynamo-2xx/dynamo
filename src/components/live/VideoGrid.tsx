@@ -220,8 +220,10 @@ const VideoGrid = ({
         name: p.display_name || `Speaker ${p.speaker_slot}`,
         avatar: p.avatar_url,
         stream: peer?.stream ?? null,
-        cameraOn: !!peer?.stream && peer.stream.getVideoTracks().length > 0,
-        micOn: true,
+        // Trust the explicit signaled state from the peer; fall back to
+        // track presence only when no signal has arrived yet.
+        cameraOn: peer ? peer.cameraOn : false,
+        micOn: peer ? peer.micOn : true,
       };
     });
 
@@ -231,8 +233,8 @@ const VideoGrid = ({
         deviceId: p.deviceId,
         name: p.displayName || "Participant",
         stream: p.stream,
-        cameraOn: p.stream.getVideoTracks().length > 0,
-        micOn: true,
+        cameraOn: p.cameraOn,
+        micOn: p.micOn,
       });
     }
   });
