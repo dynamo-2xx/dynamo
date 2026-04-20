@@ -38,6 +38,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
   const localStreamRef = useRef<MediaStream | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const makingOfferRef = useRef<Map<string, boolean>>(new Map());
+  const [streamReady, setStreamReady] = useState(false);
 
   // ── Acquire initial local media (camera + mic both on) ──
   useEffect(() => {
@@ -56,6 +57,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
         }
         localStreamRef.current = stream;
         setLocalStream(stream);
+        setStreamReady(true);
         setCameraOn(true);
         setMicOn(true);
       } catch (e: any) {
@@ -69,12 +71,16 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       setLocalStream(null);
+      setStreamReady(false);
     };
   }, [isActive, sessionId]);
 
   // ── Signaling channel + peer connections ──
+  // IMPORTANT: this effect must NOT depend on `localStream` identity, otherwise
+  // every mic/camera toggle (which re-creates the MediaStream wrapper) tears
+  // down all peer connections and the remote user's tile disappears.
   useEffect(() => {
-    if (!isActive || !sessionId || !localStream) return;
+    if (!isActive || !sessionId || !streamReady) return;
 
     const channelName = `live-rtc-${sessionId}`;
     const channel = supabase.channel(channelName, {
