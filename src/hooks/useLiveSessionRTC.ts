@@ -208,6 +208,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState() as Record<string, Array<{ displayName: string }>>;
         const presentIds = Object.keys(state).filter((id) => id !== deviceId);
+        setActiveRtcDeviceIds(new Set(presentIds));
 
         setRemotePeers((prev) => {
           const next = new Map(prev);
@@ -261,6 +262,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
       pcsRef.current.forEach((pc) => pc.close());
       pcsRef.current.clear();
       setRemotePeers(new Map());
+      setActiveRtcDeviceIds(new Set());
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
@@ -347,6 +349,7 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
         stream.addTrack(newTrack);
         replaceSenderTrack("audio", newTrack);
         bumpStream();
+        setStreamVersion((v) => v + 1);
         setMicOn(true);
       } catch (e: any) {
         console.error("[rtc] mic restart failed", e);
@@ -358,6 +361,8 @@ export function useLiveSessionRTC({ sessionId, deviceId, displayName, isActive }
   return {
     localStream,
     remotePeers: Array.from(remotePeers.values()),
+    activeRtcDeviceIds,
+    streamVersion,
     cameraOn,
     micOn,
     toggleCamera,
