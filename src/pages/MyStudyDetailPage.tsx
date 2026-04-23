@@ -337,6 +337,9 @@ const MyStudyDetailPage = () => {
                       <DropdownMenuItem asChild>
                         <Link to={`/live/${notebook.session_id}`}>Open session record</Link>
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setInboxOpen(true)}>
+                        Notes from readers{reader.unreadCount > 0 ? ` (${reader.unreadCount})` : ""}
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setRenameOpen(true)}>Rename</DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={async () => {
