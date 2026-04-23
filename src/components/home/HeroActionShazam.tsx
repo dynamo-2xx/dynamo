@@ -29,10 +29,20 @@ const HeroActionShazam = ({ highlight, onUnauth }: HeroActionShazamProps) => {
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [pulse, setPulse] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const slide = SLIDES[index];
   const Icon = slide.icon;
+
+  const triggerPulse = () => {
+    setPulse(false);
+    // next tick so the class re-applies and animation restarts
+    requestAnimationFrame(() => {
+      setPulse(true);
+      window.setTimeout(() => setPulse(false), 700);
+    });
+  };
 
   const go = (dir: 1 | -1) => {
     setIndex((i) => (i + dir + SLIDES.length) % SLIDES.length);
@@ -40,6 +50,7 @@ const HeroActionShazam = ({ highlight, onUnauth }: HeroActionShazamProps) => {
 
   const handleActivate = () => {
     if (dragging) return;
+    triggerPulse();
     if (!user) {
       onUnauth();
       return;
