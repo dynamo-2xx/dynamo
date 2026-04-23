@@ -46,6 +46,7 @@ interface NotebookPanelProps {
   annotations: SessionAnnotation[];
   onJumpToAnnotation: (a: SessionAnnotation) => void;
   onRemoveAnnotation: (id: string) => void;
+  onUpdateAnnotation?: (id: string, patch: { note?: string; excerpt?: string }) => void;
   notebookId?: string | null;
   // Dynamo (AI Q&A) context
   transcriptEntries: LiveTranscriptEntry[];
@@ -99,6 +100,7 @@ const NotebookPanel = ({
   annotations,
   onJumpToAnnotation,
   onRemoveAnnotation,
+  onUpdateAnnotation,
   notebookId,
   transcriptEntries,
   subtopics,
