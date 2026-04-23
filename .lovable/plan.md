@@ -1,97 +1,88 @@
 
 
-# Change My Mind — new debate format
+# Change My Mind — revised plan
 
-A lightweight debate style where the **owner** publishes a topic + subtopics, and **anyone can queue up** to challenge them. Each challenger writes their own "side" (their position) when they queue. The owner then runs through challengers one-at-a-time, like a stack.
+Adds invites, a grading toggle, and pre-live editability on top of the previously approved CMM plan. Everything else (open queue, owner-only side up-front, AI subtopics) stays the same.
 
-Mobile-first design. No turns/prep-time/timers config. Just: topic → AI subtopics → tags → public/private → owner's side → publish → queue forms → owner takes them on.
+## What's new vs. the previous plan
 
-## How it differs from a normal debate
+1. **Invites** — owner can pre-invite specific users (in addition to the open queue) so they get notified and skip the cold discovery step.
+2. **Grading toggle** — at creation time, owner chooses whether AI grading runs on each round (off by default to keep CMM lightweight).
+3. **Pre-live editability** — a published CMM stays editable (topic, subtopics, owner's side, tags, public/private, invites, grading) until the **first challenger round starts**. Once `started_at` is set, it locks (matching standard debate behavior).
 
-| Step | Normal Debate | Change My Mind |
-|---|---|---|
-| Setup categories | turns, time/turn, prep time, two sides, invites | **just** topic, subtopics, tags, public/private, owner's side |
-| Sides defined | both sides up-front by owner | only **owner's side** up-front; challengers write theirs at queue-time |
-| Participants | invited / fixed roster | open queue, anyone authenticated can join |
-| Flow | structured turns alternating | owner vs. **current challenger** in a 1-v-1 round; pop next from queue |
+## Creation flow (mobile-first, 3 steps)
 
-## User flow (mobile-first)
+1. **Prompt** → AI generates subtopics (no turns / no prep / no time).
+2. **Subtopics** → reorder / add / remove (max 6).
+3. **Your side + settings**:
+   - "My position…" (single text field)
+   - Tags (max 5)
+   - Public / private toggle
+   - **Invite people** (optional): username search → adds to invite list (reuses `InviteFriendsDialog` pattern, single-side variant)
+   - **Enable AI grading** toggle (default OFF) — when on, runs `grade_turn` after each completed round and `grade_final` per challenger when their round ends
+   - Publish
 
-### Owner: Create
-1. Tap "Change My Mind" on the home Hero (new third slide alongside Debate / Live).
-2. Step 1 — Prompt: "What do you want to be challenged on?" → AI generates subtopic suggestions.
-3. Step 2 — Edit subtopics (reorder / add / remove, max 6, same UI patterns as `CreateDebatePage`).
-4. Step 3 — **Your side**: single short text field ("My position…"), tags picker (max 5), public/private toggle. No turns / no prep / no time / no invites.
-5. Tap "Publish" → routes to the live "Change My Mind" room.
+## Pre-live edit mode
 
-### Challenger: Queue
-1. Visits the public CMM room (`/cmm/:id`). Sees topic, subtopics, owner's side, and live queue.
-2. Taps "Challenge" → bottom-sheet composer prompts: **"Your position (1–2 sentences)"** (required) + optional preferred subtopic.
-3. Submits → appears in queue with status `waiting`. Can withdraw.
+- Route `/cmm/:id` detects `status = 'published' && started_at IS NULL` and renders an **"Edit setup"** banner for the owner.
+- Owner can:
+  - Edit topic, subtopics, owner's side label, tags, public/private
+  - Add/remove invites
+  - Toggle grading
+  - Delete the CMM
+- Challengers can still queue during this window — their queue rows persist through edits.
+- The moment the owner taps **Start next** for the first time, `started_at` is set and the edit banner disappears (locked).
 
-### Owner: Run the room
-- Sees an **ordered queue** of challengers with their stated positions.
-- Taps "Start" on the next challenger → that challenger becomes `active`; the room shows a 1-v-1 view (owner side vs. challenger side, with the challenger's stated position rendered as their side label).
-- Both speak using the existing live-transcription pipeline (single-device by default; no rigid turns).
-- Owner taps "End round" → challenger marked `completed`, next in queue is auto-promoted to `up_next`.
-- Owner can `skip` or `kick` a challenger.
+## Invites behavior
 
-## Data model (single migration)
+- Reuses existing `debate_invitations` table (already debate-scoped, has token + notification path).
+- For CMM, invitation `side_id` is left NULL (challengers define their own side at queue time).
+- On accept: invitee lands directly in `/cmm/:id` with the **Challenge** composer pre-opened.
+- Notification: standard `debate_invitation` notification + email (existing `send-invite-email` function).
 
-**`debates.format` enum-like text column** (default `'standard'`):
-- `'standard'` — existing debate behavior, all current logic untouched.
-- `'change_my_mind'` — new format. Skips turns/prep/sides-as-pair logic.
+## Grading toggle
 
-**`debate_sides`** is reused. For CMM, exactly one row is created at publish time: the **owner's side** (label = owner's stated position, sort_order 0). Challenger sides are inserted on-the-fly when their turn starts.
+- New column `debates.grading_enabled boolean default false`.
+- Creation UI exposes a Switch ("AI grading — each round gets scored privately").
+- Room logic: when owner taps **End round**:
+  - If `grading_enabled = true` → call `ai-facilitator` `grade_turn` for both owner and challenger; on the *last* round per challenger also `grade_final` for that challenger.
+  - If `false` → skip entirely. No badge, no narrative.
+- Grades remain owner-private + speaker-private (existing `debate_grades` RLS already enforces this).
 
-**New table `cmm_queue`:**
+## Data model deltas
 
-| column | type | notes |
-|---|---|---|
-| `id` | uuid pk | |
-| `debate_id` | uuid | references debate (FK enforced via RLS, like other tables) |
-| `user_id` | uuid | the challenger |
-| `position_text` | text | challenger's stated side, ≤ 280 chars |
-| `preferred_subtopic_id` | uuid \| null | optional |
-| `status` | text | `waiting` \| `active` \| `completed` \| `skipped` \| `withdrawn` |
-| `queue_index` | int | append-on-insert (max+1), used for ordering |
-| `started_at` / `ended_at` | timestamptz | |
-| `created_at` | timestamptz default `now()` |
+Single migration adds:
 
-Unique partial index on `(debate_id, user_id) WHERE status IN ('waiting','active')` so a user can't double-queue.
+- `debates.format text default 'standard'` — `'standard' | 'change_my_mind'`.
+- `debates.grading_enabled boolean default false`.
+- `cmm_queue` table (as previously specified): `id`, `debate_id`, `user_id`, `position_text` (≤280), `preferred_subtopic_id`, `status` (`waiting|active|completed|skipped|withdrawn`), `queue_index`, `started_at`, `ended_at`, `created_at`. Unique partial index on `(debate_id, user_id) WHERE status IN ('waiting','active')`.
 
-**RLS on `cmm_queue`:**
-- `SELECT`: `can_view_debate(debate_id)` (existing helper covers public + owner + participant cases).
-- `INSERT`: `auth.uid() = user_id AND can_view_debate(debate_id) AND debates.format = 'change_my_mind'`. Validation trigger blocks self-queue by owner and enforces ≤280-char position_text.
-- `UPDATE`: requester can only update own row to set `status = 'withdrawn'`. Owner (via `debates.created_by = auth.uid()`) can transition any row to `active`/`completed`/`skipped`.
-- `DELETE`: requester owns row, only when `status = 'waiting'`.
+RLS on `cmm_queue`:
+- SELECT: `can_view_debate(debate_id)`.
+- INSERT: `auth.uid() = user_id AND can_view_debate(debate_id)` and trigger blocks owner-self-queue + enforces 280 char cap.
+- UPDATE: requester → own row only to set `withdrawn`; owner → any row to `active|completed|skipped`.
+- DELETE: requester owns row when `waiting`.
 
-**RPCs (SECURITY DEFINER):**
-- `cmm_join_queue(_debate_id uuid, _position text, _preferred_subtopic uuid)` → inserts the row at `MAX(queue_index)+1`, returns the new row.
-- `cmm_start_next(_debate_id uuid)` → owner-only; promotes next `waiting` row to `active`, sets `started_at`, creates a `debate_sides` row for the challenger (sort_order = next), inserts a `debate_participants` row for the challenger as a speaker on that new side, and updates `debates.current_speaker_side_id` to the challenger's side.
-- `cmm_end_round(_debate_id uuid, _outcome text)` → owner-only; marks active row `completed`/`skipped`, sets `ended_at`. Returns the next waiting row (or null).
+RPCs (SECURITY DEFINER): `cmm_join_queue`, `cmm_start_next` (sets `debates.started_at` if null on first call → triggers lock), `cmm_end_round`.
 
-**Realtime:** add `cmm_queue` to `supabase_realtime` so the queue updates live for owner and challengers.
+Realtime: add `cmm_queue` to `supabase_realtime`.
 
-## Routes & files
+## Files
 
-- **New** `src/pages/CreateChangeMyMindPage.tsx` — 3-step setup (prompt → subtopics → side+tags+visibility). Reuses `TagPicker`, `DynamoLoader`, the AI `generate_debate` action (we'll add a `format: 'cmm'` hint server-side that asks for subtopics only and skips turns/time).
-- **New** `src/pages/ChangeMyMindRoomPage.tsx` — single mobile-first screen:
-  - Top: topic + subtopic chips, owner's side card.
-  - Middle: live transcript (reuses the single-device `useLiveTranscription` pipeline).
-  - Bottom (mobile sticky): "Challenge" CTA for visitors, or "Start next / End round / Skip" controls for the owner.
-- **New** `src/components/cmm/QueueList.tsx` — ordered list of pending challengers showing avatar, name, and stated position. Owner sees action buttons; visitors see "You are #N in queue" if they've queued.
-- **New** `src/components/cmm/ChallengeComposer.tsx` — bottom-sheet (mobile) / dialog (desktop) form for `position_text` + optional preferred subtopic. Auth-gated; opens `AuthPromptDialog` if signed out.
-- **Edit** `src/components/home/HeroActionShazam.tsx` — add a third slide:
-  `{ id: "cmm", label: "Change My Mind", description: "Open a topic. Take on every challenger.", icon: Swords, route: "/cmm/new" }`.
-- **Edit** `src/App.tsx` — add routes `/cmm/new` (protected) and `/cmm/:id` (public/protected).
-- **Edit** `supabase/functions/ai-facilitator/index.ts` — extend `generate_debate` to accept `payload.format = 'change_my_mind'`; in that mode, return only `topic` + `subtopics` (skip `sides`, `turns_per_subtopic`, `time_per_turn`).
+- **New** `src/pages/CreateChangeMyMindPage.tsx` — 3-step setup including invite picker + grading switch.
+- **New** `src/pages/ChangeMyMindRoomPage.tsx` — single screen; renders **EditSetupBanner** when `started_at IS NULL` for the owner, otherwise the live 1-v-1 view.
+- **New** `src/components/cmm/EditSetupPanel.tsx` — inline pre-live edit form (topic, subtopics, side, tags, visibility, invites, grading).
+- **New** `src/components/cmm/QueueList.tsx` — ordered challengers, owner controls.
+- **New** `src/components/cmm/ChallengeComposer.tsx` — bottom-sheet (mobile) / dialog (desktop) for `position_text`.
+- **New** `src/components/cmm/InvitePeoplePanel.tsx` — username search + chip list (lightweight wrapper that reuses `InviteFriendsDialog` patterns without its 2-side logic).
+- **Edit** `src/components/home/HeroActionShazam.tsx` — third slide: Change My Mind (`Swords` icon, `/cmm/new`).
+- **Edit** `src/App.tsx` — routes `/cmm/new` (protected), `/cmm/:id` (mixed).
+- **Edit** `supabase/functions/ai-facilitator/index.ts` — `generate_debate` accepts `payload.format = 'change_my_mind'`; returns only `topic` + `subtopics`.
 
 ## Out of scope
 
-- Multi-challenger / panel mode (only 1-v-1 owner vs. challenger at a time).
-- AI moderation of the queue (no auto-rejection of low-quality positions).
-- Grading / round-summary AI for CMM rounds in this pass — basic transcript only.
-- Email invites — CMM is open-queue by design.
-- Editing a published CMM topic's subtopics (matches normal debate behavior — locked once live).
+- Multi-challenger / panel mode.
+- AI moderation of queued positions.
+- Editing a CMM **after** the first round starts (locked, like standard debates).
+- Subscription gating for grading (uses existing global limits).
 
