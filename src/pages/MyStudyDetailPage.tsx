@@ -171,20 +171,20 @@ const MyStudyDetailPage = () => {
     right: "annotations",
     ratio: 0.5,
   }));
-  // Hydrate split when sessionId arrives
+  // Hydrate split when target arrives
   useEffect(() => {
-    if (!sessionId) return;
-    const s = loadSplit(sessionId);
+    if (!recordId) return;
+    const s = loadSplit(recordId);
     if (s) setSplit(s);
-  }, [sessionId]);
+  }, [recordId]);
   useEffect(() => {
-    if (!sessionId) return;
+    if (!recordId) return;
     try {
-      localStorage.setItem(SPLIT_KEY(sessionId), JSON.stringify(split));
+      localStorage.setItem(SPLIT_KEY(recordId), JSON.stringify(split));
     } catch {
       /* noop */
     }
-  }, [split, sessionId]);
+  }, [split, recordId]);
 
   const folder = useMemo(
     () => study.folders.find((f) => f.id === notebook?.folder_id) || null,
