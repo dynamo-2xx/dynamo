@@ -20,6 +20,7 @@ import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import { useGrading } from "@/hooks/useGrading";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import RecordToolsMount from "@/components/record/RecordToolsMount";
 
 
 type UserRole = "facilitator" | "speaker" | "spectator";
@@ -1165,7 +1166,7 @@ const DebateRoomPage = () => {
   if (!debate) return null;
 
   return (
-    <div className="h-screen w-full bg-background flex flex-col overflow-hidden">
+    <div className="h-screen w-full bg-background flex flex-col overflow-hidden" data-record-root>
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between shrink-0 w-full">
         <div className="flex items-center gap-3">
@@ -1528,6 +1529,7 @@ const DebateRoomPage = () => {
                         {stTranscripts.map((entry) => (
                           <TranscriptCard
                             key={entry.id}
+                            entryId={entry.id}
                             speakerSide={entry.speaker_side}
                             sideOrder={getSideOrder(entry.speaker_side)}
                             text={entry.text}
@@ -1546,6 +1548,7 @@ const DebateRoomPage = () => {
                               return (
                                 <TranscriptCard
                                   key={arg.id}
+                                  argumentId={arg.id}
                                   speakerSide={side?.label || "Unknown"}
                                   sideOrder={side?.sort_order ?? 0}
                                   text={arg.content}
@@ -1575,6 +1578,23 @@ const DebateRoomPage = () => {
 
         {/* Sidebar is now integrated into ParticipantSharedView */}
       </div>
+      {user && id && (
+        <RecordToolsMount
+          recordType="debate"
+          recordId={id}
+          transcriptEntries={transcriptEntries.map((e: any) => ({
+            id: e.id,
+            speaker_id: 0,
+            speaker_label: e.speaker_side,
+            text: e.text,
+            subtopic: e.subtopic,
+            timestamp: e.timestamp,
+            is_final: e.is_final,
+            ai_summary: e.ai_summary,
+          }))}
+          subtopics={subtopics.map((s: any) => s.title)}
+        />
+      )}
     </div>
   );
 };
