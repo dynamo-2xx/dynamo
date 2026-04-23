@@ -479,6 +479,8 @@ const NotebookPanel = ({
         width: size.w,
         height: size.h,
         zIndex: 50,
+        maxWidth: "100vw",
+        maxHeight: "100vh",
       }}
       className="bg-background border border-foreground/10 rounded-lg shadow-xl flex flex-col"
     >
@@ -486,11 +488,13 @@ const NotebookPanel = ({
       <TabBar />
       {split.enabled ? <SplitContent /> : <SingleContent />}
 
-      <div
-        onMouseDown={startResize}
-        className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize bg-foreground/20 rounded-br-lg"
-        aria-label="Resize"
-      />
+      {!maximized && (
+        <div
+          onMouseDown={startResize}
+          className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize bg-foreground/20 rounded-br-lg"
+          aria-label="Resize"
+        />
+      )}
     </div>
   );
 };
