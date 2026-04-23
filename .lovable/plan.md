@@ -1,159 +1,218 @@
 
 
-# Post-Session Record Redesign
+# My Study — Notebook Library
 
-A study-first, dynamo-styled record page. Hierarchical at-a-glance reading on the left, full transcript on the right, with private notebook + AI cross-references as study aids.
+A personal library of every notebook the user has built. Lives in the **Profile tab (above My Agenda)** and as a **Home page row (above "Find people to debate with")**. Supports search, sort, multi-select delete, folders, manual reorder, rename, share, and revisit-to-edit. Publish stays inside the **My Take** tab only.
 
-## Layout (default state)
+## User stories
+
+1. **The recap student** — "After a session ends, I open Profile → My Study, find yesterday's notebook by session title, and reread my Thoughts to study for class."
+2. **The cross-session synthesizer** — "I create a folder called 'Climate Series' and drag four notebooks into it so I can compare arguments across weeks."
+3. **The cleaner** — "I multi-select five empty drafts and delete them in one tap."
+4. **The republisher** — "I revisit a published Take, edit it, and unpublish it from the My Take tab — the card pill flips from Published to Draft on the list."
+5. **The sharer** — "I send a friend a read-only link to my published Take from the share menu; they open it without an account."
+6. **The renamer** — "A notebook auto-titled from a generic session name; I rename it 'Tariffs vs. Free Trade — round 2' so it's findable."
+7. **The reorderer** — "Inside 'Climate Series' I drag my favorite notebook to the top so it's the first thing I see."
+8. **The home-page returner** — "From the home page row I tap the latest notebook and jump straight back into My Take to keep writing."
+9. **The searcher** — "I type 'tariffs' in the search bar and instantly see every notebook whose session title, Thoughts, Take, or annotation mentions it."
+10. **The mobile reader** — "On my phone I long-press a card to enter multi-select, tap three drafts, and move them into a folder."
+
+## Blindspots worth addressing now
+
+- **Sharing scope**: a Take can be Published (public via profile) *and* link-shared. We need a separate `share_token` for read-only links so the user can share without making it appear on their public profile.
+- **Folder uniqueness & ordering**: folders need an `order_index` and notebooks need `folder_id` + `sort_index`; otherwise reorder won't survive refresh.
+- **A notebook can live in only one folder** (no multi-parent) — keeps mental model simple. "Uncategorized" is the implicit root.
+- **Folder deletion**: deleting a folder must move its notebooks back to root, not orphan them. Confirm dialog states this.
+- **Rename source of truth**: today the card title is the parent session title. Add a nullable `display_title` on `session_notebooks`; cards prefer `display_title` over session title. Rename never mutates the underlying session.
+- **Multi-select UX**: sticky bottom action bar (Move to folder · Delete · Cancel). Long-press on mobile, checkbox on hover desktop, "Select" toggle in the toolbar always available.
+- **Delete safety**: soft-delete with `deleted_at` + 30-day "Trash" view. Hard delete after that. Prevents the "I deleted my finals notes" panic.
+- **Empty-but-not-blank notebooks**: a notebook is auto-created the first time the user opens the panel even if they type nothing. Filter these out by default unless `thoughts`/`my_take`/annotations are non-empty; show under "Hidden empty notebooks (N)" expander.
+- **Conflict: same session opened from two devices**: `session_notebooks` is unique on `(session_id, user_id)`, so both devices already share one row. Auto-save uses last-write-wins; surface a small "saved just now" indicator to make this obvious.
+- **Home row scope**: limit to 6 most-recently-edited notebooks with a `View all →` link to `/my-study`. Don't dump the whole library on Home.
+- **Performance**: add `(user_id, updated_at desc)` index and `(user_id, folder_id, sort_index)` index. Search runs client-side over the user's own rows (already RLS-bounded).
+- **Accessibility**: drag handles need keyboard alternative (`Move up`/`Move down` in the row menu). Multi-select supports shift-click range on desktop.
+- **Notification noise**: do not notify on auto-save or rename. Notify only on Publish success and on share-link first open (optional, defer).
+- **Public profile sync**: when a Take is unpublished, it disappears from the public profile immediately (already handled by RLS `published = true`).
+
+## Where it lives
+
+- **Route**: `/my-study` (list) and `/my-study/:notebookId` (detail editor).
+- **Profile page**: insert a new row **above My Agenda** in the Activity section: `📓 My Study › ` (count badge).
+- **Profile dropdown**: add "My Study" link.
+- **Home page**: insert a row component **above "Find people to debate with"** titled "My Study" with a horizontal scroll of up to 6 recent notebook cards + `View all →`.
+- **Notebook panel** (in-session): small `↗ Open in My Study` link in the panel header.
+
+## Layout — list view
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  ← Back        MAIN TOPIC (Instrument Serif, large)        Share │
-│                Date · Duration · Ended · [Tags]                  │
-├──────────────────────────┬───────────────────────────────────────┤
-│ THREADED RECORD          │ FULL TRANSCRIPT                       │
-│ (left pane, default 55%) │ (right pane, default 45%)             │
-│                          │                                       │
-│ ▼ 1. Subtopic A          │ 10:02  Alex                           │
-│    One-line description  │ "Verbatim text…"                      │
-│    ▸ Thread 1 — title    │                                       │
-│    ▼ Thread 2 — title ⁵  │ 10:03  Sam                            │
-│      One-line conflict   │ "Response…"                           │
-│      • Main — Alex       │ ──────────────                        │
-│        Summary line.     │ 10:05  Alex …                         │
-│        [View transcript] │                                       │
-│        ─── citation ───  │                                       │
-│      ↳ Counter — Sam     │                                       │
-│        Summary line.     │                                       │
-│      • Rebuttal — Alex   │                                       │
-│        Summary line ²    │                                       │
-│                          │                                       │
-│ ▶ 2. Subtopic B          │                                       │
-└──────────────────────────┴───────────────────────────────────────┘
-              [Notebook 📓]  [Q&A 🙂]   (floating, bottom-right)
+│  My Study                                  [ Search 🔍       ]  │
+│  Your private notebooks from every session.                      │
+│                                                                  │
+│  [ All · 24 ] [ Drafts · 18 ] [ Published · 6 ] [ Trash · 2 ]    │
+│  ⌄ Sort: Newest    [ + New folder ]    [ Select ]                │
+├──────────────────────────────────────────────────────────────────┤
+│  ▾ 📁 Climate Series (4)                              ⋮          │
+│     ┌─────────────────────────────────────────────────────┐ ⠿   │
+│     │ ☐  Tariffs vs. Free Trade — round 2     · Published │     │
+│     │    Apr 12 · 38 min · 4 annotations · #climate       │     │
+│     │    "First two paragraphs of My Take preview…"       │     │
+│     └─────────────────────────────────────────────────────┘     │
+│     ┌─────────────────────────────────────────────────────┐ ⠿   │
+│     │ ☐  Carbon credits panel               · Draft       │     │
+│     └─────────────────────────────────────────────────────┘     │
+│  ▸ 📁 Civics 101 (7)                                  ⋮          │
+│                                                                  │
+│  Uncategorized                                                   │
+│  ┌──── notebook card ────┐ ┌──── notebook card ────┐             │
+└──────────────────────────────────────────────────────────────────┘
+
+When [Select] is on:
+┌──────────────────────────────────────────────────────────────────┐
+│ 3 selected   [ Move to folder ▾ ]  [ Delete ]   [ Cancel ]       │
+└──────────────────────────────────────────────────────────────────┘  (sticky bottom)
 ```
 
-- **Resize**: drag the vertical divider between panes (uses existing `react-resizable-panels`). Both panes scroll independently.
-- **Mobile (<768px)**: single column with a top toggle pill `[ Threads | Transcript ]`. No split-pane. Hover-previews become tap-to-open sheets.
-- **Default expansion**: Main topic open. Subtopics collapsed (chevron right). Threads collapsed inside subtopics. Click a subtopic → reveals threads (collapsed). Click a thread → reveals its summaries (always shown when thread open).
+- **Drag handle (⠿)** on each card for reorder; folders are drop targets. Within a folder, cards reorder freely. Drag a folder to reorder folders.
+- **Card overflow menu (⋮)** per row: Open · Open session record · Rename · Move to folder · Share · Publish (if unpublished, links to My Take) · Delete.
+- **Folder overflow menu (⋮)**: Rename · Reorder · Delete (confirms, returns notebooks to root).
+- **Mobile (<768px)**: same list, full-width cards, filter chips horizontally scrollable; long-press = multi-select; drag handle becomes "Move…" in the row menu.
 
-## Hierarchy & content rules
+## Card anatomy
 
-- **Main topic**: session title only. Always visible as page header.
-- **Subtopic**: from existing `subtopics[]`. AI-generated one-line description shown beneath title (reuse `summaries` payload field; if absent, derive once via `analyze-transcript` augment).
-- **Argument Thread**: from existing `threadTitles` map. One-line conflict summary shown when expanded.
-- **Argument Summary** (new granularity — **per role-group, not per entry**):
-  - Role groups: `main`, `counter`, `rebuttal`, then a new `main` when the claim shifts.
-  - Bullet style: `•` for main/rebuttal, `↳` for counter. Speaker label after em-dash.
-  - Each summary card has: summary text, `[View transcript]` link (jumps right pane + flashes the cited entries), optional citation strip.
-- **Citation strip** (host-entered only): a slim 1px divider directly under a summary with citation text + link. No strip rendered when no citation exists.
+- **Title**: `display_title` if set, else parent session title, else "Untitled session" (Instrument Serif).
+- **Eyebrow**: recorded date · duration · annotation count.
+- **Status pill**: `Draft` (hairline) / `Published` (black filled) / `Shared` (small chain icon if a `share_token` exists).
+- **Preview**: first ~140 chars of My Take → else Thoughts → else italic "No content yet".
+- **Tags**: inherited session tags (max 3, +N overflow).
+- **Click** → `/my-study/:notebookId` (detail editor).
 
-## Interactive study tools
+## Detail view (`/my-study/:notebookId`)
 
-### 1. Hover/long-press preview bubble
-- Hovering (desktop) or long-pressing (mobile, 400ms) an Argument Summary opens a translucent floating bubble:
-  - **Top half**: source transcript excerpt (verbatim, time-stamped).
-  - **Slim divider** + **bottom half**: citation (only if host entered one).
-- Click either half → scrolls right pane to the source / opens citation URL.
-- Bubble is **preview only** — no text selection inside it. Highlighting requires expanding the summary first (rule #9).
+```text
+← Back to My Study
 
-### 2. AI cross-reference footnotes
-- Superscript markers `¹ ² ³` appended inline to thread titles or summary text.
-- Three semantic colors (max 3 marker colors per item):
-  - 🔴 **Red** — contradiction (highest priority)
-  - 🔵 **Blue** — shared evidence/citation (medium)
-  - 🟢 **Green** — restated claim (low)
-- **Cluster rule**: if more than 3 cross-refs exist on one node, render a **single** marker `¹⁻⁵` that opens a list popover showing all refs with their colors.
-- Hover marker → small bubble previews the linked summary; click → scrolls + flashes target node (cross-subtopic if needed). Numbering is **global per session**; renumbers on edit/merge.
+Title (editable inline pencil)               [ Open session record ↗ ]
+Recorded Apr 12 · 38 min · in 📁 Climate Series
+                                                       [ Share ▾ ]
 
-### 3. Highlight → annotate
-- When the user selects text inside an **expanded** Argument Summary or transcript bubble, a small floating action chip `[ Annotate ]` appears at the selection's top-right.
-- Click → translucent popover with a textarea. Saving stores `{excerpt, note, anchor: {sessionId, nodeId, charRange}, createdAt}` in the user's private notebook (Annotations tab).
-- Selections inside hover-preview bubbles do **not** trigger the chip (per rule #9).
+[ Thoughts ] [ Annotations · 4 ] [ My Take ]   ← Chrome tabs
+```
 
-### 4. Notebook (draggable, resizable, private)
-- Floating button bottom-left of viewport (mirrors Q&A button on the right). Opens a draggable, resizable panel (reuse `FloatingOverlay` pattern from `NotebookOverlay.tsx`; add corner/edge resize handles).
-- **Three Chrome-style tabs** (rounded top, active tab bg = white, inactive = `rgba(0,0,0,0.04)`):
-  1. **Thoughts** — free-text editor, paste images supported (stored as data URLs in MVP; storage bucket later).
-  2. **Annotations** — list of all annotations for this session. Each row: highlighted excerpt (italic) + user note + small `↗` to jump to source in argument map.
-  3. **My Take** — AI-consolidated summary (see below). Empty state until first generation.
-- **Auto-save**: debounced 1s writes to `notebooks` table (per-session-per-user).
-- **AI consolidation trigger** (rule #6): fires **only when the user navigates away** from the record page (route change or tab close via `beforeunload`). Sends Thoughts + Annotations to Lovable AI Gateway (`google/gemini-2.5-flash`) → produces a legible consolidation → writes to `My Take` tab → emits a notification ("Your take is ready").
-- **My Take card**: editable, with `×` in top-right to delete. User can edit freely before publishing.
-- **Publish button** in My Take footer: wired to **profile page** (rule #7). MVP: writes notebook with `published: true` flag and surfaces a "Published Takes" section on `ProfilePage`. Storage/listing UI for all notebooks comes in a later build.
+- Tabs reuse the same `ThoughtsTab`, `AnnotationsTab`, `MyTakeTab` components extracted from `NotebookPanel`.
+- Auto-saves with the same 1s debounce.
+- Inline rename (pencil icon next to title) → updates `display_title`.
+- **Share menu**:
+  - `Copy private link` — generates/uses `share_token`, opens at `/study/shared/:token` (read-only, no auth required).
+  - `Copy session record link` — links back to the live session record.
+- **Publish lives only in the My Take tab footer** (rule confirmed): `[ Publish to profile ]` / `[ Published ▾ ]` (View on profile · Unpublish).
+- Annotations remain clickable: `↗` jumps to `/live/:sessionId#annotation-:id`.
 
-## Transcript pane (right side)
+## Search, filter, sort
 
-- Reuses existing `SpeakerBubble` rendering (preserves rename/split/merge for owner).
-- Each bubble gets a stable `data-entry-id` so `[View transcript]` links can scroll + flash (yellow glow 800ms).
-- Owner controls hidden in shared/read-only view.
+- **Filter chips**: All · Drafts · Published · Trash.
+- **Sort**: Newest activity (default), Oldest, Session date, Most annotations, Manual (only enabled inside a folder; sticks to `sort_index`).
+- **Search**: client-side fuzzy across `display_title`, session title, Thoughts text, My Take, annotation excerpts/notes, folder name, tags.
+- URL state: `/my-study?filter=published&sort=annotations&q=climate&folder=<id>`.
+
+## Home page integration
+
+- Component: `HomeMyStudyRow` placed above the `FollowSuggestions`/"Find people to debate with" block in `HomePage.tsx`.
+- Layout: serif heading "My Study" + subhead "Pick up where you left off." + horizontally-scrolling row of up to 6 recent notebook cards (compact variant, no overflow menu) + `View all →`.
+- Empty state: small inline card "Start a notebook from any session record" linking to `/my-debates`.
+
+## Data model changes (migrations)
+
+```sql
+-- Folders
+create table public.notebook_folders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  name text not null,
+  sort_index int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index notebook_folders_user_idx on public.notebook_folders (user_id, sort_index);
+
+alter table public.notebook_folders enable row level security;
+create policy "owner can crud folders" on public.notebook_folders
+  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Extend session_notebooks
+alter table public.session_notebooks
+  add column display_title text,
+  add column folder_id uuid references public.notebook_folders(id) on delete set null,
+  add column sort_index int not null default 0,
+  add column share_token text unique,
+  add column deleted_at timestamptz;
+
+create index session_notebooks_user_updated_idx
+  on public.session_notebooks (user_id, updated_at desc) where deleted_at is null;
+create index session_notebooks_user_folder_sort_idx
+  on public.session_notebooks (user_id, folder_id, sort_index) where deleted_at is null;
+```
+
+- **Read-only share RPC** `get_shared_notebook(_token text)` (SECURITY DEFINER) returns notebook + session title for `/study/shared/:token`. Mirrors `get_shared_live_session`.
+- **Soft-delete behavior**: list filters `deleted_at is null` by default; Trash chip queries the inverse. Scheduled hard-delete after 30 days deferred to a later cron job (out of scope here).
+- **RLS on existing `session_notebooks`** already owner-scoped; new columns inherit. The public-via-published policy stays as-is.
+
+## Components & hooks
+
+- `src/pages/MyStudyPage.tsx` — list, filter/sort/search, multi-select bar, drag-and-drop.
+- `src/pages/MyStudyDetailPage.tsx` — single-notebook editor with tabs, rename, share menu.
+- `src/pages/SharedNotebookPage.tsx` — read-only `/study/shared/:token`.
+- `src/components/study/NotebookCard.tsx` — list row (full + compact variants).
+- `src/components/study/FolderRow.tsx` — collapsible folder with drop target.
+- `src/components/study/StudyFilterBar.tsx` — chips, sort, search, Select toggle, New folder.
+- `src/components/study/MultiSelectActionBar.tsx` — sticky bottom bar.
+- `src/components/study/ShareMenu.tsx` — copy private link, copy session link.
+- `src/components/home/HomeMyStudyRow.tsx` — home page row.
+- Extract from `NotebookPanel.tsx`:
+  - `src/components/live/record/notebook/ThoughtsTab.tsx`
+  - `src/components/live/record/notebook/AnnotationsTab.tsx`
+  - `src/components/live/record/notebook/MyTakeTab.tsx`
+- Hooks: `src/hooks/useMyStudy.ts` (list + hydrate session titles/tags/counts/folders), `src/hooks/useNotebookFolders.ts`, `src/hooks/useNotebookReorder.ts` (dnd-kit wrapper), extend `useSessionNotebook.ts` to load by `notebookId`.
+
+## Drag-and-drop
+
+- Use `@dnd-kit/core` + `@dnd-kit/sortable` (lightweight, accessible, already common in the React ecosystem). Keyboard reorder via row menu (`Move up` / `Move down` / `Move to folder…`).
 
 ## Visual style (dynamo)
 
-- Pure white bg `#ffffff`, black text `#0a0a0a`. Borders `0.5px solid rgba(0,0,0,0.1)`.
-- Headings: Instrument Serif, antialiased. Body: DM Sans.
-- Subtopic/thread headers: serif weight medium, no background, bottom hairline divider.
-- Summary cards: no card chrome; just left padding to indicate hierarchy depth (`pl-4`, `pl-8`, `pl-12`). Role-group bullet glyph in muted gray.
-- Hover bubble: `bg-white/85 backdrop-blur` with hairline border + soft shadow.
-- Footnote markers: small (10px), superscript, color-coded; underline on hover only.
-- Notebook panel: white bg, hairline border, Chrome tabs styled as described, drag handle is the top eyebrow strip, resize from any edge/corner.
-- Floating buttons: 44px circles, white bg, hairline border, shadow-sm.
+- Pure white bg, hairline 0.5px borders, Instrument Serif titles, DM Sans body.
+- Status pills: `Draft` = white + hairline + muted text; `Published` = black bg + white text; `Shared` = small chain glyph + muted text.
+- Folder header: serif medium, chevron, count in parentheses; subtle hover bg `rgba(0,0,0,0.03)`.
+- Drag handle (⠿) appears on hover; sticky multi-select bar uses black bg + white text.
+- Filter chips: pill, active black/white, inactive white/black with hairline.
 
-## Data model changes
+## Routing & nav
 
-New tables (migration):
-
-- `session_notebooks`
-  - `id uuid pk`, `session_id uuid`, `user_id uuid`, `thoughts jsonb` (rich text + image refs), `my_take text`, `published boolean default false`, `published_at timestamptz`, `updated_at`, `created_at`. Unique `(session_id, user_id)`. RLS: owner-only (`user_id = auth.uid()`); plus public SELECT when `published = true` for profile listing.
-- `session_annotations`
-  - `id uuid pk`, `session_id uuid`, `user_id uuid`, `node_kind text` (`summary` | `transcript`), `node_id text`, `excerpt text`, `note text`, `char_start int`, `char_end int`, `created_at`. RLS: owner-only.
-- `session_cross_refs` (AI-generated)
-  - `id uuid pk`, `session_id uuid`, `from_node text`, `to_node text`, `kind text check in ('contradiction','shared_evidence','restated')`, `created_at`. RLS: same as parent live_session via `can_view_live_session(session_id)`.
-- `session_citations` (host manual)
-  - `id uuid pk`, `session_id uuid`, `summary_node_id text`, `text text`, `url text`, `created_by uuid`, `created_at`. RLS: SELECT via `can_view_live_session`; INSERT/UPDATE/DELETE only when `is_live_session_host(session_id)`.
-
-Extend `live_sessions.summaries` JSON to include per-role-group summaries (`{node_id, kind: 'main'|'counter'|'rebuttal', text, source_entry_ids[]}`) generated by an augmented `analyze-transcript` pass.
-
-## Edge function work
-
-- **Augment `analyze-transcript`**: emit per-role-group summaries + subtopic one-liner descriptions. No per-entry summaries (rule #3).
-- **New `detect-cross-refs`**: scheduled at session end (and on transcript edit). Uses `google/gemini-2.5-pro` to classify pairs into the 3 kinds. Caps output at top-N per node by confidence; UI clusters anything beyond 3 markers.
-- **New `consolidate-notebook`**: invoked from client `beforeunload`/route-leave. Inputs: thoughts + annotations. Output: cleaned narrative summary. Writes to `session_notebooks.my_take`. Sends in-app notification.
-
-## Component plan
-
-- `src/components/live/record/SessionRecordViewV2.tsx` — top-level layout, replaces `SessionRecordView`.
-- `src/components/live/record/ThreadedRecordPane.tsx` — left pane, hierarchy renderer.
-- `src/components/live/record/TranscriptPane.tsx` — right pane wrapper (reuses `SpeakerBubble`).
-- `src/components/live/record/SummaryCard.tsx` — role-group summary with hover preview, `[View transcript]`, citation strip.
-- `src/components/live/record/HoverPreviewBubble.tsx` — translucent two-half bubble.
-- `src/components/live/record/FootnoteMarker.tsx` + `FootnoteListPopover.tsx` — superscript marker + clustered list.
-- `src/components/live/record/HighlightAnnotateLayer.tsx` — selection listener + chip + popover.
-- `src/components/live/record/NotebookPanel.tsx` — Chrome-tabbed, draggable, resizable; tabs: `ThoughtsTab`, `AnnotationsTab`, `MyTakeTab`.
-- `src/hooks/useSessionNotebook.ts`, `useSessionAnnotations.ts`, `useCrossRefs.ts`, `useCitations.ts`.
-- `src/pages/ProfilePage.tsx` — append "Published Takes" section.
-
-Replace `SessionRecordView` import sites in `LiveSessionPage` and `SharedLiveSessionPage` with `SessionRecordViewV2`. Keep `RecordQAChat` floating button unchanged.
+- Add `/my-study`, `/my-study/:notebookId`, `/study/shared/:token` to `App.tsx`. Owner routes wrapped in `<ProtectedRoute>`.
+- Update `ProfilePage.tsx` Activity section: insert My Study row **above** My Agenda.
+- Add `My Study` to profile dropdown.
+- Update `HomePage.tsx`: insert `HomeMyStudyRow` above the "Find people to debate with" block.
 
 ## Build order
 
-1. Migrations + RLS for the 4 new tables.
-2. `SessionRecordViewV2` shell with split-pane + hierarchy renderer (no tools yet).
-3. `analyze-transcript` augmentation for per-role-group summaries + subtopic descriptions.
-4. Hover preview bubble + `[View transcript]` jump/flash.
-5. Citations (host manual entry UI in owner mode + slim divider).
-6. Notebook panel (Thoughts + Annotations tabs, persistence).
-7. Highlight → annotate flow.
-8. `detect-cross-refs` function + footnote markers + clustered popover.
-9. `consolidate-notebook` function + My Take tab + leave-page trigger + notification.
-10. Profile "Published Takes" section + publish action.
-11. Mobile fallback (toggle pill, tap-to-open sheets).
+1. Migrations: `notebook_folders`, `session_notebooks` columns, indexes, `get_shared_notebook` RPC.
+2. Extract `ThoughtsTab`/`AnnotationsTab`/`MyTakeTab` from `NotebookPanel.tsx` (no behavior change).
+3. `useMyStudy` + `useNotebookFolders` hooks (list, hydrate, soft-delete-aware).
+4. `MyStudyPage` shell + `NotebookCard` + filter chips + sort + search.
+5. Folders: create, rename, delete (with notebooks-return-to-root), expand/collapse.
+6. Drag-and-drop reorder (dnd-kit) + keyboard fallback.
+7. Multi-select toolbar: Move to folder, Delete (soft), Cancel.
+8. `MyStudyDetailPage` with tabs, inline rename, Share menu.
+9. `SharedNotebookPage` (read-only).
+10. Home page `HomeMyStudyRow` + Profile page row + nav links + dropdown entry.
+11. Trash filter view + restore action.
+12. Mobile pass: long-press multi-select, swipe, horizontal chip scroll.
 
 ## Out of scope (explicit)
 
-- Cross-session notebook storage / browser (called out for "later in the build").
-- Highlighting inside hover-preview bubbles.
-- Per-entry AI summaries.
-- AI-fetched citations.
-- Comments/reactions on shared records.
+- Server-side full-text search.
+- Cron-based hard-delete of trashed items (manual delete from Trash works).
+- Sharing drafts publicly via profile (only Published Takes appear there).
+- Cross-user collaborative notebooks.
+- Notebook templates or AI auto-organize-into-folders.
 
