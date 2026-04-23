@@ -39,6 +39,8 @@ import MessagesPage from "./pages/MessagesPage";
 import MyStudyPage from "./pages/MyStudyPage";
 import MyStudyDetailPage from "./pages/MyStudyDetailPage";
 import SharedNotebookPage from "./pages/SharedNotebookPage";
+import CreateChangeMyMindPage from "./pages/CreateChangeMyMindPage";
+import ChangeMyMindRoomPage from "./pages/ChangeMyMindRoomPage";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +63,8 @@ const App = () => (
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />
+              <Route path="/cmm/new" element={<ProtectedRoute><CreateChangeMyMindPage /></ProtectedRoute>} />
+              <Route path="/cmm/:id" element={<ChangeMyMindRoomPage />} />
               <Route path="/debate/:id" element={<ProtectedRoute><DebateRoomPage /></ProtectedRoute>} />
               <Route path="/debate/:id/preview" element={<ProtectedRoute><DebateScheduledPreviewPage /></ProtectedRoute>} />
               <Route path="/debate/:id/grade" element={<ProtectedRoute><DebateGradeReportPage /></ProtectedRoute>} />
