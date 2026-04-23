@@ -39,7 +39,7 @@ export function useCmmQueue(debateId: string | undefined) {
       setLoading(false);
       return;
     }
-    const list = (data ?? []) as CmmQueueRow[];
+    const list = (data ?? []) as unknown as CmmQueueRow[];
     const userIds = Array.from(new Set(list.map((r) => r.user_id)));
     let profileMap = new Map<string, { display_name: string | null; avatar_url: string | null }>();
     if (userIds.length) {
