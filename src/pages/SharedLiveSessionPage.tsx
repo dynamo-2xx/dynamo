@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
-import SessionRecordView from "@/components/live/SessionRecordView";
+import SessionRecordView from "@/components/live/record/SessionRecordViewV2";
 
 const SharedLiveSessionPage = () => {
   const { token } = useParams<{ token: string }>();
