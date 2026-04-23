@@ -650,6 +650,7 @@ const SessionRecordViewV2 = ({
           annotations={annotationsHook.annotations}
           onJumpToAnnotation={jumpToAnnotation}
           onRemoveAnnotation={annotationsHook.remove}
+          onUpdateAnnotation={annotationsHook.update}
           transcriptEntries={transcriptEntries}
           subtopics={subtopics}
           summaries={summaries}
