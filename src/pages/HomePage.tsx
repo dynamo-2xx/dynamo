@@ -10,6 +10,7 @@ import DebateCoverCard from "@/components/home/DebateCoverCard";
 import { useForYouDebates, useMyRecentDebates } from "@/hooks/useHomeDebates";
 import LocationPrompt from "@/components/home/LocationPrompt";
 import FriendsOnlineWidget from "@/components/home/FriendsOnlineWidget";
+import FindPeopleRow from "@/components/home/FindPeopleRow";
 import { formatTodayLong } from "@/lib/date";
 import EmptyStateHint from "@/components/home/EmptyStateHint";
 import { useEmptyStateHint } from "@/hooks/useEmptyStateHint";
@@ -152,6 +153,8 @@ const HomePage = () => {
             <HomeMyStudyRow />
           </section>
         )}
+
+        <FindPeopleRow />
 
         {/* For-you carousel */}
         <section className="mb-10">
