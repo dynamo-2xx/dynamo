@@ -3,6 +3,8 @@ import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { buildHierarchy } from "./types";
 import type { LiveTranscriptEntry, LiveSummary, LiveThreadMeta } from "@/hooks/useLiveTranscription";
+import type { SessionCitation } from "@/hooks/useSessionCitations";
+import type { SessionCrossRef } from "@/hooks/useSessionCrossRefs";
 import SummaryCard from "./SummaryCard";
 
 interface ThreadedRecordPaneProps {
@@ -12,6 +14,13 @@ interface ThreadedRecordPaneProps {
   summaries: LiveSummary[];
   getSpeakerName: (speakerId: number) => string;
   onJumpToTranscript: (entryIds: string[]) => void;
+  isHost?: boolean;
+  citationByNode?: (node_id: string) => SessionCitation | null;
+  onSaveCitation?: (node_id: string, text: string, url: string) => void;
+  onDeleteCitation?: (node_id: string) => void;
+  refsByNode?: Map<string, SessionCrossRef[]>;
+  numberByRefId?: Map<string, number>;
+  onJumpToCrossRef?: (toNodeId: string) => void;
 }
 
 /**
@@ -27,6 +36,13 @@ const ThreadedRecordPane = ({
   summaries,
   getSpeakerName,
   onJumpToTranscript,
+  isHost,
+  citationByNode,
+  onSaveCitation,
+  onDeleteCitation,
+  refsByNode,
+  numberByRefId,
+  onJumpToCrossRef,
 }: ThreadedRecordPaneProps) => {
   const hierarchy = useMemo(
     () => buildHierarchy({ transcriptEntries, subtopics, threadTitles, summaries, getSpeakerName }),
@@ -83,7 +99,23 @@ const ThreadedRecordPane = ({
                             key={s.node_id}
                             summary={s}
                             speakerName={getSpeakerName(s.speaker_id)}
+                            sourceEntries={thread.entries.filter((e) =>
+                              s.source_entry_ids.includes(e.id),
+                            )}
                             onJumpToTranscript={onJumpToTranscript}
+                            citation={citationByNode?.(s.node_id) || null}
+                            isHost={isHost}
+                            onSaveCitation={
+                              onSaveCitation
+                                ? (text, url) => onSaveCitation(s.node_id, text, url)
+                                : undefined
+                            }
+                            onDeleteCitation={
+                              onDeleteCitation ? () => onDeleteCitation(s.node_id) : undefined
+                            }
+                            crossRefs={refsByNode?.get(s.node_id) || []}
+                            numberByRefId={numberByRefId}
+                            onJumpToCrossRef={onJumpToCrossRef}
                           />
                         ))}
                       </div>

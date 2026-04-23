@@ -1,14 +1,45 @@
 import { motion } from "framer-motion";
-import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight, Pencil, Users, Hash } from "lucide-react";
+import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight, Pencil, Users, Hash, BookOpen } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const roleLabels = { personal: "Personal", education: "Education", community: "Community" } as const;
 
 const ProfilePage = () => {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const [publishedTakes, setPublishedTakes] = useState<
+    { id: string; session_id: string; my_take: string | null; published_at: string | null; session_title?: string | null }[]
+  >([]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("session_notebooks" as any)
+        .select("id, session_id, my_take, published_at")
+        .eq("user_id", user.id)
+        .eq("published", true)
+        .order("published_at", { ascending: false });
+      const list = (data || []) as any[];
+      // Hydrate session titles in one pass.
+      const sessionIds = Array.from(new Set(list.map((r) => r.session_id)));
+      let titles: Record<string, string> = {};
+      if (sessionIds.length > 0) {
+        const { data: sessions } = await supabase
+          .from("live_sessions" as any)
+          .select("id, title")
+          .in("id", sessionIds);
+        for (const s of (sessions || []) as any[]) titles[s.id] = s.title;
+      }
+      setPublishedTakes(
+        list.map((r) => ({ ...r, session_title: titles[r.session_id] || "Untitled session" })),
+      );
+    })();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -112,6 +143,36 @@ const ProfilePage = () => {
             <LogOut className="w-4 h-4" />
             Sign Out
           </button>
+
+          {/* Published Takes */}
+          {publishedTakes.length > 0 && (
+            <section className="mt-8">
+              <div className="flex items-center gap-2 mb-3">
+                <BookOpen className="w-4 h-4 text-muted-foreground" />
+                <h3 className="text-sm font-display">Published Takes</h3>
+              </div>
+              <div className="space-y-3">
+                {publishedTakes.map((t) => (
+                  <article
+                    key={t.id}
+                    className="border border-border rounded-lg p-4 bg-background"
+                  >
+                    <div className="flex items-baseline justify-between gap-3 mb-1">
+                      <h4 className="font-display text-sm truncate">{t.session_title}</h4>
+                      {t.published_at && (
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {new Date(t.published_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-foreground/85 font-body whitespace-pre-wrap line-clamp-6">
+                      {t.my_take || ""}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
         </motion.div>
       </div>
     </AppLayout>
