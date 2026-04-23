@@ -51,7 +51,6 @@ export function useFeaturedDebates(limit = 4) {
       const { data: live } = await supabase
         .from("debates")
         .select(DEBATE_SELECT)
-        .eq("is_public", true)
         .eq("status", "live")
         .limit(limit);
       let pool = (live || []).map(mapDebate);
@@ -60,7 +59,6 @@ export function useFeaturedDebates(limit = 4) {
         const { data: rest } = await supabase
           .from("debates")
           .select(DEBATE_SELECT)
-          .eq("is_public", true)
           .neq("status", "live")
           .neq("status", "archived")
           .gte("created_at", since)
