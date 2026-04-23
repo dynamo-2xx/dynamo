@@ -11,17 +11,19 @@ const HomeMyStudyRow = () => {
   if (loading) return null;
 
   return (
-    <section className="mb-10">
-      <div className="flex items-center justify-between gap-3 mb-3">
+    <section className="mb-8 md:mb-10">
+      <div className="flex items-center justify-between gap-3 mb-3 px-1">
         <div className="flex items-center gap-2 min-w-0">
           <BookOpen className="w-4 h-4 text-muted-foreground" />
-          <h3 className="font-display text-lg truncate">My Study</h3>
-          <span className="text-[11px] text-muted-foreground font-body">Pick up where you left off.</span>
+          <h3 className="font-display text-lg md:text-xl truncate">My Study</h3>
+          <span className="hidden sm:inline text-[11px] text-muted-foreground font-body">
+            Pick up where you left off.
+          </span>
         </div>
         <Link
           to="/my-study"
           aria-label="Open My Study"
-          className="shrink-0 w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+          className="shrink-0 w-9 h-9 md:w-8 md:h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
         >
           <ArrowUpRight className="w-4 h-4" />
         </Link>
@@ -40,14 +42,14 @@ const HomeMyStudyRow = () => {
           </Link>
         </div>
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 sm:-mx-1 px-3 sm:px-1 snap-x">
           {items.map((n) => {
             const preview = notebookPreview(n);
             return (
               <Link
                 key={n.id}
                 to={`/my-study/${n.id}`}
-                className="snap-start shrink-0 w-64 border border-border rounded-lg p-3 hover:border-foreground/20 transition-colors"
+                className="snap-start shrink-0 w-[78vw] sm:w-64 border border-border rounded-lg p-3 sm:p-3.5 hover:border-foreground/20 transition-colors active:bg-accent/30"
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <h4 className="font-display text-sm truncate">{notebookTitle(n)}</h4>

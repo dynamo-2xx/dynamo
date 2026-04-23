@@ -1,14 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowLeft, Share2, Check, BookOpen } from "lucide-react";
+import {
+  ArrowLeft,
+  Share2,
+  Check,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import {
   LiveTranscriptEntry,
   LiveSummary,
@@ -17,9 +19,9 @@ import {
 import TagPicker from "@/components/tags/TagPicker";
 import ThreadedRecordPane from "./ThreadedRecordPane";
 import TranscriptPane from "./TranscriptPane";
-import RecordQAChat from "@/components/live/RecordQAChat";
 import NotebookPanel from "./NotebookPanel";
 import HighlightAnnotateLayer from "./HighlightAnnotateLayer";
+import { cn } from "@/lib/utils";
 import { useSessionNotebook } from "@/hooks/useSessionNotebook";
 import { useSessionAnnotations } from "@/hooks/useSessionAnnotations";
 import { useSessionCitations } from "@/hooks/useSessionCitations";
@@ -70,6 +72,53 @@ const SessionRecordViewV2 = ({
   const [mobileTab, setMobileTab] = useState<"threads" | "transcript">("threads");
   const location = useLocation();
   const { user } = useAuth();
+
+  // Desktop record/transcript split state — persisted per session
+  const SPLIT_KEY = `dynamo:record-split:${sessionId}`;
+  const [recordSplit, setRecordSplit] = useState<{
+    ratio: number;
+    collapsed: "none" | "left" | "right";
+    lastRatio: number;
+  }>(() => {
+    try {
+      const raw = localStorage.getItem(SPLIT_KEY);
+      if (raw) {
+        const v = JSON.parse(raw);
+        if (typeof v?.ratio === "number") return v;
+      }
+    } catch {
+      /* noop */
+    }
+    return { ratio: 0.55, collapsed: "none" as const, lastRatio: 0.55 };
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SPLIT_KEY, JSON.stringify(recordSplit));
+    } catch {
+      /* noop */
+    }
+  }, [recordSplit, SPLIT_KEY]);
+
+  const splitRef = useRef<HTMLDivElement>(null);
+  const dragRecordSplit = useRef(false);
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      if (!dragRecordSplit.current || !splitRef.current) return;
+      const rect = splitRef.current.getBoundingClientRect();
+      let r = (e.clientX - rect.left) / rect.width;
+      r = Math.min(0.85, Math.max(0.15, r));
+      setRecordSplit((s) => ({ ...s, ratio: r, lastRatio: r, collapsed: "none" }));
+    };
+    const up = () => {
+      dragRecordSplit.current = false;
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, []);
 
   // Study tools: notebook, annotations, citations, AI cross-refs.
   const notebook = useSessionNotebook(sessionId);
@@ -388,55 +437,170 @@ const SessionRecordViewV2 = ({
         </div>
 
         <div className="hidden md:block">
-          <ResizablePanelGroup
-            direction="horizontal"
-            className="min-h-[60vh] rounded-lg border border-foreground/10"
-          >
-            <ResizablePanel defaultSize={55} minSize={30}>
-              <div className="h-[70vh] overflow-y-auto p-3">
-                <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3 px-1">
-                  Threaded record
-                </h2>
-                <ThreadedRecordPane
-                  transcriptEntries={transcriptEntries}
-                  subtopics={subtopics}
-                  threadTitles={threadTitles}
-                  summaries={summaries}
-                  getSpeakerName={getSpeakerName}
-                  onJumpToTranscript={handleJumpToTranscript}
-                  isHost={isHost}
-                  citationByNode={citations.byNode}
-                  onSaveCitation={(node, text, url) => {
-                    void citations.upsert(node, text, url);
-                  }}
-                  onDeleteCitation={(node) => {
-                    const c = citations.byNode(node);
-                    if (c) void citations.remove(c.id);
-                  }}
-                  refsByNode={crossRefs.refsByNode}
-                  numberByRefId={crossRefs.numberByRefId}
-                  onJumpToCrossRef={jumpToCrossRef}
-                />
+          {(() => {
+            const leftCollapsed = recordSplit.collapsed === "left";
+            const rightCollapsed = recordSplit.collapsed === "right";
+            const leftPct = leftCollapsed ? 0 : rightCollapsed ? 100 : recordSplit.ratio * 100;
+            const rightPct = 100 - leftPct;
+            const expand = (side: "left" | "right") =>
+              setRecordSplit((s) => ({
+                ...s,
+                collapsed: "none",
+                ratio: s.lastRatio || 0.55,
+              }));
+            const collapse = (side: "left" | "right") =>
+              setRecordSplit((s) => ({
+                ...s,
+                lastRatio: s.collapsed === "none" ? s.ratio : s.lastRatio,
+                collapsed: side,
+              }));
+            return (
+              <div
+                ref={splitRef}
+                className="relative flex min-h-[60vh] rounded-lg border border-foreground/10 overflow-hidden"
+              >
+                {/* Left rail when threaded record is collapsed */}
+                {leftCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => expand("left")}
+                    className="absolute left-0 top-0 bottom-0 w-7 z-10 bg-background border-r border-foreground/10 hover:bg-foreground/[0.03] transition-colors flex flex-col items-center justify-center gap-2 group"
+                    aria-label="Expand threaded record"
+                    title="Expand threaded record"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />
+                    <span
+                      className="text-[10px] uppercase tracking-wider text-muted-foreground group-hover:text-foreground"
+                      style={{ writingMode: "vertical-rl" }}
+                    >
+                      Threaded record
+                    </span>
+                  </button>
+                )}
+                {/* Left pane */}
+                <div
+                  style={{ width: `${leftPct}%` }}
+                  className={cn(
+                    "h-[70vh] flex flex-col min-w-0 transition-[width] duration-200",
+                    leftCollapsed && "pointer-events-none",
+                  )}
+                >
+                  {!leftCollapsed && (
+                    <>
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-foreground/10">
+                        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Threaded record
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => collapse("left")}
+                          className="p-1 text-muted-foreground hover:text-foreground rounded"
+                          aria-label="Collapse threaded record"
+                          title="Collapse"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-3 min-h-0">
+                        <ThreadedRecordPane
+                          transcriptEntries={transcriptEntries}
+                          subtopics={subtopics}
+                          threadTitles={threadTitles}
+                          summaries={summaries}
+                          getSpeakerName={getSpeakerName}
+                          onJumpToTranscript={handleJumpToTranscript}
+                          isHost={isHost}
+                          citationByNode={citations.byNode}
+                          onSaveCitation={(node, text, url) => {
+                            void citations.upsert(node, text, url);
+                          }}
+                          onDeleteCitation={(node) => {
+                            const c = citations.byNode(node);
+                            if (c) void citations.remove(c.id);
+                          }}
+                          refsByNode={crossRefs.refsByNode}
+                          numberByRefId={crossRefs.numberByRefId}
+                          onJumpToCrossRef={jumpToCrossRef}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+                {/* Drag divider — hidden when one side is collapsed */}
+                {recordSplit.collapsed === "none" && (
+                  <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    onPointerDown={(e) => {
+                      dragRecordSplit.current = true;
+                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                    className="group relative w-1.5 shrink-0 cursor-col-resize bg-foreground/10 hover:bg-foreground/30 transition-colors"
+                    style={{ touchAction: "none" }}
+                  >
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-1 rounded-full bg-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                )}
+                {/* Right pane */}
+                <div
+                  style={{ width: `${rightPct}%` }}
+                  className={cn(
+                    "h-[70vh] flex flex-col min-w-0 transition-[width] duration-200",
+                    rightCollapsed && "pointer-events-none",
+                  )}
+                >
+                  {!rightCollapsed && (
+                    <>
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-foreground/10">
+                        <button
+                          type="button"
+                          onClick={() => collapse("right")}
+                          className="p-1 text-muted-foreground hover:text-foreground rounded"
+                          aria-label="Collapse transcript"
+                          title="Collapse"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Full transcript
+                        </h2>
+                        <span className="w-5" />
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-3 min-h-0">
+                        <TranscriptPane
+                          ref={transcriptScrollRef}
+                          entries={transcriptEntries}
+                          getSpeakerName={getSpeakerName}
+                          readOnly={readOnly}
+                          onRenameSpeaker={handleRenameSpeaker}
+                          onSplit={handleSplitEntry}
+                          onMerge={handleMergeEntry}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+                {/* Right rail when transcript is collapsed */}
+                {rightCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => expand("right")}
+                    className="absolute right-0 top-0 bottom-0 w-7 z-10 bg-background border-l border-foreground/10 hover:bg-foreground/[0.03] transition-colors flex flex-col items-center justify-center gap-2 group"
+                    aria-label="Expand full transcript"
+                    title="Expand full transcript"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />
+                    <span
+                      className="text-[10px] uppercase tracking-wider text-muted-foreground group-hover:text-foreground"
+                      style={{ writingMode: "vertical-rl" }}
+                    >
+                      Full transcript
+                    </span>
+                  </button>
+                )}
               </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle className="bg-foreground/10" />
-            <ResizablePanel defaultSize={45} minSize={25}>
-              <div className="h-[70vh] overflow-y-auto p-3">
-                <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3 px-1">
-                  Full transcript
-                </h2>
-                <TranscriptPane
-                  ref={transcriptScrollRef}
-                  entries={transcriptEntries}
-                  getSpeakerName={getSpeakerName}
-                  readOnly={readOnly}
-                  onRenameSpeaker={handleRenameSpeaker}
-                  onSplit={handleSplitEntry}
-                  onMerge={handleMergeEntry}
-                />
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
+            );
+          })()}
         </div>
 
         {transcriptEntries.length === 0 && summaries.length === 0 && (
@@ -472,6 +636,7 @@ const SessionRecordViewV2 = ({
         <NotebookPanel
           open={notebookOpen}
           onClose={() => setNotebookOpen(false)}
+          sessionId={sessionId}
           thoughts={notebook.thoughts}
           setThoughts={notebook.setThoughts}
           myTake={notebook.myTake}
@@ -483,17 +648,13 @@ const SessionRecordViewV2 = ({
           annotations={annotationsHook.annotations}
           onJumpToAnnotation={jumpToAnnotation}
           onRemoveAnnotation={annotationsHook.remove}
+          transcriptEntries={transcriptEntries}
+          subtopics={subtopics}
+          summaries={summaries}
+          speakerNames={speakerNames}
+          shareToken={currentShareToken}
         />
       )}
-
-      <RecordQAChat
-        sessionId={sessionId}
-        transcriptEntries={transcriptEntries}
-        subtopics={subtopics}
-        summaries={summaries}
-        speakerNames={speakerNames}
-        shareToken={currentShareToken}
-      />
     </div>
   );
 };

@@ -259,20 +259,20 @@ const MyStudyPage = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8 md:py-12">
+      <div className="max-w-3xl lg:max-w-4xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 md:py-8 lg:py-12">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-1 sm:mb-2">
             <Link
               to="/profile"
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground p-1 -ml-1"
               aria-label="Back to profile"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <BookOpen className="w-4 h-4 text-muted-foreground" />
-            <h1 className="text-xl sm:text-2xl font-display">My Study</h1>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-display">My Study</h1>
           </div>
-          <p className="text-sm text-muted-foreground font-body mb-6">
+          <p className="text-[15px] md:text-sm text-muted-foreground font-body mb-4 sm:mb-6">
             Your private notebooks from every session.
           </p>
 
