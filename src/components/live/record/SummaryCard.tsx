@@ -1,11 +1,25 @@
 import { ArrowRight } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { RoleGroupSummary } from "./types";
+import type { LiveTranscriptEntry } from "@/hooks/useLiveTranscription";
+import type { SessionCitation } from "@/hooks/useSessionCitations";
+import type { SessionCrossRef } from "@/hooks/useSessionCrossRefs";
+import HoverPreviewBubble from "./HoverPreviewBubble";
+import FootnoteMarker from "./FootnoteMarker";
+import CitationEditor from "./CitationEditor";
 
 interface SummaryCardProps {
   summary: RoleGroupSummary;
   speakerName: string;
+  sourceEntries: LiveTranscriptEntry[];
   onJumpToTranscript: (entryIds: string[]) => void;
-  citation?: { text: string; url?: string | null };
+  citation?: SessionCitation | null;
+  isHost?: boolean;
+  onSaveCitation?: (text: string, url: string) => void;
+  onDeleteCitation?: () => void;
+  crossRefs?: SessionCrossRef[];
+  numberByRefId?: Map<string, number>;
+  onJumpToCrossRef?: (toNodeId: string) => void;
 }
 
 /**
@@ -13,11 +27,34 @@ interface SummaryCardProps {
  *   • main / rebuttal     ↳ counter
  * Emits onJumpToTranscript when "View transcript" is clicked.
  */
-const SummaryCard = ({ summary, speakerName, onJumpToTranscript, citation }: SummaryCardProps) => {
+const SummaryCard = ({
+  summary,
+  speakerName,
+  sourceEntries,
+  onJumpToTranscript,
+  citation,
+  isHost,
+  onSaveCitation,
+  onDeleteCitation,
+  crossRefs = [],
+  numberByRefId,
+  onJumpToCrossRef,
+}: SummaryCardProps) => {
   const isCounter = summary.kind === "counter";
   const glyph = isCounter ? "↳" : "•";
   const roleLabel =
     summary.kind === "main" ? "Main" : summary.kind === "counter" ? "Counter" : "Rebuttal";
+
+  const firstEntry = sourceEntries[0];
+  const excerpt =
+    sourceEntries.map((e) => e.text).join(" ").slice(0, 280) ||
+    summary.text;
+  const ts = firstEntry?.timestamp
+    ? new Date(firstEntry.timestamp).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : undefined;
 
   return (
     <div
@@ -30,7 +67,34 @@ const SummaryCard = ({ summary, speakerName, onJumpToTranscript, citation }: Sum
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
             {roleLabel} <span className="text-foreground/40">— {speakerName}</span>
           </div>
-          <p className="text-sm text-foreground/90 leading-relaxed font-body">{summary.text}</p>
+          <HoverCard openDelay={250} closeDelay={100}>
+            <HoverCardTrigger asChild>
+              <p className="text-sm text-foreground/90 leading-relaxed font-body cursor-help">
+                {summary.text}
+                {numberByRefId && crossRefs.length > 0 && onJumpToCrossRef && (
+                  <FootnoteMarker
+                    refs={crossRefs}
+                    numberByRefId={numberByRefId}
+                    onJump={onJumpToCrossRef}
+                  />
+                )}
+              </p>
+            </HoverCardTrigger>
+            <HoverCardContent
+              side="right"
+              align="start"
+              className="p-0 border-0 bg-transparent shadow-none w-auto"
+              data-preview-bubble
+            >
+              <HoverPreviewBubble
+                excerpt={excerpt}
+                speaker={speakerName}
+                timestamp={ts}
+                citation={citation ? { text: citation.text, url: citation.url } : null}
+                onJumpToTranscript={() => onJumpToTranscript(summary.source_entry_ids)}
+              />
+            </HoverCardContent>
+          </HoverCard>
           <button
             type="button"
             onClick={() => onJumpToTranscript(summary.source_entry_ids)}
@@ -51,6 +115,15 @@ const SummaryCard = ({ summary, speakerName, onJumpToTranscript, citation }: Sum
                 {citation.text}
               </a>
             </div>
+          )}
+
+          {isHost && onSaveCitation && onDeleteCitation && (
+            <CitationEditor
+              summaryNodeId={summary.node_id}
+              citation={citation || null}
+              onSave={onSaveCitation}
+              onDelete={onDeleteCitation}
+            />
           )}
         </div>
       </div>
