@@ -22,7 +22,7 @@ const OnboardingPage = () => {
   const [selectedRole, setSelectedRole] = useState<AppRole>("personal");
   const [displayName, setDisplayName] = useState("");
   const [affiliation, setAffiliation] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const handleLocationRequest = () => {
@@ -174,8 +174,12 @@ const OnboardingPage = () => {
                     <div className={`w-5 h-5 rounded-full bg-foreground transition-transform ${isPublic ? "translate-x-4" : "translate-x-0"}`} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Public profile</p>
-                    <p className="text-xs text-muted-foreground">Others can see your debate history</p>
+                    <p className="text-sm font-medium">Let people discover you</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isPublic
+                        ? "Your profile and debates show up in search and recommendations. You can change this anytime in settings."
+                        : "Only your basic profile card is visible. Your debates and activity stay hidden until you flip this on."}
+                    </p>
                   </div>
                 </label>
               </div>
