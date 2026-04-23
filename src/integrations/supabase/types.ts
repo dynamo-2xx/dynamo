@@ -1608,6 +1608,7 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_dm_thread_party: { Args: { _thread_id: string }; Returns: boolean }
+      is_follower_of: { Args: { _owner: string }; Returns: boolean }
       is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
       is_live_session_host: { Args: { _session_id: string }; Returns: boolean }
       is_notebook_owner: { Args: { _notebook_id: string }; Returns: boolean }
