@@ -21,6 +21,7 @@ import ThreadedRecordPane from "./ThreadedRecordPane";
 import TranscriptPane from "./TranscriptPane";
 import NotebookPanel from "./NotebookPanel";
 import HighlightAnnotateLayer from "./HighlightAnnotateLayer";
+import { buildHierarchy } from "./types";
 import { cn } from "@/lib/utils";
 import { useSessionNotebook } from "@/hooks/useSessionNotebook";
 import { useSessionAnnotations } from "@/hooks/useSessionAnnotations";
