@@ -9,6 +9,7 @@ import {
   X,
   Sparkles,
   MoreHorizontal,
+  Mail,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -33,6 +34,8 @@ import { useSessionNotebook } from "@/hooks/useSessionNotebook";
 import { useSessionAnnotations } from "@/hooks/useSessionAnnotations";
 import { useRecordQA } from "@/hooks/useRecordQA";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useReaderNotes, type ReaderNote } from "@/hooks/useReaderNotes";
+import ReaderNotesPanel from "@/components/study/ReaderNotesPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type {
