@@ -3,10 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface CmmTranscriptEntry {
   id: string;
-  speaker_side: "owner" | "challenger";
+  speaker_side: "owner" | "challenger" | "interruption";
   speaker_label: string;
   text: string;
   timestamp: number;
+  /** For interruption entries only: end timestamp (ms epoch). */
+  end_timestamp?: number;
 }
 
 interface UseCmmLiveCaptureProps {
@@ -187,8 +189,11 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
         .maybeSingle();
       const list = (data?.transcript_entries as any) ?? [];
       if (Array.isArray(list) && list.length) {
-        // Filter entries that already conform to CmmTranscriptEntry shape.
-        const filtered = list.filter((e: any) => e?.speaker_side && e?.text) as CmmTranscriptEntry[];
+        // Keep any entry with a recognized speaker_side. Interruption entries
+        // may have empty text (they're pure timeline markers).
+        const filtered = list.filter(
+          (e: any) => e?.speaker_side && (e.speaker_side === "interruption" || e?.text),
+        ) as CmmTranscriptEntry[];
         setEntries(filtered);
       }
     })();
@@ -205,7 +210,9 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
         (payload) => {
           const next = (payload.new as any)?.transcript_entries;
           if (!Array.isArray(next)) return;
-          const filtered = next.filter((e: any) => e?.speaker_side && e?.text) as CmmTranscriptEntry[];
+          const filtered = next.filter(
+            (e: any) => e?.speaker_side && (e.speaker_side === "interruption" || e?.text),
+          ) as CmmTranscriptEntry[];
           // Only overwrite if remote is longer (avoid clobbering local capture mid-flight).
           setEntries((prev) => (filtered.length >= prev.length ? filtered : prev));
         },
@@ -217,5 +224,32 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
   // Reset speaker buffer when round (active) flips.
   useEffect(() => { bufRef.current = ""; bufSpeakerRef.current = 0; }, [active]);
 
-  return { entries, interimText, isConnected, micError, connect, disconnect };
+  /** Owner-only: insert a new interruption marker (start). Returns its id. */
+  const startInterruption = useCallback(async (label = "Interruption") => {
+    const id = `int-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const entry: CmmTranscriptEntry = {
+      id,
+      speaker_side: "interruption",
+      speaker_label: label,
+      text: "",
+      timestamp: Date.now(),
+    };
+    const next = [...entriesRef.current, entry];
+    setEntries(next);
+    await persist(next);
+    return id;
+  }, [persist]);
+
+  /** Owner-only: close an open interruption by stamping its end_timestamp. */
+  const endInterruption = useCallback(async (interruptionId: string) => {
+    const next = entriesRef.current.map((e) =>
+      e.id === interruptionId && e.speaker_side === "interruption"
+        ? { ...e, end_timestamp: Date.now() }
+        : e,
+    );
+    setEntries(next);
+    await persist(next);
+  }, [persist]);
+
+  return { entries, interimText, isConnected, micError, connect, disconnect, startInterruption, endInterruption };
 }

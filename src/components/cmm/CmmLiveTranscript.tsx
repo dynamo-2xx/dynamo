@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, AlertOctagon } from "lucide-react";
 import type { CmmTranscriptEntry } from "@/hooks/useCmmLiveCapture";
 import { cn } from "@/lib/utils";
 
@@ -32,19 +32,41 @@ const CmmLiveTranscript = ({ entries, interimText, isConnected, micError }: Prop
         {entries.length === 0 && !interimText && (
           <p className="text-xs text-muted-foreground py-6 text-center">Speak — your words show up here.</p>
         )}
-        {entries.map((e) => (
-          <div key={e.id} data-entry-id={e.id} className={cn(
-            "rounded-xl px-3 py-2 border",
-            e.speaker_side === "owner"
-              ? "border-border/60 bg-background"
-              : "border-foreground/30 bg-foreground/[0.03]",
-          )}>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
-              {e.speaker_label}
+        {entries.map((e) => {
+          if (e.speaker_side === "interruption") {
+            const open = !e.end_timestamp;
+            const durSec = e.end_timestamp ? Math.max(1, Math.round((e.end_timestamp - e.timestamp) / 1000)) : null;
+            return (
+              <div
+                key={e.id}
+                data-entry-id={e.id}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-1.5 border border-dashed text-xs",
+                  open ? "border-foreground bg-foreground/[0.06]" : "border-border/60 bg-foreground/[0.02] text-muted-foreground",
+                )}
+              >
+                <AlertOctagon className="w-3.5 h-3.5" />
+                <span className="uppercase tracking-wide font-medium">{e.speaker_label}</span>
+                <span className="ml-auto">
+                  {open ? "ongoing…" : `${durSec}s`}
+                </span>
+              </div>
+            );
+          }
+          return (
+            <div key={e.id} data-entry-id={e.id} className={cn(
+              "rounded-xl px-3 py-2 border",
+              e.speaker_side === "owner"
+                ? "border-border/60 bg-background"
+                : "border-foreground/30 bg-foreground/[0.03]",
+            )}>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                {e.speaker_label}
+              </div>
+              <p className="leading-snug">{e.text}</p>
             </div>
-            <p className="leading-snug">{e.text}</p>
-          </div>
-        ))}
+          );
+        })}
         {interimText && (
           <div className="rounded-xl px-3 py-2 border border-dashed border-border/60 text-muted-foreground italic">
             {interimText}
