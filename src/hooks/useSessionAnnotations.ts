@@ -76,5 +76,22 @@ export function useSessionAnnotations(sessionId: string | null) {
     [],
   );
 
-  return { annotations, loading, add, remove, refresh };
+  const update = useCallback(
+    async (id: string, patch: { note?: string; excerpt?: string }) => {
+      const { data, error } = await supabase
+        .from("session_annotations" as any)
+        .update(patch as any)
+        .eq("id", id)
+        .select()
+        .maybeSingle();
+      if (!error && data) {
+        setAnnotations((prev) =>
+          prev.map((a) => (a.id === id ? (data as any as SessionAnnotation) : a)),
+        );
+      }
+    },
+    [],
+  );
+
+  return { annotations, loading, add, remove, update, refresh };
 }
