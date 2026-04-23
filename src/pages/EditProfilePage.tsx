@@ -381,7 +381,8 @@ const EditProfilePage = () => {
               <div className="flex-1 min-w-0">
                 <Label htmlFor="is_public" className="font-body">Public profile</Label>
                 <p className="text-xs text-muted-foreground font-body mt-1">
-                  When on, others can see your name, affiliation, and debate history.
+                  When on, your activity shows up in search and recommendations. Your profile card
+                  (name, avatar, banner, affiliation) is always visible.
                 </p>
               </div>
               <Switch
