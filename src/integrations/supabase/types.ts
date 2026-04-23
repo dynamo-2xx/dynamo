@@ -1163,7 +1163,9 @@ export type Database = {
           node_id: string
           node_kind: string
           note: string
-          session_id: string
+          record_id: string
+          record_type: string
+          session_id: string | null
           user_id: string
         }
         Insert: {
@@ -1175,7 +1177,9 @@ export type Database = {
           node_id: string
           node_kind: string
           note?: string
-          session_id: string
+          record_id: string
+          record_type?: string
+          session_id?: string | null
           user_id: string
         }
         Update: {
@@ -1187,18 +1191,12 @@ export type Database = {
           node_id?: string
           node_kind?: string
           note?: string
-          session_id?: string
+          record_id?: string
+          record_type?: string
+          session_id?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "session_annotations_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "live_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       session_citations: {
         Row: {
@@ -1286,7 +1284,9 @@ export type Database = {
           my_take: string | null
           published: boolean
           published_at: string | null
-          session_id: string
+          record_id: string
+          record_type: string
+          session_id: string | null
           share_token: string | null
           sort_index: number
           thoughts: Json
@@ -1302,7 +1302,9 @@ export type Database = {
           my_take?: string | null
           published?: boolean
           published_at?: string | null
-          session_id: string
+          record_id: string
+          record_type?: string
+          session_id?: string | null
           share_token?: string | null
           sort_index?: number
           thoughts?: Json
@@ -1318,7 +1320,9 @@ export type Database = {
           my_take?: string | null
           published?: boolean
           published_at?: string | null
-          session_id?: string
+          record_id?: string
+          record_type?: string
+          session_id?: string | null
           share_token?: string | null
           sort_index?: number
           thoughts?: Json
@@ -1331,13 +1335,6 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "notebook_folders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "session_notebooks_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "live_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -1414,6 +1411,10 @@ export type Database = {
     Functions: {
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
+      can_view_record: {
+        Args: { _id: string; _type: string }
+        Returns: boolean
+      }
       cmm_end_round: {
         Args: { _debate_id: string; _outcome?: string }
         Returns: {
