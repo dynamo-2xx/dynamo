@@ -9,7 +9,6 @@ import {
 } from "@/hooks/useConnections";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import AutoCarousel from "@/components/home/AutoCarousel";
 
 const FindPeopleRow = () => {
   const { user } = useAuth();
@@ -56,10 +55,8 @@ const FindPeopleRow = () => {
         </Link>
       </div>
 
-      <AutoCarousel
-        items={users}
-        getKey={(u) => u.user_id}
-        renderItem={(u) => {
+      <div className="flex gap-3 overflow-x-auto snap-x pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {users.map((u) => {
           const isRequested = pendingIds.has(u.user_id) || u.follow_status === "pending";
           const isFollowing = followingIds.has(u.user_id) || u.follow_status === "following";
           const subtitle =
@@ -69,9 +66,11 @@ const FindPeopleRow = () => {
             u.affiliation ||
             u.location ||
             null;
-
           return (
-            <div className="w-[180px] shrink-0 border border-border rounded-xl bg-background p-4 flex flex-col items-center text-center">
+            <div
+              key={u.user_id}
+              className="snap-start shrink-0 w-[160px] border border-border rounded-xl bg-background p-4 flex flex-col items-center text-center"
+            >
               <Link to={`/u/${u.user_id}`} className="contents">
                 <div className="w-14 h-14 rounded-full bg-accent overflow-hidden mb-3">
                   {u.avatar_url ? (
@@ -111,8 +110,8 @@ const FindPeopleRow = () => {
               )}
             </div>
           );
-        }}
-      />
+        })}
+      </div>
     </section>
   );
 };
