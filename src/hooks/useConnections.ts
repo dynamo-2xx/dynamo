@@ -15,6 +15,15 @@ export interface Recommendation extends ConnectionUser {
   same_location: boolean;
   mutual_count: number;
   score: number;
+  is_public?: boolean;
+  follow_status?: "none" | "pending" | "following";
+}
+
+export interface IncomingFollowRequest {
+  id: string;
+  requester_id: string;
+  created_at: string;
+  requester?: ConnectionUser | null;
 }
 
 /** Users I follow */
@@ -97,12 +106,18 @@ export function useFollowMutations() {
   const { user } = useAuth();
 
   const follow = useCallback(
-    async (targetUserId: string) => {
+    async (targetUserId: string): Promise<"following" | "requested" | false> => {
       if (!user) return false;
-      const { error } = await (supabase as any)
-        .from("connections")
-        .insert({ follower_id: user.id, followed_id: targetUserId });
-      return !error;
+      const { data, error } = await (supabase as any).rpc("request_follow", { _target: targetUserId });
+      if (error) {
+        console.error(error);
+        return false;
+      }
+      const status = (Array.isArray(data) ? data[0]?.status : (data as any)?.status) as
+        | "following"
+        | "requested"
+        | undefined;
+      return status ?? "following";
     },
     [user],
   );
@@ -120,7 +135,128 @@ export function useFollowMutations() {
     [user],
   );
 
-  return { follow, unfollow };
+  const cancelRequest = useCallback(
+    async (targetUserId: string) => {
+      if (!user) return false;
+      const { error } = await (supabase as any)
+        .from("follow_requests")
+        .delete()
+        .eq("requester_id", user.id)
+        .eq("target_id", targetUserId)
+        .eq("status", "pending");
+      return !error;
+    },
+    [user],
+  );
+
+  return { follow, unfollow, cancelRequest };
+}
+
+/** Outgoing follow requests I've made that are still pending (target ids) */
+export function useMyPendingRequests() {
+  const { user } = useAuth();
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [version, setVersion] = useState(0);
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!user) {
+      setPendingIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("follow_requests")
+        .select("target_id")
+        .eq("requester_id", user.id)
+        .eq("status", "pending");
+      if (!cancelled) setPendingIds(new Set((data || []).map((r: any) => r.target_id)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, version]);
+
+  return { pendingIds, refresh };
+}
+
+/** Incoming follow requests targeted at me (pending) */
+export function useIncomingFollowRequests() {
+  const { user } = useAuth();
+  const [requests, setRequests] = useState<IncomingFollowRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [version, setVersion] = useState(0);
+  const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    if (!user) {
+      setRequests([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data: reqs } = await (supabase as any)
+        .from("follow_requests")
+        .select("id, requester_id, created_at")
+        .eq("target_id", user.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      const list = (reqs || []) as IncomingFollowRequest[];
+      if (list.length === 0) {
+        if (!cancelled) {
+          setRequests([]);
+          setLoading(false);
+        }
+        return;
+      }
+      const ids = list.map((r) => r.requester_id);
+      const cards = await Promise.all(
+        ids.map((id) => (supabase as any).rpc("get_profile_card", { _user_id: id })),
+      );
+      const map = new Map<string, ConnectionUser>();
+      cards.forEach((res: any, i) => {
+        const row = Array.isArray(res?.data) ? res.data[0] : res?.data;
+        if (row) map.set(ids[i], row as ConnectionUser);
+      });
+      if (!cancelled) {
+        setRequests(list.map((r) => ({ ...r, requester: map.get(r.requester_id) ?? null })));
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, version]);
+
+  // Realtime: refresh on any change to follow_requests targeting me
+  useEffect(() => {
+    if (!user) return;
+    const channel = (supabase as any)
+      .channel(`follow-requests-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "follow_requests", filter: `target_id=eq.${user.id}` },
+        () => refresh(),
+      )
+      .subscribe();
+    return () => {
+      (supabase as any).removeChannel(channel);
+    };
+  }, [user, refresh]);
+
+  const respond = useCallback(async (requestId: string, accept: boolean) => {
+    const { error } = await (supabase as any).rpc("respond_follow_request", {
+      _request_id: requestId,
+      _accept: accept,
+    });
+    if (!error) refresh();
+    return !error;
+  }, [refresh]);
+
+  return { requests, loading, refresh, respond };
 }
 
 /** Online friends count + list (visible per privacy rules) */
