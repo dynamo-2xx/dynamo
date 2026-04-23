@@ -58,7 +58,11 @@ serve(async (req) => {
 
     switch (action) {
       case "generate_debate": {
-        const { topic } = payload as { topic: string };
+        const { topic, format } = payload as { topic: string; format?: string };
+        if (format === "change_my_mind") {
+          systemPrompt = `You are d., an AI debate architect. Given a topic the user wants to be challenged on, generate clear subtopics that break the topic into 3-5 distinct angles a challenger might attack from. Return ONLY topic and subtopics via the suggest_debate tool — no sides, no turns, no times.`;
+          userPrompt = `Generate Change-My-Mind subtopics for: "${topic}"`;
+        } else {
         systemPrompt = `You are d., an AI debate architect. Given a topic, generate a structured debate format.
 Return a JSON object using the suggest_debate tool with:
 - topic: a clear, debatable question  
@@ -67,6 +71,7 @@ Return a JSON object using the suggest_debate tool with:
 - turns_per_subtopic: recommended number (1-4)
 - time_per_turn: recommended time ("1 min", "2 min", "3 min", or "5 min")`;
         userPrompt = `Generate a structured debate for: "${topic}"`;
+        }
         break;
       }
 
@@ -265,13 +270,22 @@ Grade this speaker using the grade_final tool.`;
 
     // Add tool calling for structured outputs
     if (action === "generate_debate") {
+      const isCmm = (payload as any)?.format === "change_my_mind";
       body.tools = [
         {
           type: "function",
           function: {
             name: "suggest_debate",
             description: "Return a structured debate format",
-            parameters: {
+            parameters: isCmm ? {
+              type: "object",
+              properties: {
+                topic: { type: "string" },
+                subtopics: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 },
+              },
+              required: ["topic", "subtopics"],
+              additionalProperties: false,
+            } : {
               type: "object",
               properties: {
                 topic: { type: "string" },

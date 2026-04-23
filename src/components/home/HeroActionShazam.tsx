@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { motion, PanInfo } from "framer-motion";
-import { PlusCircle, Radio, ChevronLeft, ChevronRight } from "lucide-react";
+import { PlusCircle, Radio, Swords, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ interface Slide {
 const SLIDES: Slide[] = [
   { id: "debate", label: "Debate", description: "Structure a sincere dialogue", icon: PlusCircle, route: "/create" },
   { id: "live", label: "Live", description: "Capture a real conversation", icon: Radio, route: "/live/new" },
+  { id: "cmm", label: "Change My Mind", description: "Open a topic. Take on every challenger.", icon: Swords, route: "/cmm/new" },
 ];
 
 interface HeroActionShazamProps {

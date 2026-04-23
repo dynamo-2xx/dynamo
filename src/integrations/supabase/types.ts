@@ -85,6 +85,45 @@ export type Database = {
           },
         ]
       }
+      cmm_queue: {
+        Row: {
+          created_at: string
+          debate_id: string
+          ended_at: string | null
+          id: string
+          position_text: string
+          preferred_subtopic_id: string | null
+          queue_index: number
+          started_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          ended_at?: string | null
+          id?: string
+          position_text: string
+          preferred_subtopic_id?: string | null
+          queue_index?: number
+          started_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          ended_at?: string | null
+          id?: string
+          position_text?: string
+          preferred_subtopic_id?: string | null
+          queue_index?: number
+          started_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       connections: {
         Row: {
           created_at: string
@@ -528,6 +567,8 @@ export type Database = {
           facilitator_type: string
           facilitator_user_id: string | null
           feedback_enabled: boolean
+          format: string
+          grading_enabled: boolean
           id: string
           institution_tag: string | null
           is_public: boolean
@@ -565,6 +606,8 @@ export type Database = {
           facilitator_type?: string
           facilitator_user_id?: string | null
           feedback_enabled?: boolean
+          format?: string
+          grading_enabled?: boolean
           id?: string
           institution_tag?: string | null
           is_public?: boolean
@@ -602,6 +645,8 @@ export type Database = {
           facilitator_type?: string
           facilitator_user_id?: string | null
           feedback_enabled?: boolean
+          format?: string
+          grading_enabled?: boolean
           id?: string
           institution_tag?: string | null
           is_public?: boolean
@@ -1369,6 +1414,73 @@ export type Database = {
     Functions: {
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
+      cmm_end_round: {
+        Args: { _debate_id: string; _outcome?: string }
+        Returns: {
+          created_at: string
+          debate_id: string
+          ended_at: string | null
+          id: string
+          position_text: string
+          preferred_subtopic_id: string | null
+          queue_index: number
+          started_at: string | null
+          status: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cmm_queue"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cmm_join_queue: {
+        Args: {
+          _debate_id: string
+          _position: string
+          _preferred_subtopic?: string
+        }
+        Returns: {
+          created_at: string
+          debate_id: string
+          ended_at: string | null
+          id: string
+          position_text: string
+          preferred_subtopic_id: string | null
+          queue_index: number
+          started_at: string | null
+          status: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cmm_queue"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cmm_start_next: {
+        Args: { _debate_id: string }
+        Returns: {
+          created_at: string
+          debate_id: string
+          ended_at: string | null
+          id: string
+          position_text: string
+          preferred_subtopic_id: string | null
+          queue_index: number
+          started_at: string | null
+          status: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cmm_queue"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_debate_invitation: {
         Args: {
           _debate_id: string
