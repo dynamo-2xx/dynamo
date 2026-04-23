@@ -640,6 +640,7 @@ export type Database = {
           body: string
           created_at: string
           id: string
+          metadata: Json
           read_at: string | null
           sender_id: string
           thread_id: string
@@ -648,6 +649,7 @@ export type Database = {
           body: string
           created_at?: string
           id?: string
+          metadata?: Json
           read_at?: string | null
           sender_id: string
           thread_id: string
@@ -656,6 +658,7 @@ export type Database = {
           body?: string
           created_at?: string
           id?: string
+          metadata?: Json
           read_at?: string | null
           sender_id?: string
           thread_id?: string
@@ -895,6 +898,62 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      notebook_reader_notes: {
+        Row: {
+          anchor_char_end: number | null
+          anchor_char_start: number | null
+          anchor_excerpt: string | null
+          anchor_kind: string | null
+          body: string
+          created_at: string
+          dismissed_from_thoughts: boolean
+          dm_thread_id: string | null
+          id: string
+          notebook_id: string
+          read_at: string | null
+          sender_id: string
+          updated_at: string
+        }
+        Insert: {
+          anchor_char_end?: number | null
+          anchor_char_start?: number | null
+          anchor_excerpt?: string | null
+          anchor_kind?: string | null
+          body: string
+          created_at?: string
+          dismissed_from_thoughts?: boolean
+          dm_thread_id?: string | null
+          id?: string
+          notebook_id: string
+          read_at?: string | null
+          sender_id: string
+          updated_at?: string
+        }
+        Update: {
+          anchor_char_end?: number | null
+          anchor_char_start?: number | null
+          anchor_excerpt?: string | null
+          anchor_kind?: string | null
+          body?: string
+          created_at?: string
+          dismissed_from_thoughts?: boolean
+          dm_thread_id?: string | null
+          id?: string
+          notebook_id?: string
+          read_at?: string | null
+          sender_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notebook_reader_notes_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "session_notebooks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -1370,6 +1429,23 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_shared_notebook_for_reader: {
+        Args: { _token: string }
+        Returns: {
+          display_title: string
+          id: string
+          my_notes: Json
+          my_take: string
+          owner_id: string
+          published: boolean
+          published_at: string
+          session_created_at: string
+          session_id: string
+          session_title: string
+          thoughts: Json
+          updated_at: string
+        }[]
+      }
       invitation_is_visible: {
         Args: {
           _inv: Database["public"]["Tables"]["debate_invitations"]["Row"]
@@ -1380,6 +1456,7 @@ export type Database = {
       is_dm_thread_party: { Args: { _thread_id: string }; Returns: boolean }
       is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
       is_live_session_host: { Args: { _session_id: string }; Returns: boolean }
+      is_notebook_owner: { Args: { _notebook_id: string }; Returns: boolean }
       join_live_session: {
         Args: {
           _avatar_url?: string
@@ -1404,6 +1481,37 @@ export type Database = {
         Returns: undefined
       }
       realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
+      submit_reader_note: {
+        Args: {
+          _anchor_char_end?: number
+          _anchor_char_start?: number
+          _anchor_excerpt?: string
+          _anchor_kind?: string
+          _body: string
+          _token: string
+        }
+        Returns: {
+          anchor_char_end: number | null
+          anchor_char_start: number | null
+          anchor_excerpt: string | null
+          anchor_kind: string | null
+          body: string
+          created_at: string
+          dismissed_from_thoughts: boolean
+          dm_thread_id: string | null
+          id: string
+          notebook_id: string
+          read_at: string | null
+          sender_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "notebook_reader_notes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_role: "personal" | "education" | "community" | "admin"

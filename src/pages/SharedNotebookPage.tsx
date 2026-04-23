@@ -1,36 +1,51 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BookOpen, ArrowLeft } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-
-interface SharedNotebook {
-  id: string;
-  session_id: string;
-  display_title: string | null;
-  thoughts: any;
-  my_take: string | null;
-  published: boolean;
-  published_at: string | null;
-  updated_at: string;
-  session_title: string | null;
-  session_created_at: string | null;
-}
+import { BookOpen, ArrowLeft, X, Pencil, Check } from "lucide-react";
+import { useMyReaderNotes } from "@/hooks/useMyReaderNotes";
+import LeaveReaderNoteComposer, {
+  type PinAnchor,
+} from "@/components/study/LeaveReaderNoteComposer";
+import { Textarea } from "@/components/ui/textarea";
 
 const SharedNotebookPage = () => {
   const { token } = useParams<{ token: string }>();
-  const [nb, setNb] = useState<SharedNotebook | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { notebook: nb, loading, submit, update, remove } = useMyReaderNotes(token);
+  const [pendingAnchor, setPendingAnchor] = useState<PinAnchor | null>(null);
+  const thoughtsRef = useRef<HTMLParagraphElement>(null);
+  const myTakeRef = useRef<HTMLParagraphElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
 
+  // Capture text selection inside Thoughts/My Take and convert to a pin anchor
   useEffect(() => {
-    if (!token) return;
-    (async () => {
-      const { data } = await (supabase.rpc as any)("get_shared_notebook", { _token: token });
-      const row = (data && data[0]) || null;
-      setNb(row);
-      setLoading(false);
-    })();
-  }, [token]);
+    const handler = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      const text = sel.toString().trim();
+      if (!text) return;
+      const tEl = thoughtsRef.current;
+      const mEl = myTakeRef.current;
+      const inThoughts = tEl && tEl.contains(range.commonAncestorContainer);
+      const inMyTake = mEl && mEl.contains(range.commonAncestorContainer);
+      if (!inThoughts && !inMyTake) return;
+      const sourceText = (inThoughts ? tEl?.textContent : mEl?.textContent) || "";
+      const start = sourceText.indexOf(text);
+      setPendingAnchor({
+        kind: inThoughts ? "thought" : "my_take",
+        excerpt: text.length > 240 ? text.slice(0, 240) + "…" : text,
+        char_start: start >= 0 ? start : 0,
+        char_end: start >= 0 ? start + text.length : text.length,
+      });
+    };
+    document.addEventListener("mouseup", handler);
+    document.addEventListener("touchend", handler);
+    return () => {
+      document.removeEventListener("mouseup", handler);
+      document.removeEventListener("touchend", handler);
+    };
+  }, []);
 
   const title = nb?.display_title || nb?.session_title || "Untitled session";
   const thoughts = ((nb?.thoughts as any)?.blocks?.[0]?.value || "").trim();
@@ -83,7 +98,10 @@ const SharedNotebookPage = () => {
             {nb.my_take && (
               <section>
                 <h2 className="font-display text-lg mb-2">My Take</h2>
-                <p className="text-sm text-foreground/90 font-body whitespace-pre-wrap leading-relaxed">
+                <p
+                  ref={myTakeRef}
+                  className="text-sm text-foreground/90 font-body whitespace-pre-wrap leading-relaxed"
+                >
                   {nb.my_take}
                 </p>
               </section>
@@ -92,7 +110,10 @@ const SharedNotebookPage = () => {
             {thoughts && (
               <section>
                 <h2 className="font-display text-lg mb-2">Thoughts</h2>
-                <p className="text-sm text-foreground/85 font-body whitespace-pre-wrap leading-relaxed">
+                <p
+                  ref={thoughtsRef}
+                  className="text-sm text-foreground/85 font-body whitespace-pre-wrap leading-relaxed"
+                >
                   {thoughts}
                 </p>
               </section>
@@ -101,6 +122,98 @@ const SharedNotebookPage = () => {
             {!nb.my_take && !thoughts && (
               <p className="text-sm italic text-muted-foreground">This notebook is empty.</p>
             )}
+
+            {/* Recipient's previously-sent notes */}
+            {nb.my_notes && nb.my_notes.length > 0 && (
+              <section className="pt-4 border-t border-border">
+                <h2 className="font-display text-base mb-2">Your notes</h2>
+                <div className="space-y-2">
+                  {nb.my_notes.map((n) => (
+                    <div
+                      key={n.id}
+                      className="rounded-md border border-foreground/10 bg-background p-3"
+                      style={{ borderWidth: "0.5px" }}
+                    >
+                      {n.anchor_excerpt && (
+                        <div className="mb-1.5 pl-2 border-l-2 border-foreground/20 text-[11px] italic text-muted-foreground line-clamp-2">
+                          “{n.anchor_excerpt}”
+                          <span className="ml-1 not-italic text-[10px] uppercase tracking-wider">
+                            · {n.anchor_kind === "my_take" ? "My Take" : "Thought"}
+                          </span>
+                        </div>
+                      )}
+                      {editingId === n.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editBody}
+                            onChange={(e) => setEditBody(e.target.value)}
+                            rows={3}
+                            className="text-sm font-body"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await update(n.id, editBody);
+                                setEditingId(null);
+                              }}
+                              className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-foreground text-background rounded"
+                            >
+                              <Check className="w-3 h-3" /> Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-foreground/90 font-body whitespace-pre-wrap break-words leading-relaxed">
+                            {n.body}
+                          </p>
+                          <div className="flex justify-end gap-1 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(n.id);
+                                setEditBody(n.body);
+                              }}
+                              className="p-1 text-muted-foreground hover:text-foreground"
+                              aria-label="Edit"
+                              title="Edit"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => remove(n.id)}
+                              className="p-1 text-muted-foreground hover:text-foreground"
+                              aria-label="Delete"
+                              title="Delete"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Composer */}
+            <section className="pt-4 border-t border-border">
+              <LeaveReaderNoteComposer
+                onSubmit={submit}
+                pendingAnchor={pendingAnchor}
+                clearAnchor={() => setPendingAnchor(null)}
+              />
+            </section>
           </motion.article>
         )}
       </div>

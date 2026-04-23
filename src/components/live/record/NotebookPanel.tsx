@@ -8,6 +8,7 @@ import {
   Sparkles,
   Maximize2,
   Minimize2,
+  Mail,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { SessionAnnotation } from "@/hooks/useSessionAnnotations";
@@ -21,6 +22,8 @@ import MyTakeTab from "./notebook/MyTakeTab";
 import DynamoChatPane from "./DynamoChatPane";
 import NotebookSplitDivider from "./NotebookSplitDivider";
 import { useRecordQA } from "@/hooks/useRecordQA";
+import { useReaderNotes, type ReaderNote } from "@/hooks/useReaderNotes";
+import ReaderNotesPanel from "@/components/study/ReaderNotesPanel";
 
 type Tab = "thoughts" | "annotations" | "my_take" | "dynamo";
 
@@ -208,6 +211,10 @@ const NotebookPanel = ({
   // Shared QA state
   const qa = useRecordQA(sessionId, shareToken);
 
+  // Reader notes (owner-side inbox)
+  const reader = useReaderNotes(notebookId ?? null);
+  const [inboxOpen, setInboxOpen] = useState(false);
+
   // Split container ref for divider geometry
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
@@ -217,9 +224,30 @@ const NotebookPanel = ({
 
   if (!open) return null;
 
+  const handleJumpReaderNote = (n: ReaderNote) => {
+    if (n.anchor_kind === "my_take") {
+      setTab("my_take");
+      setSplit((s) => ({ ...s, enabled: false }));
+    } else {
+      setTab("thoughts");
+      setSplit((s) => ({ ...s, enabled: false }));
+    }
+    setInboxOpen(false);
+    if (!n.read_at) reader.markRead(n.id);
+  };
+
   // Render content for a given tab id (used for both single + split modes)
   const renderTab = (t: Tab) => {
-    if (t === "thoughts") return <ThoughtsTab thoughts={thoughts} setThoughts={setThoughts} />;
+    if (t === "thoughts")
+      return (
+        <ThoughtsTab
+          thoughts={thoughts}
+          setThoughts={setThoughts}
+          readerNotes={reader.inThoughts}
+          onDismissReaderNote={reader.dismiss}
+          onJumpReaderNote={handleJumpReaderNote}
+        />
+      );
     if (t === "annotations")
       return (
         <AnnotationsTab
@@ -324,6 +352,22 @@ const NotebookPanel = ({
               My Study
             </Link>
           )}
+          {notebookId && (
+            <button
+              type="button"
+              onClick={() => setInboxOpen((v) => !v)}
+              className="relative p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Notes from readers"
+              title="Notes from readers"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              {reader.unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] leading-[14px] text-center font-medium">
+                  {reader.unreadCount > 9 ? "9+" : reader.unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => (split.enabled ? setSplit((s) => ({ ...s, enabled: false })) : enterSplit())}
@@ -423,6 +467,14 @@ const NotebookPanel = ({
         {headerEl}
         {tabBarEl}
         {bodyEl}
+        <ReaderNotesPanel
+          open={inboxOpen}
+          onClose={() => setInboxOpen(false)}
+          notes={reader.notes}
+          onDismiss={reader.dismiss}
+          onClearAll={reader.clearAll}
+          onJump={handleJumpReaderNote}
+        />
       </div>
     );
   }
@@ -453,6 +505,14 @@ const NotebookPanel = ({
           aria-label="Resize"
         />
       )}
+      <ReaderNotesPanel
+        open={inboxOpen}
+        onClose={() => setInboxOpen(false)}
+        notes={reader.notes}
+        onDismiss={reader.dismiss}
+        onClearAll={reader.clearAll}
+        onJump={handleJumpReaderNote}
+      />
     </div>
   );
 };

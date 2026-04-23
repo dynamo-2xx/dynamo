@@ -9,6 +9,7 @@ import {
   X,
   Sparkles,
   MoreHorizontal,
+  Mail,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -33,6 +34,8 @@ import { useSessionNotebook } from "@/hooks/useSessionNotebook";
 import { useSessionAnnotations } from "@/hooks/useSessionAnnotations";
 import { useRecordQA } from "@/hooks/useRecordQA";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useReaderNotes, type ReaderNote } from "@/hooks/useReaderNotes";
+import ReaderNotesPanel from "@/components/study/ReaderNotesPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type {
@@ -146,6 +149,15 @@ const MyStudyDetailPage = () => {
 
   const [tab, setTab] = useState<Tab>("thoughts");
   const [renameOpen, setRenameOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const reader = useReaderNotes(notebookId ?? null);
+
+  const handleJumpReaderNote = (n: ReaderNote) => {
+    setTab(n.anchor_kind === "my_take" ? "my_take" : "thoughts");
+    setSplit((s) => ({ ...s, enabled: false }));
+    setInboxOpen(false);
+    if (!n.read_at) reader.markRead(n.id);
+  };
 
   const [split, setSplit] = useState<SplitState>(() => ({
     enabled: false,
@@ -186,7 +198,16 @@ const MyStudyDetailPage = () => {
     t === "annotations" ? `Annotations · ${annotations?.length || 0}` : TAB_LABEL[t];
 
   const renderTab = (t: Tab) => {
-    if (t === "thoughts") return <ThoughtsTab thoughts={nb.thoughts} setThoughts={nb.setThoughts} />;
+    if (t === "thoughts")
+      return (
+        <ThoughtsTab
+          thoughts={nb.thoughts}
+          setThoughts={nb.setThoughts}
+          readerNotes={reader.inThoughts}
+          onDismissReaderNote={reader.dismiss}
+          onJumpReaderNote={handleJumpReaderNote}
+        />
+      );
     if (t === "annotations")
       return (
         <AnnotationsTab
@@ -316,6 +337,9 @@ const MyStudyDetailPage = () => {
                       <DropdownMenuItem asChild>
                         <Link to={`/live/${notebook.session_id}`}>Open session record</Link>
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setInboxOpen(true)}>
+                        Notes from readers{reader.unreadCount > 0 ? ` (${reader.unreadCount})` : ""}
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setRenameOpen(true)}>Rename</DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={async () => {
@@ -336,6 +360,20 @@ const MyStudyDetailPage = () => {
 
                 {/* Desktop: inline actions */}
                 <div className="hidden sm:flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setInboxOpen((v) => !v)}
+                    className="relative inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5"
+                    aria-label="Notes from readers"
+                    title="Notes from readers"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    {reader.unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] leading-[16px] text-center font-medium">
+                        {reader.unreadCount > 9 ? "9+" : reader.unreadCount}
+                      </span>
+                    )}
+                  </button>
                   <Link
                     to={`/live/${notebook.session_id}`}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5"
@@ -389,6 +427,7 @@ const MyStudyDetailPage = () => {
               )}
 
               {/* Body */}
+              <div className="relative">
               {split.enabled ? (
                 <div className="bg-background border border-border rounded-md min-h-[60vh] sm:min-h-[480px] flex flex-col overflow-hidden">
                   <div className="flex items-center justify-between px-2 py-1.5 border-b border-border bg-accent/20">
@@ -458,6 +497,15 @@ const MyStudyDetailPage = () => {
                   )}
                 </div>
               )}
+                <ReaderNotesPanel
+                  open={inboxOpen}
+                  onClose={() => setInboxOpen(false)}
+                  notes={reader.notes}
+                  onDismiss={reader.dismiss}
+                  onClearAll={reader.clearAll}
+                  onJump={handleJumpReaderNote}
+                />
+              </div>
             </>
           )}
         </motion.div>
