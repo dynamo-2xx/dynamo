@@ -44,22 +44,27 @@ serve(async (req) => {
       });
     }
 
-    const { sessionId, sessionTitle } = await req.json();
-    if (!sessionId) throw new Error("sessionId required");
+    const body = await req.json();
+    const { sessionTitle } = body;
+    const recordType: string = body.recordType || "live_session";
+    const recordId: string | undefined = body.recordId || body.sessionId || body.session_id;
+    if (!recordId) throw new Error("recordId required");
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     const { data: nb } = await admin
       .from("session_notebooks")
       .select("*")
-      .eq("session_id", sessionId)
+      .eq("record_type", recordType)
+      .eq("record_id", recordId)
       .eq("user_id", userId)
       .maybeSingle();
 
     const { data: anns } = await admin
       .from("session_annotations")
       .select("excerpt, note")
-      .eq("session_id", sessionId)
+      .eq("record_type", recordType)
+      .eq("record_id", recordId)
       .eq("user_id", userId)
       .order("created_at", { ascending: true });
 
@@ -113,12 +118,14 @@ serve(async (req) => {
       .from("session_notebooks")
       .upsert(
         {
-          session_id: sessionId,
+          session_id: recordType === "live_session" ? recordId : null,
+          record_type: recordType,
+          record_id: recordId,
           user_id: userId,
           thoughts: nb?.thoughts || { blocks: [{ type: "text", value: thoughts }] },
           my_take: myTake,
         },
-        { onConflict: "session_id,user_id" },
+        { onConflict: "record_type,record_id,user_id" },
       );
 
     await admin.from("notifications").insert({
@@ -127,7 +134,7 @@ serve(async (req) => {
       type: "notebook_take_ready",
       title: "Your take is ready",
       body: `We've consolidated your notes for "${sessionTitle || "this session"}".`,
-      metadata: { session_id: sessionId },
+      metadata: { session_id: recordType === "live_session" ? recordId : null, record_type: recordType, record_id: recordId },
     });
 
     return new Response(JSON.stringify({ ok: true, my_take: myTake }), {
