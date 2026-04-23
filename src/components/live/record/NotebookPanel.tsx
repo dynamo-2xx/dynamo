@@ -6,6 +6,8 @@ import {
   Columns2,
   ArrowLeftRight,
   Sparkles,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { SessionAnnotation } from "@/hooks/useSessionAnnotations";
@@ -118,21 +120,29 @@ const NotebookPanel = ({
   // Desktop floating panel pos/size (only used at md+)
   const [pos, setPos] = useState({ x: 24, y: 80 });
   const [size, setSize] = useState({ w: 460, h: 560 });
+  const [maximized, setMaximized] = useState(false);
+  const prevRectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const drag = useRef<{ ox: number; oy: number; sx: number; sy: number } | null>(null);
   const resize = useRef<{ ow: number; oh: number; sx: number; sy: number } | null>(null);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
       if (drag.current) {
+        const nextX = e.clientX - drag.current.ox + drag.current.sx;
+        const nextY = e.clientY - drag.current.oy + drag.current.sy;
+        const maxX = Math.max(0, window.innerWidth - size.w);
+        const maxY = Math.max(0, window.innerHeight - size.h);
         setPos({
-          x: Math.max(0, e.clientX - drag.current.ox + drag.current.sx),
-          y: Math.max(0, e.clientY - drag.current.oy + drag.current.sy),
+          x: Math.min(maxX, Math.max(0, nextX)),
+          y: Math.min(maxY, Math.max(0, nextY)),
         });
       }
       if (resize.current) {
+        const maxW = Math.max(320, window.innerWidth - pos.x);
+        const maxH = Math.max(320, window.innerHeight - pos.y);
         setSize({
-          w: Math.max(320, resize.current.ow + (e.clientX - resize.current.sx)),
-          h: Math.max(320, resize.current.oh + (e.clientY - resize.current.sy)),
+          w: Math.min(maxW, Math.max(320, resize.current.ow + (e.clientX - resize.current.sx))),
+          h: Math.min(maxH, Math.max(320, resize.current.oh + (e.clientY - resize.current.sy))),
         });
       }
     };
@@ -146,7 +156,44 @@ const NotebookPanel = ({
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
     };
-  }, []);
+  }, [pos.x, pos.y, size.w, size.h]);
+
+  // Keep panel within viewport on window resize
+  useEffect(() => {
+    const onResize = () => {
+      if (maximized) {
+        setSize({ w: window.innerWidth, h: window.innerHeight });
+        setPos({ x: 0, y: 0 });
+        return;
+      }
+      setPos((p) => ({
+        x: Math.min(p.x, Math.max(0, window.innerWidth - size.w)),
+        y: Math.min(p.y, Math.max(0, window.innerHeight - size.h)),
+      }));
+      setSize((s) => ({
+        w: Math.min(s.w, window.innerWidth),
+        h: Math.min(s.h, window.innerHeight),
+      }));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [maximized, size.w, size.h]);
+
+  const toggleMaximize = () => {
+    if (maximized) {
+      const prev = prevRectRef.current;
+      if (prev) {
+        setPos({ x: prev.x, y: prev.y });
+        setSize({ w: prev.w, h: prev.h });
+      }
+      setMaximized(false);
+    } else {
+      prevRectRef.current = { x: pos.x, y: pos.y, w: size.w, h: size.h };
+      setPos({ x: 0, y: 0 });
+      setSize({ w: window.innerWidth, h: window.innerHeight });
+      setMaximized(true);
+    }
+  };
 
   const startDrag = (e: React.MouseEvent) => {
     drag.current = { ox: e.clientX, oy: e.clientY, sx: pos.x, sy: pos.y };
