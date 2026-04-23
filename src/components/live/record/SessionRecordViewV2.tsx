@@ -270,13 +270,14 @@ const SessionRecordViewV2 = ({
     (nodeId: string) => {
       ensureBothPanesOpen();
       // Defer one frame so the pane has mounted if it was just expanded.
-      window.setTimeout(() => {
-        const el = recordRootRef.current?.querySelector<HTMLElement>(
-          `[data-summary-node-id="${nodeId}"]`,
-        );
+      window.setTimeout(async () => {
+        const sel = `[data-summary-node-id="${nodeId}"]`;
+        // Open every closed ancestor collapsible so the summary becomes visible.
+        await expandAncestors(sel, sel);
+        // Re-query — the element may have been (re)mounted by Radix.
+        const el = recordRootRef.current?.querySelector<HTMLElement>(sel);
         if (!el) return;
-        expandAncestors(el);
-        // Wait for collapsibles to finish their open animation before scrolling.
+        // Allow one more frame for the open animation to settle.
         window.setTimeout(() => {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
           flashEl(el);
