@@ -201,7 +201,7 @@ const EditSetupPanel = ({ debateId, topic, isPublic, gradingEnabled, subtopics, 
             }
           }}
         >
-          <Send className="w-4 h-4" /> Publish to Explore
+          <Send className="w-4 h-4" /> Publish
         </Button>
         <p className="text-[11px] text-muted-foreground text-center mt-1.5">
           Makes this Change My Mind public so others can find and challenge it.
