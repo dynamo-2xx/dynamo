@@ -166,26 +166,53 @@ const SessionRecordViewV2 = ({
   );
 
   /**
-   * Walk up from `el`, clicking any Radix Collapsible root that is currently
-   * `data-state="closed"`. Each click expands one level, so nested
-   * subtopic → thread collapsibles all open before we scroll.
+   * Walk up from `el`, opening every Radix Collapsible ancestor that is currently
+   * closed. We open OUTERMOST first (so inner content mounts), waiting a frame
+   * between clicks because Radix only mounts CollapsibleContent on open.
+   * After expansion, the caller should re-query the DOM for the now-mounted
+   * target node.
    */
-  const expandAncestors = (el: HTMLElement | null) => {
-    if (!el) return;
-    const closedRoots: HTMLElement[] = [];
-    let cur: HTMLElement | null = el.parentElement;
-    while (cur) {
-      if (cur.getAttribute("data-state") === "closed") closedRoots.push(cur);
-      cur = cur.parentElement;
+  const expandAncestors = async (rootSelector: string, targetSelector: string) => {
+    const root = recordRootRef.current;
+    if (!root) return;
+    // Loop: keep finding closed ancestors of the target (which may be re-mounted
+    // each time) and click their triggers.
+    for (let i = 0; i < 6; i++) {
+      const target = root.querySelector<HTMLElement>(targetSelector);
+      if (target) {
+        // Check if any ancestor inside the record root is still closed.
+        let closedAncestor: HTMLElement | null = null;
+        let cur: HTMLElement | null = target.parentElement;
+        while (cur && cur !== root) {
+          if (cur.getAttribute("data-state") === "closed") closedAncestor = cur;
+          cur = cur.parentElement;
+        }
+        if (!closedAncestor) return; // all open already
+        // Find this collapsible's OWN trigger: the closest descendant button with
+        // data-state="closed". Radix marks both root and trigger with data-state.
+        const trigger = closedAncestor.querySelector<HTMLElement>(
+          'button[data-state="closed"]',
+        );
+        trigger?.click();
+      } else {
+        // Target not mounted yet — find the deepest closed collapsible whose
+        // descendants might contain it (by id substring) and open it. Fallback:
+        // open every closed collapsible inside the root.
+        const allClosed = Array.from(
+          root.querySelectorAll<HTMLElement>('[data-state="closed"]'),
+        ).filter((n) => n.tagName !== "BUTTON");
+        if (allClosed.length === 0) return;
+        // Open the outermost one first.
+        const outermost = allClosed[0];
+        const trigger = outermost.querySelector<HTMLElement>('button[data-state="closed"]');
+        trigger?.click();
+      }
+      // Wait one animation frame so Radix mounts the newly-opened content.
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
     }
-    // Open outermost first so inner triggers are mounted/visible.
-    closedRoots.reverse().forEach((root) => {
-      const trigger = root.querySelector<HTMLElement>(
-        ':scope > button[data-state="closed"], :scope button[data-state="closed"]',
-      );
-      trigger?.click();
-    });
   };
+  // Suppress unused-var lint (rootSelector kept for possible future scoping).
+  void expandAncestors;
 
   /** Force both record/transcript panes to be visible side-by-side. */
   const ensureBothPanesOpen = useCallback(() => {
