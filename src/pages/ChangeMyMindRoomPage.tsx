@@ -24,6 +24,7 @@ interface DebateRow {
   format: string;
   grading_enabled: boolean;
   started_at: string | null;
+  current_subtopic_index: number;
 }
 interface Subtopic { id: string; title: string; sort_order: number; }
 interface Side { id: string; label: string; }
