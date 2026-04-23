@@ -427,6 +427,7 @@ const MyStudyDetailPage = () => {
               )}
 
               {/* Body */}
+              <div className="relative">
               {split.enabled ? (
                 <div className="bg-background border border-border rounded-md min-h-[60vh] sm:min-h-[480px] flex flex-col overflow-hidden">
                   <div className="flex items-center justify-between px-2 py-1.5 border-b border-border bg-accent/20">
@@ -496,6 +497,15 @@ const MyStudyDetailPage = () => {
                   )}
                 </div>
               )}
+                <ReaderNotesPanel
+                  open={inboxOpen}
+                  onClose={() => setInboxOpen(false)}
+                  notes={reader.notes}
+                  onDismiss={reader.dismiss}
+                  onClearAll={reader.clearAll}
+                  onJump={handleJumpReaderNote}
+                />
+              </div>
             </>
           )}
         </motion.div>

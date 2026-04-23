@@ -54,6 +54,7 @@ const ThreadView = ({ threadId, className }: ThreadViewProps) => {
         ) : (
           messages.map((m) => {
             const mine = m.sender_id === user?.id;
+            const isNote = (m as any).metadata?.kind === "notebook_note";
             return (
               <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
                 <div
@@ -64,6 +65,11 @@ const ThreadView = ({ threadId, className }: ThreadViewProps) => {
                       : "bg-accent text-foreground rounded-bl-sm",
                   )}
                 >
+                  {isNote && (
+                    <div className={cn("text-[10px] uppercase tracking-wider mb-1 opacity-70")}>
+                      💌 Left a note on a notebook
+                    </div>
+                  )}
                   {m.body}
                 </div>
               </div>
