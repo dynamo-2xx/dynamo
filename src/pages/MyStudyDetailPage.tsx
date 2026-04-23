@@ -104,10 +104,13 @@ const MyStudyDetailPage = () => {
   const isMobile = useIsMobile();
   const study = useMyStudy({ includeTrashed: true });
   const notebook = study.notebooks.find((n) => n.id === notebookId);
-  const sessionId = notebook?.session_id || null;
+  const recordType = notebook?.record_type || "live_session";
+  const recordId = notebook?.record_id || notebook?.session_id || null;
 
-  const nb = useSessionNotebook(sessionId);
-  const { annotations, remove: removeAnnotation } = useSessionAnnotations(sessionId) as any;
+  const nb = useSessionNotebook(recordId ? { recordType, recordId } : null);
+  const { annotations, remove: removeAnnotation } = useSessionAnnotations(
+    recordId ? { recordType, recordId } : null,
+  ) as any;
 
   // Soft-handle remove
   const handleRemoveAnn = async (id: string) => {
@@ -123,13 +126,13 @@ const MyStudyDetailPage = () => {
     share_token: string | null;
   } | null>(null);
   useEffect(() => {
-    if (!sessionId) return;
+    if (!recordId || recordType !== "live_session") return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
         .from("live_sessions")
         .select("transcript_entries, subtopics, summaries, speaker_names, share_token")
-        .eq("id", sessionId)
+        .eq("id", recordId)
         .maybeSingle();
       if (cancelled || !data) return;
       setSessionData({
@@ -143,9 +146,12 @@ const MyStudyDetailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [recordId, recordType]);
 
-  const qa = useRecordQA(sessionId || "", sessionData?.share_token);
+  const qa = useRecordQA(
+    recordId ? { recordType, recordId } : "",
+    sessionData?.share_token,
+  );
 
   const [tab, setTab] = useState<Tab>("thoughts");
   const [renameOpen, setRenameOpen] = useState(false);
