@@ -165,21 +165,129 @@ const SessionRecordViewV2 = ({
     [speakerNames],
   );
 
-  // Jump-to-transcript: scroll the right pane to the first cited entry and flash all cited.
-  const handleJumpToTranscript = useCallback((entryIds: string[]) => {
-    if (entryIds.length === 0) return;
-    const root = transcriptScrollRef.current;
-    const target = root?.querySelector<HTMLElement>(`[data-entry-id="${entryIds[0]}"]`);
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
+  /**
+   * Walk up from `el`, clicking any Radix Collapsible root that is currently
+   * `data-state="closed"`. Each click expands one level, so nested
+   * subtopic → thread collapsibles all open before we scroll.
+   */
+  const expandAncestors = (el: HTMLElement | null) => {
+    if (!el) return;
+    const closedRoots: HTMLElement[] = [];
+    let cur: HTMLElement | null = el.parentElement;
+    while (cur) {
+      if (cur.getAttribute("data-state") === "closed") closedRoots.push(cur);
+      cur = cur.parentElement;
     }
-    entryIds.forEach((id) => {
-      const el = root?.querySelector<HTMLElement>(`[data-entry-id="${id}"]`);
-      if (!el) return;
-      el.classList.add("transcript-flash");
-      window.setTimeout(() => el.classList.remove("transcript-flash"), 900);
+    // Open outermost first so inner triggers are mounted/visible.
+    closedRoots.reverse().forEach((root) => {
+      const trigger = root.querySelector<HTMLElement>(
+        ':scope > button[data-state="closed"], :scope button[data-state="closed"]',
+      );
+      trigger?.click();
     });
+  };
+
+  /** Force both record/transcript panes to be visible side-by-side. */
+  const ensureBothPanesOpen = useCallback(() => {
+    setRecordSplit((s) => (s.collapsed === "none" ? s : { ...s, collapsed: "none" }));
   }, []);
+
+  const flashEl = (el: HTMLElement) => {
+    el.classList.add("transcript-flash");
+    window.setTimeout(() => el.classList.remove("transcript-flash"), 1200);
+  };
+
+  // Build entry → summary node lookup so a transcript annotation can also reveal the
+  // matching argument summary in the threaded record pane.
+  const summaryNodeByEntryId = useMemo(() => {
+    const map = new Map<string, string>();
+    const hierarchy = buildHierarchy({
+      transcriptEntries,
+      subtopics,
+      threadTitles,
+      summaries,
+      getSpeakerName,
+    });
+    hierarchy.forEach((sub) =>
+      sub.threads.forEach((th) =>
+        th.summaries.forEach((s) =>
+          s.source_entry_ids.forEach((eid) => map.set(eid, s.node_id)),
+        ),
+      ),
+    );
+    return map;
+  }, [transcriptEntries, subtopics, threadTitles, summaries, getSpeakerName]);
+
+  const summaryByNodeId = useMemo(() => {
+    const map = new Map<string, { source_entry_ids: string[] }>();
+    const hierarchy = buildHierarchy({
+      transcriptEntries,
+      subtopics,
+      threadTitles,
+      summaries,
+      getSpeakerName,
+    });
+    hierarchy.forEach((sub) =>
+      sub.threads.forEach((th) =>
+        th.summaries.forEach((s) => map.set(s.node_id, { source_entry_ids: s.source_entry_ids })),
+      ),
+    );
+    return map;
+  }, [transcriptEntries, subtopics, threadTitles, summaries, getSpeakerName]);
+
+  /**
+   * Reveal a summary node inside the (possibly collapsed) threaded record pane:
+   * make sure the pane is open, expand all ancestor Collapsibles, then scroll/flash.
+   */
+  const revealSummaryNode = useCallback(
+    (nodeId: string) => {
+      ensureBothPanesOpen();
+      // Defer one frame so the pane has mounted if it was just expanded.
+      window.setTimeout(() => {
+        const el = recordRootRef.current?.querySelector<HTMLElement>(
+          `[data-summary-node-id="${nodeId}"]`,
+        );
+        if (!el) return;
+        expandAncestors(el);
+        // Wait for collapsibles to finish their open animation before scrolling.
+        window.setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          flashEl(el);
+        }, 220);
+      }, 60);
+    },
+    [ensureBothPanesOpen],
+  );
+
+  /**
+   * Reveal one or more transcript entries in the right pane and flash them.
+   * Transcript entries are not collapsed, so just scroll + flash.
+   */
+  const revealTranscriptEntries = useCallback(
+    (entryIds: string[]) => {
+      if (entryIds.length === 0) return;
+      ensureBothPanesOpen();
+      window.setTimeout(() => {
+        const root = transcriptScrollRef.current;
+        const target = root?.querySelector<HTMLElement>(`[data-entry-id="${entryIds[0]}"]`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+        entryIds.forEach((id) => {
+          const el = root?.querySelector<HTMLElement>(`[data-entry-id="${id}"]`);
+          if (el) flashEl(el);
+        });
+      }, 60);
+    },
+    [ensureBothPanesOpen],
+  );
+
+  // Jump-to-transcript from the threaded record (e.g. "View transcript" button).
+  // Also makes sure the right pane is visible.
+  const handleJumpToTranscript = useCallback(
+    (entryIds: string[]) => {
+      revealTranscriptEntries(entryIds);
+    },
+    [revealTranscriptEntries],
+  );
 
   const handleRenameSpeaker = useCallback(
     async (speakerId: number, newName: string) => {
