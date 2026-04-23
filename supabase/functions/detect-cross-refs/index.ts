@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT = `You analyze a recorded debate's role-group argument summaries and detect cross-references between nodes (often across subtopics).
 
-You will receive an array of nodes, each with: { node_id, subtopic, thread_id, kind (main|counter|rebuttal), speaker, text }.
+You will receive an array of nodes, each with: { node_id, subtopic, thread_id, kind (main|counter|rebuttal|affirms|concedes), speaker, text }.
 
 Return cross-references using the report_cross_refs tool. Each ref has:
 - from_node, to_node (string node_ids; must both be in the input)

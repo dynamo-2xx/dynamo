@@ -1,6 +1,11 @@
 import type { LiveTranscriptEntry, LiveSummary, LiveThreadMeta } from "@/hooks/useLiveTranscription";
 
-export type RoleGroupKind = "main" | "counter" | "rebuttal";
+export type RoleGroupKind =
+  | "main"
+  | "counter"
+  | "rebuttal"
+  | "affirms"
+  | "concedes";
 
 export interface RoleGroupSummary {
   /** Stable id for this summary node, used by annotations / cross-refs / citations. */
@@ -140,7 +145,11 @@ export function buildHierarchy({
 }
 
 function kindOrder(k: RoleGroupKind): number {
-  return k === "main" ? 0 : k === "counter" ? 1 : 2;
+  if (k === "main") return 0;
+  if (k === "counter") return 1;
+  if (k === "rebuttal") return 2;
+  if (k === "affirms") return 3;
+  return 4; // concedes
 }
 
 /**
@@ -170,19 +179,28 @@ function deriveRoleGroupSummaries(
   const out: RoleGroupSummary[] = [];
   let mainSpeaker: number | null = null;
   spans.forEach((span, i) => {
+    const text = span.entries
+      .map((e) => (e.ai_summary && e.ai_summary.trim()) || e.text)
+      .join(" ")
+      .trim();
     let kind: RoleGroupKind;
     if (i === 0) {
       kind = "main";
       mainSpeaker = span.speaker_id;
     } else if (span.speaker_id !== mainSpeaker) {
-      kind = "counter";
+      // Different speaker reacting to the main point. Detect agreement /
+      // concession; otherwise treat as a counter.
+      if (detectsConcession(text)) kind = "concedes";
+      else if (detectsAffirmation(text)) kind = "affirms";
+      else kind = "counter";
     } else {
-      kind = "rebuttal";
+      // Same speaker continuing. Concessions to the opposing point still count
+      // as "concedes"; affirmations of the opposing point count as "affirms";
+      // otherwise it's a rebuttal continuation.
+      if (detectsConcession(text)) kind = "concedes";
+      else if (detectsAffirmation(text)) kind = "affirms";
+      else kind = "rebuttal";
     }
-    const text = span.entries
-      .map((e) => (e.ai_summary && e.ai_summary.trim()) || e.text)
-      .join(" ")
-      .trim();
     out.push({
       node_id: `${thread_id}:${i}`,
       thread_id,
@@ -194,4 +212,51 @@ function deriveRoleGroupSummaries(
     });
   });
   return out;
+}
+
+/**
+ * Lexical heuristic: speaker is AGREEING with / affirming the prior point.
+ * Conservative — we'd rather mis-label as counter than over-claim agreement.
+ */
+function detectsAffirmation(text: string): boolean {
+  const t = text.toLowerCase().trim();
+  if (!t) return false;
+  const patterns = [
+    /^(yes|yeah|yep|right|exactly|absolutely|totally|of course|for sure|definitely|agreed)\b/,
+    /\bi (agree|concur)\b/,
+    /\bthat'?s (right|true|correct|fair|a (good|fair|valid) point)\b/,
+    /\byou'?re (right|correct)\b/,
+    /\bgood point\b/,
+    /\bwell said\b/,
+    /\bi see what you mean\b/,
+    /\bcouldn'?t agree more\b/,
+  ];
+  return patterns.some((re) => re.test(t));
+}
+
+/**
+ * Lexical heuristic: speaker is CONCEDING ground to the prior point — i.e.
+ * yielding part of their position even if they continue arguing.
+ */
+function detectsConcession(text: string): boolean {
+  const t = text.toLowerCase().trim();
+  if (!t) return false;
+  const patterns = [
+    /\bi'?ll (give|grant) you that\b/,
+    /\bfair (enough|point)\b/,
+    /\bthat'?s a fair (point|criticism)\b/,
+    /\byou (have|'?ve got) a point\b/,
+    /\bi concede\b/,
+    /\bi'?ll concede\b/,
+    /\bi (was|may have been) wrong\b/,
+    /\bok(ay)?,? you'?re right\b/,
+    /\bi (have|'?ve) to (admit|concede)\b/,
+    /\b(point )?taken\b/,
+    /\bi stand corrected\b/,
+    /\bi (changed|'?ve changed) my mind\b/,
+    /\bi (see|get) your point\b/,
+    /\bthat'?s true,? (but|however|though)\b/,
+    /\byou'?re right (about|that)\b/,
+  ];
+  return patterns.some((re) => re.test(t));
 }
