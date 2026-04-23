@@ -995,6 +995,173 @@ export type Database = {
           },
         ]
       }
+      session_annotations: {
+        Row: {
+          char_end: number | null
+          char_start: number | null
+          created_at: string
+          excerpt: string
+          id: string
+          node_id: string
+          node_kind: string
+          note: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          char_end?: number | null
+          char_start?: number | null
+          created_at?: string
+          excerpt: string
+          id?: string
+          node_id: string
+          node_kind: string
+          note?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          char_end?: number | null
+          char_start?: number | null
+          created_at?: string
+          excerpt?: string
+          id?: string
+          node_id?: string
+          node_kind?: string
+          note?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_annotations_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_citations: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          session_id: string
+          summary_node_id: string
+          text: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          session_id: string
+          summary_node_id: string
+          text: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          session_id?: string
+          summary_node_id?: string
+          text?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_citations_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_cross_refs: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          from_node: string
+          id: string
+          kind: string
+          session_id: string
+          to_node: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          from_node: string
+          id?: string
+          kind: string
+          session_id: string
+          to_node: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          from_node?: string
+          id?: string
+          kind?: string
+          session_id?: string
+          to_node?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_cross_refs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_notebooks: {
+        Row: {
+          created_at: string
+          id: string
+          my_take: string | null
+          published: boolean
+          published_at: string | null
+          session_id: string
+          thoughts: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          my_take?: string | null
+          published?: boolean
+          published_at?: string | null
+          session_id: string
+          thoughts?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          my_take?: string | null
+          published?: boolean
+          published_at?: string | null
+          session_id?: string
+          thoughts?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_notebooks_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tags: {
         Row: {
           created_at: string
