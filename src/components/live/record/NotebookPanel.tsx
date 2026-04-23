@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ArrowUpRight, BookOpen, Trash2 } from "lucide-react";
+import { X, ArrowUpRight, BookOpen, Trash2, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ interface NotebookPanelProps {
   annotations: SessionAnnotation[];
   onJumpToAnnotation: (a: SessionAnnotation) => void;
   onRemoveAnnotation: (id: string) => void;
+  notebookId?: string | null;
 }
 
 /**
@@ -41,6 +43,7 @@ const NotebookPanel = ({
   annotations,
   onJumpToAnnotation,
   onRemoveAnnotation,
+  notebookId,
 }: NotebookPanelProps) => {
   const [tab, setTab] = useState<Tab>("thoughts");
   const [pos, setPos] = useState({ x: 24, y: 80 });
@@ -144,13 +147,25 @@ const NotebookPanel = ({
           <BookOpen className="w-3 h-3" />
           Notebook
         </div>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground"
-          aria-label="Close notebook"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {notebookId && (
+            <Link
+              to={`/my-study/${notebookId}`}
+              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+              title="Open in My Study"
+            >
+              <ExternalLink className="w-3 h-3" />
+              My Study
+            </Link>
+          )}
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Close notebook"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Chrome tabs */}

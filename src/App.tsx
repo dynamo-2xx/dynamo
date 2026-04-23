@@ -36,6 +36,9 @@ import AdminTagsPage from "./pages/AdminTagsPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import MessagesPage from "./pages/MessagesPage";
+import MyStudyPage from "./pages/MyStudyPage";
+import MyStudyDetailPage from "./pages/MyStudyDetailPage";
+import SharedNotebookPage from "./pages/SharedNotebookPage";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +75,9 @@ const App = () => (
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
               <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
               <Route path="/messages/:threadId" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
+              <Route path="/my-study" element={<ProtectedRoute><MyStudyPage /></ProtectedRoute>} />
+              <Route path="/my-study/:notebookId" element={<ProtectedRoute><MyStudyDetailPage /></ProtectedRoute>} />
+              <Route path="/study/shared/:token" element={<SharedNotebookPage />} />
               <Route path="/my-debates" element={<ProtectedRoute><MyDebatesPage /></ProtectedRoute>} />
               <Route path="/for-you" element={<ProtectedRoute><ForYouPage /></ProtectedRoute>} />
               <Route path="/my-recent" element={<ProtectedRoute><MyRecentPage /></ProtectedRoute>} />
