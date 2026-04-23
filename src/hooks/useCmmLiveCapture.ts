@@ -179,6 +179,26 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
     })();
   }, [debateId]);
 
+  // Subscribe to remote transcript updates so non-capturing devices stay in sync.
+  useEffect(() => {
+    if (!debateId) return;
+    const channel = supabase
+      .channel(`cmm-transcript-${debateId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "debate_transcripts", filter: `debate_id=eq.${debateId}` },
+        (payload) => {
+          const next = (payload.new as any)?.transcript_entries;
+          if (!Array.isArray(next)) return;
+          const filtered = next.filter((e: any) => e?.speaker_side && e?.text) as CmmTranscriptEntry[];
+          // Only overwrite if remote is longer (avoid clobbering local capture mid-flight).
+          setEntries((prev) => (filtered.length >= prev.length ? filtered : prev));
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [debateId]);
+
   // Reset speaker buffer when round (active) flips.
   useEffect(() => { bufRef.current = ""; bufSpeakerRef.current = 0; }, [active]);
 

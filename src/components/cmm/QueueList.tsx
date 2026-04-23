@@ -1,6 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Play, X, SkipForward, Square } from "lucide-react";
+import { Play, X, SkipForward, Square, ChevronRight, StopCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CmmQueueRowWithProfile } from "@/hooks/useCmmQueue";
 
@@ -11,13 +11,16 @@ interface Props {
   onStartNext?: () => void;
   onEndRound?: (outcome: "completed" | "skipped") => void;
   onWithdraw?: (rowId: string) => void;
+  onSkipSubtopic?: () => void;
+  onEndSession?: () => void;
+  hasNextSubtopic?: boolean;
   busy?: boolean;
 }
 
 const initials = (name: string | null) =>
   (name || "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
-const QueueList = ({ rows, isOwner, meId, onStartNext, onEndRound, onWithdraw, busy }: Props) => {
+const QueueList = ({ rows, isOwner, meId, onStartNext, onEndRound, onWithdraw, onSkipSubtopic, onEndSession, hasNextSubtopic, busy }: Props) => {
   const active = rows.find((r) => r.status === "active");
   const waiting = rows.filter((r) => r.status === "waiting");
 
@@ -55,6 +58,27 @@ const QueueList = ({ rows, isOwner, meId, onStartNext, onEndRound, onWithdraw, b
                 <Square className="w-3.5 h-3.5" /> End round
               </Button>
             </div>
+          )}
+        </div>
+      )}
+
+      {isOwner && (onSkipSubtopic || onEndSession) && (
+        <div className="flex gap-2">
+          {onSkipSubtopic && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1"
+              onClick={onSkipSubtopic}
+              disabled={busy || !hasNextSubtopic}
+            >
+              <ChevronRight className="w-3.5 h-3.5" /> Next subtopic
+            </Button>
+          )}
+          {onEndSession && (
+            <Button size="sm" variant="outline" className="flex-1" onClick={onEndSession} disabled={busy}>
+              <StopCircle className="w-3.5 h-3.5" /> End session
+            </Button>
           )}
         </div>
       )}
