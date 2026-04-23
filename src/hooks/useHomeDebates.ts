@@ -30,7 +30,6 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         .select(
           "id, topic, status, cover_image_url, created_at, location, is_public, created_by, debate_participants(count)",
         )
-        .eq("is_public", true)
         .not("status", "in", "(draft,archived)");
 
       if (mode === "local" && profile?.location) {
@@ -52,11 +51,10 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         participant_count: d.debate_participants?.[0]?.count ?? 0,
       }));
 
-      // Public live sessions only (must be marked public by owner)
+      // Public live sessions OR private ones from followed creators (RLS-enforced)
       const { data: liveData } = await supabase
         .from("live_sessions" as any)
         .select("id, title, status, created_at, created_by, share_token, is_public")
-        .eq("is_public", true)
         .neq("status", "archived")
         .limit(50);
       if (cancelled) return;
