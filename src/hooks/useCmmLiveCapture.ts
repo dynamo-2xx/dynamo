@@ -67,7 +67,9 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
   const flush = useCallback(() => {
     const text = bufRef.current.trim();
     if (!text) return;
-    const speakerSide: "owner" | "challenger" = bufSpeakerRef.current === 0 ? "owner" : "challenger";
+    const speakerSide: "owner" | "challenger" = fixedSide
+      ? fixedSide
+      : bufSpeakerRef.current === 0 ? "owner" : "challenger";
     const entry: CmmTranscriptEntry = {
       id: `cmm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       speaker_side: speakerSide,
@@ -81,7 +83,7 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
       persist(next);
       return next;
     });
-  }, [ownerLabel, challengerLabel, persist]);
+  }, [ownerLabel, challengerLabel, persist, fixedSide]);
 
   const connect = useCallback(async () => {
     if (wsRef.current) return;
