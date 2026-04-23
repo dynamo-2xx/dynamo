@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, X, GripVertical, Globe, Lock, Sparkles, Trash2 } from "lucide-react";
+import { Plus, X, GripVertical, Globe, Lock, Sparkles, Trash2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -175,6 +175,37 @@ const EditSetupPanel = ({ debateId, topic, isPublic, gradingEnabled, subtopics, 
         <Button className="flex-1" onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save changes"}
         </Button>
+      </div>
+
+      <div className="pt-1">
+        <Button
+          variant="default"
+          className="w-full"
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              const { error } = await supabase
+                .from("debates")
+                .update({ is_public: true })
+                .eq("id", debateId);
+              if (error) throw error;
+              setPub(true);
+              toast.success("Published to Explore");
+              onChanged();
+              navigate("/explore");
+            } catch (e: any) {
+              toast.error(e.message || "Couldn't publish");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          <Send className="w-4 h-4" /> Publish to Explore
+        </Button>
+        <p className="text-[11px] text-muted-foreground text-center mt-1.5">
+          Makes this Change My Mind public so others can find and challenge it.
+        </p>
       </div>
     </div>
   );
