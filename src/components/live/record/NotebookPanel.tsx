@@ -391,10 +391,10 @@ const NotebookPanel = ({
         <div className="h-1 w-10 rounded-full bg-foreground/20" />
       </div>
       <div
-        onMouseDown={isMobile ? undefined : startDrag}
+        onMouseDown={isMobile || maximized ? undefined : startDrag}
         className={cn(
           "flex items-center justify-between px-3 py-2 border-b border-foreground/10 bg-foreground/[0.02] select-none",
-          !isMobile && "cursor-move rounded-t-lg",
+          !isMobile && !maximized && "cursor-move rounded-t-lg",
         )}
       >
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -424,6 +424,17 @@ const NotebookPanel = ({
           >
             <Columns2 className="w-3.5 h-3.5" />
           </button>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={toggleMaximize}
+              className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={maximized ? "Restore notebook size" : "Maximize notebook"}
+              title={maximized ? "Restore" : "Maximize"}
+            >
+              {maximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
