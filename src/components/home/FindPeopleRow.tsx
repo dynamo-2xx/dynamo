@@ -6,6 +6,7 @@ import {
   useRecommendedUsers,
   useFollowMutations,
   useMyPendingRequests,
+  useFriendsOnline,
 } from "@/hooks/useConnections";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ const FindPeopleRow = () => {
   const { users: following, refresh: refreshFollowing } = useFollowing();
   const { pendingIds, refresh: refreshPending } = useMyPendingRequests();
   const { follow, cancelRequest } = useFollowMutations();
+  const { online, totalFollowing } = useFriendsOnline();
 
   const followingIds = useMemo(() => new Set(following.map((u) => u.user_id)), [following]);
 
@@ -45,7 +47,22 @@ const FindPeopleRow = () => {
   return (
     <section className="mb-10">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h3 className="font-display text-lg truncate">Find people</h3>
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h3 className="font-display text-lg truncate">Find people</h3>
+          {totalFollowing > 0 && (
+            <p className="text-[11px] text-muted-foreground font-body truncate">
+              {online.length > 0 ? (
+                <>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#22c55e] align-middle mr-1.5" />
+                  <span className="text-foreground font-medium">{online.length}</span>{" "}
+                  {online.length === 1 ? "friend" : "friends"} online
+                </>
+              ) : (
+                <>No friends online · Following {totalFollowing}</>
+              )}
+            </p>
+          )}
+        </div>
         <Link
           to="/profile/connections"
           aria-label="Open connections"
