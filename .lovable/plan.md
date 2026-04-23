@@ -1,89 +1,83 @@
 
 
-# Reader notes on shared notebooks
+# Profile visibility overhaul
 
-Let signed-in recipients of a shared notebook leave **unlimited** notes (free-form OR pinned to a specific Thought / My Take excerpt). The owner sees an envelope button with an unread count, opens an inbox of notes, and each note also auto-creates / appends to a real DM thread with the sender.
+## Behavior summary
 
-## User stories
+1. **All profile cards are viewable** by anyone (name, avatar, banner, affiliation). Content (debates, agenda, recent) is gated by `is_public`.
+2. **New signups default to public** with a one-time onboarding screen explaining visibility, plus easy opt-out.
+3. **Existing private accounts stay as-is** (no backfill).
+4. **Private profiles appear in recommendations and search** as profile cards only — clicking lands on the locked profile shell.
+5. **Follows on private profiles use a request/approval flow** — the private user must approve before the follow takes effect.
 
-1. **Recipient (signed-in)** opens a `/study/shared/<token>` link → sees the notebook + a persistent "Leave a note" composer they can use as many times as they want. Each submission creates a new note. They can edit/delete their own notes.
-2. **Recipient (anonymous)** sees the notebook in read-only mode plus a "Sign in to leave a note" CTA that routes through `/auth` and returns to the shared page.
-3. **Owner** sees a new envelope button on their notebook (next to the maximize/close controls) with a red bubble showing the count of **unread notes** (not senders).
-4. **Owner clicks envelope** → side panel opens listing every note (sender avatar + name + timestamp + pin context if any + body). Each note has its own bordered card with an `×`. `×` marks that single note read+dismissed-from-Thoughts. A "Clear all" button at the top dismisses everything.
-5. **Notes also surface inline in the Thoughts tab** as bordered "Note from <name>" cards above the user's own thoughts, each with `×`. Dismissing here mirrors the envelope dismiss.
-6. **DM mirror**: every note inserts a `dm_messages` row in the recipient↔owner thread (created on first note) so back-and-forth continues in Messages.
+## Database changes (single migration)
 
-## Database
+**Defaults & trigger:**
+- `ALTER TABLE profiles ALTER COLUMN is_public SET DEFAULT true;`
+- Update `handle_new_user` to explicitly set `is_public = true` for clarity.
 
-New table `notebook_reader_notes`:
+**New RPC `get_profile_card(_user_id uuid)`** — SECURITY DEFINER, returns name/avatar/banner/affiliation/role/is_public/created_at regardless of `is_public`. Granted to `anon` and `authenticated`. (Bypasses the existing RLS without weakening it; existing `get_public_profile` stays for callers that should only see public profiles.)
+
+**New RPC `search_profile_cards(_q text, _limit int)`** — returns the same card subset for any profile (public or private) matching `_q` against `display_name`/`affiliation`. Used by user-search UIs.
+
+**Update `get_recommended_users`** — drop the `is_public = true` filter on candidates; add `is_public` and `follow_status` (`none` | `pending` | `following`) to the returned columns. Recommendations now include private profiles.
+
+**New table `follow_requests`:**
 
 | column | type | notes |
 |---|---|---|
 | `id` | uuid pk | |
-| `notebook_id` | uuid | references `session_notebooks.id` |
-| `sender_id` | uuid | `auth.uid()` of recipient |
-| `body` | text | the note |
-| `anchor_kind` | text nullable | `thought` \| `my_take` \| null |
-| `anchor_excerpt` | text nullable | quoted text the note pins to |
-| `anchor_char_start` / `anchor_char_end` | int nullable | offsets within source field |
-| `dm_thread_id` | uuid nullable | DM thread the note was mirrored into |
-| `dismissed_from_thoughts` | bool default false | owner toggled `×` in Thoughts |
-| `read_at` | timestamptz nullable | owner opened it in envelope |
-| `created_at` / `updated_at` | timestamptz | |
+| `requester_id` | uuid | `auth.uid()` |
+| `target_id` | uuid | the private profile being requested |
+| `status` | text | `pending` \| `accepted` \| `declined` |
+| `created_at` / `responded_at` | timestamptz | |
+
+Unique `(requester_id, target_id)` while `status = 'pending'`.
 
 RLS:
-- **Sender**: `INSERT` if signed in AND notebook has non-null `share_token`. `SELECT`/`UPDATE`/`DELETE` own rows.
-- **Owner**: `SELECT`/`UPDATE` any note where they own the notebook (via `is_notebook_owner` SECURITY DEFINER helper).
-- No per-user note limit.
+- Requester: `INSERT` if `auth.uid() = requester_id`. `SELECT`/`DELETE` own rows.
+- Target: `SELECT`/`UPDATE` rows where `auth.uid() = target_id` (to accept/decline).
 
-RPCs:
-- `submit_reader_note(_token, _body, _anchor_kind, _anchor_excerpt, _anchor_char_start, _anchor_char_end)` → resolves notebook by share token, inserts note, calls `get_or_create_dm_thread(owner_id)`, inserts a `dm_messages` row with the body, stores `thread_id` on the note. Returns the new note row.
-- `get_shared_notebook_for_reader(_token)` → returns notebook + the caller's existing notes list (so they see and can manage their history on revisit).
+**New RPCs:**
+- `request_follow(_target uuid)` — if target's profile is public, insert directly into `connections` (skip request flow). If private, insert a `follow_requests` row (idempotent on existing pending) and a `notifications` row to the target. Returns `{status: 'following' | 'requested'}`.
+- `respond_follow_request(_request_id uuid, _accept bool)` — target-only. On accept, inserts the `connections` edge (SECURITY DEFINER bypasses the "public-only" INSERT policy) and marks request `accepted`. On decline, marks `declined`. Notifies requester either way.
 
-Realtime: add `notebook_reader_notes` to `supabase_realtime` publication so the envelope count updates live for the owner.
+**Connections RLS** stays as-is — direct INSERT remains public-only; private follows only happen via `respond_follow_request` SECURITY DEFINER path.
 
-## Frontend
+Realtime: add `follow_requests` to `supabase_realtime` so request inboxes update live.
 
-### Shared notebook page (`src/pages/SharedNotebookPage.tsx`)
-- Persistent composer at the bottom: textarea + Submit. After submit, clears and stays open for the next note.
-- Selection-pin affordance: highlighting text inside the rendered Thoughts or My Take section reveals a "Pin note here" pill that captures `anchor_kind`, `anchor_excerpt`, and offsets for the next submission.
-- Above the composer: the recipient's own previously-submitted notes, each with edit/delete.
-- Unauthenticated state → composer disabled with "Sign in to leave a note" → routes to `/auth?redirect=<current path>`.
+## Frontend changes
 
-### Owner notebook (`NotebookPanel.tsx` + `MyStudyDetailPage.tsx`)
-- New header icon button: `Mail` icon with red bubble = `unreadNoteCount`. Sits left of the maximize/close cluster. Hidden on shared-only views.
-- Click → opens a `ReaderNotesPanel` (slide-in side panel on desktop, full sheet on mobile). Lists every note as a bordered card: sender avatar + name (links to public profile), timestamp, "Pinned to: <excerpt>" if anchored (clicking it jumps to the pinned text via existing jump infrastructure), body, and `×` dismiss.
-- `×` → `update` row: `dismissed_from_thoughts = true`, `read_at = now()`. Envelope count decreases.
-- "Clear all" → bulk update of all undismissed notes for this notebook.
+**`src/pages/PublicProfilePage.tsx`** — switch fetch to `get_profile_card`. Always render the header. If `profile.is_public === false`:
+- Replace public-debates section with a small "This profile is private. Their activity is hidden." notice.
+- Follow button still active, but on private profiles it calls `request_follow` and shows `Requested` (pending) or `Following` based on returned status.
 
-### Thoughts tab (`src/components/live/record/notebook/ThoughtsTab.tsx`)
-- Above the user's own textarea, render every note with `dismissed_from_thoughts = false`. Bordered (0.5px hairline), shows pin excerpt as quoted prefix if anchored, body below, sender label, `×` in top-right that mirrors the envelope dismiss.
+**`src/pages/OnboardingPage.tsx`** — add a one-time visibility step ("Let people discover you") with a toggle defaulting to public and a short note that it can be changed anytime in profile settings. Writes to `profiles.is_public`.
 
-### Messages
-- No new code. `submit_reader_note` already inserts into `dm_messages`, so the thread surfaces in `/messages` for both users automatically.
-- Tag the inserted message with `metadata = { kind: "notebook_note", notebook_id }` so `ThreadView` can render a small "💌 Left a note on <notebook>" prefix on those messages.
+**Recommendations & search UIs** — `useRecommendedUsers` and any user-search hook now render private profiles too. Each card uses `follow_status` to render `Follow` / `Requested` / `Following`. Clicking a card navigates to `/u/<id>` (which handles the locked-shell case).
 
-### New files
-- `src/hooks/useReaderNotes.ts` — owner-side: load notes for a notebook, expose `unreadNoteCount`, `dismiss(noteId)`, `clearAll()`, realtime subscription.
-- `src/hooks/useMyReaderNotes.ts` — recipient-side: load own notes for a shared token, `submit`, `update`, `delete`.
-- `src/components/study/ReaderNotesPanel.tsx` — owner-side envelope inbox.
-- `src/components/study/ReaderNoteCard.tsx` — shared bordered card (used in Thoughts + inbox).
-- `src/components/study/LeaveReaderNoteComposer.tsx` — recipient composer + selection-pinning.
+**New `src/pages/FollowRequestsPage.tsx`** (linked from the existing Inbox / `/notifications` area) — lists incoming pending requests with Accept / Decline buttons calling `respond_follow_request`. Optional small bubble in the existing notifications icon.
+
+**`src/hooks/useConnections.ts`** — replace direct `connections` insert in `follow()` with `request_follow` RPC; expose new `pending` / `requested` state. Add `useIncomingFollowRequests` hook.
+
+**`src/pages/EditProfilePage.tsx`** — clarify the existing visibility toggle copy: "Public profile — show your activity in search and recommendations. Your profile card is always visible."
 
 ## Files touched
 
-- **Migration** (new): create `notebook_reader_notes`, `is_notebook_owner` helper, `submit_reader_note` and `get_shared_notebook_for_reader` RPCs, RLS policies, realtime publication add.
-- `src/pages/SharedNotebookPage.tsx` — composer, selection pinning, own-notes list, auth gate.
-- `src/components/live/record/NotebookPanel.tsx` — envelope button + count + panel mount.
-- `src/pages/MyStudyDetailPage.tsx` — same envelope + panel on desktop view.
-- `src/components/live/record/notebook/ThoughtsTab.tsx` — render reader-note cards above user textarea.
-- `src/components/messages/ThreadView.tsx` — render "Left a note on <notebook>" label when `metadata.kind === "notebook_note"`.
+- **New migration**: defaults + trigger update, `get_profile_card`, `search_profile_cards`, updated `get_recommended_users`, `follow_requests` table + RLS + realtime, `request_follow`, `respond_follow_request`.
+- `src/pages/PublicProfilePage.tsx` — locked shell rendering.
+- `src/pages/OnboardingPage.tsx` — visibility step.
+- `src/pages/EditProfilePage.tsx` — toggle copy.
+- `src/pages/FollowRequestsPage.tsx` — **new**.
+- `src/hooks/useConnections.ts` — request flow + status.
+- `src/components/home/FriendsOnlineWidget.tsx` and any recs/search consumer — render private cards + new follow states.
+- `src/integrations/supabase/types.ts` — auto-regenerated.
 
 ## Out of scope
 
-- Anonymous note submission.
-- Per-note threaded replies inside the notebook (back-and-forth happens in DMs).
-- Email or push notifications (envelope + DM are the only surfaces).
-- Owner editing or redacting a recipient's note.
-- Reactions, attachments, or inline images on reader notes.
+- Backfilling existing private accounts to public.
+- DM permission changes for private users (current rules retained).
+- Blocking/muting users.
+- Showing private users' content to approved followers (still hidden — the approved flag only enables the connection edge; viewing rules on debates/sessions are unchanged).
+- Email notifications for follow requests (in-app notification + DM thread mirror only).
 
