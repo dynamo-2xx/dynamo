@@ -420,35 +420,46 @@ const SessionRecordViewV2 = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  // Jump to the source of an annotation (summary node or transcript entry).
-  const jumpToAnnotation = useCallback((a: { node_kind: string; node_id: string }) => {
-    if (a.node_kind === "transcript") {
-      handleJumpToTranscript([a.node_id]);
-      return;
-    }
-    const el = recordRootRef.current?.querySelector<HTMLElement>(
-      `[data-summary-node-id="${a.node_id}"]`,
-    );
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("transcript-flash");
-      window.setTimeout(() => el.classList.remove("transcript-flash"), 900);
-    }
-  }, [handleJumpToTranscript]);
+  /**
+   * Jump to the source of an annotation (summary node or transcript entry).
+   * Always reveals BOTH panes so the user sees the source in the threaded
+   * record AND the parallel transcript at the same time.
+   */
+  const jumpToAnnotation = useCallback(
+    (a: { node_kind: string; node_id: string }) => {
+      if (a.node_kind === "transcript") {
+        // Reveal the entry in transcript pane.
+        revealTranscriptEntries([a.node_id]);
+        // Also surface the matching summary node in the threaded record.
+        const summaryNodeId = summaryNodeByEntryId.get(a.node_id);
+        if (summaryNodeId) revealSummaryNode(summaryNodeId);
+        return;
+      }
+      // Summary node: open it in threaded record AND scroll its source entries
+      // into view in the transcript pane.
+      revealSummaryNode(a.node_id);
+      const sourceIds = summaryByNodeId.get(a.node_id)?.source_entry_ids || [];
+      if (sourceIds.length > 0) revealTranscriptEntries(sourceIds);
+    },
+    [revealTranscriptEntries, revealSummaryNode, summaryNodeByEntryId, summaryByNodeId],
+  );
 
-  // Cross-ref jump: scroll to either summary or transcript node id.
-  const jumpToCrossRef = useCallback((toNodeId: string) => {
-    const el = recordRootRef.current?.querySelector<HTMLElement>(
-      `[data-summary-node-id="${toNodeId}"], [data-entry-id="${toNodeId}"]`,
-    );
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("transcript-flash");
-      window.setTimeout(() => el.classList.remove("transcript-flash"), 900);
-    } else {
-      handleJumpToTranscript([toNodeId]);
-    }
-  }, [handleJumpToTranscript]);
+  // Cross-ref jump: scroll to either summary or transcript node id, also revealing
+  // ancestor collapsibles when the target is a summary node.
+  const jumpToCrossRef = useCallback(
+    (toNodeId: string) => {
+      if (summaryByNodeId.has(toNodeId)) {
+        revealSummaryNode(toNodeId);
+        const sourceIds = summaryByNodeId.get(toNodeId)?.source_entry_ids || [];
+        if (sourceIds.length > 0) revealTranscriptEntries(sourceIds);
+        return;
+      }
+      revealTranscriptEntries([toNodeId]);
+      const summaryNodeId = summaryNodeByEntryId.get(toNodeId);
+      if (summaryNodeId) revealSummaryNode(summaryNodeId);
+    },
+    [revealTranscriptEntries, revealSummaryNode, summaryNodeByEntryId, summaryByNodeId],
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 md:py-10" ref={recordRootRef} data-record-root>
