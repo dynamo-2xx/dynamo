@@ -19,7 +19,12 @@ interface Props {
 const MultiSelectActionBar = ({ count, folders, onMove, onDelete, onCancel }: Props) => {
   if (count === 0) return null;
   return (
-    <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-foreground text-background rounded-full shadow-lg flex items-center gap-1 px-3 py-2 text-xs font-body">
+    <div
+      className="fixed left-1/2 -translate-x-1/2 z-40 bg-foreground text-background rounded-full shadow-lg flex items-center gap-1 px-3 py-2 text-xs font-body max-w-[calc(100vw-1.5rem)] overflow-x-auto"
+      style={{
+        bottom: `calc(env(safe-area-inset-bottom, 0px) + 5rem)`,
+      }}
+    >
       <span className="px-2">{count} selected</span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

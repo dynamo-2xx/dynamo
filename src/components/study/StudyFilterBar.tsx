@@ -1,4 +1,4 @@
-import { Search, Plus, CheckSquare, X } from "lucide-react";
+import { Search, Plus, CheckSquare, X, MoreHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -74,10 +74,10 @@ const StudyFilterBar = ({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search notebooks…"
-          className="pl-9"
+          className="pl-9 h-11 md:h-10 text-[15px] md:text-sm"
         />
       </div>
-      <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+      <div className="flex gap-2 overflow-x-auto -mx-3 sm:-mx-1 px-3 sm:px-1 pb-1 scrollbar-thin">
         <Chip active={filter === "all"} onClick={() => setFilter("all")}>
           All · {counts.all}
         </Chip>
@@ -96,7 +96,7 @@ const StudyFilterBar = ({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="text-xs font-body text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              className="text-xs font-body text-muted-foreground hover:text-foreground inline-flex items-center gap-1 min-h-[36px]"
             >
               ⌄ Sort: {sortLabels[sort]}
             </button>
@@ -109,7 +109,8 @@ const StudyFilterBar = ({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <div className="flex items-center gap-2">
+        {/* Desktop: inline buttons */}
+        <div className="hidden sm:flex items-center gap-2">
           <button
             type="button"
             onClick={onCreateFolder}
@@ -137,6 +138,39 @@ const StudyFilterBar = ({
               </>
             )}
           </button>
+        </div>
+        {/* Mobile: overflow menu */}
+        <div className="sm:hidden flex items-center gap-2">
+          {selectMode && (
+            <button
+              type="button"
+              onClick={toggleSelectMode}
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-full bg-foreground text-background text-xs font-body min-h-[36px]"
+            >
+              <X className="w-3.5 h-3.5" /> Cancel
+            </button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-full border border-border text-muted-foreground hover:text-foreground"
+                aria-label="More actions"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onCreateFolder}>
+                <Plus className="w-3.5 h-3.5 mr-2" /> New folder
+              </DropdownMenuItem>
+              {!selectMode && (
+                <DropdownMenuItem onClick={toggleSelectMode}>
+                  <CheckSquare className="w-3.5 h-3.5 mr-2" /> Select
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>

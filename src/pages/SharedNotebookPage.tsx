@@ -37,7 +37,7 @@ const SharedNotebookPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
+      <div className="max-w-2xl lg:max-w-3xl mx-auto px-4 lg:px-8 py-6 sm:py-8 lg:py-12">
         <Link
           to="/"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-6"
@@ -67,7 +67,7 @@ const SharedNotebookPage = () => {
               <div className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
                 <BookOpen className="w-3 h-3" /> Shared notebook
               </div>
-              <h1 className="font-display text-3xl sm:text-4xl mb-2">{title}</h1>
+              <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl mb-2">{title}</h1>
               {nb.session_created_at && (
                 <p className="text-xs text-muted-foreground font-body">
                   Recorded{" "}
