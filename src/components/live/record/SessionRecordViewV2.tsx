@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Share2, Check } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { ArrowLeft, Share2, Check, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -18,6 +18,13 @@ import TagPicker from "@/components/tags/TagPicker";
 import ThreadedRecordPane from "./ThreadedRecordPane";
 import TranscriptPane from "./TranscriptPane";
 import RecordQAChat from "@/components/live/RecordQAChat";
+import NotebookPanel from "./NotebookPanel";
+import HighlightAnnotateLayer from "./HighlightAnnotateLayer";
+import { useSessionNotebook } from "@/hooks/useSessionNotebook";
+import { useSessionAnnotations } from "@/hooks/useSessionAnnotations";
+import { useSessionCitations } from "@/hooks/useSessionCitations";
+import { useSessionCrossRefs } from "@/hooks/useSessionCrossRefs";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
   sessionId: string;
