@@ -1,88 +1,71 @@
 
 
-# Change My Mind — revised plan
+# Bring Record + Study tools to Debates and Change My Mind
 
-Adds invites, a grading toggle, and pre-live editability on top of the previously approved CMM plan. Everything else (open queue, owner-only side up-front, AI subtopics) stays the same.
+Today: notebook (Thoughts / My Take / Annotations / Dynamo Q&A) + My Study only work on Live Sessions. After this: same toolset works on Debates and CMM, mounted live and in the archive, with full annotation parity.
 
-## What's new vs. the previous plan
+## Behavior
 
-1. **Invites** — owner can pre-invite specific users (in addition to the open queue) so they get notified and skip the cold discovery step.
-2. **Grading toggle** — at creation time, owner chooses whether AI grading runs on each round (off by default to keep CMM lightweight).
-3. **Pre-live editability** — a published CMM stays editable (topic, subtopics, owner's side, tags, public/private, invites, grading) until the **first challenger round starts**. Once `started_at` is set, it locks (matching standard debate behavior).
+- **Notebook is available live AND after** for Debates and CMM (matches Live Sessions). Mobile: bottom sheet. Desktop: side panel.
+- **Annotations match Live exactly** — highlight any transcript text, attach a note, jump back to source.
+- **My Study** lists every notebook regardless of format with a small chip (`Live` / `Debate` / `CMM`).
+- **Dynamo Q&A** for Debates and CMM reads only from `arguments` (the canonical published statements).
 
-## Creation flow (mobile-first, 3 steps)
+## Database (one migration)
 
-1. **Prompt** → AI generates subtopics (no turns / no prep / no time).
-2. **Subtopics** → reorder / add / remove (max 6).
-3. **Your side + settings**:
-   - "My position…" (single text field)
-   - Tags (max 5)
-   - Public / private toggle
-   - **Invite people** (optional): username search → adds to invite list (reuses `InviteFriendsDialog` pattern, single-side variant)
-   - **Enable AI grading** toggle (default OFF) — when on, runs `grade_turn` after each completed round and `grade_final` per challenger when their round ends
-   - Publish
+1. Add to `session_notebooks` and `session_annotations`:
+   - `record_type text not null default 'live_session'` (`'live_session' | 'debate' | 'change_my_mind'`)
+   - `record_id uuid` — backfilled from `session_id`, then set `not null`
+2. Drop FK on `session_id → live_sessions.id` (keep column nullable as legacy mirror; remove in a follow-up).
+3. New unique index `(record_type, record_id, user_id)` on `session_notebooks`.
+4. New SECURITY DEFINER helper `can_view_record(_type text, _id uuid)` that dispatches to `can_view_live_session` or `can_view_debate`.
+5. Update RLS on both tables: owner full access; published rows readable when `can_view_record(record_type, record_id)`.
+6. Update `get_shared_notebook` / `get_shared_notebook_for_reader` to LEFT JOIN both `live_sessions` and `debates` based on `record_type` for `session_title`.
 
-## Pre-live edit mode
+## Annotation anchoring (Debates/CMM)
 
-- Route `/cmm/:id` detects `status = 'published' && started_at IS NULL` and renders an **"Edit setup"** banner for the owner.
-- Owner can:
-  - Edit topic, subtopics, owner's side label, tags, public/private
-  - Add/remove invites
-  - Toggle grading
-  - Delete the CMM
-- Challengers can still queue during this window — their queue rows persist through edits.
-- The moment the owner taps **Start next** for the first time, `started_at` is set and the edit banner disappears (locked).
+- `node_kind = 'argument'` → `node_id = arguments.id` (typed/published statements)
+- `node_kind = 'transcript'` → `node_id = ` per-entry id from `debate_transcripts.transcript_entries[].id` (spoken)
+- `char_start` / `char_end` already exist — used same as Live.
 
-## Invites behavior
+## Hooks
 
-- Reuses existing `debate_invitations` table (already debate-scoped, has token + notification path).
-- For CMM, invitation `side_id` is left NULL (challengers define their own side at queue time).
-- On accept: invitee lands directly in `/cmm/:id` with the **Challenge** composer pre-opened.
-- Notification: standard `debate_invitation` notification + email (existing `send-invite-email` function).
+- Generalize:
+  - `useSessionNotebook` → `useRecordNotebook({ recordType, recordId })`. Thin `useSessionNotebook(sessionId)` wrapper retained for existing Live call sites.
+  - `useSessionAnnotations` → `useRecordAnnotations({ recordType, recordId })`.
+  - `useRecordQA(sessionId)` → `useRecordQA({ recordType, recordId })`.
+- `useMyStudy`: fetch all user notebooks, hydrate titles by `record_type` from `live_sessions` or `debates`, expose `recordType` on each card.
 
-## Grading toggle
+## UI integration
 
-- New column `debates.grading_enabled boolean default false`.
-- Creation UI exposes a Switch ("AI grading — each round gets scored privately").
-- Room logic: when owner taps **End round**:
-  - If `grading_enabled = true` → call `ai-facilitator` `grade_turn` for both owner and challenger; on the *last* round per challenger also `grade_final` for that challenger.
-  - If `false` → skip entirely. No badge, no narrative.
-- Grades remain owner-private + speaker-private (existing `debate_grades` RLS already enforces this).
+- **`DebatePreviewPage.tsx`** — mount `NotebookPanel` with `recordType: 'debate'`, available live and in archive. Highlight layer attaches to argument cards and transcript bubbles using new node ids.
+- **`ChangeMyMindRoomPage.tsx`** — same panel, `recordType: 'change_my_mind'`. Available throughout.
+- **`NotebookPanel.tsx`** — accepts `{ recordType, recordId }`; internal hook calls swapped for generalized hooks.
+- **`MyStudyPage` / `NotebookCard`** — render small chip (Live/Debate/CMM); cards link to `/live/:id`, `/debate/:id`, or `/cmm/:id` via `recordType`.
+- **`MyStudyDetailPage`** — format-aware render: title source + back-link route depend on `recordType`.
 
-## Data model deltas
+## Edge functions
 
-Single migration adds:
+- **`record-qa`** — accept `recordType` + `recordId`. For `debate` / `change_my_mind`, build context from `arguments` (ordered by `subtopic.sort_order`, then `created_at`). For `live_session`, unchanged.
+- **`consolidate-notebook`** — read notebook by `(record_type, record_id, user_id)`; same prompt and output.
 
-- `debates.format text default 'standard'` — `'standard' | 'change_my_mind'`.
-- `debates.grading_enabled boolean default false`.
-- `cmm_queue` table (as previously specified): `id`, `debate_id`, `user_id`, `position_text` (≤280), `preferred_subtopic_id`, `status` (`waiting|active|completed|skipped|withdrawn`), `queue_index`, `started_at`, `ended_at`, `created_at`. Unique partial index on `(debate_id, user_id) WHERE status IN ('waiting','active')`.
+## Backfill + safety
 
-RLS on `cmm_queue`:
-- SELECT: `can_view_debate(debate_id)`.
-- INSERT: `auth.uid() = user_id AND can_view_debate(debate_id)` and trigger blocks owner-self-queue + enforces 280 char cap.
-- UPDATE: requester → own row only to set `withdrawn`; owner → any row to `active|completed|skipped`.
-- DELETE: requester owns row when `waiting`.
-
-RPCs (SECURITY DEFINER): `cmm_join_queue`, `cmm_start_next` (sets `debates.started_at` if null on first call → triggers lock), `cmm_end_round`.
-
-Realtime: add `cmm_queue` to `supabase_realtime`.
+- Migration sets `record_id = session_id`, `record_type = 'live_session'` for all existing rows.
+- Existing share tokens keep working (lookup is on the notebook row).
+- Old `(session_id, user_id)` upserts redirected to new key in client + edge functions.
 
 ## Files
 
-- **New** `src/pages/CreateChangeMyMindPage.tsx` — 3-step setup including invite picker + grading switch.
-- **New** `src/pages/ChangeMyMindRoomPage.tsx` — single screen; renders **EditSetupBanner** when `started_at IS NULL` for the owner, otherwise the live 1-v-1 view.
-- **New** `src/components/cmm/EditSetupPanel.tsx` — inline pre-live edit form (topic, subtopics, side, tags, visibility, invites, grading).
-- **New** `src/components/cmm/QueueList.tsx` — ordered challengers, owner controls.
-- **New** `src/components/cmm/ChallengeComposer.tsx` — bottom-sheet (mobile) / dialog (desktop) for `position_text`.
-- **New** `src/components/cmm/InvitePeoplePanel.tsx` — username search + chip list (lightweight wrapper that reuses `InviteFriendsDialog` patterns without its 2-side logic).
-- **Edit** `src/components/home/HeroActionShazam.tsx` — third slide: Change My Mind (`Swords` icon, `/cmm/new`).
-- **Edit** `src/App.tsx` — routes `/cmm/new` (protected), `/cmm/:id` (mixed).
-- **Edit** `supabase/functions/ai-facilitator/index.ts` — `generate_debate` accepts `payload.format = 'change_my_mind'`; returns only `topic` + `subtopics`.
+- New migration (schema + RLS + helper + RPC updates)
+- Edit: `useSessionNotebook.ts`, `useSessionAnnotations.ts`, `useRecordQA.ts`, `useMyStudy.ts`
+- Edit: `NotebookPanel.tsx`, `HighlightAnnotateLayer.tsx` (accept generalized props), `MyStudyDetailPage.tsx`, `NotebookCard.tsx`
+- Edit: `DebatePreviewPage.tsx`, `ChangeMyMindRoomPage.tsx` (mount panel)
+- Edit: `supabase/functions/record-qa/index.ts`, `supabase/functions/consolidate-notebook/index.ts`
 
 ## Out of scope
 
-- Multi-challenger / panel mode.
-- AI moderation of queued positions.
-- Editing a CMM **after** the first round starts (locked, like standard debates).
-- Subscription gating for grading (uses existing global limits).
+- Reader-notes inbox for debates (Live-only for now — follow-up).
+- Removing the legacy `session_id` column (kept one release for safety).
+- Subscription/limit changes.
 
