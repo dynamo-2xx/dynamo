@@ -226,6 +226,7 @@ const NotebookPanel = ({
           annotations={annotations}
           onJump={onJumpToAnnotation}
           onRemove={onRemoveAnnotation}
+          onUpdate={onUpdateAnnotation}
         />
       );
     if (t === "my_take")
@@ -254,16 +255,7 @@ const NotebookPanel = ({
     );
   };
 
-  // Pane header (used only when split mode is enabled)
-  const PaneHeader = ({
-    side,
-    value,
-    other,
-  }: {
-    side: "left" | "right";
-    value: Tab;
-    other: Tab;
-  }) => (
+  const renderPaneHeader = (value: Tab, other: Tab) => (
     <div className="flex items-center justify-between px-2 py-1.5 border-b border-foreground/10 bg-foreground/[0.02]">
       <div className="flex items-center gap-1.5 min-w-0">
         {value === "dynamo" && <Sparkles className="w-3 h-3 text-muted-foreground" />}
@@ -284,7 +276,6 @@ const NotebookPanel = ({
         <button
           type="button"
           onClick={() => {
-            // Closing this side exits split, focus the other tab
             setTab(other);
             setSplit((s) => ({ ...s, enabled: false }));
           }}
@@ -298,95 +289,14 @@ const NotebookPanel = ({
     </div>
   );
 
-  // Picker shown for the right pane when entering split & no second tab chosen yet
-  const SplitTabPicker = ({ exclude, onPick }: { exclude: Tab; onPick: (t: Tab) => void }) => (
-    <div className="flex flex-col items-center justify-center h-full gap-3 p-4 text-center">
-      <p className="text-xs italic text-muted-foreground font-body">Pick a tab to compare…</p>
-      <div className="flex flex-wrap items-center justify-center gap-1.5">
-        {tabsArr
-          .filter((t) => t !== exclude)
-          .map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => onPick(t)}
-              className="px-3 py-1.5 rounded-full border border-foreground/15 text-xs font-body hover:border-foreground/40 hover:bg-foreground/[0.04] transition-colors"
-            >
-              {tabLabel(t)}
-            </button>
-          ))}
-      </div>
-    </div>
-  );
-
-  // Single-tab content
-  const SingleContent = () => (
-    <div className="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0">{renderTab(tab)}</div>
-  );
-
-  // Split content
-  const SplitContent = () => {
-    const direction: "horizontal" | "vertical" = isMobile ? "horizontal" : "vertical";
-    const firstStyle = isMobile
-      ? { height: `${split.ratio * 100}%` }
-      : { width: `${split.ratio * 100}%` };
-    const secondStyle = isMobile
-      ? { height: `${(1 - split.ratio) * 100}%` }
-      : { width: `${(1 - split.ratio) * 100}%` };
-
-    const setRatio = (r: number) => setSplit((s) => ({ ...s, ratio: r }));
-
-    return (
-      <div
-        ref={splitContainerRef}
-        className={cn("flex-1 min-h-0 flex", isMobile ? "flex-col" : "flex-row")}
-      >
-        <div style={firstStyle} className="flex flex-col min-h-0 min-w-0">
-          <PaneHeader side="left" value={split.left} other={split.right} />
-          <div className="flex-1 overflow-y-auto p-3 min-h-0">{renderTab(split.left)}</div>
-        </div>
-        <NotebookSplitDivider
-          direction={direction}
-          ratio={split.ratio}
-          onChange={setRatio}
-          containerRef={splitContainerRef}
-        />
-        <div style={secondStyle} className="flex flex-col min-h-0 min-w-0">
-          <PaneHeader side="right" value={split.right} other={split.left} />
-          <div className="flex-1 overflow-y-auto p-3 min-h-0">{renderTab(split.right)}</div>
-        </div>
-      </div>
-    );
-  };
-
-  // Tab button (single mode tab bar)
-  const TabBtn = ({ id }: { id: Tab }) => {
-    const active = tab === id;
-    return (
-      <button
-        type="button"
-        onClick={() => setTab(id)}
-        className={cn(
-          "relative shrink-0 px-3 pt-2 pb-2.5 text-[13px] md:text-xs font-medium rounded-t-md border border-b-0 transition-colors min-h-[44px] md:min-h-0 whitespace-nowrap",
-          active
-            ? "bg-background border-foreground/10 text-foreground -mb-px z-10"
-            : "bg-foreground/[0.04] border-transparent text-muted-foreground hover:text-foreground",
-        )}
-      >
-        {id === "dynamo" && <Sparkles className="w-3 h-3 inline -mt-0.5 mr-1" />}
-        {tabLabel(id)}
-      </button>
-    );
-  };
-
   const enterSplit = () => {
     // Pre-fill: left = current, right = first other
     const otherTab = tabsArr.find((t) => t !== tab) || "annotations";
     setSplit((s) => ({ ...s, enabled: true, left: tab, right: otherTab }));
   };
 
-  // Header (drag bar / grab pill)
-  const Header = () => (
+  // Header JSX (inline, not a component, so input children keep identity across renders)
+  const headerEl = (
     <>
       {/* Mobile grab bar */}
       <div className="md:hidden pt-2 pb-1 flex justify-center">
@@ -450,23 +360,69 @@ const NotebookPanel = ({
     </>
   );
 
-  // Tab bar (single mode only — split has its own headers)
-  const TabBar = () =>
-    !split.enabled ? (
-      <div className="flex items-end gap-1 px-2 pt-1.5 border-b border-foreground/10 bg-foreground/[0.02] overflow-x-auto">
-        {tabsArr.map((t) => (
-          <TabBtn key={t} id={t} />
-        ))}
+  const tabBarEl = !split.enabled ? (
+    <div className="flex items-end gap-1 px-2 pt-1.5 border-b border-foreground/10 bg-foreground/[0.02] overflow-x-auto">
+      {tabsArr.map((id) => {
+        const active = tab === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cn(
+              "relative shrink-0 px-3 pt-2 pb-2.5 text-[13px] md:text-xs font-medium rounded-t-md border border-b-0 transition-colors min-h-[44px] md:min-h-0 whitespace-nowrap",
+              active
+                ? "bg-background border-foreground/10 text-foreground -mb-px z-10"
+                : "bg-foreground/[0.04] border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {id === "dynamo" && <Sparkles className="w-3 h-3 inline -mt-0.5 mr-1" />}
+            {tabLabel(id)}
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
+
+  const direction: "horizontal" | "vertical" = isMobile ? "horizontal" : "vertical";
+  const firstStyle = isMobile
+    ? { height: `${split.ratio * 100}%` }
+    : { width: `${split.ratio * 100}%` };
+  const secondStyle = isMobile
+    ? { height: `${(1 - split.ratio) * 100}%` }
+    : { width: `${(1 - split.ratio) * 100}%` };
+
+  const bodyEl = split.enabled ? (
+    <div
+      ref={splitContainerRef}
+      className={cn("flex-1 min-h-0 flex", isMobile ? "flex-col" : "flex-row")}
+    >
+      <div style={firstStyle} className="flex flex-col min-h-0 min-w-0">
+        {renderPaneHeader(split.left, split.right)}
+        <div className="flex-1 overflow-y-auto p-3 min-h-0">{renderTab(split.left)}</div>
       </div>
-    ) : null;
+      <NotebookSplitDivider
+        direction={direction}
+        ratio={split.ratio}
+        onChange={(r) => setSplit((s) => ({ ...s, ratio: r }))}
+        containerRef={splitContainerRef}
+      />
+      <div style={secondStyle} className="flex flex-col min-h-0 min-w-0">
+        {renderPaneHeader(split.right, split.left)}
+        <div className="flex-1 overflow-y-auto p-3 min-h-0">{renderTab(split.right)}</div>
+      </div>
+    </div>
+  ) : (
+    <div className="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0">{renderTab(tab)}</div>
+  );
 
   // Mobile: full-screen bottom sheet
   if (isMobile) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200">
-        <Header />
-        <TabBar />
-        {split.enabled ? <SplitContent /> : <SingleContent />}
+        {headerEl}
+        {tabBarEl}
+        {bodyEl}
       </div>
     );
   }
@@ -486,9 +442,9 @@ const NotebookPanel = ({
       }}
       className="bg-background border border-foreground/10 rounded-lg shadow-xl flex flex-col"
     >
-      <Header />
-      <TabBar />
-      {split.enabled ? <SplitContent /> : <SingleContent />}
+      {headerEl}
+      {tabBarEl}
+      {bodyEl}
 
       {!maximized && (
         <div
