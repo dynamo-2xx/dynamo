@@ -211,6 +211,10 @@ const NotebookPanel = ({
   // Shared QA state
   const qa = useRecordQA(sessionId, shareToken);
 
+  // Reader notes (owner-side inbox)
+  const reader = useReaderNotes(notebookId ?? null);
+  const [inboxOpen, setInboxOpen] = useState(false);
+
   // Split container ref for divider geometry
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
@@ -220,9 +224,30 @@ const NotebookPanel = ({
 
   if (!open) return null;
 
+  const handleJumpReaderNote = (n: ReaderNote) => {
+    if (n.anchor_kind === "my_take") {
+      setTab("my_take");
+      setSplit((s) => ({ ...s, enabled: false }));
+    } else {
+      setTab("thoughts");
+      setSplit((s) => ({ ...s, enabled: false }));
+    }
+    setInboxOpen(false);
+    if (!n.read_at) reader.markRead(n.id);
+  };
+
   // Render content for a given tab id (used for both single + split modes)
   const renderTab = (t: Tab) => {
-    if (t === "thoughts") return <ThoughtsTab thoughts={thoughts} setThoughts={setThoughts} />;
+    if (t === "thoughts")
+      return (
+        <ThoughtsTab
+          thoughts={thoughts}
+          setThoughts={setThoughts}
+          readerNotes={reader.inThoughts}
+          onDismissReaderNote={reader.dismiss}
+          onJumpReaderNote={handleJumpReaderNote}
+        />
+      );
     if (t === "annotations")
       return (
         <AnnotationsTab
