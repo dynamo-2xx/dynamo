@@ -120,10 +120,11 @@ const HeroActionShazam = ({ highlight, onUnauth }: HeroActionShazamProps) => {
           <button
             type="button"
             onClick={handleActivate}
+            onFocus={triggerPulse}
             aria-label={slide.label}
             className="relative w-44 h-44 rounded-full bg-foreground text-background flex items-center justify-center shadow-xl active:scale-95 transition-transform"
           >
-            {!dragging && (
+            {pulse && !dragging && (
               <span className="absolute inset-0 rounded-full bg-foreground/20 animate-ping pointer-events-none" />
             )}
             <Icon className="w-16 h-16 relative z-10" strokeWidth={1.5} />
