@@ -40,10 +40,21 @@ const SummaryCard = ({
   numberByRefId,
   onJumpToCrossRef,
 }: SummaryCardProps) => {
-  const isCounter = summary.kind === "counter";
-  const glyph = isCounter ? "↳" : "•";
+  const isResponseKind =
+    summary.kind === "counter" ||
+    summary.kind === "affirms" ||
+    summary.kind === "concedes";
+  const glyph = isResponseKind ? "↳" : "•";
   const roleLabel =
-    summary.kind === "main" ? "Main" : summary.kind === "counter" ? "Counter" : "Rebuttal";
+    summary.kind === "main"
+      ? "Main"
+      : summary.kind === "counter"
+        ? "Counter"
+        : summary.kind === "rebuttal"
+          ? "Rebuttal"
+          : summary.kind === "affirms"
+            ? "Affirms"
+            : "Concedes";
 
   const firstEntry = sourceEntries[0];
   const excerpt =
@@ -59,7 +70,7 @@ const SummaryCard = ({
   return (
     <div
       data-summary-node-id={summary.node_id}
-      className={`group relative ${isCounter ? "pl-6" : "pl-3"} py-2`}
+      className={`group relative ${isResponseKind ? "pl-6" : "pl-3"} py-2`}
     >
       <div className="flex items-baseline gap-2">
         <span className="text-foreground/40 select-none text-sm leading-none">{glyph}</span>
