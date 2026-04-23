@@ -9,9 +9,11 @@ interface TranscriptCardProps {
   timestamp?: number;
   compact?: boolean;
   autoFlip?: boolean;
+  entryId?: string;
+  argumentId?: string;
 }
 
-const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, compact = false, autoFlip = false }: TranscriptCardProps) => {
+const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, compact = false, autoFlip = false, entryId, argumentId }: TranscriptCardProps) => {
   const [expanded, setExpanded] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const [needsClamp, setNeedsClamp] = useState(false);
@@ -71,6 +73,8 @@ const TranscriptCard = ({ speakerSide, sideOrder, text, aiSummary, timestamp, co
       className={`cursor-default select-text flex ${isRight ? "justify-end" : "justify-start"}`}
       onDoubleClick={handleDoubleClick}
       style={{ perspective: "800px" }}
+      data-entry-id={entryId}
+      data-argument-id={argumentId}
     >
       <motion.div
         animate={{ rotateY: flipped ? 180 : 0 }}

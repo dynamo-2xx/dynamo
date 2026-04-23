@@ -13,6 +13,7 @@ import { useCmmQueue } from "@/hooks/useCmmQueue";
 import { useCmmLiveCapture } from "@/hooks/useCmmLiveCapture";
 import CmmLiveTranscript from "@/components/cmm/CmmLiveTranscript";
 import { useGrading } from "@/hooks/useGrading";
+import RecordToolsMount from "@/components/record/RecordToolsMount";
 
 interface DebateRow {
   id: string;
@@ -199,7 +200,7 @@ const ChangeMyMindRoomPage = () => {
 
   return (
     <AppLayout>
-      <div className="max-w-xl mx-auto px-4 py-6 space-y-5 pb-32">
+      <div className="max-w-xl mx-auto px-4 py-6 space-y-5 pb-32" data-record-root>
         {/* Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
@@ -286,6 +287,21 @@ const ChangeMyMindRoomPage = () => {
           onJoined={refresh}
         />
       </div>
+      {user && (
+        <RecordToolsMount
+          recordType="change_my_mind"
+          recordId={debate.id}
+          transcriptEntries={liveEntries.map((e) => ({
+            id: e.id,
+            speaker_id: e.speaker_side === "owner" ? 0 : 1,
+            speaker_label: e.speaker_label,
+            text: e.text,
+            timestamp: e.timestamp,
+            is_final: true,
+          }))}
+          subtopics={subtopics.map((s) => s.title)}
+        />
+      )}
     </AppLayout>
   );
 };

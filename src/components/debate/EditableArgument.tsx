@@ -72,6 +72,7 @@ const EditableArgument = ({
             ? "bg-blue-500/10 border border-blue-500/20"
             : "bg-orange-500/10 border border-orange-500/20"
         }`}
+        data-argument-id={id}
       >
         <div className="flex items-center gap-2 mb-1">
           <span
