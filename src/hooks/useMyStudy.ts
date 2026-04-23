@@ -2,10 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
+export type RecordType = "live_session" | "debate" | "change_my_mind";
+
 export interface StudyNotebook {
   id: string;
   session_id: string;
   user_id: string;
+  record_type: RecordType;
+  record_id: string;
   display_title: string | null;
   thoughts: any;
   my_take: string | null;
@@ -64,39 +68,63 @@ export function useMyStudy(opts: { includeTrashed?: boolean } = {}) {
     const { data: rows } = await q;
     const list = (rows || []) as any[];
 
-    // Hydrate sessions
-    const sessionIds = Array.from(new Set(list.map((r) => r.session_id))).filter(Boolean);
+    // Split records by type for hydration.
+    const liveIds = Array.from(
+      new Set(
+        list
+          .filter((r) => (r.record_type || "live_session") === "live_session")
+          .map((r) => r.record_id || r.session_id),
+      ),
+    ).filter(Boolean) as string[];
+    const debateIds = Array.from(
+      new Set(
+        list
+          .filter((r) => ["debate", "change_my_mind"].includes(r.record_type))
+          .map((r) => r.record_id),
+      ),
+    ).filter(Boolean) as string[];
+
     const titles: Record<string, { title: string | null; created_at: string | null; ended_at: string | null }> = {};
-    if (sessionIds.length > 0) {
+    if (liveIds.length > 0) {
       const { data: sessions } = await supabase
         .from("live_sessions" as any)
         .select("id, title, created_at, ended_at")
-        .in("id", sessionIds);
+        .in("id", liveIds);
       for (const s of (sessions || []) as any[]) {
         titles[s.id] = { title: s.title, created_at: s.created_at, ended_at: s.ended_at };
       }
     }
-
-    // Annotation counts (per session, this user)
-    const annCounts: Record<string, number> = {};
-    if (sessionIds.length > 0) {
-      const { data: anns } = await supabase
-        .from("session_annotations" as any)
-        .select("session_id")
-        .eq("user_id", user.id)
-        .in("session_id", sessionIds);
-      for (const a of (anns || []) as any[]) {
-        annCounts[a.session_id] = (annCounts[a.session_id] || 0) + 1;
+    if (debateIds.length > 0) {
+      const { data: debates } = await supabase
+        .from("debates" as any)
+        .select("id, topic, created_at, ended_at")
+        .in("id", debateIds);
+      for (const d of (debates || []) as any[]) {
+        titles[d.id] = { title: d.topic, created_at: d.created_at, ended_at: d.ended_at };
       }
     }
 
-    // Tags via live_session_tags + tags
+    // Annotation counts keyed by record_id (covers all formats).
+    const allRecordIds = [...liveIds, ...debateIds];
+    const annCounts: Record<string, number> = {};
+    if (allRecordIds.length > 0) {
+      const { data: anns } = await supabase
+        .from("session_annotations" as any)
+        .select("record_id")
+        .eq("user_id", user.id)
+        .in("record_id", allRecordIds);
+      for (const a of (anns || []) as any[]) {
+        annCounts[a.record_id] = (annCounts[a.record_id] || 0) + 1;
+      }
+    }
+
+    // Tags via live_session_tags + tags (Live only — debate tags rendered elsewhere)
     const tagsBySession: Record<string, { id: string; name: string; slug: string }[]> = {};
-    if (sessionIds.length > 0) {
+    if (liveIds.length > 0) {
       const { data: lst } = await supabase
         .from("live_session_tags" as any)
         .select("live_session_id, tag_id")
-        .in("live_session_id", sessionIds);
+        .in("live_session_id", liveIds);
       const tagIds = Array.from(new Set(((lst || []) as any[]).map((r) => r.tag_id)));
       const tagMap: Record<string, { id: string; name: string; slug: string }> = {};
       if (tagIds.length > 0) {
@@ -114,14 +142,17 @@ export function useMyStudy(opts: { includeTrashed?: boolean } = {}) {
     }
 
     const hydrated: StudyNotebook[] = list.map((r) => {
-      const meta = titles[r.session_id];
+      const recordId = r.record_id || r.session_id;
+      const meta = titles[recordId];
       return {
         ...(r as any),
+        record_type: (r.record_type || "live_session") as RecordType,
+        record_id: recordId,
         session_title: meta?.title ?? null,
         session_created_at: meta?.created_at ?? null,
         session_ended_at: meta?.ended_at ?? null,
-        annotation_count: annCounts[r.session_id] || 0,
-        tags: tagsBySession[r.session_id] || [],
+        annotation_count: annCounts[recordId] || 0,
+        tags: tagsBySession[recordId] || [],
       };
     });
 
