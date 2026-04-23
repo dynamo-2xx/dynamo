@@ -33,7 +33,7 @@ const CmmLiveTranscript = ({ entries, interimText, isConnected, micError }: Prop
           <p className="text-xs text-muted-foreground py-6 text-center">Speak — your words show up here.</p>
         )}
         {entries.map((e) => (
-          <div key={e.id} className={cn(
+          <div key={e.id} data-entry-id={e.id} className={cn(
             "rounded-xl px-3 py-2 border",
             e.speaker_side === "owner"
               ? "border-border/60 bg-background"
