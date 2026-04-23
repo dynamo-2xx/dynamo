@@ -869,6 +869,33 @@ export type Database = {
         }
         Relationships: []
       }
+      notebook_folders: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          sort_index: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          sort_index?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_index?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           actor_id: string | null
@@ -1121,38 +1148,60 @@ export type Database = {
       session_notebooks: {
         Row: {
           created_at: string
+          deleted_at: string | null
+          display_title: string | null
+          folder_id: string | null
           id: string
           my_take: string | null
           published: boolean
           published_at: string | null
           session_id: string
+          share_token: string | null
+          sort_index: number
           thoughts: Json
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
+          display_title?: string | null
+          folder_id?: string | null
           id?: string
           my_take?: string | null
           published?: boolean
           published_at?: string | null
           session_id: string
+          share_token?: string | null
+          sort_index?: number
           thoughts?: Json
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
+          display_title?: string | null
+          folder_id?: string | null
           id?: string
           my_take?: string | null
           published?: boolean
           published_at?: string | null
           session_id?: string
+          share_token?: string | null
+          sort_index?: number
           thoughts?: Json
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "session_notebooks_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "notebook_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "session_notebooks_session_id_fkey"
             columns: ["session_id"]
@@ -1304,6 +1353,21 @@ export type Database = {
           summaries: Json
           title: string
           transcript_entries: Json
+        }[]
+      }
+      get_shared_notebook: {
+        Args: { _token: string }
+        Returns: {
+          display_title: string
+          id: string
+          my_take: string
+          published: boolean
+          published_at: string
+          session_created_at: string
+          session_id: string
+          session_title: string
+          thoughts: Json
+          updated_at: string
         }[]
       }
       invitation_is_visible: {
