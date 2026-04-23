@@ -352,6 +352,22 @@ const NotebookPanel = ({
               My Study
             </Link>
           )}
+          {notebookId && (
+            <button
+              type="button"
+              onClick={() => setInboxOpen((v) => !v)}
+              className="relative p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Notes from readers"
+              title="Notes from readers"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              {reader.unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] leading-[14px] text-center font-medium">
+                  {reader.unreadCount > 9 ? "9+" : reader.unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => (split.enabled ? setSplit((s) => ({ ...s, enabled: false })) : enterSplit())}
