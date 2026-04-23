@@ -63,6 +63,18 @@ const NotebookCard = ({
 
   const title = notebookTitle(notebook);
   const preview = notebookPreview(notebook);
+  const formatChip =
+    notebook.record_type === "debate"
+      ? "Debate"
+      : notebook.record_type === "change_my_mind"
+        ? "CMM"
+        : "Live";
+  const recordHref =
+    notebook.record_type === "debate"
+      ? `/debate/${notebook.record_id}`
+      : notebook.record_type === "change_my_mind"
+        ? `/cmm/${notebook.record_id}`
+        : `/live/${notebook.record_id || notebook.session_id}`;
   const date = notebook.session_created_at
     ? new Date(notebook.session_created_at).toLocaleDateString(undefined, {
         month: "short",
@@ -149,6 +161,9 @@ const NotebookCard = ({
                 {notebook.share_token && (
                   <Link2 className="w-3 h-3 text-muted-foreground" aria-label="Shared" />
                 )}
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-body border border-border text-muted-foreground">
+                  {formatChip}
+                </span>
                 <span
                   className={cn(
                     "text-[10px] px-1.5 py-0.5 rounded-full font-body",
@@ -226,7 +241,7 @@ const NotebookCard = ({
                         <Link to={`/my-study/${notebook.id}`}>Open</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link to={`/live/${notebook.session_id}`}>Open session record</Link>
+                        <Link to={recordHref}>Open record</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onRename(notebook.id)}>Rename</DropdownMenuItem>
                       <DropdownMenuSub>
