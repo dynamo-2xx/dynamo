@@ -270,13 +270,22 @@ Grade this speaker using the grade_final tool.`;
 
     // Add tool calling for structured outputs
     if (action === "generate_debate") {
+      const isCmm = (payload as any)?.format === "change_my_mind";
       body.tools = [
         {
           type: "function",
           function: {
             name: "suggest_debate",
             description: "Return a structured debate format",
-            parameters: {
+            parameters: isCmm ? {
+              type: "object",
+              properties: {
+                topic: { type: "string" },
+                subtopics: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 },
+              },
+              required: ["topic", "subtopics"],
+              additionalProperties: false,
+            } : {
               type: "object",
               properties: {
                 topic: { type: "string" },
