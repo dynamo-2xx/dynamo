@@ -224,5 +224,32 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
   // Reset speaker buffer when round (active) flips.
   useEffect(() => { bufRef.current = ""; bufSpeakerRef.current = 0; }, [active]);
 
-  return { entries, interimText, isConnected, micError, connect, disconnect };
+  /** Owner-only: insert a new interruption marker (start). Returns its id. */
+  const startInterruption = useCallback(async (label = "Interruption") => {
+    const id = `int-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const entry: CmmTranscriptEntry = {
+      id,
+      speaker_side: "interruption",
+      speaker_label: label,
+      text: "",
+      timestamp: Date.now(),
+    };
+    const next = [...entriesRef.current, entry];
+    setEntries(next);
+    await persist(next);
+    return id;
+  }, [persist]);
+
+  /** Owner-only: close an open interruption by stamping its end_timestamp. */
+  const endInterruption = useCallback(async (interruptionId: string) => {
+    const next = entriesRef.current.map((e) =>
+      e.id === interruptionId && e.speaker_side === "interruption"
+        ? { ...e, end_timestamp: Date.now() }
+        : e,
+    );
+    setEntries(next);
+    await persist(next);
+  }, [persist]);
+
+  return { entries, interimText, isConnected, micError, connect, disconnect, startInterruption, endInterruption };
 }
