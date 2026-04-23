@@ -45,6 +45,8 @@ const ChangeMyMindRoomPage = () => {
   const { gradeTurn, gradeFinal } = useGrading();
 
   const activeRow = rows.find((r) => r.status === "active") || null;
+  const currentSubtopicTitle = subtopics[debate?.current_subtopic_index ?? 0]?.title ?? null;
+  const hasNextSubtopic = (debate?.current_subtopic_index ?? 0) < subtopics.length - 1;
 
   const challengerLabel = useMemo(
     () => activeRow?.display_name || "Challenger",
@@ -57,7 +59,8 @@ const ChangeMyMindRoomPage = () => {
   );
 
   const isOwnerEarly = !!user && !!debate && user.id === debate.created_by;
-  const captureActive = !!activeRow && isOwnerEarly; // Owner-device captures shared mic.
+  // Capture runs on the active challenger's device — owner devices receive transcript via realtime.
+  const captureActive = !!activeRow && !!user && activeRow.user_id === user.id;
 
   const { entries: liveEntries, interimText, isConnected, micError } = useCmmLiveCapture({
     debateId: id ?? null,
@@ -198,6 +201,37 @@ const ChangeMyMindRoomPage = () => {
     refresh();
   };
 
+  const handleSkipSubtopic = async () => {
+    if (!debate) return;
+    const nextIndex = (debate.current_subtopic_index ?? 0) + 1;
+    if (nextIndex >= subtopics.length) { toast.info("No more subtopics."); return; }
+    setBusy(true);
+    const { error } = await supabase.from("debates").update({ current_subtopic_index: nextIndex }).eq("id", debate.id);
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Moved to: ${subtopics[nextIndex]?.title ?? "next subtopic"}`);
+    load();
+  };
+
+  const handleEndSession = async () => {
+    if (!debate) return;
+    if (!confirm("End this Change My Mind session for everyone?")) return;
+    setBusy(true);
+    // End any active round first.
+    if (activeRow) {
+      await supabase.rpc("cmm_end_round" as any, { _debate_id: debate.id, _outcome: "completed" });
+    }
+    const { error } = await supabase
+      .from("debates")
+      .update({ status: "completed", ended_at: new Date().toISOString() })
+      .eq("id", debate.id);
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Session ended.");
+    load();
+    refresh();
+  };
+
   return (
     <AppLayout>
       <div className="max-w-xl mx-auto px-4 py-6 space-y-5 pb-32" data-record-root>
@@ -220,11 +254,21 @@ const ChangeMyMindRoomPage = () => {
         {/* Subtopics */}
         {subtopics.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {subtopics.map((s) => (
-              <span key={s.id} className="text-xs px-2.5 py-1 rounded-full border border-border/60 text-muted-foreground">
-                {s.title}
-              </span>
-            ))}
+            {subtopics.map((s, i) => {
+              const isCurrent = i === (debate?.current_subtopic_index ?? 0);
+              return (
+                <span
+                  key={s.id}
+                  className={
+                    isCurrent
+                      ? "text-xs px-2.5 py-1 rounded-full border border-foreground bg-foreground text-background"
+                      : "text-xs px-2.5 py-1 rounded-full border border-border/60 text-muted-foreground"
+                  }
+                >
+                  {s.title}
+                </span>
+              );
+            })}
           </div>
         )}
 
@@ -249,6 +293,9 @@ const ChangeMyMindRoomPage = () => {
           onStartNext={handleStartNext}
           onEndRound={handleEndRound}
           onWithdraw={handleWithdraw}
+          onSkipSubtopic={subtopics.length > 0 ? handleSkipSubtopic : undefined}
+          onEndSession={handleEndSession}
+          hasNextSubtopic={hasNextSubtopic}
           busy={busy}
         />
 
@@ -256,9 +303,9 @@ const ChangeMyMindRoomPage = () => {
         {activeRow && (
           <CmmLiveTranscript
             entries={liveEntries}
-            interimText={isOwner ? interimText : ""}
-            isConnected={isOwner ? isConnected : true}
-            micError={isOwner ? micError : null}
+            interimText={captureActive ? interimText : ""}
+            isConnected={captureActive ? isConnected : true}
+            micError={captureActive ? micError : null}
           />
         )}
 
