@@ -231,6 +231,67 @@ const SessionRecordViewV2 = ({
     setIsSharing(false);
   }, [currentShareToken, sessionId]);
 
+  // Consolidate notebook → "My Take" when the user navigates away from this session.
+  const consolidatedRef = useRef(false);
+  const triggerConsolidate = useCallback(async () => {
+    if (consolidatedRef.current) return;
+    if (!user || readOnly) return;
+    if (!notebook.thoughts.trim() && annotationsHook.annotations.length === 0) return;
+    consolidatedRef.current = true;
+    try {
+      await notebook.flushNow();
+      await supabase.functions.invoke("consolidate-notebook", {
+        body: { session_id: sessionId },
+      });
+    } catch (e) {
+      console.error("consolidate-notebook failed", e);
+    }
+  }, [user, readOnly, notebook, annotationsHook.annotations.length, sessionId]);
+
+  // Fire on route change away from this page, and on tab close.
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      // Best-effort flush; consolidation continues server-side via invoke.
+      void triggerConsolidate();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      void triggerConsolidate();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // Jump to the source of an annotation (summary node or transcript entry).
+  const jumpToAnnotation = useCallback((a: { node_kind: string; node_id: string }) => {
+    if (a.node_kind === "transcript") {
+      handleJumpToTranscript([a.node_id]);
+      return;
+    }
+    const el = recordRootRef.current?.querySelector<HTMLElement>(
+      `[data-summary-node-id="${a.node_id}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("transcript-flash");
+      window.setTimeout(() => el.classList.remove("transcript-flash"), 900);
+    }
+  }, [handleJumpToTranscript]);
+
+  // Cross-ref jump: scroll to either summary or transcript node id.
+  const jumpToCrossRef = useCallback((toNodeId: string) => {
+    const el = recordRootRef.current?.querySelector<HTMLElement>(
+      `[data-summary-node-id="${toNodeId}"], [data-entry-id="${toNodeId}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("transcript-flash");
+      window.setTimeout(() => el.classList.remove("transcript-flash"), 900);
+    } else {
+      handleJumpToTranscript([toNodeId]);
+    }
+  }, [handleJumpToTranscript]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 md:py-10">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
