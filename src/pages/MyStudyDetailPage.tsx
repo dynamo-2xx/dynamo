@@ -191,6 +191,13 @@ const MyStudyDetailPage = () => {
     [study.folders, notebook?.folder_id],
   );
 
+  const recordHref =
+    recordType === "debate"
+      ? `/debate/${recordId}`
+      : recordType === "change_my_mind"
+        ? `/cmm/${recordId}`
+        : `/live/${recordId}`;
+
   useEffect(() => {
     return () => {
       nb.flushNow?.();
@@ -218,7 +225,7 @@ const MyStudyDetailPage = () => {
       return (
         <AnnotationsTab
           annotations={annotations || []}
-          onJump={(a) => navigate(`/live/${notebook?.session_id}#annotation-${a.id}`)}
+          onJump={(a) => navigate(`${recordHref}#annotation-${a.id}`)}
           onRemove={handleRemoveAnn}
         />
       );
@@ -341,7 +348,7 @@ const MyStudyDetailPage = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild>
-                        <Link to={`/live/${notebook.session_id}`}>Open session record</Link>
+                        <Link to={recordHref}>Open record</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setInboxOpen(true)}>
                         Notes from readers{reader.unreadCount > 0 ? ` (${reader.unreadCount})` : ""}
@@ -381,14 +388,14 @@ const MyStudyDetailPage = () => {
                     )}
                   </button>
                   <Link
-                    to={`/live/${notebook.session_id}`}
+                    to={recordHref}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5"
                   >
-                    Open session record <ArrowUpRight className="w-3 h-3" />
+                    Open record <ArrowUpRight className="w-3 h-3" />
                   </Link>
                   <ShareMenu
                     notebookId={notebook.id}
-                    sessionId={notebook.session_id}
+                    sessionId={notebook.record_id || notebook.session_id}
                     shareToken={notebook.share_token}
                     onGenerate={study.generateShareToken}
                   />
