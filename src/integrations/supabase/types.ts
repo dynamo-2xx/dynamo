@@ -700,6 +700,33 @@ export type Database = {
         }
         Relationships: []
       }
+      follow_requests: {
+        Row: {
+          created_at: string
+          id: string
+          requester_id: string
+          responded_at: string | null
+          status: string
+          target_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          requester_id: string
+          responded_at?: string | null
+          status?: string
+          target_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          requester_id?: string
+          responded_at?: string | null
+          status?: string
+          target_id?: string
+        }
+        Relationships: []
+      }
       live_session_entries: {
         Row: {
           client_ts: string
@@ -1372,6 +1399,19 @@ export type Database = {
         Args: { _debate_id?: string; _other_user: string }
         Returns: string
       }
+      get_profile_card: {
+        Args: { _user_id: string }
+        Returns: {
+          affiliation: string
+          avatar_url: string
+          banner_url: string
+          created_at: string
+          display_name: string
+          is_public: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
       get_public_profile: {
         Args: { _user_id: string }
         Returns: {
@@ -1391,6 +1431,8 @@ export type Database = {
           affiliation: string
           avatar_url: string
           display_name: string
+          follow_status: string
+          is_public: boolean
           location: string
           mutual_count: number
           same_location: boolean
@@ -1481,6 +1523,31 @@ export type Database = {
         Returns: undefined
       }
       realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
+      request_follow: {
+        Args: { _target: string }
+        Returns: {
+          status: string
+        }[]
+      }
+      respond_follow_request: {
+        Args: { _accept: boolean; _request_id: string }
+        Returns: {
+          status: string
+        }[]
+      }
+      search_profile_cards: {
+        Args: { _limit?: number; _q: string }
+        Returns: {
+          affiliation: string
+          avatar_url: string
+          banner_url: string
+          created_at: string
+          display_name: string
+          is_public: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
       submit_reader_note: {
         Args: {
           _anchor_char_end?: number
