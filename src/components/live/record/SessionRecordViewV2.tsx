@@ -1,14 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation } from "react-router-dom";
-import { ArrowLeft, Share2, Check, BookOpen } from "lucide-react";
+import {
+  ArrowLeft,
+  Share2,
+  Check,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import {
   LiveTranscriptEntry,
   LiveSummary,
@@ -17,9 +19,9 @@ import {
 import TagPicker from "@/components/tags/TagPicker";
 import ThreadedRecordPane from "./ThreadedRecordPane";
 import TranscriptPane from "./TranscriptPane";
-import RecordQAChat from "@/components/live/RecordQAChat";
 import NotebookPanel from "./NotebookPanel";
 import HighlightAnnotateLayer from "./HighlightAnnotateLayer";
+import { cn } from "@/lib/utils";
 import { useSessionNotebook } from "@/hooks/useSessionNotebook";
 import { useSessionAnnotations } from "@/hooks/useSessionAnnotations";
 import { useSessionCitations } from "@/hooks/useSessionCitations";
