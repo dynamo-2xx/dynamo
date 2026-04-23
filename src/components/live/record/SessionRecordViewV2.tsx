@@ -483,6 +483,7 @@ const SessionRecordViewV2 = ({
                   className={cn(
                     "h-[70vh] flex flex-col min-w-0 transition-[width] duration-200",
                     leftCollapsed && "pointer-events-none",
+                    rightCollapsed && "pr-7",
                   )}
                 >
                   {!leftCollapsed && (
@@ -547,6 +548,7 @@ const SessionRecordViewV2 = ({
                   className={cn(
                     "h-[70vh] flex flex-col min-w-0 transition-[width] duration-200",
                     rightCollapsed && "pointer-events-none",
+                    leftCollapsed && "pl-7",
                   )}
                 >
                   {!rightCollapsed && (
@@ -625,7 +627,7 @@ const SessionRecordViewV2 = ({
       {!readOnly && user && (
         <button
           onClick={() => setNotebookOpen((v) => !v)}
-          className="fixed bottom-6 left-6 z-40 w-11 h-11 rounded-full bg-background border border-foreground/10 shadow-sm flex items-center justify-center hover:bg-foreground/[0.04] transition-colors"
+          className="fixed bottom-6 right-6 z-40 w-11 h-11 rounded-full bg-background border border-foreground/10 shadow-sm flex items-center justify-center hover:bg-foreground/[0.04] transition-colors"
           aria-label="Open notebook"
         >
           <BookOpen className="w-5 h-5 text-foreground" />
