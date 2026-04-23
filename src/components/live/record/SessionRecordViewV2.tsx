@@ -65,6 +65,38 @@ const SessionRecordViewV2 = ({
   const [currentShareToken, setCurrentShareToken] = useState(shareToken);
   const [isSharing, setIsSharing] = useState(false);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
+  const recordRootRef = useRef<HTMLDivElement>(null);
+  const [notebookOpen, setNotebookOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"threads" | "transcript">("threads");
+  const location = useLocation();
+  const { user } = useAuth();
+
+  // Study tools: notebook, annotations, citations, AI cross-refs.
+  const notebook = useSessionNotebook(sessionId);
+  const annotationsHook = useSessionAnnotations(sessionId);
+  const citations = useSessionCitations(sessionId);
+  const crossRefs = useSessionCrossRefs(sessionId);
+
+  // Determine if current viewer is the host (owner of the session).
+  const [isHost, setIsHost] = useState(false);
+  useEffect(() => {
+    if (!user || readOnly) {
+      setIsHost(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("live_sessions")
+        .select("created_by")
+        .eq("id", sessionId)
+        .maybeSingle();
+      if (!cancelled) setIsHost(data?.created_by === user.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, user, readOnly]);
 
   const threadTitles: Record<string, LiveThreadMeta> =
     threadTitlesProp && Object.keys(threadTitlesProp).length > 0
