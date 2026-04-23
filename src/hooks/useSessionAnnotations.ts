@@ -2,11 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
+export type RecordType = "live_session" | "debate" | "change_my_mind";
+
 export interface SessionAnnotation {
   id: string;
   session_id: string;
   user_id: string;
-  node_kind: "summary" | "transcript";
+  record_type: RecordType;
+  record_id: string;
+  node_kind: "summary" | "transcript" | "argument";
   node_id: string;
   excerpt: string;
   note: string;
@@ -15,26 +19,42 @@ export interface SessionAnnotation {
   created_at: string;
 }
 
+export interface AnnotationsTarget {
+  recordType: RecordType;
+  recordId: string;
+}
+
+function resolveTarget(arg: string | null | AnnotationsTarget): AnnotationsTarget | null {
+  if (!arg) return null;
+  if (typeof arg === "string") return { recordType: "live_session", recordId: arg };
+  if (!arg.recordId) return null;
+  return { recordType: arg.recordType, recordId: arg.recordId };
+}
+
 /** Private per-user list of highlighted excerpts + notes for one session. */
-export function useSessionAnnotations(sessionId: string | null) {
+export function useSessionAnnotations(arg: string | null | AnnotationsTarget) {
+  const target = resolveTarget(arg);
+  const recordType = target?.recordType ?? "live_session";
+  const recordId = target?.recordId ?? null;
   const { user } = useAuth();
   const [annotations, setAnnotations] = useState<SessionAnnotation[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    if (!sessionId || !user) {
+    if (!recordId || !user) {
       setLoading(false);
       return;
     }
     const { data } = await supabase
       .from("session_annotations" as any)
       .select("*")
-      .eq("session_id", sessionId)
+      .eq("record_type", recordType)
+      .eq("record_id", recordId)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
     setAnnotations((data || []) as any as SessionAnnotation[]);
     setLoading(false);
-  }, [sessionId, user]);
+  }, [recordType, recordId, user]);
 
   useEffect(() => {
     refresh();
@@ -42,18 +62,20 @@ export function useSessionAnnotations(sessionId: string | null) {
 
   const add = useCallback(
     async (input: {
-      node_kind: "summary" | "transcript";
+      node_kind: "summary" | "transcript" | "argument";
       node_id: string;
       excerpt: string;
       note: string;
       char_start?: number | null;
       char_end?: number | null;
     }) => {
-      if (!sessionId || !user) return null;
+      if (!recordId || !user) return null;
       const { data, error } = await supabase
         .from("session_annotations" as any)
         .insert({
-          session_id: sessionId,
+          session_id: recordType === "live_session" ? recordId : null,
+          record_type: recordType,
+          record_id: recordId,
           user_id: user.id,
           ...input,
         } as any)
@@ -65,7 +87,7 @@ export function useSessionAnnotations(sessionId: string | null) {
       }
       return null;
     },
-    [sessionId, user],
+    [recordType, recordId, user],
   );
 
   const remove = useCallback(

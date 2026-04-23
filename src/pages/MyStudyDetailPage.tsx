@@ -104,10 +104,13 @@ const MyStudyDetailPage = () => {
   const isMobile = useIsMobile();
   const study = useMyStudy({ includeTrashed: true });
   const notebook = study.notebooks.find((n) => n.id === notebookId);
-  const sessionId = notebook?.session_id || null;
+  const recordType = notebook?.record_type || "live_session";
+  const recordId = notebook?.record_id || notebook?.session_id || null;
 
-  const nb = useSessionNotebook(sessionId);
-  const { annotations, remove: removeAnnotation } = useSessionAnnotations(sessionId) as any;
+  const nb = useSessionNotebook(recordId ? { recordType, recordId } : null);
+  const { annotations, remove: removeAnnotation } = useSessionAnnotations(
+    recordId ? { recordType, recordId } : null,
+  ) as any;
 
   // Soft-handle remove
   const handleRemoveAnn = async (id: string) => {
@@ -123,13 +126,13 @@ const MyStudyDetailPage = () => {
     share_token: string | null;
   } | null>(null);
   useEffect(() => {
-    if (!sessionId) return;
+    if (!recordId || recordType !== "live_session") return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
         .from("live_sessions")
         .select("transcript_entries, subtopics, summaries, speaker_names, share_token")
-        .eq("id", sessionId)
+        .eq("id", recordId)
         .maybeSingle();
       if (cancelled || !data) return;
       setSessionData({
@@ -143,9 +146,12 @@ const MyStudyDetailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [recordId, recordType]);
 
-  const qa = useRecordQA(sessionId || "", sessionData?.share_token);
+  const qa = useRecordQA(
+    recordId ? { recordType, recordId } : "",
+    sessionData?.share_token,
+  );
 
   const [tab, setTab] = useState<Tab>("thoughts");
   const [renameOpen, setRenameOpen] = useState(false);
@@ -165,25 +171,32 @@ const MyStudyDetailPage = () => {
     right: "annotations",
     ratio: 0.5,
   }));
-  // Hydrate split when sessionId arrives
+  // Hydrate split when target arrives
   useEffect(() => {
-    if (!sessionId) return;
-    const s = loadSplit(sessionId);
+    if (!recordId) return;
+    const s = loadSplit(recordId);
     if (s) setSplit(s);
-  }, [sessionId]);
+  }, [recordId]);
   useEffect(() => {
-    if (!sessionId) return;
+    if (!recordId) return;
     try {
-      localStorage.setItem(SPLIT_KEY(sessionId), JSON.stringify(split));
+      localStorage.setItem(SPLIT_KEY(recordId), JSON.stringify(split));
     } catch {
       /* noop */
     }
-  }, [split, sessionId]);
+  }, [split, recordId]);
 
   const folder = useMemo(
     () => study.folders.find((f) => f.id === notebook?.folder_id) || null,
     [study.folders, notebook?.folder_id],
   );
+
+  const recordHref =
+    recordType === "debate"
+      ? `/debate/${recordId}`
+      : recordType === "change_my_mind"
+        ? `/cmm/${recordId}`
+        : `/live/${recordId}`;
 
   useEffect(() => {
     return () => {
@@ -212,7 +225,7 @@ const MyStudyDetailPage = () => {
       return (
         <AnnotationsTab
           annotations={annotations || []}
-          onJump={(a) => navigate(`/live/${notebook?.session_id}#annotation-${a.id}`)}
+          onJump={(a) => navigate(`${recordHref}#annotation-${a.id}`)}
           onRemove={handleRemoveAnn}
         />
       );
@@ -335,7 +348,7 @@ const MyStudyDetailPage = () => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild>
-                        <Link to={`/live/${notebook.session_id}`}>Open session record</Link>
+                        <Link to={recordHref}>Open record</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setInboxOpen(true)}>
                         Notes from readers{reader.unreadCount > 0 ? ` (${reader.unreadCount})` : ""}
@@ -375,14 +388,14 @@ const MyStudyDetailPage = () => {
                     )}
                   </button>
                   <Link
-                    to={`/live/${notebook.session_id}`}
+                    to={recordHref}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5"
                   >
-                    Open session record <ArrowUpRight className="w-3 h-3" />
+                    Open record <ArrowUpRight className="w-3 h-3" />
                   </Link>
                   <ShareMenu
                     notebookId={notebook.id}
-                    sessionId={notebook.session_id}
+                    sessionId={notebook.record_id || notebook.session_id}
                     shareToken={notebook.share_token}
                     onGenerate={study.generateShareToken}
                   />

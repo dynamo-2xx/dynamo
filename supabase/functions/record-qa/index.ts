@@ -11,9 +11,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { sessionId, messages, shareToken } = await req.json();
-    if (!sessionId || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: "sessionId and messages[] required" }), {
+    const body = await req.json();
+    const { messages, shareToken } = body;
+    // Resolve target: prefer explicit record_type/record_id, fall back to legacy sessionId.
+    let recordType: string = body.recordType || "live_session";
+    let recordId: string | undefined = body.recordId || body.sessionId;
+    if (!recordId || !Array.isArray(messages)) {
+      return new Response(JSON.stringify({ error: "recordId and messages[] required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -23,29 +27,69 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Fetch session
-    const { data: session, error: fetchErr } = await supabase
-      .from("live_sessions")
-      .select("transcript_entries, summaries, subtopics, speaker_names, created_by, share_token")
-      .eq("id", sessionId)
-      .single();
+    let transcriptText = "";
+    let subtopicList = "";
 
-    if (fetchErr || !session) {
-      return new Response(JSON.stringify({ error: "Session not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (recordType === "live_session") {
+      // Fetch session
+      const { data: session, error: fetchErr } = await supabase
+        .from("live_sessions")
+        .select("transcript_entries, summaries, subtopics, speaker_names, created_by, share_token")
+        .eq("id", recordId)
+        .single();
 
-    // Auth: either share token match or JWT owner
-    if (shareToken) {
-      if (!session.share_token || session.share_token !== shareToken) {
-        return new Response(JSON.stringify({ error: "Invalid share token" }), {
-          status: 403,
+      if (fetchErr || !session) {
+        return new Response(JSON.stringify({ error: "Session not found" }), {
+          status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-    } else {
+
+      // Auth: either share token match or JWT owner
+      if (shareToken) {
+        if (!session.share_token || session.share_token !== shareToken) {
+          return new Response(JSON.stringify({ error: "Invalid share token" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const token = authHeader.replace("Bearer ", "");
+        const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+        const userClient = createClient(supabaseUrl, anonKey);
+        const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
+        if (authErr || !user || user.id !== session.created_by) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      const entries = (session.transcript_entries as any[]) || [];
+      const subtopics = (session.subtopics as string[]) || [];
+      const speakerNames = (session.speaker_names as Record<string, string>) || {};
+
+      const getSpeakerName = (id: number) =>
+        speakerNames[String(id)] || `Speaker ${id + 1}`;
+
+      for (const e of entries) {
+        const topic = e.subtopic ? ` [Topic: "${e.subtopic}"]` : "";
+        const summary = e.ai_summary ? ` | Summary: ${e.ai_summary}` : "";
+        transcriptText += `${getSpeakerName(e.speaker_id)}${topic}: ${e.text}${summary}\n`;
+      }
+      subtopicList = subtopics.length > 0
+        ? `\nSubtopics discussed: ${subtopics.map((s, i) => `${i + 1}. ${s}`).join(", ")}`
+        : "";
+    } else if (recordType === "debate" || recordType === "change_my_mind") {
+      // Auth via JWT — viewer must be able to see the debate.
       const authHeader = req.headers.get("Authorization");
       if (!authHeader) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -55,34 +99,82 @@ serve(async (req) => {
       }
       const token = authHeader.replace("Bearer ", "");
       const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-      const userClient = createClient(supabaseUrl, anonKey);
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
       const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
-      if (authErr || !user || user.id !== session.created_by) {
+      if (authErr || !user) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const { data: visible } = await userClient.rpc("can_view_debate", { _debate_id: recordId });
+      if (!visible) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Build transcript context from arguments + sides + subtopics.
+      const [{ data: debate }, { data: sides }, { data: subs }, { data: parts }, { data: args }] =
+        await Promise.all([
+          supabase.from("debates").select("topic").eq("id", recordId).maybeSingle(),
+          supabase.from("debate_sides").select("id, label").eq("debate_id", recordId),
+          supabase
+            .from("debate_subtopics")
+            .select("id, title, sort_order")
+            .eq("debate_id", recordId)
+            .order("sort_order"),
+          supabase
+            .from("debate_participants")
+            .select("id, side_id, user_id")
+            .eq("debate_id", recordId),
+          supabase
+            .from("arguments")
+            .select("id, content, subtopic_id, participant_id, created_at")
+            .eq("debate_id", recordId)
+            .order("created_at", { ascending: true }),
+        ]);
+
+      const sideById: Record<string, string> = {};
+      for (const s of (sides || []) as any[]) sideById[s.id] = s.label;
+      const partSide: Record<string, string> = {};
+      for (const p of (parts || []) as any[]) partSide[p.id] = p.side_id ? sideById[p.side_id] || "" : "";
+      const subTitle: Record<string, string> = {};
+      for (const s of (subs || []) as any[]) subTitle[s.id] = s.title;
+
+      // Group arguments by subtopic order, then by created_at.
+      const subOrder: string[] = ((subs || []) as any[]).map((s) => s.id);
+      const sortedArgs = ((args || []) as any[])
+        .slice()
+        .sort((a, b) => {
+          const ai = a.subtopic_id ? subOrder.indexOf(a.subtopic_id) : 9999;
+          const bi = b.subtopic_id ? subOrder.indexOf(b.subtopic_id) : 9999;
+          if (ai !== bi) return ai - bi;
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        });
+
+      transcriptText = `Topic: ${debate?.topic || "Untitled debate"}\n\n`;
+      for (const a of sortedArgs) {
+        const speaker = partSide[a.participant_id] || "Speaker";
+        const topic = a.subtopic_id && subTitle[a.subtopic_id]
+          ? ` [Topic: "${subTitle[a.subtopic_id]}"]`
+          : "";
+        transcriptText += `${speaker}${topic}: ${a.content}\n`;
+      }
+      subtopicList = (subs || []).length > 0
+        ? `\nSubtopics: ${((subs || []) as any[])
+            .map((s, i) => `${i + 1}. ${s.title}`)
+            .join(", ")}`
+        : "";
+    } else {
+      return new Response(JSON.stringify({ error: "Unknown recordType" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    const entries = session.transcript_entries as any[];
-    const subtopics = session.subtopics as string[];
-    const speakerNames = session.speaker_names as Record<string, string>;
-    const summaries = session.summaries as any[];
-
-    // Build transcript context
-    const getSpeakerName = (id: number) => speakerNames[String(id)] || `Speaker ${id + 1}`;
-
-    let transcriptText = "";
-    for (const e of entries) {
-      const topic = e.subtopic ? ` [Topic: "${e.subtopic}"]` : "";
-      const summary = e.ai_summary ? ` | Summary: ${e.ai_summary}` : "";
-      transcriptText += `${getSpeakerName(e.speaker_id)}${topic}: ${e.text}${summary}\n`;
-    }
-
-    const subtopicList = subtopics.length > 0
-      ? `\nSubtopics discussed: ${subtopics.map((s, i) => `${i + 1}. ${s}`).join(", ")}`
-      : "";
 
     const systemPrompt = `You are an AI assistant that answers questions about a recorded conversation transcript. You MUST answer ONLY from the transcript data provided below. If the answer is not in the transcript, say so.
 

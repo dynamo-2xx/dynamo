@@ -38,6 +38,9 @@ interface NotebookPanelProps {
   open: boolean;
   onClose: () => void;
   sessionId: string;
+  /** Optional: when set, Dynamo Q&A targets a debate or CMM record instead of a live session. */
+  recordType?: "live_session" | "debate" | "change_my_mind";
+  recordId?: string;
   thoughts: string;
   setThoughts: (v: string) => void;
   myTake: string;
@@ -92,6 +95,8 @@ const NotebookPanel = ({
   open,
   onClose,
   sessionId,
+  recordType,
+  recordId,
   thoughts,
   setThoughts,
   myTake,
@@ -209,7 +214,12 @@ const NotebookPanel = ({
   };
 
   // Shared QA state
-  const qa = useRecordQA(sessionId, shareToken);
+  const qa = useRecordQA(
+    recordType && recordId
+      ? { recordType, recordId }
+      : sessionId,
+    shareToken,
+  );
 
   // Reader notes (owner-side inbox)
   const reader = useReaderNotes(notebookId ?? null);

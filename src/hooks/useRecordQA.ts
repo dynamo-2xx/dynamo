@@ -4,29 +4,43 @@ import { toast } from "sonner";
 
 export type QAMsg = { role: "user" | "assistant"; content: string };
 
+export type RecordType = "live_session" | "debate" | "change_my_mind";
+
+export interface QATarget {
+  recordType: RecordType;
+  recordId: string;
+}
+
 /**
  * Shared chat state for the Dynamo (AI Q&A) tab inside a session notebook.
- * Keyed by sessionId so switching tabs preserves the conversation.
+ * Keyed by record so switching tabs preserves the conversation.
  * State is in-memory only (matches the prior floating chat behavior).
+ *
+ * Accepts either a legacy `sessionId: string` (Live Session) or a target
+ * `{ recordType, recordId }` for Debates / CMM.
  */
 export const useRecordQA = (
-  sessionId: string,
+  arg: string | QATarget,
   shareToken?: string | null,
 ) => {
+  const recordType: RecordType = typeof arg === "string" ? "live_session" : arg.recordType;
+  const recordId = typeof arg === "string" ? arg : arg.recordId;
+  const conversationKey = `${recordType}:${recordId}`;
+
   const [messages, setMessages] = useState<QAMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Reset when the session changes.
-  const lastSessionRef = useRef(sessionId);
+  // Reset when the conversation target changes.
+  const lastKeyRef = useRef(conversationKey);
   useEffect(() => {
-    if (lastSessionRef.current !== sessionId) {
-      lastSessionRef.current = sessionId;
+    if (lastKeyRef.current !== conversationKey) {
+      lastKeyRef.current = conversationKey;
       setMessages([]);
       setInput("");
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [conversationKey]);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -39,7 +53,13 @@ export const useRecordQA = (
     setLoading(true);
 
     try {
-      const body: any = { sessionId, messages: allMessages };
+      const body: any = {
+        // Legacy field for live sessions; edge function still accepts it.
+        sessionId: recordType === "live_session" ? recordId : undefined,
+        recordType,
+        recordId,
+        messages: allMessages,
+      };
       if (shareToken) body.shareToken = shareToken;
 
       const { data, error } = await supabase.functions.invoke("record-qa", { body });
@@ -61,7 +81,7 @@ export const useRecordQA = (
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages, sessionId, shareToken]);
+  }, [input, loading, messages, recordType, recordId, shareToken]);
 
   return { messages, input, setInput, loading, send };
 };

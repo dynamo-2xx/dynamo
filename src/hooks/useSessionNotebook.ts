@@ -7,10 +7,14 @@ export interface NotebookThoughtBlock {
   value: string;
 }
 
+export type RecordType = "live_session" | "debate" | "change_my_mind";
+
 export interface SessionNotebook {
   id: string;
   session_id: string;
   user_id: string;
+  record_type: RecordType;
+  record_id: string;
   thoughts: { blocks: NotebookThoughtBlock[] };
   my_take: string | null;
   published: boolean;
@@ -18,11 +22,30 @@ export interface SessionNotebook {
   updated_at: string;
 }
 
+export interface NotebookTarget {
+  recordType: RecordType;
+  recordId: string;
+}
+
+/** Resolve a legacy `sessionId` arg or a `{recordType, recordId}` target. */
+function resolveTarget(arg: string | null | NotebookTarget | null): NotebookTarget | null {
+  if (!arg) return null;
+  if (typeof arg === "string") return { recordType: "live_session", recordId: arg };
+  if (!arg.recordId) return null;
+  return { recordType: arg.recordType, recordId: arg.recordId };
+}
+
 /**
  * Per-session, per-user private notebook. Auto-saves Thoughts (debounced 1s)
  * to session_notebooks. Exposes setters + a publish toggle.
+ *
+ * Accepts either a legacy `sessionId: string` (treated as a Live Session) or
+ * `{ recordType, recordId }` for Debates / CMM.
  */
-export function useSessionNotebook(sessionId: string | null) {
+export function useSessionNotebook(arg: string | null | NotebookTarget) {
+  const target = resolveTarget(arg);
+  const recordType = target?.recordType ?? "live_session";
+  const recordId = target?.recordId ?? null;
   const { user } = useAuth();
   const [notebook, setNotebook] = useState<SessionNotebook | null>(null);
   const [thoughts, setThoughts] = useState<string>("");
@@ -35,7 +58,7 @@ export function useSessionNotebook(sessionId: string | null) {
 
   // Load
   useEffect(() => {
-    if (!sessionId || !user) {
+    if (!recordId || !user) {
       setLoading(false);
       return;
     }
@@ -44,7 +67,8 @@ export function useSessionNotebook(sessionId: string | null) {
       const { data } = await supabase
         .from("session_notebooks" as any)
         .select("*")
-        .eq("session_id", sessionId)
+        .eq("record_type", recordType)
+        .eq("record_id", recordId)
         .eq("user_id", user.id)
         .maybeSingle();
       if (cancelled) return;
@@ -62,19 +86,22 @@ export function useSessionNotebook(sessionId: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, user]);
+  }, [recordType, recordId, user]);
 
   const persist = useCallback(async () => {
-    if (!sessionId || !user) return;
+    if (!recordId || !user) return;
     const payload = {
-      session_id: sessionId,
+      // Keep legacy session_id mirror for live sessions only.
+      session_id: recordType === "live_session" ? recordId : null,
+      record_type: recordType,
+      record_id: recordId,
       user_id: user.id,
       thoughts: { blocks: [{ type: "text", value: thoughts }] },
       my_take: myTake || null,
     };
     const { data, error } = await supabase
       .from("session_notebooks" as any)
-      .upsert(payload as any, { onConflict: "session_id,user_id" })
+      .upsert(payload as any, { onConflict: "record_type,record_id,user_id" })
       .select()
       .maybeSingle();
     if (!error && data) {
@@ -83,7 +110,7 @@ export function useSessionNotebook(sessionId: string | null) {
       lastPersistedTakeRef.current = myTake;
       dirtyRef.current = false;
     }
-  }, [sessionId, user, thoughts, myTake]);
+  }, [recordType, recordId, user, thoughts, myTake]);
 
   // Debounced auto-save on Thoughts/MyTake change
   useEffect(() => {
@@ -111,40 +138,43 @@ export function useSessionNotebook(sessionId: string | null) {
   }, [persist]);
 
   const publish = useCallback(async () => {
-    if (!sessionId || !user) return;
+    if (!recordId || !user) return;
     await flushNow();
     const { data, error } = await supabase
       .from("session_notebooks" as any)
       .update({ published: true, published_at: new Date().toISOString() } as any)
-      .eq("session_id", sessionId)
+      .eq("record_type", recordType)
+      .eq("record_id", recordId)
       .eq("user_id", user.id)
       .select()
       .maybeSingle();
     if (!error && data) setNotebook(data as any as SessionNotebook);
-  }, [sessionId, user, flushNow]);
+  }, [recordType, recordId, user, flushNow]);
 
   const unpublish = useCallback(async () => {
-    if (!sessionId || !user) return;
+    if (!recordId || !user) return;
     const { data, error } = await supabase
       .from("session_notebooks" as any)
       .update({ published: false, published_at: null } as any)
-      .eq("session_id", sessionId)
+      .eq("record_type", recordType)
+      .eq("record_id", recordId)
       .eq("user_id", user.id)
       .select()
       .maybeSingle();
     if (!error && data) setNotebook(data as any as SessionNotebook);
-  }, [sessionId, user]);
+  }, [recordType, recordId, user]);
 
   const deleteMyTake = useCallback(async () => {
     setMyTake("");
-    if (!sessionId || !user) return;
+    if (!recordId || !user) return;
     await supabase
       .from("session_notebooks" as any)
       .update({ my_take: null } as any)
-      .eq("session_id", sessionId)
+      .eq("record_type", recordType)
+      .eq("record_id", recordId)
       .eq("user_id", user.id);
     lastPersistedTakeRef.current = "";
-  }, [sessionId, user]);
+  }, [recordType, recordId, user]);
 
   return {
     notebook,
