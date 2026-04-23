@@ -92,7 +92,6 @@ export function useTrendingDebates(limit = 6) {
       const { data } = await supabase
         .from("debates")
         .select(DEBATE_SELECT)
-        .eq("is_public", true)
         .neq("status", "archived")
         .gte("created_at", since)
         .limit(50);
@@ -119,7 +118,6 @@ export function useLatestDebates(limit = 8) {
       const { data } = await supabase
         .from("debates")
         .select(DEBATE_SELECT)
-        .eq("is_public", true)
         .neq("status", "archived")
         .order("created_at", { ascending: false })
         .limit(limit);
@@ -164,7 +162,6 @@ export function useDebatesByTag(tagId: string | null, limit = 50) {
         .from("debates")
         .select(DEBATE_SELECT)
         .in("id", ids)
-        .eq("is_public", true)
         .neq("status", "archived")
         .order("created_at", { ascending: false });
       if (!cancelled) {
