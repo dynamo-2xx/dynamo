@@ -3,10 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 export interface CmmTranscriptEntry {
   id: string;
-  speaker_side: "owner" | "challenger";
+  speaker_side: "owner" | "challenger" | "interruption";
   speaker_label: string;
   text: string;
   timestamp: number;
+  /** For interruption entries only: end timestamp (ms epoch). */
+  end_timestamp?: number;
 }
 
 interface UseCmmLiveCaptureProps {
