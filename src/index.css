@@ -127,4 +127,12 @@
   .font-body {
     font-family: var(--font-body);
   }
+  /* Brief yellow flash used by the post-session record's "View transcript" jump. */
+  .transcript-flash {
+    animation: transcript-flash 900ms ease-out;
+  }
+  @keyframes transcript-flash {
+    0%   { background-color: hsl(48 96% 70% / 0.55); }
+    100% { background-color: transparent; }
+  }
 }

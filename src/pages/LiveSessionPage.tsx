@@ -4,7 +4,7 @@ import { Mic, Square, Radio, Loader2, ChevronDown, ArrowLeft, UserPlus } from "l
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
-import SessionRecordView from "@/components/live/SessionRecordView";
+import SessionRecordView from "@/components/live/record/SessionRecordViewV2";
 import LiveThreadView from "@/components/live/LiveThreadView";
 import TagPicker from "@/components/tags/TagPicker";
 import type { Tag } from "@/hooks/useTags";
