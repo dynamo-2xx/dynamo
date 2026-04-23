@@ -17,6 +17,7 @@ import {
 import TagPicker from "@/components/tags/TagPicker";
 import ThreadedRecordPane from "./ThreadedRecordPane";
 import TranscriptPane from "./TranscriptPane";
+import RecordQAChat from "@/components/live/RecordQAChat";
 
 interface Props {
   sessionId: string;
@@ -310,6 +311,15 @@ const SessionRecordViewV2 = ({
           </p>
         )}
       </motion.div>
+
+      <RecordQAChat
+        sessionId={sessionId}
+        transcriptEntries={transcriptEntries}
+        subtopics={subtopics}
+        summaries={summaries}
+        speakerNames={speakerNames}
+        shareToken={currentShareToken}
+      />
     </div>
   );
 };
