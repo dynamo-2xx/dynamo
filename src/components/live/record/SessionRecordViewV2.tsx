@@ -293,7 +293,7 @@ const SessionRecordViewV2 = ({
   }, [handleJumpToTranscript]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 md:py-10">
+    <div className="max-w-7xl mx-auto px-4 py-6 md:py-10" ref={recordRootRef} data-record-root>
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         {/* Header — Main Topic */}
         <div className="flex items-center gap-3 mb-2">
@@ -333,26 +333,48 @@ const SessionRecordViewV2 = ({
           </div>
         )}
 
-        {/* Split-pane: Threaded Record | Full Transcript */}
-        {/* Mobile (<768px): single column with toggle pill (Step 11). For now, stack. */}
-        <div className="md:hidden space-y-6">
-          <section>
-            <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 px-2">
-              Threaded record
-            </h2>
+        {/* Mobile (<768px): single column with toggle pill */}
+        <div className="md:hidden">
+          <div className="inline-flex items-center gap-1 p-1 mb-4 rounded-full border border-foreground/10 bg-background">
+            {(["threads", "transcript"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setMobileTab(t)}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                  mobileTab === t
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t === "threads" ? "Threads" : "Transcript"}
+              </button>
+            ))}
+          </div>
+          {mobileTab === "threads" ? (
             <ThreadedRecordPane
               transcriptEntries={transcriptEntries}
               subtopics={subtopics}
               threadTitles={threadTitles}
               summaries={summaries}
               getSpeakerName={getSpeakerName}
-              onJumpToTranscript={handleJumpToTranscript}
+              onJumpToTranscript={(ids) => {
+                handleJumpToTranscript(ids);
+                setMobileTab("transcript");
+              }}
+              isHost={isHost}
+              citationByNode={citations.byNode}
+              onSaveCitation={(node, text, url) => {
+                void citations.upsert(node, text, url);
+              }}
+              onDeleteCitation={(node) => {
+                const c = citations.byNode(node);
+                if (c) void citations.remove(c.id);
+              }}
+              refsByNode={crossRefs.refsByNode}
+              numberByRefId={crossRefs.numberByRefId}
+              onJumpToCrossRef={jumpToCrossRef}
             />
-          </section>
-          <section>
-            <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 px-2">
-              Full transcript
-            </h2>
+          ) : (
             <TranscriptPane
               ref={transcriptScrollRef}
               entries={transcriptEntries}
@@ -362,7 +384,7 @@ const SessionRecordViewV2 = ({
               onSplit={handleSplitEntry}
               onMerge={handleMergeEntry}
             />
-          </section>
+          )}
         </div>
 
         <div className="hidden md:block">
@@ -382,6 +404,18 @@ const SessionRecordViewV2 = ({
                   summaries={summaries}
                   getSpeakerName={getSpeakerName}
                   onJumpToTranscript={handleJumpToTranscript}
+                  isHost={isHost}
+                  citationByNode={citations.byNode}
+                  onSaveCitation={(node, text, url) => {
+                    void citations.upsert(node, text, url);
+                  }}
+                  onDeleteCitation={(node) => {
+                    const c = citations.byNode(node);
+                    if (c) void citations.remove(c.id);
+                  }}
+                  refsByNode={crossRefs.refsByNode}
+                  numberByRefId={crossRefs.numberByRefId}
+                  onJumpToCrossRef={jumpToCrossRef}
                 />
               </div>
             </ResizablePanel>
@@ -411,6 +445,46 @@ const SessionRecordViewV2 = ({
           </p>
         )}
       </motion.div>
+
+      {/* Highlight → annotate layer (private, owner only) */}
+      {!readOnly && user && (
+        <HighlightAnnotateLayer
+          containerSelector="[data-record-root]"
+          onAnnotate={(input) => {
+            void annotationsHook.add(input);
+            toast.success("Saved to notebook");
+          }}
+        />
+      )}
+
+      {/* Floating Notebook button (bottom-left), mirrors Q&A on the right */}
+      {!readOnly && user && (
+        <button
+          onClick={() => setNotebookOpen((v) => !v)}
+          className="fixed bottom-6 left-6 z-40 w-11 h-11 rounded-full bg-background border border-foreground/10 shadow-sm flex items-center justify-center hover:bg-foreground/[0.04] transition-colors"
+          aria-label="Open notebook"
+        >
+          <BookOpen className="w-5 h-5 text-foreground" />
+        </button>
+      )}
+
+      {!readOnly && user && (
+        <NotebookPanel
+          open={notebookOpen}
+          onClose={() => setNotebookOpen(false)}
+          thoughts={notebook.thoughts}
+          setThoughts={notebook.setThoughts}
+          myTake={notebook.myTake}
+          setMyTake={notebook.setMyTake}
+          onDeleteMyTake={notebook.deleteMyTake}
+          onPublish={notebook.publish}
+          onUnpublish={notebook.unpublish}
+          isPublished={notebook.isPublished}
+          annotations={annotationsHook.annotations}
+          onJumpToAnnotation={jumpToAnnotation}
+          onRemoveAnnotation={annotationsHook.remove}
+        />
+      )}
 
       <RecordQAChat
         sessionId={sessionId}
