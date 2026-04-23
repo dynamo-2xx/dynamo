@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 interface HighlightAnnotateLayerProps {
   containerSelector: string;
   onAnnotate: (input: {
-    node_kind: "summary" | "transcript";
+    node_kind: "summary" | "transcript" | "argument";
     node_id: string;
     excerpt: string;
     char_start: number;
@@ -26,7 +26,7 @@ const HighlightAnnotateLayer = ({ containerSelector, onAnnotate }: HighlightAnno
     top: number;
     left: number;
     excerpt: string;
-    node_kind: "summary" | "transcript";
+    node_kind: "summary" | "transcript" | "argument";
     node_id: string;
     char_start: number;
     char_end: number;
@@ -61,8 +61,16 @@ const HighlightAnnotateLayer = ({ containerSelector, onAnnotate }: HighlightAnno
       }
       const summaryEl = anchorEl.closest("[data-summary-node-id]") as HTMLElement | null;
       const transcriptEl = anchorEl.closest("[data-entry-id]") as HTMLElement | null;
-      const node_id = summaryEl?.dataset.summaryNodeId || transcriptEl?.dataset.entryId;
-      const node_kind: "summary" | "transcript" = summaryEl ? "summary" : "transcript";
+      const argumentEl = anchorEl.closest("[data-argument-id]") as HTMLElement | null;
+      const node_id =
+        summaryEl?.dataset.summaryNodeId ||
+        transcriptEl?.dataset.entryId ||
+        argumentEl?.dataset.argumentId;
+      const node_kind: "summary" | "transcript" | "argument" = summaryEl
+        ? "summary"
+        : transcriptEl
+          ? "transcript"
+          : "argument";
       if (!node_id) {
         setChip(null);
         return;
