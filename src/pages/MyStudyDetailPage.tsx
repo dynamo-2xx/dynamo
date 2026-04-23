@@ -312,7 +312,6 @@ const MyStudyDetailPage = () => {
             </div>
           ) : (
             <>
-              {(() => null)()}
               <div className="flex items-start justify-between gap-3 mb-1">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-display truncate">
