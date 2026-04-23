@@ -14,6 +14,16 @@ interface UseCmmLiveCaptureProps {
   active: boolean;
   ownerLabel: string;
   challengerLabel: string;
+  /**
+   * If set, every utterance captured on this device is tagged with this side
+   * regardless of Deepgram's diarization output. Use 'owner' on the publisher's
+   * device and 'challenger' on the active challenger's device so each mic owns
+   * its own attribution. When omitted, falls back to diarization heuristic
+   * (speaker 0 -> owner, others -> challenger) for single-mic scenarios.
+   */
+  fixedSide?: "owner" | "challenger";
+  /** When true, audio frames are dropped before sending to Deepgram. */
+  muted?: boolean;
 }
 
 /**
@@ -21,7 +31,7 @@ interface UseCmmLiveCaptureProps {
  * Streams from Deepgram and persists merged entries into debate_transcripts.transcript_entries.
  * Speaker mapping: speaker 0 -> owner, speaker 1+ -> challenger (heuristic; both at one mic).
  */
-export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabel }: UseCmmLiveCaptureProps) {
+export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabel, fixedSide, muted }: UseCmmLiveCaptureProps) {
   const [entries, setEntries] = useState<CmmTranscriptEntry[]>([]);
   const [interimText, setInterimText] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -34,6 +44,8 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
   const entriesRef = useRef<CmmTranscriptEntry[]>([]);
   const bufRef = useRef("");
   const bufSpeakerRef = useRef(0);
+  const mutedRef = useRef(false);
+  useEffect(() => { mutedRef.current = !!muted; }, [muted]);
 
   useEffect(() => { entriesRef.current = entries; }, [entries]);
 
@@ -101,6 +113,7 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
         procRef.current = proc;
         proc.onaudioprocess = (e) => {
           if (ws.readyState !== WebSocket.OPEN) return;
+          if (mutedRef.current) return;
           const input = e.inputBuffer.getChannelData(0);
           let sum = 0;
           for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
