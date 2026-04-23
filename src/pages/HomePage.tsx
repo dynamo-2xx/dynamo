@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { PlusCircle, Radio, ArrowUpRight, Compass } from "lucide-react";
+import { PlusCircle, ArrowUpRight, Compass } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,7 @@ import EmptyStateHint from "@/components/home/EmptyStateHint";
 import { useEmptyStateHint } from "@/hooks/useEmptyStateHint";
 import AuthPromptDialog from "@/components/AuthPromptDialog";
 import HomeMyStudyRow from "@/components/home/HomeMyStudyRow";
+import HeroActionShazam from "@/components/home/HeroActionShazam";
 
 type Mode = "trending" | "local";
 
@@ -80,12 +81,6 @@ const HomePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const actionCardClass = `flex items-center gap-3 bg-background border rounded-lg p-5 transition-all duration-500 group ${
-    highlightActions
-      ? "border-foreground/40 ring-2 ring-foreground/30"
-      : "border-border hover:border-foreground/20"
-  }`;
-
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
@@ -98,49 +93,8 @@ const HomePage = () => {
         </div>
 
         {/* Action row: Create + Live side-by-side */}
-        <div ref={actionRowRef} className="grid grid-cols-2 gap-3 mb-6 scroll-mt-4">
-          {user ? (
-            <Link to="/create" className={actionCardClass}>
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
-                <PlusCircle className="w-5 h-5 text-foreground" />
-              </div>
-              <div className="min-w-0 text-left">
-                <p className="font-body text-sm font-medium">Debate</p>
-                <p className="text-[11px] text-muted-foreground font-body truncate">Structure a sincere dialogue</p>
-              </div>
-            </Link>
-          ) : (
-            <button type="button" onClick={handleProtectedAction} className={actionCardClass}>
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
-                <PlusCircle className="w-5 h-5 text-foreground" />
-              </div>
-              <div className="min-w-0 text-left">
-                <p className="font-body text-sm font-medium">Debate</p>
-                <p className="text-[11px] text-muted-foreground font-body truncate">Structure a sincere dialogue</p>
-              </div>
-            </button>
-          )}
-          {user ? (
-            <Link to="/live/new" className={actionCardClass}>
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
-                <Radio className="w-5 h-5 text-foreground" />
-              </div>
-              <div className="min-w-0 text-left">
-                <p className="font-body text-sm font-medium">Live</p>
-                <p className="text-[11px] text-muted-foreground font-body truncate">Capture a real conversation</p>
-              </div>
-            </Link>
-          ) : (
-            <button type="button" onClick={handleProtectedAction} className={actionCardClass}>
-              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
-                <Radio className="w-5 h-5 text-foreground" />
-              </div>
-              <div className="min-w-0 text-left">
-                <p className="font-body text-sm font-medium">Live</p>
-                <p className="text-[11px] text-muted-foreground font-body truncate">Capture a real conversation</p>
-              </div>
-            </button>
-          )}
+        <div ref={actionRowRef}>
+          <HeroActionShazam highlight={highlightActions} onUnauth={() => setAuthPromptOpen(true)} />
         </div>
 
         {user && (
