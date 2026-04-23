@@ -189,8 +189,11 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
         .maybeSingle();
       const list = (data?.transcript_entries as any) ?? [];
       if (Array.isArray(list) && list.length) {
-        // Filter entries that already conform to CmmTranscriptEntry shape.
-        const filtered = list.filter((e: any) => e?.speaker_side && e?.text) as CmmTranscriptEntry[];
+        // Keep any entry with a recognized speaker_side. Interruption entries
+        // may have empty text (they're pure timeline markers).
+        const filtered = list.filter(
+          (e: any) => e?.speaker_side && (e.speaker_side === "interruption" || e?.text),
+        ) as CmmTranscriptEntry[];
         setEntries(filtered);
       }
     })();
@@ -207,7 +210,9 @@ export function useCmmLiveCapture({ debateId, active, ownerLabel, challengerLabe
         (payload) => {
           const next = (payload.new as any)?.transcript_entries;
           if (!Array.isArray(next)) return;
-          const filtered = next.filter((e: any) => e?.speaker_side && e?.text) as CmmTranscriptEntry[];
+          const filtered = next.filter(
+            (e: any) => e?.speaker_side && (e.speaker_side === "interruption" || e?.text),
+          ) as CmmTranscriptEntry[];
           // Only overwrite if remote is longer (avoid clobbering local capture mid-flight).
           setEntries((prev) => (filtered.length >= prev.length ? filtered : prev));
         },
