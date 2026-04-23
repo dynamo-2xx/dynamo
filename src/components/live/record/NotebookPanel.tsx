@@ -8,6 +8,7 @@ import {
   Sparkles,
   Maximize2,
   Minimize2,
+  Mail,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { SessionAnnotation } from "@/hooks/useSessionAnnotations";
@@ -21,6 +22,8 @@ import MyTakeTab from "./notebook/MyTakeTab";
 import DynamoChatPane from "./DynamoChatPane";
 import NotebookSplitDivider from "./NotebookSplitDivider";
 import { useRecordQA } from "@/hooks/useRecordQA";
+import { useReaderNotes, type ReaderNote } from "@/hooks/useReaderNotes";
+import ReaderNotesPanel from "@/components/study/ReaderNotesPanel";
 
 type Tab = "thoughts" | "annotations" | "my_take" | "dynamo";
 
