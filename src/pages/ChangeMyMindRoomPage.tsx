@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Swords, Lock, Globe } from "lucide-react";
+import { Swords, Lock, Globe, Mic, MicOff } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +41,7 @@ const ChangeMyMindRoomPage = () => {
   const [composerOpen, setComposerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const lastGradedActiveIdRef = useRef<string | null>(null);
+  const [ownerMuted, setOwnerMuted] = useState(false);
 
   const { rows, refresh } = useCmmQueue(id);
   const { gradeTurn, gradeFinal } = useGrading();
@@ -60,15 +61,49 @@ const ChangeMyMindRoomPage = () => {
   );
 
   const isOwnerEarly = !!user && !!debate && user.id === debate.created_by;
-  // Capture runs on the active challenger's device — owner devices receive transcript via realtime.
-  const captureActive = !!activeRow && !!user && activeRow.user_id === user.id;
+  // Two independent capture sessions:
+  //  - Owner mic: always on while a round is active (with mute toggle).
+  //  - Challenger mic: on for the active challenger's device only.
+  // Both write to the same shared transcript; non-capturing devices receive
+  // updates via realtime subscription inside the hook.
+  const challengerCaptureActive = !!activeRow && !!user && activeRow.user_id === user.id;
+  const ownerCaptureActive = !!activeRow && isOwnerEarly && !challengerCaptureActive;
 
-  const { entries: liveEntries, interimText, isConnected, micError } = useCmmLiveCapture({
+  const owner = useCmmLiveCapture({
     debateId: id ?? null,
-    active: captureActive,
+    active: ownerCaptureActive,
     ownerLabel,
     challengerLabel,
+    fixedSide: "owner",
+    muted: ownerMuted,
   });
+  const challenger = useCmmLiveCapture({
+    debateId: id ?? null,
+    active: challengerCaptureActive,
+    ownerLabel,
+    challengerLabel,
+    fixedSide: "challenger",
+  });
+
+  // Pick the locally capturing session for transcript display state; the
+  // entries themselves come from the shared store and are identical across
+  // both hook instances (they merge via realtime).
+  const liveEntries = challengerCaptureActive ? challenger.entries : owner.entries;
+  const interimText = challengerCaptureActive
+    ? challenger.interimText
+    : ownerCaptureActive
+      ? owner.interimText
+      : "";
+  const isConnected = challengerCaptureActive
+    ? challenger.isConnected
+    : ownerCaptureActive
+      ? owner.isConnected
+      : true;
+  const micError = challengerCaptureActive
+    ? challenger.micError
+    : ownerCaptureActive
+      ? owner.micError
+      : null;
 
   const load = async () => {
     if (!id) return;
@@ -302,12 +337,35 @@ const ChangeMyMindRoomPage = () => {
 
         {/* Live transcript — visible whenever a round is active */}
         {activeRow && (
-          <CmmLiveTranscript
-            entries={liveEntries}
-            interimText={captureActive ? interimText : ""}
-            isConnected={captureActive ? isConnected : true}
-            micError={captureActive ? micError : null}
-          />
+          <>
+            {isOwner && (
+              <div className="flex items-center justify-between rounded-xl border border-border/60 px-3 py-2">
+                <div className="flex items-center gap-2 text-xs">
+                  {ownerMuted ? (
+                    <MicOff className="w-3.5 h-3.5 text-muted-foreground" />
+                  ) : (
+                    <Mic className="w-3.5 h-3.5 text-foreground" />
+                  )}
+                  <span className={ownerMuted ? "text-muted-foreground" : "text-foreground"}>
+                    Your mic is {ownerMuted ? "muted" : "live"}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant={ownerMuted ? "default" : "outline"}
+                  onClick={() => setOwnerMuted((m) => !m)}
+                >
+                  {ownerMuted ? "Unmute" : "Mute"}
+                </Button>
+              </div>
+            )}
+            <CmmLiveTranscript
+              entries={liveEntries}
+              interimText={interimText}
+              isConnected={isConnected}
+              micError={micError}
+            />
+          </>
         )}
 
         {/* Sticky CTA for non-owner */}
