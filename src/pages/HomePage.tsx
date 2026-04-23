@@ -14,6 +14,7 @@ import { formatTodayLong } from "@/lib/date";
 import EmptyStateHint from "@/components/home/EmptyStateHint";
 import { useEmptyStateHint } from "@/hooks/useEmptyStateHint";
 import AuthPromptDialog from "@/components/AuthPromptDialog";
+import HomeMyStudyRow from "@/components/home/HomeMyStudyRow";
 
 type Mode = "trending" | "local";
 
@@ -145,6 +146,12 @@ const HomePage = () => {
         <div className="mb-10">
           <FriendsOnlineWidget />
         </div>
+
+        {user && (
+          <section className="mb-10">
+            <HomeMyStudyRow />
+          </section>
+        )}
 
         {/* For-you carousel */}
         <section className="mb-10">

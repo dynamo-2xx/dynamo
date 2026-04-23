@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight, Pencil, Users, Hash, BookOpen } from "lucide-react";
+import { User, Shield, Globe, Lock, LogOut, MessageSquare, Bell, ChevronRight, Pencil, Users, Hash, BookOpen, NotebookPen } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
@@ -80,6 +80,14 @@ const ProfilePage = () => {
 
           {/* Activity */}
           <div className="bg-background border border-border rounded-lg divide-y divide-border mb-6">
+            <Link
+              to="/my-study"
+              className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
+            >
+              <NotebookPen className="w-4 h-4 text-muted-foreground" />
+              <span className="flex-1">My Study</span>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
             <Link
               to="/my-debates"
               className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
