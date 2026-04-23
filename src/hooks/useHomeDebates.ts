@@ -66,7 +66,7 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         status: s.status === "recording" ? "live" : "completed",
         cover_image_url: null,
         created_at: s.created_at,
-        is_public: true,
+        is_public: !!s.is_public,
         created_by: s.created_by,
         participant_count: 0,
       }));
