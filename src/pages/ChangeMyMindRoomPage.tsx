@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Swords, Lock, Globe } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,9 @@ import QueueList from "@/components/cmm/QueueList";
 import ChallengeComposer from "@/components/cmm/ChallengeComposer";
 import EditSetupPanel from "@/components/cmm/EditSetupPanel";
 import { useCmmQueue } from "@/hooks/useCmmQueue";
+import { useCmmLiveCapture } from "@/hooks/useCmmLiveCapture";
+import CmmLiveTranscript from "@/components/cmm/CmmLiveTranscript";
+import { useGrading } from "@/hooks/useGrading";
 
 interface DebateRow {
   id: string;
@@ -27,6 +30,7 @@ interface Side { id: string; label: string; }
 const ChangeMyMindRoomPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [debate, setDebate] = useState<DebateRow | null>(null);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
@@ -34,8 +38,32 @@ const ChangeMyMindRoomPage = () => {
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const lastGradedActiveIdRef = useRef<string | null>(null);
 
   const { rows, refresh } = useCmmQueue(id);
+  const { gradeTurn, gradeFinal } = useGrading();
+
+  const activeRow = rows.find((r) => r.status === "active") || null;
+
+  const challengerLabel = useMemo(
+    () => activeRow?.display_name || "Challenger",
+    [activeRow?.display_name],
+  );
+
+  const ownerLabel = useMemo(
+    () => ownerSide?.label?.slice(0, 32) || "Owner",
+    [ownerSide?.label],
+  );
+
+  const isOwnerEarly = !!user && !!debate && user.id === debate.created_by;
+  const captureActive = !!activeRow && isOwnerEarly; // Owner-device captures shared mic.
+
+  const { entries: liveEntries, interimText, isConnected, micError } = useCmmLiveCapture({
+    debateId: id ?? null,
+    active: captureActive,
+    ownerLabel,
+    challengerLabel,
+  });
 
   const load = async () => {
     if (!id) return;
@@ -63,6 +91,18 @@ const ChangeMyMindRoomPage = () => {
 
   useEffect(() => { load(); }, [id]);
 
+  // Auto-open challenge composer if arriving from invite (?challenge=1).
+  useEffect(() => {
+    if (!debate || !user) return;
+    if (user.id === debate.created_by) return;
+    if (searchParams.get("challenge") === "1") {
+      setComposerOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("challenge");
+      setSearchParams(next, { replace: true });
+    }
+  }, [debate, user, searchParams, setSearchParams]);
+
   if (loading || !debate) {
     return <AppLayout><div className="max-w-xl mx-auto px-4 py-10 text-sm text-muted-foreground">Loading…</div></AppLayout>;
   }
@@ -81,11 +121,74 @@ const ChangeMyMindRoomPage = () => {
   };
 
   const handleEndRound = async (outcome: "completed" | "skipped") => {
+    // Snapshot challenger before we end the round so we can grade after.
+    const ending = activeRow;
     setBusy(true);
     const { error } = await supabase.rpc("cmm_end_round" as any, { _debate_id: debate.id, _outcome: outcome });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     refresh();
+
+    // Optional AI grading — fire-and-forget.
+    if (debate.grading_enabled && outcome === "completed" && ending) {
+      const ownerEntries = liveEntries.filter((e) => e.speaker_side === "owner").map((e) => e.text).join(" ").trim();
+      const challengerEntries = liveEntries.filter((e) => e.speaker_side === "challenger").map((e) => e.text).join(" ").trim();
+
+      try {
+        // Resolve owner participant_id.
+        const { data: ownerPart } = await supabase
+          .from("debate_participants")
+          .select("id")
+          .eq("debate_id", debate.id)
+          .eq("user_id", debate.created_by)
+          .maybeSingle();
+        const { data: challengerPart } = await supabase
+          .from("debate_participants")
+          .select("id, side_id")
+          .eq("debate_id", debate.id)
+          .eq("user_id", ending.user_id)
+          .maybeSingle();
+
+        const baseTopic = debate.topic;
+        if (ownerPart && ownerEntries.length > 8) {
+          await gradeTurn({
+            debateId: debate.id, participantId: ownerPart.id, userId: debate.created_by,
+            subtopicId: null, turnIndex: 0,
+            topic: baseTopic, subtopic: baseTopic,
+            side: ownerLabel, content: ownerEntries,
+            opposingArguments: [{ side: ending.position_text, content: challengerEntries }],
+            includeResolution: false,
+          });
+          await gradeFinal({
+            debateId: debate.id, participantId: ownerPart.id, userId: debate.created_by,
+            topic: baseTopic, side: ownerLabel,
+            allTurns: [{ subtopic: baseTopic, content: ownerEntries }],
+            opposingTurns: [{ subtopic: baseTopic, side: ending.position_text, content: challengerEntries }],
+            includeResolution: false,
+          });
+        }
+        if (challengerPart && challengerEntries.length > 8) {
+          await gradeTurn({
+            debateId: debate.id, participantId: challengerPart.id, userId: ending.user_id,
+            subtopicId: null, turnIndex: 0,
+            topic: baseTopic, subtopic: baseTopic,
+            side: ending.position_text, content: challengerEntries,
+            opposingArguments: [{ side: ownerLabel, content: ownerEntries }],
+            includeResolution: false,
+          });
+          await gradeFinal({
+            debateId: debate.id, participantId: challengerPart.id, userId: ending.user_id,
+            topic: baseTopic, side: ending.position_text,
+            allTurns: [{ subtopic: baseTopic, content: challengerEntries }],
+            opposingTurns: [{ subtopic: baseTopic, side: ownerLabel, content: ownerEntries }],
+            includeResolution: false,
+          });
+        }
+        toast.success("Round graded.");
+      } catch (err) {
+        console.error("[cmm] grading failed", err);
+      }
+    }
   };
 
   const handleWithdraw = async (rowId: string) => {
@@ -147,6 +250,16 @@ const ChangeMyMindRoomPage = () => {
           onWithdraw={handleWithdraw}
           busy={busy}
         />
+
+        {/* Live transcript — visible whenever a round is active */}
+        {activeRow && (
+          <CmmLiveTranscript
+            entries={liveEntries}
+            interimText={isOwner ? interimText : ""}
+            isConnected={isOwner ? isConnected : true}
+            micError={isOwner ? micError : null}
+          />
+        )}
 
         {/* Sticky CTA for non-owner */}
         {!isOwner && (

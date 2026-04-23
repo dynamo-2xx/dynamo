@@ -21,6 +21,7 @@ interface Invitation {
   debate_topic: string;
   publisher_name: string;
   side_label: string | null;
+  debate_format: string;
 }
 
 interface Side {
@@ -82,7 +83,7 @@ const NotificationsPage = () => {
       // Fetch debate details and publisher profiles
       const debateIds = [...new Set(invites.map((i) => i.debate_id))];
       const [debatesRes, sidesRes] = await Promise.all([
-        supabase.from("debates").select("id, topic, created_by").in("id", debateIds),
+        supabase.from("debates").select("id, topic, created_by, format").in("id", debateIds),
         supabase.from("debate_sides").select("*").in("debate_id", debateIds),
       ]);
 
@@ -105,6 +106,7 @@ const NotificationsPage = () => {
           debate_topic: debate?.topic || "Unknown debate",
           publisher_name: profile?.display_name || "Unknown",
           side_label: side?.label || null,
+          debate_format: (debate as any)?.format || "standard",
         };
       });
 
@@ -116,6 +118,19 @@ const NotificationsPage = () => {
 
   const handleAccept = async (invitation: Invitation) => {
     if (!user) return;
+
+    // Change My Mind: no side pre-join — route to room and open the challenge composer.
+    if (invitation.debate_format === "change_my_mind") {
+      await supabase
+        .from("debate_invitations")
+        .update({ status: "accepted" })
+        .eq("id", invitation.id);
+      setInvitations((prev) =>
+        prev.map((i) => (i.id === invitation.id ? { ...i, status: "accepted" } : i)),
+      );
+      navigate(`/cmm/${invitation.debate_id}?challenge=1`);
+      return;
+    }
 
     // If no side pre-assigned, show side picker
     if (!invitation.side_id) {
