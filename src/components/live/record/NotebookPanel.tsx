@@ -1,16 +1,38 @@
-import { useEffect, useRef, useState } from "react";
-import { X, ArrowUpRight, BookOpen, Trash2, ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  X,
+  BookOpen,
+  ExternalLink,
+  Columns2,
+  ArrowLeftRight,
+  Sparkles,
+} from "lucide-react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
 import type { SessionAnnotation } from "@/hooks/useSessionAnnotations";
+import type { LiveTranscriptEntry, LiveSummary } from "@/hooks/useLiveTranscription";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
-type Tab = "thoughts" | "annotations" | "my_take";
+import ThoughtsTab from "./notebook/ThoughtsTab";
+import AnnotationsTab from "./notebook/AnnotationsTab";
+import MyTakeTab from "./notebook/MyTakeTab";
+import DynamoChatPane from "./DynamoChatPane";
+import NotebookSplitDivider from "./NotebookSplitDivider";
+import { useRecordQA } from "@/hooks/useRecordQA";
+
+type Tab = "thoughts" | "annotations" | "my_take" | "dynamo";
+
+const TAB_LABEL: Record<Tab, string> = {
+  thoughts: "Thoughts",
+  annotations: "Annotations",
+  my_take: "My Take",
+  dynamo: "Dynamo",
+};
 
 interface NotebookPanelProps {
   open: boolean;
   onClose: () => void;
+  sessionId: string;
   thoughts: string;
   setThoughts: (v: string) => void;
   myTake: string;
@@ -23,15 +45,47 @@ interface NotebookPanelProps {
   onJumpToAnnotation: (a: SessionAnnotation) => void;
   onRemoveAnnotation: (id: string) => void;
   notebookId?: string | null;
+  // Dynamo (AI Q&A) context
+  transcriptEntries: LiveTranscriptEntry[];
+  subtopics: string[];
+  summaries: LiveSummary[];
+  speakerNames: Record<string, string>;
+  shareToken?: string | null;
 }
 
-/**
- * Draggable + resizable notebook panel with three Chrome-style tabs:
- * Thoughts · Annotations · My Take.
- */
+interface SplitState {
+  enabled: boolean;
+  left: Tab;
+  right: Tab;
+  ratio: number;
+}
+
+const SPLIT_STORAGE_KEY = (sid: string) => `dynamo:notebook-split:${sid}`;
+
+const loadSplit = (sessionId: string): SplitState | null => {
+  try {
+    const raw = localStorage.getItem(SPLIT_STORAGE_KEY(sessionId));
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    if (typeof v?.enabled !== "boolean") return null;
+    return v;
+  } catch {
+    return null;
+  }
+};
+
+const saveSplit = (sessionId: string, state: SplitState) => {
+  try {
+    localStorage.setItem(SPLIT_STORAGE_KEY(sessionId), JSON.stringify(state));
+  } catch {
+    /* noop */
+  }
+};
+
 const NotebookPanel = ({
   open,
   onClose,
+  sessionId,
   thoughts,
   setThoughts,
   myTake,
@@ -44,34 +98,29 @@ const NotebookPanel = ({
   onJumpToAnnotation,
   onRemoveAnnotation,
   notebookId,
+  transcriptEntries,
+  subtopics,
+  summaries,
+  speakerNames,
+  shareToken,
 }: NotebookPanelProps) => {
+  const isMobile = useIsMobile();
   const [tab, setTab] = useState<Tab>("thoughts");
+
+  // Split state — persisted per session
+  const [split, setSplit] = useState<SplitState>(() =>
+    loadSplit(sessionId) || { enabled: false, left: "thoughts", right: "annotations", ratio: 0.5 },
+  );
+  useEffect(() => {
+    saveSplit(sessionId, split);
+  }, [sessionId, split]);
+
+  // Desktop floating panel pos/size (only used at md+)
   const [pos, setPos] = useState({ x: 24, y: 80 });
-  const [size, setSize] = useState({ w: 380, h: 500 });
+  const [size, setSize] = useState({ w: 460, h: 560 });
   const drag = useRef<{ ox: number; oy: number; sx: number; sy: number } | null>(null);
   const resize = useRef<{ ow: number; oh: number; sx: number; sy: number } | null>(null);
 
-  // Image paste support in Thoughts → inline data URL.
-  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith("image/")) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (!file) continue;
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = reader.result as string;
-          setThoughts(thoughts + `\n\n![pasted image](${dataUrl})\n\n`);
-        };
-        reader.readAsDataURL(file);
-        return;
-      }
-    }
-  };
-
-  // Drag handlers
   useEffect(() => {
     const move = (e: MouseEvent) => {
       if (drag.current) {
@@ -82,8 +131,8 @@ const NotebookPanel = ({
       }
       if (resize.current) {
         setSize({
-          w: Math.max(280, resize.current.ow + (e.clientX - resize.current.sx)),
-          h: Math.max(280, resize.current.oh + (e.clientY - resize.current.sy)),
+          w: Math.max(320, resize.current.ow + (e.clientX - resize.current.sx)),
+          h: Math.max(320, resize.current.oh + (e.clientY - resize.current.sy)),
         });
       }
     };
@@ -107,25 +156,262 @@ const NotebookPanel = ({
     resize.current = { ow: size.w, oh: size.h, sx: e.clientX, sy: e.clientY };
   };
 
+  // Shared QA state
+  const qa = useRecordQA(sessionId, shareToken);
+
+  // Split container ref for divider geometry
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
+  const tabsArr = useMemo<Tab[]>(() => ["thoughts", "annotations", "my_take", "dynamo"], []);
+
+  const tabLabel = (t: Tab) => (t === "annotations" ? `Annotations · ${annotations.length}` : TAB_LABEL[t]);
+
   if (!open) return null;
 
-  const TabBtn = ({ id, label }: { id: Tab; label: string }) => {
+  // Render content for a given tab id (used for both single + split modes)
+  const renderTab = (t: Tab) => {
+    if (t === "thoughts") return <ThoughtsTab thoughts={thoughts} setThoughts={setThoughts} />;
+    if (t === "annotations")
+      return (
+        <AnnotationsTab
+          annotations={annotations}
+          onJump={onJumpToAnnotation}
+          onRemove={onRemoveAnnotation}
+        />
+      );
+    if (t === "my_take")
+      return (
+        <MyTakeTab
+          myTake={myTake}
+          setMyTake={setMyTake}
+          onDelete={onDeleteMyTake}
+          onPublish={onPublish}
+          onUnpublish={onUnpublish}
+          isPublished={isPublished}
+        />
+      );
+    return (
+      <DynamoChatPane
+        messages={qa.messages}
+        input={qa.input}
+        setInput={qa.setInput}
+        loading={qa.loading}
+        onSend={qa.send}
+        transcriptEntries={transcriptEntries}
+        subtopics={subtopics}
+        summaries={summaries}
+        speakerNames={speakerNames}
+      />
+    );
+  };
+
+  // Pane header (used only when split mode is enabled)
+  const PaneHeader = ({
+    side,
+    value,
+    other,
+  }: {
+    side: "left" | "right";
+    value: Tab;
+    other: Tab;
+  }) => (
+    <div className="flex items-center justify-between px-2 py-1.5 border-b border-foreground/10 bg-foreground/[0.02]">
+      <div className="flex items-center gap-1.5 min-w-0">
+        {value === "dynamo" && <Sparkles className="w-3 h-3 text-muted-foreground" />}
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground truncate">
+          {tabLabel(value)}
+        </span>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          type="button"
+          onClick={() => setSplit((s) => ({ ...s, left: s.right, right: s.left }))}
+          className="p-1 text-muted-foreground hover:text-foreground rounded"
+          aria-label="Swap panes"
+          title="Swap panes"
+        >
+          <ArrowLeftRight className="w-3 h-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // Closing this side exits split, focus the other tab
+            setTab(other);
+            setSplit((s) => ({ ...s, enabled: false }));
+          }}
+          className="p-1 text-muted-foreground hover:text-foreground rounded"
+          aria-label={`Close ${tabLabel(value)} pane`}
+          title="Close pane"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+
+  // Picker shown for the right pane when entering split & no second tab chosen yet
+  const SplitTabPicker = ({ exclude, onPick }: { exclude: Tab; onPick: (t: Tab) => void }) => (
+    <div className="flex flex-col items-center justify-center h-full gap-3 p-4 text-center">
+      <p className="text-xs italic text-muted-foreground font-body">Pick a tab to compare…</p>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        {tabsArr
+          .filter((t) => t !== exclude)
+          .map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onPick(t)}
+              className="px-3 py-1.5 rounded-full border border-foreground/15 text-xs font-body hover:border-foreground/40 hover:bg-foreground/[0.04] transition-colors"
+            >
+              {tabLabel(t)}
+            </button>
+          ))}
+      </div>
+    </div>
+  );
+
+  // Single-tab content
+  const SingleContent = () => (
+    <div className="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0">{renderTab(tab)}</div>
+  );
+
+  // Split content
+  const SplitContent = () => {
+    const direction: "horizontal" | "vertical" = isMobile ? "horizontal" : "vertical";
+    const firstStyle = isMobile
+      ? { height: `${split.ratio * 100}%` }
+      : { width: `${split.ratio * 100}%` };
+    const secondStyle = isMobile
+      ? { height: `${(1 - split.ratio) * 100}%` }
+      : { width: `${(1 - split.ratio) * 100}%` };
+
+    const setRatio = (r: number) => setSplit((s) => ({ ...s, ratio: r }));
+
+    return (
+      <div
+        ref={splitContainerRef}
+        className={cn("flex-1 min-h-0 flex", isMobile ? "flex-col" : "flex-row")}
+      >
+        <div style={firstStyle} className="flex flex-col min-h-0 min-w-0">
+          <PaneHeader side="left" value={split.left} other={split.right} />
+          <div className="flex-1 overflow-y-auto p-3 min-h-0">{renderTab(split.left)}</div>
+        </div>
+        <NotebookSplitDivider
+          direction={direction}
+          ratio={split.ratio}
+          onChange={setRatio}
+          containerRef={splitContainerRef}
+        />
+        <div style={secondStyle} className="flex flex-col min-h-0 min-w-0">
+          <PaneHeader side="right" value={split.right} other={split.left} />
+          <div className="flex-1 overflow-y-auto p-3 min-h-0">{renderTab(split.right)}</div>
+        </div>
+      </div>
+    );
+  };
+
+  // Tab button (single mode tab bar)
+  const TabBtn = ({ id }: { id: Tab }) => {
     const active = tab === id;
     return (
       <button
         type="button"
         onClick={() => setTab(id)}
-        className={`relative px-3 pt-1.5 pb-2 text-xs font-medium rounded-t-md border border-b-0 transition-colors ${
+        className={cn(
+          "relative shrink-0 px-3 pt-2 pb-2.5 text-[13px] md:text-xs font-medium rounded-t-md border border-b-0 transition-colors min-h-[44px] md:min-h-0 whitespace-nowrap",
           active
             ? "bg-background border-foreground/10 text-foreground -mb-px z-10"
-            : "bg-foreground/[0.04] border-transparent text-muted-foreground hover:text-foreground"
-        }`}
+            : "bg-foreground/[0.04] border-transparent text-muted-foreground hover:text-foreground",
+        )}
       >
-        {label}
+        {id === "dynamo" && <Sparkles className="w-3 h-3 inline -mt-0.5 mr-1" />}
+        {tabLabel(id)}
       </button>
     );
   };
 
+  const enterSplit = () => {
+    // Pre-fill: left = current, right = first other
+    const otherTab = tabsArr.find((t) => t !== tab) || "annotations";
+    setSplit((s) => ({ ...s, enabled: true, left: tab, right: otherTab }));
+  };
+
+  // Header (drag bar / grab pill)
+  const Header = () => (
+    <>
+      {/* Mobile grab bar */}
+      <div className="md:hidden pt-2 pb-1 flex justify-center">
+        <div className="h-1 w-10 rounded-full bg-foreground/20" />
+      </div>
+      <div
+        onMouseDown={isMobile ? undefined : startDrag}
+        className={cn(
+          "flex items-center justify-between px-3 py-2 border-b border-foreground/10 bg-foreground/[0.02] select-none",
+          !isMobile && "cursor-move rounded-t-lg",
+        )}
+      >
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <BookOpen className="w-3 h-3" />
+          Notebook
+        </div>
+        <div className="flex items-center gap-2">
+          {notebookId && (
+            <Link
+              to={`/my-study/${notebookId}`}
+              className="hidden sm:inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+              title="Open in My Study"
+            >
+              <ExternalLink className="w-3 h-3" />
+              My Study
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => (split.enabled ? setSplit((s) => ({ ...s, enabled: false })) : enterSplit())}
+            className={cn(
+              "p-1 rounded text-muted-foreground hover:text-foreground transition-colors",
+              split.enabled && "text-foreground",
+            )}
+            aria-label={split.enabled ? "Exit split view" : "Enter split view"}
+            title={split.enabled ? "Exit split view" : "Split view"}
+          >
+            <Columns2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 text-muted-foreground hover:text-foreground rounded"
+            aria-label="Close notebook"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
+  // Tab bar (single mode only — split has its own headers)
+  const TabBar = () =>
+    !split.enabled ? (
+      <div className="flex items-end gap-1 px-2 pt-1.5 border-b border-foreground/10 bg-foreground/[0.02] overflow-x-auto">
+        {tabsArr.map((t) => (
+          <TabBtn key={t} id={t} />
+        ))}
+      </div>
+    ) : null;
+
+  // Mobile: full-screen bottom sheet
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-background animate-in slide-in-from-bottom-4 duration-200">
+        <Header />
+        <TabBar />
+        {split.enabled ? <SplitContent /> : <SingleContent />}
+      </div>
+    );
+  }
+
+  // Desktop: floating draggable/resizable panel
   return (
     <div
       style={{
@@ -138,146 +424,10 @@ const NotebookPanel = ({
       }}
       className="bg-background border border-foreground/10 rounded-lg shadow-xl flex flex-col"
     >
-      {/* Drag handle / eyebrow */}
-      <div
-        onMouseDown={startDrag}
-        className="cursor-move flex items-center justify-between px-3 py-1.5 border-b border-foreground/10 bg-foreground/[0.02] rounded-t-lg select-none"
-      >
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-          <BookOpen className="w-3 h-3" />
-          Notebook
-        </div>
-        <div className="flex items-center gap-2">
-          {notebookId && (
-            <Link
-              to={`/my-study/${notebookId}`}
-              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
-              title="Open in My Study"
-            >
-              <ExternalLink className="w-3 h-3" />
-              My Study
-            </Link>
-          )}
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Close notebook"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
+      <Header />
+      <TabBar />
+      {split.enabled ? <SplitContent /> : <SingleContent />}
 
-      {/* Chrome tabs */}
-      <div className="flex items-end gap-1 px-2 pt-1.5 border-b border-foreground/10 bg-foreground/[0.02]">
-        <TabBtn id="thoughts" label="Thoughts" />
-        <TabBtn id="annotations" label={`Annotations · ${annotations.length}`} />
-        <TabBtn id="my_take" label="My Take" />
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-3">
-        {tab === "thoughts" && (
-          <Textarea
-            value={thoughts}
-            onChange={(e) => setThoughts(e.target.value)}
-            onPaste={handlePaste}
-            placeholder="Free-form thoughts. Paste images directly…"
-            className="w-full h-full min-h-[240px] resize-none border-foreground/10 text-sm font-body"
-          />
-        )}
-
-        {tab === "annotations" && (
-          <div className="space-y-2">
-            {annotations.length === 0 ? (
-              <p className="text-xs italic text-muted-foreground">
-                No annotations yet. Highlight text in a summary or transcript bubble to capture one.
-              </p>
-            ) : (
-              annotations.map((a) => (
-                <div key={a.id} className="border border-foreground/10 rounded-md p-2">
-                  <p className="text-xs italic text-foreground/80 line-clamp-3 mb-1">
-                    “{a.excerpt}”
-                  </p>
-                  {a.note && (
-                    <p className="text-xs text-foreground/90 font-body mb-1">{a.note}</p>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <button
-                      onClick={() => onJumpToAnnotation(a)}
-                      className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-                    >
-                      Jump to source
-                      <ArrowUpRight className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => onRemoveAnnotation(a.id)}
-                      className="text-[11px] text-muted-foreground hover:text-destructive"
-                      aria-label="Delete annotation"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {tab === "my_take" && (
-          <div className="flex flex-col h-full">
-            {!myTake ? (
-              <p className="text-xs italic text-muted-foreground">
-                Your take will appear here after you leave this page. The AI will consolidate your
-                thoughts and annotations into a clean summary.
-              </p>
-            ) : (
-              <>
-                <div className="relative mb-2">
-                  <Textarea
-                    value={myTake}
-                    onChange={(e) => setMyTake(e.target.value)}
-                    className="w-full min-h-[220px] resize-none border-foreground/10 text-sm pr-7 font-body"
-                  />
-                  <button
-                    type="button"
-                    onClick={onDeleteMyTake}
-                    className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-destructive"
-                    aria-label="Delete take"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="mt-auto flex justify-end gap-2 pt-2 border-t border-foreground/10">
-                  {isPublished ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        await onUnpublish();
-                        toast.success("Unpublished from your profile");
-                      }}
-                    >
-                      Unpublish
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        await onPublish();
-                        toast.success("Published to your profile");
-                      }}
-                    >
-                      Publish to profile
-                    </Button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Resize grip — bottom-right corner */}
       <div
         onMouseDown={startResize}
         className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize bg-foreground/20 rounded-br-lg"
