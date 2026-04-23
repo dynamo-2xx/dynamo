@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Swords, Lock, Globe, Mic, MicOff } from "lucide-react";
+import { Swords, Lock, Globe, Mic, MicOff, AlertOctagon } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -84,6 +84,23 @@ const ChangeMyMindRoomPage = () => {
     challengerLabel,
     fixedSide: "challenger",
   });
+
+  // Use the owner-side hook for interruption controls so the call goes through
+  // the owner's persist path (single source of truth for interruption writes).
+  const { startInterruption, endInterruption } = owner;
+  const liveEntriesForUI = challengerCaptureActive ? challenger.entries : owner.entries;
+  const openInterruption = useMemo(
+    () => liveEntriesForUI.find((e) => e.speaker_side === "interruption" && !e.end_timestamp) ?? null,
+    [liveEntriesForUI],
+  );
+
+  const handleToggleInterruption = async () => {
+    if (openInterruption) {
+      await endInterruption(openInterruption.id);
+    } else {
+      await startInterruption("Interruption");
+    }
+  };
 
   // Pick the locally capturing session for transcript display state; the
   // entries themselves come from the shared store and are identical across
@@ -350,13 +367,23 @@ const ChangeMyMindRoomPage = () => {
                     Your mic is {ownerMuted ? "muted" : "live"}
                   </span>
                 </div>
-                <Button
-                  size="sm"
-                  variant={ownerMuted ? "default" : "outline"}
-                  onClick={() => setOwnerMuted((m) => !m)}
-                >
-                  {ownerMuted ? "Unmute" : "Mute"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={openInterruption ? "default" : "outline"}
+                    onClick={handleToggleInterruption}
+                  >
+                    <AlertOctagon className="w-3.5 h-3.5" />
+                    {openInterruption ? "End interruption" : "Mark interruption"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={ownerMuted ? "default" : "outline"}
+                    onClick={() => setOwnerMuted((m) => !m)}
+                  >
+                    {ownerMuted ? "Unmute" : "Mute"}
+                  </Button>
+                </div>
               </div>
             )}
             <CmmLiveTranscript
