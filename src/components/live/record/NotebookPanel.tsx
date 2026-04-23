@@ -467,6 +467,14 @@ const NotebookPanel = ({
         {headerEl}
         {tabBarEl}
         {bodyEl}
+        <ReaderNotesPanel
+          open={inboxOpen}
+          onClose={() => setInboxOpen(false)}
+          notes={reader.notes}
+          onDismiss={reader.dismiss}
+          onClearAll={reader.clearAll}
+          onJump={handleJumpReaderNote}
+        />
       </div>
     );
   }
@@ -497,6 +505,14 @@ const NotebookPanel = ({
           aria-label="Resize"
         />
       )}
+      <ReaderNotesPanel
+        open={inboxOpen}
+        onClose={() => setInboxOpen(false)}
+        notes={reader.notes}
+        onDismiss={reader.dismiss}
+        onClearAll={reader.clearAll}
+        onJump={handleJumpReaderNote}
+      />
     </div>
   );
 };
