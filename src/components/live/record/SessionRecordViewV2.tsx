@@ -73,6 +73,53 @@ const SessionRecordViewV2 = ({
   const location = useLocation();
   const { user } = useAuth();
 
+  // Desktop record/transcript split state — persisted per session
+  const SPLIT_KEY = `dynamo:record-split:${sessionId}`;
+  const [recordSplit, setRecordSplit] = useState<{
+    ratio: number;
+    collapsed: "none" | "left" | "right";
+    lastRatio: number;
+  }>(() => {
+    try {
+      const raw = localStorage.getItem(SPLIT_KEY);
+      if (raw) {
+        const v = JSON.parse(raw);
+        if (typeof v?.ratio === "number") return v;
+      }
+    } catch {
+      /* noop */
+    }
+    return { ratio: 0.55, collapsed: "none" as const, lastRatio: 0.55 };
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SPLIT_KEY, JSON.stringify(recordSplit));
+    } catch {
+      /* noop */
+    }
+  }, [recordSplit, SPLIT_KEY]);
+
+  const splitRef = useRef<HTMLDivElement>(null);
+  const dragRecordSplit = useRef(false);
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      if (!dragRecordSplit.current || !splitRef.current) return;
+      const rect = splitRef.current.getBoundingClientRect();
+      let r = (e.clientX - rect.left) / rect.width;
+      r = Math.min(0.85, Math.max(0.15, r));
+      setRecordSplit((s) => ({ ...s, ratio: r, lastRatio: r, collapsed: "none" }));
+    };
+    const up = () => {
+      dragRecordSplit.current = false;
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, []);
+
   // Study tools: notebook, annotations, citations, AI cross-refs.
   const notebook = useSessionNotebook(sessionId);
   const annotationsHook = useSessionAnnotations(sessionId);
