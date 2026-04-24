@@ -255,6 +255,10 @@ const DebateRoomPage = () => {
     if (mediaRequested) return;
     if (userRole === "spectator") return;
     if (loading) return;
+    // Only request mic/camera while the debate is actively LIVE. Opening a
+    // completed debate's record (or a draft) must NOT trigger a permission
+    // prompt — there's no recording happening.
+    if (debate?.status !== "live") return;
 
     const requestPermissions = async () => {
       try {
@@ -271,7 +275,7 @@ const DebateRoomPage = () => {
       }
     };
     requestPermissions();
-  }, [userRole, loading, mediaRequested]);
+  }, [userRole, loading, mediaRequested, debate?.status]);
 
   // Load data
   useEffect(() => {

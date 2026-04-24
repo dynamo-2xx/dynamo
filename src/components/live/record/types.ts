@@ -179,10 +179,21 @@ function deriveRoleGroupSummaries(
   const out: RoleGroupSummary[] = [];
   let mainSpeaker: number | null = null;
   spans.forEach((span, i) => {
-    const text = span.entries
-      .map((e) => (e.ai_summary && e.ai_summary.trim()) || e.text)
-      .join(" ")
-      .trim();
+    // Build the displayed text by concatenating per-entry summary OR raw text,
+    // de-duplicating consecutive identical chunks. Without dedup, the AI's
+    // per-entry summaries (which often collapse a continuous thought into the
+    // SAME sentence for adjacent entries) end up repeated 2-3x in the UI.
+    const seen = new Set<string>();
+    const chunks: string[] = [];
+    for (const e of span.entries) {
+      const raw = ((e.ai_summary && e.ai_summary.trim()) || e.text || "").trim();
+      if (!raw) continue;
+      const key = raw.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      chunks.push(raw);
+    }
+    const text = chunks.join(" ").trim();
     let kind: RoleGroupKind;
     if (i === 0) {
       kind = "main";
@@ -216,12 +227,15 @@ function deriveRoleGroupSummaries(
 
 /**
  * Lexical heuristic: speaker is AGREEING with / affirming the prior point.
- * Conservative — we'd rather mis-label as counter than over-claim agreement.
+ * Catches both first-person ("I agree", "you're right") and the third-person
+ * phrasing typical of AI summaries ("Speaker 2 agrees with…", "Speaker 3
+ * affirms the prior point").
  */
 function detectsAffirmation(text: string): boolean {
   const t = text.toLowerCase().trim();
   if (!t) return false;
   const patterns = [
+    // First-person / direct speech.
     /^(yes|yeah|yep|right|exactly|absolutely|totally|of course|for sure|definitely|agreed)\b/,
     /\bi (agree|concur)\b/,
     /\bthat'?s (right|true|correct|fair|a (good|fair|valid) point)\b/,
@@ -230,18 +244,27 @@ function detectsAffirmation(text: string): boolean {
     /\bwell said\b/,
     /\bi see what you mean\b/,
     /\bcouldn'?t agree more\b/,
+    // Third-person summary phrasing — what the AI typically writes.
+    /\b(agrees?|concurs?|affirms?|endorses?|supports?|seconds?|echoes?) (with|that|the|this|on)\b/,
+    /\b(speaker|the speaker|they) (agrees?|concurs?|affirms?|endorses?)\b/,
+    /\b(in agreement|voicing agreement|expresses? agreement|shares? the (view|position|sentiment))\b/,
+    /\b(co-?signs?|backs? up|aligns? with) (the|this|that|their)\b/,
+    /\b(also (believes?|thinks?|argues?)) (that|the same)\b/,
+    /\b(builds? on|adds? to|expands? on) (the|this|that) (point|argument|claim)\b/,
   ];
   return patterns.some((re) => re.test(t));
 }
 
 /**
  * Lexical heuristic: speaker is CONCEDING ground to the prior point — i.e.
- * yielding part of their position even if they continue arguing.
+ * yielding part of their position even if they continue arguing. Handles
+ * both first-person and third-person AI-summary phrasing.
  */
 function detectsConcession(text: string): boolean {
   const t = text.toLowerCase().trim();
   if (!t) return false;
   const patterns = [
+    // First-person / direct speech.
     /\bi'?ll (give|grant) you that\b/,
     /\bfair (enough|point)\b/,
     /\bthat'?s a fair (point|criticism)\b/,
@@ -257,6 +280,13 @@ function detectsConcession(text: string): boolean {
     /\bi (see|get) your point\b/,
     /\bthat'?s true,? (but|however|though)\b/,
     /\byou'?re right (about|that)\b/,
+    // Third-person summary phrasing.
+    /\b(concedes?|yields?|relents?|acknowledges?|admits?|grants?|allows?)\b.*\b(point|argument|claim|position|that|the)\b/,
+    /\b(speaker|the speaker|they) (concedes?|yields?|admits?|acknowledges?)\b/,
+    /\bgives? ground\b/,
+    /\b(walks? back|backs? off|retreats? from|softens?) (their|the|his|her)\b/,
+    /\b(agrees? in part|partially agrees?|conceding|conceded)\b/,
+    /\b(accepts? the|accepts? this|accepts? that) (point|argument|criticism|critique|premise)\b/,
   ];
   return patterns.some((re) => re.test(t));
 }
