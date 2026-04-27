@@ -1173,6 +1173,17 @@ const DebateRoomPage = () => {
 
   if (!debate) return null;
 
+  // Spectator preview: non-participant viewers on scheduled or live debates
+  // see a record-style shell (with live threads-so-far for live debates,
+  // or ghost cards for scheduled). Owners and speakers keep the full room UI.
+  const isParticipant = !!myParticipant;
+  const showSpectatorPreview =
+    !isParticipant && !isCreator && (debate.status === "scheduled" || debate.status === "live");
+
+  if (showSpectatorPreview) {
+    return <SpectatorPreviewShell debate={debate} navigate={navigate} userId={user?.id ?? null} />;
+  }
+
   return (
     <div className="h-screen w-full bg-background flex flex-col overflow-hidden" data-record-root>
       {/* Header */}
