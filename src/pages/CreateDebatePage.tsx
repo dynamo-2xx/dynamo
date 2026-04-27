@@ -180,6 +180,12 @@ const CreateDebatePage = () => {
       setEditLoading(false);
       setStep(3);
 
+      // Edit mode: this debate already exists, so it has a join_code we can show.
+      setDraftDebateId(editId);
+      setDraftJoinCode(d.join_code ?? null);
+      setDraftSideIds((sds || []).map((s: any) => s.id as string));
+      setMaxSpeakersPerSide((d as any).max_speakers_per_side ?? 2);
+
       // Load creator's existing side assignment from debate_participants
       const { data: meAsParticipant } = await supabase
         .from("debate_participants")
