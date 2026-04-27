@@ -1204,51 +1204,114 @@ const CreateDebatePage = () => {
 
                 {/* Sides */}
                 <div className="bg-background border border-border rounded-lg p-5">
-                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Participant Sides</label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    {debate.sides.map((side, i) => (
-                      <input
-                        key={i}
-                        value={side}
-                        onChange={(e) => {
-                          const updated = [...debate.sides];
-                          updated[i] = e.target.value;
-                          setDebate({ ...debate, sides: updated });
-                        }}
-                        className="w-full sm:flex-1 min-w-0 bg-accent rounded-lg px-3 py-2 text-base sm:text-sm text-center font-body font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
-                      />
-                    ))}
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider">
+                      Participant Sides
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditingSides((v) => !v)}
+                      aria-pressed={editingSides}
+                      aria-label={editingSides ? "Done editing side labels" : "Edit side labels"}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {editingSides ? <Check className="w-4 h-4" /> : <Pencil className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
 
-                  {/* Your side picker — creator chooses which side they're joining as */}
-                  <div className="mt-4">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-2">
-                      Your side
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      {debate.sides.map((side, i) => {
-                        const selected = creatorSideIndex === i;
-                        return (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => setCreatorSideIndex(i)}
-                            aria-pressed={selected}
-                            className={`flex-1 rounded-lg px-3 py-2 text-sm font-body font-medium transition-all border ${
-                              selected
-                                ? "bg-foreground text-background border-foreground"
-                                : "bg-background text-foreground border-border hover:border-foreground/40"
-                            }`}
-                          >
-                            {selected ? "✓ " : ""}{side || `Side ${i + 1}`}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-1.5 font-body">
-                      You'll be added as a speaker on this side.
-                    </p>
+                  {/* Online / In-person toggle */}
+                  <div className="flex items-center gap-1 bg-accent rounded-lg p-1 mb-3 w-full sm:w-auto sm:inline-flex">
+                    <button
+                      type="button"
+                      onClick={() => setJoinMode("online")}
+                      aria-pressed={joinMode === "online"}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-body font-medium transition-all ${
+                        joinMode === "online"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Wifi className="w-3.5 h-3.5" />
+                      Online
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setJoinMode("in_person")}
+                      aria-pressed={joinMode === "in_person"}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-body font-medium transition-all ${
+                        joinMode === "in_person"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      In-person
+                    </button>
                   </div>
+
+                  {/* Merged sides row: pick mode (default) or edit mode */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {debate.sides.map((side, i) => {
+                      if (editingSides) {
+                        return (
+                          <input
+                            key={i}
+                            value={side}
+                            onChange={(e) => {
+                              const updated = [...debate.sides];
+                              updated[i] = e.target.value;
+                              setDebate({ ...debate, sides: updated });
+                            }}
+                            placeholder={`Side ${i + 1}`}
+                            className="w-full sm:flex-1 min-w-0 bg-accent rounded-lg px-3 py-2 text-base sm:text-sm text-center font-body font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                          />
+                        );
+                      }
+                      const selected = creatorSideIndex === i;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setCreatorSideIndex(i)}
+                          aria-pressed={selected}
+                          className={`flex-1 rounded-lg px-3 py-2 text-sm font-body font-medium transition-all border ${
+                            selected
+                              ? "bg-foreground text-background border-foreground"
+                              : "bg-background text-foreground border-border hover:border-foreground/40"
+                          }`}
+                        >
+                          {selected ? "✓ " : ""}{side || `Side ${i + 1}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5 font-body">
+                    {editingSides
+                      ? "Tap the check icon when you're done renaming."
+                      : "You'll be added as a speaker on this side."}
+                  </p>
+
+                  {/* In-person panel — code, link, QR, projector, max-per-side, live counts */}
+                  {joinMode === "in_person" && (
+                    <div className="mt-4">
+                      <InPersonJoinPanel
+                        debateId={draftDebateId}
+                        joinCode={draftJoinCode}
+                        maxSpeakersPerSide={maxSpeakersPerSide}
+                        onMaxSpeakersChange={setMaxSpeakersPerSide}
+                        onCodeRegenerated={(c) => setDraftJoinCode(c)}
+                        speakerCounts={
+                          draftSideIds
+                            ? draftSideIds.map((id, idx) => ({
+                                sideId: id,
+                                sideLabel: debate.sides[idx] || `Side ${idx + 1}`,
+                                count: sideSpeakerCounts[id] || 0,
+                              }))
+                            : []
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Turns & Time */}
