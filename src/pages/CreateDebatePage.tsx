@@ -138,6 +138,172 @@ const CreateDebatePage = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // When the user flips to In-person mode and we don't have a debate row yet,
+  // persist a minimal draft so a join_code is auto-generated and visible.
+  useEffect(() => {
+    if (joinMode !== "in_person") return;
+    if (draftDebateId) return; // already have one (edit mode or previously created)
+    if (!debate || !user) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: created, error } = await supabase
+          .from("debates")
+          .insert({
+            topic: debate.topic,
+            created_by: user.id,
+            is_public: isPublic,
+            turns_per_subtopic: debate.turnsPerSubtopic,
+            time_per_turn: debate.timePerTurn,
+            prep_time_min: debate.prepTime,
+            prep_time_max: debate.prepTime,
+            facilitator_type: "ai",
+            status: "draft",
+            location: location.trim() || null,
+            scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+            feedback_enabled: feedbackEnabled,
+            description: description.trim() || null,
+            max_speakers_per_side: maxSpeakersPerSide,
+          } as any)
+          .select()
+          .single();
+        if (error) throw error;
+        if (cancelled || !created) return;
+
+        // Insert subtopics + sides so the cap-check and side-pick on /join/:code works.
+        const subtopicInserts = debate.subtopics.map((title, i) => ({
+          debate_id: created.id,
+          title,
+          sort_order: i,
+        }));
+        if (subtopicInserts.length > 0) {
+          await supabase.from("debate_subtopics").insert(subtopicInserts);
+        }
+        const sideInserts = debate.sides.map((label, i) => ({
+          debate_id: created.id,
+          label,
+          sort_order: i,
+        }));
+        if (sideInserts.length > 0) {
+          await supabase.from("debate_sides").insert(sideInserts);
+        }
+        const { data: freshSides } = await supabase
+          .from("debate_sides")
+          .select("id, sort_order")
+          .eq("debate_id", created.id)
+          .order("sort_order");
+        const ids = (freshSides || []).map((s: any) => s.id as string);
+
+        // Add creator as participant on chosen side
+        const creatorSideId = ids[creatorSideIndex] ?? ids[0] ?? null;
+        if (creatorSideId) {
+          await supabase.from("debate_participants").insert({
+            debate_id: created.id,
+            user_id: user.id,
+            side_id: creatorSideId,
+          });
+        }
+
+        if (cancelled) return;
+        setDraftDebateId(created.id);
+        setDraftJoinCode(created.join_code ?? null);
+        setDraftSideIds(ids);
+        // Adopt the freshly-minted side IDs so subsequent invitations resolve correctly.
+        setSideIds(ids);
+        // Switch the URL to edit mode without a navigation flash so the rest of the
+        // form (publish flow, invitations) treats this as an edit.
+        const url = new URL(window.location.href);
+        url.searchParams.set("edit", created.id);
+        window.history.replaceState({}, "", url.toString());
+      } catch (err) {
+        console.error("Draft creation for in-person mode failed:", err);
+        toast.error("Couldn't save draft for in-person mode.");
+        setJoinMode("online");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joinMode, draftDebateId, debate, user]);
+
+  // Persist max_speakers_per_side changes immediately on existing drafts.
+  useEffect(() => {
+    if (!draftDebateId) return;
+    supabase
+      .from("debates")
+      .update({ max_speakers_per_side: maxSpeakersPerSide } as any)
+      .eq("id", draftDebateId)
+      .then(({ error }) => {
+        if (error) console.warn("Failed to persist max_speakers_per_side", error);
+      });
+  }, [maxSpeakersPerSide, draftDebateId]);
+
+  // Live speaker counts per side + toast when a new joiner arrives (in-person flow).
+  useEffect(() => {
+    if (!draftDebateId) return;
+    let cancelled = false;
+
+    const refresh = async () => {
+      const { data } = await supabase
+        .from("debate_participants")
+        .select("side_id, participant_role, user_id")
+        .eq("debate_id", draftDebateId);
+      if (cancelled || !data) return;
+      const counts: Record<string, number> = {};
+      data.forEach((p: any) => {
+        if (p.participant_role === "speaker" && p.side_id) {
+          counts[p.side_id] = (counts[p.side_id] || 0) + 1;
+        }
+      });
+      setSideSpeakerCounts(counts);
+    };
+    refresh();
+
+    const channel = supabase
+      .channel(`create-participants-${draftDebateId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "debate_participants", filter: `debate_id=eq.${draftDebateId}` },
+        async (payload) => {
+          const row: any = payload.new;
+          refresh();
+          // Toast only for joiners other than the creator
+          if (row?.user_id && row.user_id !== user?.id) {
+            const { data: prof } = await supabase
+              .from("profiles")
+              .select("display_name")
+              .eq("user_id", row.user_id)
+              .maybeSingle();
+            const sideLabel = debate?.sides[
+              (draftSideIds || []).findIndex((id) => id === row.side_id)
+            ];
+            toast.success(
+              `${prof?.display_name || "Someone"} joined${sideLabel ? ` ${sideLabel}` : ""}`
+            );
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "debate_participants", filter: `debate_id=eq.${draftDebateId}` },
+        () => refresh()
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "debate_participants", filter: `debate_id=eq.${draftDebateId}` },
+        () => refresh()
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftDebateId, debate?.sides, draftSideIds, user?.id]);
+
   // Edit mode: load existing debate template and jump straight to step 3.
   useEffect(() => {
     if (!editId || !user) return;
