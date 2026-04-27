@@ -68,12 +68,12 @@ const ExplorePage = () => {
                 )}
               </div>
 
-              {/* Trending */}
-              <SectionHeader title="Trending" icon={<TrendingUp className="w-4 h-4" />} />
+              {/* Today */}
+              <SectionHeader title="Today" icon={<TrendingUp className="w-4 h-4" />} />
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-12">
                 {trending.length === 0 ? (
                   <div className="sm:col-span-2 md:col-span-3">
-                    <EmptyState text="Trending picks up as more public debates happen." />
+                    <EmptyState text="Today picks up as more public debates happen." />
                   </div>
                 ) : (
                   trending.map((d, i) => (
@@ -187,7 +187,7 @@ const CompactCard = ({ d, rank, onClick }: { d: ExploreDebate; rank: number; onC
     onClick={onClick}
     className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group"
   >
-    <span className="text-[10px] font-body text-muted-foreground font-medium">#{rank} Trending</span>
+    <span className="text-[10px] font-body text-muted-foreground font-medium">#{rank} Today</span>
     <h4 className="font-display text-sm mt-1 leading-snug line-clamp-2">{d.topic}</h4>
     <div className="text-[11px] text-muted-foreground font-body mt-3">
       {d.participant_count} speakers · {new Date(d.created_at).toLocaleDateString()}
