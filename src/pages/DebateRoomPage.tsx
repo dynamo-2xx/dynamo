@@ -15,6 +15,8 @@ import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import AppLayout from "@/components/AppLayout";
+import InPersonMicBar from "@/components/debate/InPersonMicBar";
+import { takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
 import InterestedComposer from "@/components/debate/InterestedComposer";
 import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay";
@@ -111,6 +113,9 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
    const turnEndTriggeredRef = useRef(false);
+  // In-person joiner: pick up the live MediaStream the pre-flight mic test
+  // handed off so we can show the persistent mic bar without re-prompting.
+  const [handoffStream] = useState<MediaStream | null>(() => takeHandoffStream());
      const timerWasActiveRef = useRef(false);
    const prepExitRef = useRef(false);
    const lastSyncedTurnStartRef = useRef<string | null>(null);
@@ -1186,6 +1191,12 @@ const DebateRoomPage = () => {
 
   return (
     <div className="h-screen w-full bg-background flex flex-col overflow-hidden" data-record-root>
+      {handoffStream && (
+        <InPersonMicBar
+          initialStream={handoffStream}
+          displayName={user?.email ?? null}
+        />
+      )}
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between shrink-0 w-full">
         <div className="flex items-center gap-3">

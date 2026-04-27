@@ -2,13 +2,14 @@ import { useState, useCallback, useEffect } from "react";
 import TagPicker from "@/components/tags/TagPicker";
 import type { Tag } from "@/hooks/useTags";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send, Play } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send, Play, Pencil, Check, Wifi } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
 
 interface GeneratedDebate {
   topic: string;
@@ -88,6 +89,20 @@ const CreateDebatePage = () => {
   // Stable IDs for subtopic editor rows — prevents input remount on every keystroke.
   const [subtopicItems, setSubtopicItems] = useState<{ id: string; title: string }[]>([]);
 
+  // ─── In-person join + sides editing ────────────────────────────────────────
+  // "online" (default) or "in_person". Controls whether we show the join-code
+  // panel in the Sides block.
+  const [joinMode, setJoinMode] = useState<"online" | "in_person">("online");
+  // Pencil-toggle: when true, the two side buttons swap to text inputs.
+  const [editingSides, setEditingSides] = useState(false);
+  // Persisted draft so the join code is visible before publish.
+  const [draftDebateId, setDraftDebateId] = useState<string | null>(null);
+  const [draftJoinCode, setDraftJoinCode] = useState<string | null>(null);
+  const [draftSideIds, setDraftSideIds] = useState<string[] | null>(null);
+  const [maxSpeakersPerSide, setMaxSpeakersPerSide] = useState<number>(2);
+  // Live counts of joined speakers per side, populated when a draft exists.
+  const [sideSpeakerCounts, setSideSpeakerCounts] = useState<Record<string, number>>({});
+
   // Sync editor items whenever the underlying debate.subtopics changes from outside
   // (initial generation, collaborative-mode add/remove). We preserve existing IDs by title match
   // so user keystrokes don't trigger a re-sync that wipes focus.
@@ -122,6 +137,172 @@ const CreateDebatePage = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // When the user flips to In-person mode and we don't have a debate row yet,
+  // persist a minimal draft so a join_code is auto-generated and visible.
+  useEffect(() => {
+    if (joinMode !== "in_person") return;
+    if (draftDebateId) return; // already have one (edit mode or previously created)
+    if (!debate || !user) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: created, error } = await supabase
+          .from("debates")
+          .insert({
+            topic: debate.topic,
+            created_by: user.id,
+            is_public: isPublic,
+            turns_per_subtopic: debate.turnsPerSubtopic,
+            time_per_turn: debate.timePerTurn,
+            prep_time_min: debate.prepTime,
+            prep_time_max: debate.prepTime,
+            facilitator_type: "ai",
+            status: "draft",
+            location: location.trim() || null,
+            scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+            feedback_enabled: feedbackEnabled,
+            description: description.trim() || null,
+            max_speakers_per_side: maxSpeakersPerSide,
+          } as any)
+          .select()
+          .single();
+        if (error) throw error;
+        if (cancelled || !created) return;
+
+        // Insert subtopics + sides so the cap-check and side-pick on /join/:code works.
+        const subtopicInserts = debate.subtopics.map((title, i) => ({
+          debate_id: created.id,
+          title,
+          sort_order: i,
+        }));
+        if (subtopicInserts.length > 0) {
+          await supabase.from("debate_subtopics").insert(subtopicInserts);
+        }
+        const sideInserts = debate.sides.map((label, i) => ({
+          debate_id: created.id,
+          label,
+          sort_order: i,
+        }));
+        if (sideInserts.length > 0) {
+          await supabase.from("debate_sides").insert(sideInserts);
+        }
+        const { data: freshSides } = await supabase
+          .from("debate_sides")
+          .select("id, sort_order")
+          .eq("debate_id", created.id)
+          .order("sort_order");
+        const ids = (freshSides || []).map((s: any) => s.id as string);
+
+        // Add creator as participant on chosen side
+        const creatorSideId = ids[creatorSideIndex] ?? ids[0] ?? null;
+        if (creatorSideId) {
+          await supabase.from("debate_participants").insert({
+            debate_id: created.id,
+            user_id: user.id,
+            side_id: creatorSideId,
+          });
+        }
+
+        if (cancelled) return;
+        setDraftDebateId(created.id);
+        setDraftJoinCode(created.join_code ?? null);
+        setDraftSideIds(ids);
+        // Adopt the freshly-minted side IDs so subsequent invitations resolve correctly.
+        setSideIds(ids);
+        // Switch the URL to edit mode without a navigation flash so the rest of the
+        // form (publish flow, invitations) treats this as an edit.
+        const url = new URL(window.location.href);
+        url.searchParams.set("edit", created.id);
+        window.history.replaceState({}, "", url.toString());
+      } catch (err) {
+        console.error("Draft creation for in-person mode failed:", err);
+        toast.error("Couldn't save draft for in-person mode.");
+        setJoinMode("online");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joinMode, draftDebateId, debate, user]);
+
+  // Persist max_speakers_per_side changes immediately on existing drafts.
+  useEffect(() => {
+    if (!draftDebateId) return;
+    supabase
+      .from("debates")
+      .update({ max_speakers_per_side: maxSpeakersPerSide } as any)
+      .eq("id", draftDebateId)
+      .then(({ error }) => {
+        if (error) console.warn("Failed to persist max_speakers_per_side", error);
+      });
+  }, [maxSpeakersPerSide, draftDebateId]);
+
+  // Live speaker counts per side + toast when a new joiner arrives (in-person flow).
+  useEffect(() => {
+    if (!draftDebateId) return;
+    let cancelled = false;
+
+    const refresh = async () => {
+      const { data } = await supabase
+        .from("debate_participants")
+        .select("side_id, participant_role, user_id")
+        .eq("debate_id", draftDebateId);
+      if (cancelled || !data) return;
+      const counts: Record<string, number> = {};
+      data.forEach((p: any) => {
+        if (p.participant_role === "speaker" && p.side_id) {
+          counts[p.side_id] = (counts[p.side_id] || 0) + 1;
+        }
+      });
+      setSideSpeakerCounts(counts);
+    };
+    refresh();
+
+    const channel = supabase
+      .channel(`create-participants-${draftDebateId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "debate_participants", filter: `debate_id=eq.${draftDebateId}` },
+        async (payload) => {
+          const row: any = payload.new;
+          refresh();
+          // Toast only for joiners other than the creator
+          if (row?.user_id && row.user_id !== user?.id) {
+            const { data: prof } = await supabase
+              .from("profiles")
+              .select("display_name")
+              .eq("user_id", row.user_id)
+              .maybeSingle();
+            const sideLabel = debate?.sides[
+              (draftSideIds || []).findIndex((id) => id === row.side_id)
+            ];
+            toast.success(
+              `${prof?.display_name || "Someone"} joined${sideLabel ? ` ${sideLabel}` : ""}`
+            );
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "debate_participants", filter: `debate_id=eq.${draftDebateId}` },
+        () => refresh()
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "debate_participants", filter: `debate_id=eq.${draftDebateId}` },
+        () => refresh()
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftDebateId, debate?.sides, draftSideIds, user?.id]);
 
   // Edit mode: load existing debate template and jump straight to step 3.
   useEffect(() => {
@@ -164,6 +345,12 @@ const CreateDebatePage = () => {
       setLoadedStatus(d.status ?? null);
       setEditLoading(false);
       setStep(3);
+
+      // Edit mode: this debate already exists, so it has a join_code we can show.
+      setDraftDebateId(editId);
+      setDraftJoinCode(d.join_code ?? null);
+      setDraftSideIds((sds || []).map((s: any) => s.id as string));
+      setMaxSpeakersPerSide((d as any).max_speakers_per_side ?? 2);
 
       // Load creator's existing side assignment from debate_participants
       const { data: meAsParticipant } = await supabase
@@ -1017,51 +1204,114 @@ const CreateDebatePage = () => {
 
                 {/* Sides */}
                 <div className="bg-background border border-border rounded-lg p-5">
-                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">Participant Sides</label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    {debate.sides.map((side, i) => (
-                      <input
-                        key={i}
-                        value={side}
-                        onChange={(e) => {
-                          const updated = [...debate.sides];
-                          updated[i] = e.target.value;
-                          setDebate({ ...debate, sides: updated });
-                        }}
-                        className="w-full sm:flex-1 min-w-0 bg-accent rounded-lg px-3 py-2 text-base sm:text-sm text-center font-body font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
-                      />
-                    ))}
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider">
+                      Participant Sides
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditingSides((v) => !v)}
+                      aria-pressed={editingSides}
+                      aria-label={editingSides ? "Done editing side labels" : "Edit side labels"}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {editingSides ? <Check className="w-4 h-4" /> : <Pencil className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
 
-                  {/* Your side picker — creator chooses which side they're joining as */}
-                  <div className="mt-4">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-2">
-                      Your side
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      {debate.sides.map((side, i) => {
-                        const selected = creatorSideIndex === i;
-                        return (
-                          <button
-                            key={i}
-                            type="button"
-                            onClick={() => setCreatorSideIndex(i)}
-                            aria-pressed={selected}
-                            className={`flex-1 rounded-lg px-3 py-2 text-sm font-body font-medium transition-all border ${
-                              selected
-                                ? "bg-foreground text-background border-foreground"
-                                : "bg-background text-foreground border-border hover:border-foreground/40"
-                            }`}
-                          >
-                            {selected ? "✓ " : ""}{side || `Side ${i + 1}`}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-1.5 font-body">
-                      You'll be added as a speaker on this side.
-                    </p>
+                  {/* Online / In-person toggle */}
+                  <div className="flex items-center gap-1 bg-accent rounded-lg p-1 mb-3 w-full sm:w-auto sm:inline-flex">
+                    <button
+                      type="button"
+                      onClick={() => setJoinMode("online")}
+                      aria-pressed={joinMode === "online"}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-body font-medium transition-all ${
+                        joinMode === "online"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Wifi className="w-3.5 h-3.5" />
+                      Online
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setJoinMode("in_person")}
+                      aria-pressed={joinMode === "in_person"}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-body font-medium transition-all ${
+                        joinMode === "in_person"
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      In-person
+                    </button>
                   </div>
+
+                  {/* Merged sides row: pick mode (default) or edit mode */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {debate.sides.map((side, i) => {
+                      if (editingSides) {
+                        return (
+                          <input
+                            key={i}
+                            value={side}
+                            onChange={(e) => {
+                              const updated = [...debate.sides];
+                              updated[i] = e.target.value;
+                              setDebate({ ...debate, sides: updated });
+                            }}
+                            placeholder={`Side ${i + 1}`}
+                            className="w-full sm:flex-1 min-w-0 bg-accent rounded-lg px-3 py-2 text-base sm:text-sm text-center font-body font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                          />
+                        );
+                      }
+                      const selected = creatorSideIndex === i;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setCreatorSideIndex(i)}
+                          aria-pressed={selected}
+                          className={`flex-1 rounded-lg px-3 py-2 text-sm font-body font-medium transition-all border ${
+                            selected
+                              ? "bg-foreground text-background border-foreground"
+                              : "bg-background text-foreground border-border hover:border-foreground/40"
+                          }`}
+                        >
+                          {selected ? "✓ " : ""}{side || `Side ${i + 1}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5 font-body">
+                    {editingSides
+                      ? "Tap the check icon when you're done renaming."
+                      : "You'll be added as a speaker on this side."}
+                  </p>
+
+                  {/* In-person panel — code, link, QR, projector, max-per-side, live counts */}
+                  {joinMode === "in_person" && (
+                    <div className="mt-4">
+                      <InPersonJoinPanel
+                        debateId={draftDebateId}
+                        joinCode={draftJoinCode}
+                        maxSpeakersPerSide={maxSpeakersPerSide}
+                        onMaxSpeakersChange={setMaxSpeakersPerSide}
+                        onCodeRegenerated={(c) => setDraftJoinCode(c)}
+                        speakerCounts={
+                          draftSideIds
+                            ? draftSideIds.map((id, idx) => ({
+                                sideId: id,
+                                sideLabel: debate.sides[idx] || `Side ${idx + 1}`,
+                                count: sideSpeakerCounts[id] || 0,
+                              }))
+                            : []
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Turns & Time */}

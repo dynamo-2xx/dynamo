@@ -575,6 +575,7 @@ export type Database = {
           is_verified: boolean
           join_code: string | null
           location: string | null
+          max_speakers_per_side: number
           prep_duration_seconds: number | null
           prep_phase_active: boolean
           prep_phase_started_at: string | null
@@ -614,6 +615,7 @@ export type Database = {
           is_verified?: boolean
           join_code?: string | null
           location?: string | null
+          max_speakers_per_side?: number
           prep_duration_seconds?: number | null
           prep_phase_active?: boolean
           prep_phase_started_at?: string | null
@@ -653,6 +655,7 @@ export type Database = {
           is_verified?: boolean
           join_code?: string | null
           location?: string | null
+          max_speakers_per_side?: number
           prep_duration_seconds?: number | null
           prep_phase_active?: boolean
           prep_phase_started_at?: string | null
@@ -1613,6 +1616,14 @@ export type Database = {
       is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
       is_live_session_host: { Args: { _session_id: string }; Returns: boolean }
       is_notebook_owner: { Args: { _notebook_id: string }; Returns: boolean }
+      join_debate_in_person: {
+        Args: { _code: string; _side_id: string }
+        Returns: {
+          became_audience: boolean
+          debate_id: string
+          side_id: string
+        }[]
+      }
       join_live_session: {
         Args: {
           _avatar_url?: string

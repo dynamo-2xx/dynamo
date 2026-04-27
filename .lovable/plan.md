@@ -1,97 +1,120 @@
-## Goal
+## What you'll get
 
-Make every published debate opened from Explore feel like a "preview of the final record." Visitors land on a layout that mirrors the threaded record view (cover, title, status, publisher, subtopic dropdowns), so they can see exactly what the finished debate will look like — and scout subtopics before deciding to join.
+Three connected changes to the Create flow + joiner experience:
 
-Behavior by status:
-- **Scheduled / draft** — subtopics expand to dimmed skeleton ghost cards (a faint Main / Counter / Affirms shape per side) so the structure is felt.
-- **Live** — subtopics are populated with real threads + role-group summaries built from arguments captured up to the moment the page was opened. Empty subtopics still show ghost cards.
-- **Completed** — already routes to the existing record view (no change).
+1. The two Sides rows merge into one editable block with a pencil-toggle.
+2. A new In-person/Online toggle exposes a live join code, share link, and QR.
+3. In-person joiners go through a mic-permission + level-meter check before landing in the room, and get a persistent mic bar inside.
 
-## Affected routes
+---
 
-- `/debate/:id/preview` → `DebateScheduledPreviewPage` (rebuilt)
-- `/debate/:id` for spectators when status is `scheduled` or `live` (audience preview reuses same shell)
-- Mock `/explore/:debateId` page is left as-is for now (out of scope per user answer).
+### 1. Merge the two Sides rows into one editable block
 
-## New shared component
+Today: stacked "Participant Sides" (text inputs) + "Your side" (pick buttons). Becomes one row of two side **buttons** that double as picker and label.
 
-`src/components/debate/DebateRecordPreview.tsx` — pure presentation, fed by props:
+- **Default (pick mode)**: each side is a button. Tap to choose which side you'll join. Selected side keeps the filled "✓ Label" treatment.
+- **Pencil icon** in the block header. Tap → swaps both buttons into text inputs so you can rename either side. Tap again (now a checkmark) → returns to pick mode.
+- "You'll be added as a speaker on this side." helper stays underneath.
 
-```text
-┌─────────────────────────────────────────────┐
-│  Cover (image OR gradientFromSeed)          │
-│   ── status pill · scheduled time           │
-│   Topic title (display font)                │
-│   by {publisher_name} · {participants}      │
-└─────────────────────────────────────────────┘
-[ About this debate ▾ ]   (if description)
-[ Sides: For | Against ]
+---
 
-THREADED RECORD
-┌ 1. Subtopic title ───────────── n threads ▾┐
-│   ┌ Thread title ──────────────────────── ▾┐
-│   │  ● MAIN — Speaker 1                    │
-│   │     ░░░░░░░░░░░░░░░░░░░░  (ghost)     │
-│   │  ↳ COUNTER — Speaker 2                 │
-│   │     ░░░░░░░░░░░░░░░░░░░░               │
-│   └────────────────────────────────────────┘
-└────────────────────────────────────────────┘
+### 2. In-person / Online toggle
 
-[ Interested? ]   (sticky bottom — non-owners)
-[ Edit debate ]   (sticky bottom — owner)
-```
+Segmented toggle inside the Sides block (above the side buttons), defaulting to **Online**.
 
-Internal pieces:
-- `SubtopicDropdown` — collapsible row matching `ThreadedRecordPane` styling (chevron, display font, "n threads" badge). Defaults closed.
-- `ThreadCard` — collapsed row inside a subtopic. For scheduled debates each subtopic gets exactly one ghost thread named "Coming soon".
-- `GhostStatementCard` — a `SummaryCard`-shaped block with: faint role label ("MAIN — Speaker 1"), 2 lines of `bg-foreground/5` skeleton bars, no actions. One per side, alternating, with a `↳` for the second.
+- **Online**: same flow as today (invite by username/email, drag-to-side). A collapsed "Share join link" panel is still available.
+- **In-person**: expands a "Join in person" panel with:
+  - 8-character **join code** (large monospace, tap-to-copy).
+  - Full **join link** (`/join/{code}`) with copy button.
+  - **QR code** rendered from the link.
+  - **Max speakers per side** stepper (1–8, default 2).
+  - **Project** button → fullscreen page with topic + giant code + giant QR for classroom screens.
+  - Helper: "Anyone who scans signs in (or creates an account), tests their mic, then picks their side."
 
-## Live data wiring
+The draft debate is saved as soon as In-person is toggled on so the auto-generated `join_code` is immediately visible.
 
-A new hook `src/hooks/useDebatePreviewThreads.ts`:
-- Inputs: `debateId`, `status`.
-- If `status === 'scheduled'`: returns empty hierarchy → ghosts only.
-- If `status === 'live'`:
-  1. Fetch `arguments` + `debate_subtopics` + `debate_sides` + `debate_participants` (one-shot, no realtime — snapshot at open time, per user spec).
-  2. Group arguments by `subtopic_id`, then build threads via existing `parent_argument_id` chain (root = `parent_argument_id IS NULL`).
-  3. Map each argument to a `SummaryCard`-style node: kind = `main` for roots, `counter` / `affirms` / `concedes` based on `argument_type` and the existing detection helpers in `src/components/live/record/types.ts` (`detectsAffirmation` / `detectsConcession`); fallback `counter` otherwise.
-  4. Resolve speaker label per side using `debate_sides.label` + side index (e.g. "Speaker 1 · For").
-- Returns `{ hierarchy, loading }` consumed by `DebateRecordPreview`.
+---
 
-No realtime subscription — the page is an opened-at-this-moment preview. Refresh re-fetches.
+### 3. Joiner flow (in-person) — with mic check
 
-## Page-level changes
+When someone scans the QR or opens `/join/{code}`:
 
-**`src/pages/DebateScheduledPreviewPage.tsx`**
-- Keep existing data load (debate, subtopics, sides, publisher, owner tabs, Interested CTA, TagPicker).
-- Replace the current "Sides + Subtopics + Turns/Time" cards block with `<DebateRecordPreview …>` for the Overview tab.
-- Cover hero: existing `cover_image_url` or `gradientFromSeed(topic)` → moved into `DebateRecordPreview`.
-- Owner tabs (Overview / Tags / Interested) and bottom CTAs are preserved.
+1. **Not signed in** → existing JoinDebatePage redirects to `/auth?redirect=/join/{code}`.
+2. **Signed in** → new **"Pick your side"** screen showing topic, publisher, side labels (with live "3 on A · 1 on B" counts), and side buttons. If a side is full, it's disabled with "Full — joining as audience"; if only one side is open, auto-select it.
+3. After tapping a side → **Mic Test screen**:
+   - Browser mic permission prompt fires immediately.
+   - On grant: shows a live **input level meter** (Web Audio `AnalyserNode` over the stream), a **device picker** dropdown (`navigator.mediaDevices.enumerateDevices`) so they can switch from phone mic → AirPods, and a "Speak now to test" prompt.
+   - On deny: clear recovery message + "Try again" + "Join as audience instead" fallback.
+   - **Continue** button stays disabled until we detect ≥1 second of audio above a low threshold (proves the mic actually works).
+4. **Confirm** → server-side RPC `join_debate_in_person(code, side_id)`:
+   - Re-checks `max_speakers_per_side`; if filled by someone else mid-flow, falls back to audience.
+   - Inserts `debate_participants` (role=`speaker`).
+   - Inserts `debate_invitations` (status=`accepted`) so they appear in the creator's Invited Speakers list.
+   - Returns `{ debate_id, side_id, became_audience }`.
+5. Redirects to the debate room with their stream already initialized.
 
-**`src/pages/DebateRoomPage.tsx`**
-- For spectators (no `myParticipant`) when `debate.status === 'scheduled'` OR `'live'`, render `<DebateRecordPreview status={debate.status} …>` instead of the current minimal black header + empty body shown in screenshot 1. Speakers/owner keep the existing room UI. (Live spectators will see threads-so-far, scheduled spectators see ghosts.)
+---
 
-## Visual / brand alignment
+### 4. Mic UX inside the debate room
 
-- Use existing tokens: `bg-card`, `border-border`, `text-foreground`, `text-muted-foreground`, `font-display`, `font-body`. No raw hex.
-- Skeleton bars: `bg-foreground/[0.06]`, height `h-3`, `rounded-md`, slight opacity pulse via `animate-pulse` to feel alive but subtle.
-- Reuse `Collapsible` from `@/components/ui/collapsible` and the chevron rotation pattern from `ThreadedRecordPane.tsx`.
-- Status pill copy: `SCHEDULED` (existing) / `LIVE NOW` (red dot) / keep `Spectator` chip if present.
+Persistent bottom **mic bar** for in-person joiners:
 
-## Files to create
+- Their avatar + display name on the left.
+- Live audio level meter (same `AnalyserNode` pattern — animated bars).
+- Big mute toggle (mic icon).
+- Small "switch device" menu for changing input on the fly.
+- If their stream goes silent for >10 s while they're "live," a soft toast: "We can't hear you — check your mic."
 
-- `src/components/debate/DebateRecordPreview.tsx`
-- `src/components/debate/preview/GhostStatementCard.tsx`
-- `src/components/debate/preview/PreviewSubtopicSection.tsx`
-- `src/hooks/useDebatePreviewThreads.ts`
+---
 
-## Files to edit
+### 5. Speaker identity (hybrid diarization)
 
-- `src/pages/DebateScheduledPreviewPage.tsx` — swap Overview body for new component.
-- `src/pages/DebateRoomPage.tsx` — render preview for spectators on scheduled/live.
+Each in-person device streams its own audio tagged with that user's profile (display name + avatar) — no shared-mic diarization needed by default. **But** if two people share one phone:
 
-## Out of scope
+- The existing energy-based diarization from the Live engine runs **within** that single device's stream.
+- Sub-speakers detected on a shared device are tagged with the primary profile + a "Speaker A / B" suffix in the transcript, which the host can rename later from the Live Session participants tab.
 
-- No DB migrations.
-- No changes to the Explore card list, the live record view itself, ExploreDebateDetailPage mock page, or the invite-token preview (`DebatePreviewPage`).
-- No realtime updates — snapshot at page-open per user spec.
+This reuses `mem://technical/live-transcription-logic` (energy-based separation) without changing it; we only add the profile-tag wrapper.
+
+---
+
+### 6. Real-time effects on the creator's screen
+
+- Joiner's profile chip appears in **Invited Speakers** AND in the chosen **Participant Sides** slot the moment they confirm (existing realtime subscription on `debate_participants`).
+- A toast fires on the creator's view: "Maya joined Side B."
+- The In-person panel updates "3 on Side A · 1 on Side B" live so the creator can see the room filling up.
+
+---
+
+### 7. Bonus suggestions worth keeping
+
+1. **Project view** (giant code + QR for classroom display).
+2. **Side-balance hint + auto-assign** when only one side has room.
+3. **Regenerate code** button (in case the code feels stale or compromised).
+4. **Toast on creator screen** for each new joiner.
+5. **Pre-flight mic test** with level meter and device picker (covered above).
+
+If any of these feel like scope creep, say which to drop. Otherwise all five are in.
+
+---
+
+## Technical notes
+
+- **File touched**: `src/pages/CreateDebatePage.tsx` — Sides block restructure (lines 1019–1065) + new In-person panel.
+- **New components**:
+  - `src/components/create/InPersonJoinPanel.tsx` (code, link, QR, project button, max-speakers stepper, live joiner counter).
+  - `src/components/join/MicTestStep.tsx` (permission prompt, level meter, device picker, gated Continue).
+  - `src/components/debate/MicBar.tsx` (persistent bottom bar with meter + mute + device switch).
+- **New pages**:
+  - `src/pages/InPersonJoinPickSidePage.tsx` at `/join/:code/pick-side`.
+  - `src/pages/InPersonJoinMicTestPage.tsx` at `/join/:code/mic-test`.
+  - `src/pages/JoinCodeProjectorPage.tsx` at `/debate/:id/project-code`.
+- **Existing pages reused**: `JoinDebatePage.tsx` extended to route signed-in non-participants into the pick-side step.
+- **New RPC**: `join_debate_in_person(_code text, _side_id uuid)` — SECURITY DEFINER. Validates code, enforces `max_speakers_per_side`, inserts participant + invitation rows, returns debate id + assigned side + audience-fallback flag.
+- **Schema migration**:
+  - `ALTER TABLE debates ADD COLUMN max_speakers_per_side INT NOT NULL DEFAULT 2;`
+- **Audio plumbing**: `getUserMedia` → `MediaStreamAudioSourceNode` → `AnalyserNode.getByteFrequencyData` for the level meter. Stream is stashed in a shared context (`MicStreamProvider`) so the mic test page hands the same stream off to the room without re-prompting. New deps: `qrcode.react`.
+- **Diarization**: piggybacks the existing live-transcription pipeline; we just inject `profile_user_id` into each utterance payload.
+- **No realtime schema changes needed** — `debate_participants` is already published via the existing room subscription.
+
+Nothing else changes outside these files. Existing record/preview/explore work stays intact.

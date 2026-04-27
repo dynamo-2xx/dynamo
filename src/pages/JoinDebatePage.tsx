@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Users, Mic } from "lucide-react";
+import MicTestStep from "@/components/join/MicTestStep";
+import { setHandoffStream } from "@/lib/micHandoff";
 
 interface Side {
   id: string;
@@ -34,6 +36,8 @@ const JoinDebatePage = () => {
   const [selectedSide, setSelectedSide] = useState<string>("");
   const [showPicker, setShowPicker] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [maxPerSide, setMaxPerSide] = useState<number>(2);
+  const [phase, setPhase] = useState<"pick" | "mic">("pick");
 
   useEffect(() => {
     if (authLoading) return;
@@ -73,18 +77,32 @@ const JoinDebatePage = () => {
       }
 
       // Fetch sides and participants to determine availability
-      const [sidesRes, partsRes] = await Promise.all([
+      const [debateMetaRes, sidesRes, partsRes] = await Promise.all([
+        supabase.from("debates").select("max_speakers_per_side").eq("id", debate.id).single(),
         supabase.from("debate_sides").select("*").eq("debate_id", debate.id).order("sort_order"),
         supabase.from("debate_participants").select("*").eq("debate_id", debate.id),
       ]);
 
       const debateSides = (sidesRes.data || []) as Side[];
       const debateParticipants = (partsRes.data || []) as Participant[];
+      const cap = (debateMetaRes.data as any)?.max_speakers_per_side ?? 2;
 
       setDebateId(debate.id);
       setDebateTopic(debate.topic);
       setSides(debateSides);
       setParticipants(debateParticipants);
+      setMaxPerSide(cap);
+
+      // Auto-select the only open side, if exactly one has room
+      const openSides = debateSides.filter((s) => {
+        const cnt = debateParticipants.filter(
+          (p) => p.side_id === s.id && p.participant_role === "speaker"
+        ).length;
+        return cnt < cap;
+      });
+      if (openSides.length === 1) {
+        setSelectedSide(openSides[0].id);
+      }
 
       // Always show side picker — multiple speakers can join the same side
       setShowPicker(true);
@@ -101,25 +119,35 @@ const JoinDebatePage = () => {
     ).length,
   }));
 
-  const handleJoinAsSpeaker = async () => {
-    if (!selectedSide || !debateId || !user || joining) return;
+  const handleProceedToMic = () => {
+    if (!selectedSide || !debateId || joining) return;
+    setPhase("mic");
+  };
+
+  const finalizeJoin = async (stream: MediaStream | null) => {
+    if (!debateId || !user || joining) return;
     setJoining(true);
-
-    const { error } = await supabase.from("debate_participants").insert({
-      debate_id: debateId,
-      user_id: user.id,
-      participant_role: "speaker",
-      side_id: selectedSide,
-    });
-
-    if (error) {
-      toast.error("Failed to join debate.");
+    try {
+      const { data, error } = await supabase.rpc("join_debate_in_person", {
+        _code: (code || "").toUpperCase(),
+        _side_id: selectedSide || null,
+      });
+      if (error) throw error;
+      const result = Array.isArray(data) ? (data[0] as any) : (data as any);
+      if (result?.became_audience) {
+        toast("That side filled up — joining as audience.", { duration: 4000 });
+      } else {
+        toast.success("Joined as speaker!");
+      }
+      // Hand off the live stream so the debate room can use it without re-prompting
+      if (stream) setHandoffStream(stream);
+      navigate(`/debate/${debateId}`, { replace: true });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Failed to join debate.");
       setJoining(false);
-      return;
+      stream?.getTracks().forEach((t) => t.stop());
     }
-
-    toast.success("Joined as speaker!");
-    navigate(`/debate/${debateId}`, { replace: true });
   };
 
   const handleJoinAsAudience = () => {
@@ -140,62 +168,79 @@ const JoinDebatePage = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="font-display text-xl">Join Debate</CardTitle>
+          <CardTitle className="font-display text-xl">
+            {phase === "pick" ? "Join Debate" : "Test your mic"}
+          </CardTitle>
           <CardDescription className="font-body mt-1">
             {debateTopic}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
-            <p className="text-sm font-medium text-foreground mb-3 font-body">
-              Choose a side to speak for:
-            </p>
-            <RadioGroup value={selectedSide} onValueChange={setSelectedSide} className="space-y-2">
-              {speakersPerSide.map((side) => (
-                <label
-                  key={side.id}
-                  className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                    selectedSide === side.id
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <RadioGroupItem value={side.id} />
-                  <div className="flex-1">
-                    <span className="text-sm font-medium text-foreground font-body">
-                      {side.label}
-                    </span>
-                    {side.speakerCount > 0 && (
-                      <span className="block text-xs text-muted-foreground">
-                        {side.speakerCount} speaker{side.speakerCount !== 1 ? "s" : ""} joined
-                      </span>
-                    )}
-                  </div>
-                  <Mic className="w-4 h-4 text-muted-foreground" />
-                </label>
-              ))}
-            </RadioGroup>
-          </div>
+          {phase === "pick" ? (
+            <>
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3 font-body">
+                  Choose a side to speak for:
+                </p>
+                <RadioGroup value={selectedSide} onValueChange={setSelectedSide} className="space-y-2">
+                  {speakersPerSide.map((side) => {
+                    const full = side.speakerCount >= maxPerSide;
+                    return (
+                      <label
+                        key={side.id}
+                        className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                          full
+                            ? "border-border opacity-50 cursor-not-allowed"
+                            : selectedSide === side.id
+                            ? "border-primary bg-primary/5 cursor-pointer"
+                            : "border-border hover:border-primary/50 cursor-pointer"
+                        }`}
+                      >
+                        <RadioGroupItem value={side.id} disabled={full} />
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-foreground font-body">
+                            {side.label}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {full
+                              ? "Full — pick the other side or join as audience"
+                              : `${side.speakerCount} of ${maxPerSide} speaker${maxPerSide !== 1 ? "s" : ""}`}
+                          </span>
+                        </div>
+                        <Mic className="w-4 h-4 text-muted-foreground" />
+                      </label>
+                    );
+                  })}
+                </RadioGroup>
+              </div>
 
-          <div className="flex flex-col gap-2">
-            <Button
-              onClick={handleJoinAsSpeaker}
-              disabled={!selectedSide || joining}
-              className="w-full"
-            >
-              <Mic className="w-4 h-4 mr-1" />
-              Join as Speaker
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleJoinAsAudience}
-              disabled={joining}
-              className="w-full"
-            >
-              <Users className="w-4 h-4 mr-1" />
-              Join as Audience
-            </Button>
-          </div>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleProceedToMic}
+                  disabled={!selectedSide || joining}
+                  className="w-full"
+                >
+                  <Mic className="w-4 h-4 mr-1" />
+                  Continue
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleJoinAsAudience}
+                  disabled={joining}
+                  className="w-full"
+                >
+                  <Users className="w-4 h-4 mr-1" />
+                  Join as Audience
+                </Button>
+              </div>
+            </>
+          ) : (
+            <MicTestStep
+              continueLabel={joining ? "Joining…" : "Join debate"}
+              onReady={(stream) => finalizeJoin(stream)}
+              onSkipToAudience={handleJoinAsAudience}
+            />
+          )}
         </CardContent>
       </Card>
     </div>
