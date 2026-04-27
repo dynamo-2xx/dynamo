@@ -14,7 +14,7 @@ interface Slide {
 }
 
 const SLIDES: Slide[] = [
-  { id: "debate", label: "Debate", description: "Structure a sincere dialogue", icon: PlusCircle, route: "/create" },
+  { id: "debate", label: "Debate", description: "Structure a sincere dialogue in seconds", icon: PlusCircle, route: "/create" },
   { id: "live", label: "Live", description: "Capture a real conversation", icon: Radio, route: "/live/new" },
   { id: "cmm", label: "Change My Mind", description: "Open a topic. Take on every challenger.", icon: Swords, route: "/cmm/new" },
 ];
