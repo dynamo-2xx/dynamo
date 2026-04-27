@@ -89,6 +89,20 @@ const CreateDebatePage = () => {
   // Stable IDs for subtopic editor rows — prevents input remount on every keystroke.
   const [subtopicItems, setSubtopicItems] = useState<{ id: string; title: string }[]>([]);
 
+  // ─── In-person join + sides editing ────────────────────────────────────────
+  // "online" (default) or "in_person". Controls whether we show the join-code
+  // panel in the Sides block.
+  const [joinMode, setJoinMode] = useState<"online" | "in_person">("online");
+  // Pencil-toggle: when true, the two side buttons swap to text inputs.
+  const [editingSides, setEditingSides] = useState(false);
+  // Persisted draft so the join code is visible before publish.
+  const [draftDebateId, setDraftDebateId] = useState<string | null>(null);
+  const [draftJoinCode, setDraftJoinCode] = useState<string | null>(null);
+  const [draftSideIds, setDraftSideIds] = useState<string[] | null>(null);
+  const [maxSpeakersPerSide, setMaxSpeakersPerSide] = useState<number>(2);
+  // Live counts of joined speakers per side, populated when a draft exists.
+  const [sideSpeakerCounts, setSideSpeakerCounts] = useState<Record<string, number>>({});
+
   // Sync editor items whenever the underlying debate.subtopics changes from outside
   // (initial generation, collaborative-mode add/remove). We preserve existing IDs by title match
   // so user keystrokes don't trigger a re-sync that wipes focus.
