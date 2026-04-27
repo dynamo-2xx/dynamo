@@ -13,6 +13,10 @@ import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechI
 import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
+import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
+import AppLayout from "@/components/AppLayout";
+import { ArrowLeft, HandHeart } from "lucide-react";
+import InterestedComposer from "@/components/debate/InterestedComposer";
 import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay";
 import RoundSummaryCard from "@/components/debate/RoundSummaryCard";
 import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
