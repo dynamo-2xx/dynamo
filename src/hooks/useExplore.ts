@@ -90,8 +90,11 @@ export function useFeaturedDebates(limit = 4) {
         pool = [...pool, ...additions];
       }
       if (!cancelled) {
-        setItems(pool.slice(0, limit));
-        setLoading(false);
+        const enriched = await attachPublishers(pool.slice(0, limit));
+        if (!cancelled) {
+          setItems(enriched);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -117,8 +120,11 @@ export function useTrendingDebates(limit = 6) {
         .limit(50);
       const mapped = (data || []).map(mapDebate).sort((a, b) => b.participant_count - a.participant_count);
       if (!cancelled) {
-        setItems(mapped.slice(0, limit));
-        setLoading(false);
+        const enriched = await attachPublishers(mapped.slice(0, limit));
+        if (!cancelled) {
+          setItems(enriched);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -142,8 +148,11 @@ export function useLatestDebates(limit = 8) {
         .order("created_at", { ascending: false })
         .limit(limit);
       if (!cancelled) {
-        setItems((data || []).map(mapDebate));
-        setLoading(false);
+        const enriched = await attachPublishers((data || []).map(mapDebate));
+        if (!cancelled) {
+          setItems(enriched);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -185,8 +194,11 @@ export function useDebatesByTag(tagId: string | null, limit = 50) {
         .neq("status", "archived")
         .order("created_at", { ascending: false });
       if (!cancelled) {
-        setItems((data || []).map(mapDebate));
-        setLoading(false);
+        const enriched = await attachPublishers((data || []).map(mapDebate));
+        if (!cancelled) {
+          setItems(enriched);
+          setLoading(false);
+        }
       }
     })();
     return () => {
