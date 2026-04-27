@@ -1191,6 +1191,12 @@ const DebateRoomPage = () => {
 
   return (
     <div className="h-screen w-full bg-background flex flex-col overflow-hidden" data-record-root>
+      {handoffStream && (
+        <InPersonMicBar
+          initialStream={handoffStream}
+          displayName={user?.email ?? null}
+        />
+      )}
       {/* Header */}
       <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between shrink-0 w-full">
         <div className="flex items-center gap-3">
