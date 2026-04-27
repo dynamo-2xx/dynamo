@@ -15,6 +15,8 @@ import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import AppLayout from "@/components/AppLayout";
+import InPersonMicBar from "@/components/debate/InPersonMicBar";
+import { takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
 import InterestedComposer from "@/components/debate/InterestedComposer";
 import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay";
