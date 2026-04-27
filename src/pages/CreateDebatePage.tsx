@@ -2,13 +2,14 @@ import { useState, useCallback, useEffect } from "react";
 import TagPicker from "@/components/tags/TagPicker";
 import type { Tag } from "@/hooks/useTags";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send, Play } from "lucide-react";
+import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send, Play, Pencil, Check, Wifi } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
 
 interface GeneratedDebate {
   topic: string;
