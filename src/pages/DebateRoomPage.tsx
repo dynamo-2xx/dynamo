@@ -1619,3 +1619,93 @@ const DebateRoomPage = () => {
 };
 
 export default DebateRoomPage;
+
+/* ── Spectator-only preview shell ──
+   Mirrors the threaded record (with live or ghost data) so visitors
+   browsing from Explore can see the shape of the debate. */
+function SpectatorPreviewShell({
+  debate,
+  navigate,
+  userId,
+}: {
+  debate: any;
+  navigate: ReturnType<typeof useNavigate>;
+  userId: string | null;
+}) {
+  const [publisherName, setPublisherName] = useState<string>("");
+  const [participantCount, setParticipantCount] = useState<number>(0);
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (debate?.created_by) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("user_id", debate.created_by)
+          .maybeSingle();
+        if (!cancelled) setPublisherName(prof?.display_name || "Publisher");
+      }
+      const { count } = await supabase
+        .from("debate_participants")
+        .select("id", { count: "exact", head: true })
+        .eq("debate_id", debate.id);
+      if (!cancelled) setParticipantCount(count || 0);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debate?.id, debate?.created_by]);
+
+  return (
+    <AppLayout>
+      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
+        <button
+          type="button"
+          onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))}
+          className="inline-flex items-center gap-1.5 text-sm font-body text-muted-foreground hover:text-foreground transition-colors mb-6 group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+          Back
+        </button>
+
+        <DebateRecordPreview
+          debateId={debate.id}
+          topic={debate.topic}
+          description={debate.description}
+          status={debate.status}
+          scheduledAt={debate.scheduled_at}
+          coverImageUrl={debate.cover_image_url}
+          publisherName={publisherName}
+          participantCount={participantCount}
+        />
+
+        {userId && (
+          <div className="mt-8 sticky bottom-4 z-10">
+            <button
+              type="button"
+              onClick={() => setComposerOpen(true)}
+              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-foreground text-background text-sm font-body font-medium hover:opacity-90 transition-opacity shadow-lg"
+            >
+              <HandHeart className="w-4 h-4" />
+              Interested?
+            </button>
+          </div>
+        )}
+      </div>
+
+      {userId && (
+        <InterestedComposer
+          open={composerOpen}
+          onOpenChange={setComposerOpen}
+          debateId={debate.id}
+          debateTopic={debate.topic}
+          publisherId={debate.created_by}
+          publisherName={publisherName}
+          sides={[]}
+        />
+      )}
+    </AppLayout>
+  );
+}
