@@ -174,6 +174,9 @@ const FeaturedCard = ({ d, index, onClick }: { d: ExploreDebate; index: number; 
           </span>
         )}
         <span className="text-[11px] text-muted-foreground font-body">{d.participant_count} speakers</span>
+        {d.publisher_name && (
+          <span className="text-[11px] text-muted-foreground font-body truncate">· by {d.publisher_name}</span>
+        )}
       </div>
     </div>
   </motion.div>
@@ -188,6 +191,7 @@ const CompactCard = ({ d, rank, onClick }: { d: ExploreDebate; rank: number; onC
     <h4 className="font-display text-sm mt-1 leading-snug line-clamp-2">{d.topic}</h4>
     <div className="text-[11px] text-muted-foreground font-body mt-3">
       {d.participant_count} speakers · {new Date(d.created_at).toLocaleDateString()}
+      {d.publisher_name ? ` · by ${d.publisher_name}` : ""}
     </div>
   </div>
 );
@@ -201,6 +205,7 @@ const ListRow = ({ d, onClick }: { d: ExploreDebate; onClick: () => void }) => (
       <h4 className="font-display text-sm leading-snug truncate">{d.topic}</h4>
       <div className="text-[11px] text-muted-foreground font-body mt-1.5">
         {new Date(d.created_at).toLocaleDateString()} · {d.participant_count} speakers
+        {d.publisher_name ? ` · by ${d.publisher_name}` : ""}
       </div>
     </div>
     <ChevronRight className="w-4 h-4 text-muted-foreground" />

@@ -14,6 +14,8 @@ export interface ExploreDebate {
   argument_count?: number;
   community_tag?: string | null;
   tags?: Tag[];
+  publisher_name?: string | null;
+  publisher_avatar?: string | null;
 }
 
 export interface ExploreLiveSession {
@@ -40,6 +42,24 @@ const mapDebate = (d: any): ExploreDebate => ({
   community_tag: d.community_tag,
   participant_count: d.debate_participants?.[0]?.count ?? 0,
 });
+
+async function attachPublishers(items: ExploreDebate[]): Promise<ExploreDebate[]> {
+  const ids = Array.from(new Set(items.map((i) => i.created_by).filter(Boolean)));
+  if (ids.length === 0) return items;
+  const { data } = await supabase
+    .from("profiles")
+    .select("user_id, display_name, avatar_url")
+    .in("user_id", ids);
+  const map = new Map<string, { name: string | null; avatar: string | null }>();
+  (data || []).forEach((p: any) =>
+    map.set(p.user_id, { name: p.display_name, avatar: p.avatar_url }),
+  );
+  return items.map((i) => ({
+    ...i,
+    publisher_name: map.get(i.created_by)?.name ?? null,
+    publisher_avatar: map.get(i.created_by)?.avatar ?? null,
+  }));
+}
 
 export function useFeaturedDebates(limit = 4) {
   const [items, setItems] = useState<ExploreDebate[]>([]);
@@ -70,8 +90,11 @@ export function useFeaturedDebates(limit = 4) {
         pool = [...pool, ...additions];
       }
       if (!cancelled) {
-        setItems(pool.slice(0, limit));
-        setLoading(false);
+        const enriched = await attachPublishers(pool.slice(0, limit));
+        if (!cancelled) {
+          setItems(enriched);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -97,8 +120,11 @@ export function useTrendingDebates(limit = 6) {
         .limit(50);
       const mapped = (data || []).map(mapDebate).sort((a, b) => b.participant_count - a.participant_count);
       if (!cancelled) {
-        setItems(mapped.slice(0, limit));
-        setLoading(false);
+        const enriched = await attachPublishers(mapped.slice(0, limit));
+        if (!cancelled) {
+          setItems(enriched);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -122,8 +148,11 @@ export function useLatestDebates(limit = 8) {
         .order("created_at", { ascending: false })
         .limit(limit);
       if (!cancelled) {
-        setItems((data || []).map(mapDebate));
-        setLoading(false);
+        const enriched = await attachPublishers((data || []).map(mapDebate));
+        if (!cancelled) {
+          setItems(enriched);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -165,8 +194,11 @@ export function useDebatesByTag(tagId: string | null, limit = 50) {
         .neq("status", "archived")
         .order("created_at", { ascending: false });
       if (!cancelled) {
-        setItems((data || []).map(mapDebate));
-        setLoading(false);
+        const enriched = await attachPublishers((data || []).map(mapDebate));
+        if (!cancelled) {
+          setItems(enriched);
+          setLoading(false);
+        }
       }
     })();
     return () => {
