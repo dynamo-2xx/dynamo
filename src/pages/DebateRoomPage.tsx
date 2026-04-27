@@ -113,6 +113,9 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
    const turnEndTriggeredRef = useRef(false);
+  // In-person joiner: pick up the live MediaStream the pre-flight mic test
+  // handed off so we can show the persistent mic bar without re-prompting.
+  const [handoffStream] = useState<MediaStream | null>(() => takeHandoffStream());
      const timerWasActiveRef = useRef(false);
    const prepExitRef = useRef(false);
    const lastSyncedTurnStartRef = useRef<string | null>(null);
