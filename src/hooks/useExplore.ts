@@ -14,6 +14,8 @@ export interface ExploreDebate {
   argument_count?: number;
   community_tag?: string | null;
   tags?: Tag[];
+  publisher_name?: string | null;
+  publisher_avatar?: string | null;
 }
 
 export interface ExploreLiveSession {
@@ -40,6 +42,24 @@ const mapDebate = (d: any): ExploreDebate => ({
   community_tag: d.community_tag,
   participant_count: d.debate_participants?.[0]?.count ?? 0,
 });
+
+async function attachPublishers(items: ExploreDebate[]): Promise<ExploreDebate[]> {
+  const ids = Array.from(new Set(items.map((i) => i.created_by).filter(Boolean)));
+  if (ids.length === 0) return items;
+  const { data } = await supabase
+    .from("profiles")
+    .select("user_id, display_name, avatar_url")
+    .in("user_id", ids);
+  const map = new Map<string, { name: string | null; avatar: string | null }>();
+  (data || []).forEach((p: any) =>
+    map.set(p.user_id, { name: p.display_name, avatar: p.avatar_url }),
+  );
+  return items.map((i) => ({
+    ...i,
+    publisher_name: map.get(i.created_by)?.name ?? null,
+    publisher_avatar: map.get(i.created_by)?.avatar ?? null,
+  }));
+}
 
 export function useFeaturedDebates(limit = 4) {
   const [items, setItems] = useState<ExploreDebate[]>([]);
