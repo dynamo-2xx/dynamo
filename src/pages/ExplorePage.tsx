@@ -64,7 +64,7 @@ const ExplorePage = () => {
   const builtinChips: { id: ChipId; label: string }[] = [
     { id: "all", label: "All" },
     { id: "live", label: "Live" },
-    { id: "today", label: "Today" },
+    { id: "today", label: "For You" },
     { id: "latest", label: "Latest" },
   ];
 
