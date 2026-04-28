@@ -1646,6 +1646,7 @@ function SpectatorPreviewShell({
   const [publisherName, setPublisherName] = useState<string>("");
   const [participantCount, setParticipantCount] = useState<number>(0);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [sides, setSides] = useState<{ id: string; label: string; sort_order: number }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1663,6 +1664,12 @@ function SpectatorPreviewShell({
         .select("id", { count: "exact", head: true })
         .eq("debate_id", debate.id);
       if (!cancelled) setParticipantCount(count || 0);
+      const { data: sds } = await supabase
+        .from("debate_sides")
+        .select("id,label,sort_order")
+        .eq("debate_id", debate.id)
+        .order("sort_order");
+      if (!cancelled) setSides((sds as any) || []);
     })();
     return () => {
       cancelled = true;
@@ -1690,9 +1697,10 @@ function SpectatorPreviewShell({
           coverImageUrl={debate.cover_image_url}
           publisherName={publisherName}
           participantCount={participantCount}
+          fallbackSideLabels={sides.map((s) => s.label)}
         />
 
-        {userId && (
+        {userId && userId !== debate.created_by && (
           <div className="mt-8 sticky bottom-4 z-10">
             <button
               type="button"
@@ -1706,7 +1714,7 @@ function SpectatorPreviewShell({
         )}
       </div>
 
-      {userId && (
+      {userId && userId !== debate.created_by && (
         <InterestedComposer
           open={composerOpen}
           onOpenChange={setComposerOpen}
@@ -1714,7 +1722,7 @@ function SpectatorPreviewShell({
           debateTopic={debate.topic}
           publisherId={debate.created_by}
           publisherName={publisherName}
-          sides={[]}
+          sides={sides.map((s) => ({ id: s.id, label: s.label }))}
         />
       )}
     </AppLayout>
