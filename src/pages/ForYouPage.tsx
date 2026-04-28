@@ -171,7 +171,7 @@ const ForYouPage = () => {
                   mode === "trending" ? "bg-foreground text-background" : "text-muted-foreground"
                 )}
               >
-                Today
+                For You
               </button>
               <button
                 onClick={() => {
