@@ -116,7 +116,7 @@ const HomePage = () => {
                   onClick={() => setMode("trending")}
                   className={`px-2.5 py-0.5 rounded-full text-[11px] font-body transition-colors ${mode === "trending" ? "bg-foreground text-background" : "text-muted-foreground"}`}
                 >
-                  Today
+                  For You
                 </button>
                 <button
                   onClick={() => {
@@ -137,7 +137,7 @@ const HomePage = () => {
                   active={forYouHint.active}
                   baseText={
                     mode === "local"
-                      ? "No local conversations yet. Try Today."
+                      ? "No local conversations yet. Try For You."
                       : "No conversations yet today."
                   }
                   hintMessages={["Break the ice!", "Move a mountain!"]}
