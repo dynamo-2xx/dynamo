@@ -1,121 +1,134 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { TrendingUp, Sparkles, Search, ChevronRight, Hash } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Search } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
-import { useFeaturedDebates, useTrendingDebates, useLatestDebates, type ExploreDebate } from "@/hooks/useExplore";
+import {
+  useFeaturedDebates,
+  useTrendingDebates,
+  useLatestDebates,
+  useDebatesByTag,
+  type ExploreDebate,
+} from "@/hooks/useExplore";
 import { useAllTags } from "@/hooks/useTags";
+import DebateCoverCard from "@/components/home/DebateCoverCard";
+import { cn } from "@/lib/utils";
+
+type ChipId = "all" | "live" | "today" | "latest" | `tag:${string}`;
 
 const ExplorePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const navigate = useNavigate();
-  const { items: featured, loading: loadingFeatured } = useFeaturedDebates(2);
-  const { items: trending } = useTrendingDebates(6);
-  const { items: latest } = useLatestDebates(8);
+  const [activeChip, setActiveChip] = useState<ChipId>("all");
+
+  const { items: featured } = useFeaturedDebates(6);
+  const { items: trending } = useTrendingDebates(24);
+  const { items: latest } = useLatestDebates(24);
   const { tags } = useAllTags();
 
-  const visibleTags = useMemo(() => {
-    // Official tags + community tags with at least 1 debate
-    return tags.filter((t) => t.is_official || t.debate_count > 0).slice(0, 18);
-  }, [tags]);
+  const visibleTags = useMemo(
+    () => tags.filter((t) => t.is_official || t.debate_count > 0).slice(0, 24),
+    [tags],
+  );
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return null;
-    return [...featured, ...trending, ...latest]
-      .filter((d, i, arr) => arr.findIndex((x) => x.id === d.id) === i)
-      .filter((d) => d.topic.toLowerCase().includes(q));
-  }, [searchQuery, featured, trending, latest]);
+  const activeTagId = activeChip.startsWith("tag:") ? activeChip.slice(4) : null;
+  const { items: tagItems } = useDebatesByTag(activeTagId, 30);
+
+  const allMerged = useMemo(() => {
+    const seen = new Set<string>();
+    return [...featured, ...trending, ...latest].filter((d) => {
+      if (seen.has(d.id)) return false;
+      seen.add(d.id);
+      return true;
+    });
+  }, [featured, trending, latest]);
+
+  const chipResults: ExploreDebate[] = useMemo(() => {
+    switch (activeChip) {
+      case "all":
+        return allMerged;
+      case "live":
+        return allMerged.filter((d) => d.status === "live");
+      case "today":
+        return trending;
+      case "latest":
+        return latest;
+      default:
+        return tagItems;
+    }
+  }, [activeChip, allMerged, trending, latest, tagItems]);
+
+  const q = searchQuery.trim().toLowerCase();
+  const displayed = q
+    ? allMerged.filter((d) => d.topic.toLowerCase().includes(q))
+    : chipResults;
+
+  const builtinChips: { id: ChipId; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "live", label: "Live" },
+    { id: "today", label: "Today" },
+    { id: "latest", label: "Latest" },
+  ];
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8 md:py-12">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <h2 className="text-2xl sm:text-3xl font-display mb-6 sm:mb-8">Explore</h2>
-
-          {/* Search */}
-          <div className="relative mb-8 sm:mb-10">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search public debates…"
-              className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-3 text-base sm:text-[13px] font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 transition-colors"
-            />
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 md:py-10">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          {/* Header row */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5 sm:mb-6">
+            <h2 className="text-2xl sm:text-3xl font-display">Explore</h2>
+            <div className="relative sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search public debates…"
+                className="w-full bg-background border border-border rounded-full pl-9 pr-4 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 transition-colors"
+              />
+            </div>
           </div>
 
-          {filtered ? (
-            <div className="space-y-2 mb-12">
-              {filtered.length === 0 ? (
-                <EmptyState text={`No public debates match "${searchQuery}"`} />
-              ) : (
-                filtered.map((d) => <ListRow key={d.id} d={d} onClick={() => navigate(`/debate/${d.id}`)} />)
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Featured */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-                {loadingFeatured ? (
-                  <SkeletonHero />
-                ) : featured.length === 0 ? (
-                  <div className="md:col-span-2">
-                    <EmptyState text="No public debates yet — be the first to publish one." />
-                  </div>
-                ) : (
-                  featured.map((d, i) => <FeaturedCard key={d.id} d={d} index={i} onClick={() => navigate(`/debate/${d.id}`)} />)
-                )}
-              </div>
-
-              {/* Today */}
-              <SectionHeader title="Today" icon={<TrendingUp className="w-4 h-4" />} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-12">
-                {trending.length === 0 ? (
-                  <div className="sm:col-span-2 md:col-span-3">
-                    <EmptyState text="Today picks up as more public debates happen." />
-                  </div>
-                ) : (
-                  trending.map((d, i) => (
-                    <CompactCard key={d.id} d={d} rank={i + 1} onClick={() => navigate(`/debate/${d.id}`)} />
-                  ))
-                )}
-              </div>
-
-              {/* Latest */}
-              <SectionHeader title="Latest" icon={<Sparkles className="w-4 h-4" />} />
-              <div className="space-y-2 mb-12">
-                {latest.length === 0 ? (
-                  <EmptyState text="No recent public debates." />
-                ) : (
-                  latest.map((d) => <ListRow key={d.id} d={d} onClick={() => navigate(`/debate/${d.id}`)} />)
-                )}
-              </div>
-
-              {/* Topics */}
-              <SectionHeader title="More to Explore" />
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                {visibleTags.length === 0 ? (
-                  <div className="col-span-2 sm:col-span-3">
-                    <EmptyState text="Tags will appear here once people start using them." />
-                  </div>
-                ) : (
-                  visibleTags.map((t) => (
-                    <button
+          {/* Chip bar */}
+          {!q && (
+            <div className="sticky top-0 z-10 bg-background/90 backdrop-blur -mx-4 px-4 py-3 mb-6 border-b border-border">
+              <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {builtinChips.map((c) => (
+                  <Chip
+                    key={c.id}
+                    active={activeChip === c.id}
+                    onClick={() => setActiveChip(c.id)}
+                    label={c.label}
+                  />
+                ))}
+                {visibleTags.map((t) => {
+                  const id: ChipId = `tag:${t.id}`;
+                  return (
+                    <Chip
                       key={t.id}
-                      onClick={() => navigate(`/explore/topic/${t.slug}`)}
-                      className="flex items-center justify-between px-5 py-4 rounded-xl border border-border bg-background hover:border-foreground/20 transition-colors text-sm font-body font-medium text-foreground group cursor-pointer"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Hash className="w-3.5 h-3.5 text-muted-foreground" />
-                        {t.name}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">{t.debate_count}</span>
-                    </button>
-                  ))
-                )}
+                      active={activeChip === id}
+                      onClick={() => setActiveChip(id)}
+                      label={`#${t.name}`}
+                    />
+                  );
+                })}
               </div>
-            </>
+            </div>
+          )}
+
+          {/* Grid */}
+          {displayed.length === 0 ? (
+            <EmptyState
+              text={
+                q
+                  ? `No public debates match "${searchQuery}"`
+                  : "Nothing here yet — check back soon."
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-7">
+              {displayed.map((d) => (
+                <ExploreCard key={d.id} d={d} />
+              ))}
+            </div>
           )}
         </motion.div>
       </div>
@@ -123,92 +136,44 @@ const ExplorePage = () => {
   );
 };
 
-/* ── Sub-components ── */
+const Chip = ({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      "shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-body whitespace-nowrap transition-colors border",
+      active
+        ? "bg-foreground text-background border-foreground"
+        : "bg-background text-foreground border-border hover:border-foreground/30",
+    )}
+  >
+    {label}
+  </button>
+);
 
-const SectionHeader = ({ title, icon }: { title: string; icon?: React.ReactNode }) => (
-  <div className="flex items-center gap-2 mb-4 w-fit">
-    {icon}
-    <h3 className="font-display text-lg">{title}</h3>
+const ExploreCard = ({ d }: { d: ExploreDebate }) => (
+  <div className="flex flex-col">
+    <DebateCoverCard d={d} />
+    <div className="mt-2.5 px-0.5">
+      <div className="text-[12px] text-muted-foreground font-body truncate">
+        {d.status === "live" ? (
+          <span className="text-foreground font-medium">LIVE</span>
+        ) : d.publisher_name ? (
+          d.publisher_name
+        ) : (
+          "Anonymous"
+        )}
+        {typeof d.participant_count === "number" && d.participant_count > 0 && (
+          <> · {d.participant_count} speaker{d.participant_count === 1 ? "" : "s"}</>
+        )}
+      </div>
+    </div>
   </div>
 );
 
 const EmptyState = ({ text }: { text: string }) => (
-  <div className="border border-dashed border-border rounded-xl px-5 py-8 text-center text-sm text-muted-foreground font-body">
+  <div className="border border-dashed border-border rounded-xl px-5 py-12 text-center text-sm text-muted-foreground font-body">
     {text}
-  </div>
-);
-
-const SkeletonHero = () => (
-  <>
-    {[0, 1].map((i) => (
-      <div key={i} className="rounded-xl border border-border bg-accent/30 min-h-[220px] animate-pulse" />
-    ))}
-  </>
-);
-
-const FeaturedCard = ({ d, index, onClick }: { d: ExploreDebate; index: number; onClick: () => void }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 12 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.08 }}
-    onClick={onClick}
-    className="relative group cursor-pointer rounded-xl overflow-hidden border border-border bg-accent/40 hover:border-foreground/20 transition-colors"
-  >
-    <div className="p-6 pb-8 flex flex-col justify-between min-h-[220px]">
-      <div>
-        {d.community_tag && (
-          <span className="text-[10px] font-body font-medium uppercase tracking-wider text-muted-foreground">
-            {d.community_tag}
-          </span>
-        )}
-        {!d.community_tag && d.status === "live" && (
-          <span className="text-[10px] font-body font-medium uppercase tracking-wider text-muted-foreground">LIVE</span>
-        )}
-        <h3 className="font-display text-lg mt-1 leading-snug">{d.topic}</h3>
-      </div>
-      <div className="mt-auto pt-4 flex items-center gap-3">
-        {d.status === "live" && (
-          <span className="flex items-center gap-1.5 text-[10px] font-body font-medium uppercase tracking-wider bg-[#dcfce7] text-[#166534] dark:bg-[#166534]/20 dark:text-[#4ade80] px-2.5 py-0.5 rounded-full">
-            <span className="w-1.5 h-1.5 bg-[#166534] dark:bg-[#4ade80] rounded-full animate-pulse" />
-            Live
-          </span>
-        )}
-        <span className="text-[11px] text-muted-foreground font-body">{d.participant_count} speakers</span>
-        {d.publisher_name && (
-          <span className="text-[11px] text-muted-foreground font-body truncate">· by {d.publisher_name}</span>
-        )}
-      </div>
-    </div>
-  </motion.div>
-);
-
-const CompactCard = ({ d, rank, onClick }: { d: ExploreDebate; rank: number; onClick: () => void }) => (
-  <div
-    onClick={onClick}
-    className="border border-border rounded-xl p-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group"
-  >
-    <span className="text-[10px] font-body text-muted-foreground font-medium">#{rank} Today</span>
-    <h4 className="font-display text-sm mt-1 leading-snug line-clamp-2">{d.topic}</h4>
-    <div className="text-[11px] text-muted-foreground font-body mt-3">
-      {d.participant_count} speakers · {new Date(d.created_at).toLocaleDateString()}
-      {d.publisher_name ? ` · by ${d.publisher_name}` : ""}
-    </div>
-  </div>
-);
-
-const ListRow = ({ d, onClick }: { d: ExploreDebate; onClick: () => void }) => (
-  <div
-    onClick={onClick}
-    className="flex items-center gap-4 border border-border rounded-xl px-5 py-4 hover:border-foreground/20 transition-colors cursor-pointer bg-background group"
-  >
-    <div className="flex-1 min-w-0">
-      <h4 className="font-display text-sm leading-snug truncate">{d.topic}</h4>
-      <div className="text-[11px] text-muted-foreground font-body mt-1.5">
-        {new Date(d.created_at).toLocaleDateString()} · {d.participant_count} speakers
-        {d.publisher_name ? ` · by ${d.publisher_name}` : ""}
-      </div>
-    </div>
-    <ChevronRight className="w-4 h-4 text-muted-foreground" />
   </div>
 );
 
