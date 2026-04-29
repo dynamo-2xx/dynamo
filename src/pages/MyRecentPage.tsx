@@ -8,6 +8,7 @@ import BulkActionBar from "@/components/home/BulkActionBar";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useDeleteAnimation } from "@/hooks/useDeleteAnimation";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ const MyRecentPage = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { items, loading, removeItem, patchItem } = useMyRecentDebates(60);
+  const { isRemoving, animateRemove } = useDeleteAnimation();
   const [showAll, setShowAll] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -86,7 +88,7 @@ const MyRecentPage = () => {
       toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
       return;
     }
-    ids.forEach((id) => removeItem(id));
+    animateRemove(ids, removeItem);
     toast({ title: `${ids.length} archived`, description: "Find them in My Agenda → Archive" });
     exitSelection();
   };
@@ -105,7 +107,7 @@ const MyRecentPage = () => {
       toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
       return;
     }
-    ids.forEach((id) => removeItem(id));
+    animateRemove(ids, removeItem);
     toast({ title: `${ids.length} deleted` });
     exitSelection();
   };
@@ -130,7 +132,7 @@ const MyRecentPage = () => {
       toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
       return;
     }
-    removeItem(item.id);
+    animateRemove(item.id, removeItem);
     toast({ title: "Archived" });
   };
 
@@ -144,7 +146,7 @@ const MyRecentPage = () => {
       toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
       return;
     }
-    removeItem(item.id);
+    animateRemove(item.id, removeItem);
     toast({ title: "Deleted" });
   };
 
@@ -226,6 +228,7 @@ const MyRecentPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {visible.map((d) => {
                 const isOwner = !!user && d.created_by === user.id;
+                const removing = isRemoving(d.id);
                 const card = (
                   <DebateCoverCard
                     d={d}
@@ -233,19 +236,29 @@ const MyRecentPage = () => {
                     selected={selected.has(d.id)}
                     onToggleSelected={toggle}
                     onChanged={(action, id, patch) => {
-                      if (action === "removed") removeItem(id);
+                      if (action === "removed") animateRemove(id, removeItem);
                       else if (action === "updated" && patch) patchItem(id, patch);
                     }}
                   />
                 );
 
                 if (!isMobile || selectionMode || !isOwner) {
-                  return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
+                  return (
+                    <div
+                      key={`${d.kind || "debate"}-${d.id}`}
+                      className={removing ? "deleting-item" : undefined}
+                    >
+                      {card}
+                    </div>
+                  );
                 }
 
                 return (
-                  <SwipeableDebateCard
+                  <div
                     key={`${d.kind || "debate"}-${d.id}`}
+                    className={removing ? "deleting-item" : undefined}
+                  >
+                  <SwipeableDebateCard
                     enabled
                     isPublic={!!d.is_public}
                     busy={busy}
@@ -260,6 +273,7 @@ const MyRecentPage = () => {
                   >
                     {card}
                   </SwipeableDebateCard>
+                  </div>
                 );
               })}
             </div>
