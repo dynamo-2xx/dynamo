@@ -28,7 +28,7 @@ export function useForYouDebates(mode: Mode, limit = 12) {
       let query = supabase
         .from("debates")
         .select(
-          "id, topic, status, cover_image_url, created_at, location, is_public, created_by, debate_participants(count)",
+          "id, topic, status, cover_image_url, created_at, scheduled_at, location, is_public, created_by, debate_participants(count)",
         )
         .not("status", "in", "(draft,archived)");
 
@@ -46,6 +46,7 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         status: d.status,
         cover_image_url: d.cover_image_url,
         created_at: d.created_at,
+        scheduled_at: d.scheduled_at,
         is_public: d.is_public,
         created_by: d.created_by,
         participant_count: d.debate_participants?.[0]?.count ?? 0,
@@ -120,7 +121,7 @@ export function useMyRecentDebates(limit = 12) {
       const { data: created } = await supabase
         .from("debates")
         .select(
-          "id, topic, status, cover_image_url, created_at, updated_at, is_public, created_by, debate_participants(count)",
+          "id, topic, status, cover_image_url, created_at, updated_at, scheduled_at, is_public, created_by, debate_participants(count)",
         )
         .eq("created_by", user.id)
         .neq("status", "archived")
@@ -131,7 +132,7 @@ export function useMyRecentDebates(limit = 12) {
       const { data: parts } = await supabase
         .from("debate_participants")
         .select(
-          "debate_id, debates(id, topic, status, cover_image_url, created_at, updated_at, is_public, created_by, debate_participants(count))",
+          "debate_id, debates(id, topic, status, cover_image_url, created_at, updated_at, scheduled_at, is_public, created_by, debate_participants(count))",
         )
         .eq("user_id", user.id)
         .limit(limit);
@@ -156,6 +157,7 @@ export function useMyRecentDebates(limit = 12) {
           status: d.status,
           cover_image_url: d.cover_image_url,
           created_at: (d as any).updated_at || d.created_at,
+          scheduled_at: (d as any).scheduled_at,
           is_public: (d as any).is_public,
           created_by: (d as any).created_by,
           participant_count: (d as any).debate_participants?.[0]?.count ?? 0,
@@ -172,6 +174,7 @@ export function useMyRecentDebates(limit = 12) {
           status: d.status,
           cover_image_url: d.cover_image_url,
           created_at: d.updated_at || d.created_at,
+          scheduled_at: d.scheduled_at,
           is_public: d.is_public,
           created_by: d.created_by,
           participant_count: d.debate_participants?.[0]?.count ?? 0,

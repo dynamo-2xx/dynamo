@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check } from "lucide-react";
+import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check, HandHeart, Calendar } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { formatUpcomingShort } from "@/lib/date";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,7 @@ export interface DebateCoverItem {
   cover_image_url?: string | null;
   participant_count?: number;
   created_at?: string;
+  scheduled_at?: string | null;
   created_by?: string;
   is_public?: boolean;
   kind?: "debate" | "live_session";
@@ -58,6 +60,7 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const isOwner = !!user && !!d.created_by && user.id === d.created_by;
   const showOwnerControls = isOwner && !isLive && !selectionMode && !isLiveSession;
   const selectable = !!selectionMode && isOwner;
+  const happeningLabel = isScheduled && !isLiveSession ? formatUpcomingShort(d.scheduled_at) : null;
   // Scheduled/draft debates always route to preview (owner sees coordination panel,
   // non-owners see the Interested CTA). Live/completed go straight into the room.
   const linkTo = isLiveSession
@@ -138,6 +141,27 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
           Archived
         </span>
       );
+    }
+    // Scheduled / draft debates: if creator set a scheduled_at, show the date pill;
+    // otherwise prompt non-owners with INTERESTED?
+    if (isScheduled) {
+      if (happeningLabel) {
+        return (
+          <span className={cn(PILL_BASE, "bg-background/95 text-foreground")}>
+            <Calendar className="w-2.5 h-2.5" />
+            Happening {happeningLabel}
+          </span>
+        );
+      }
+      if (!isOwner) {
+        return (
+          <span className={cn(PILL_BASE, "bg-foreground text-background border-foreground")}>
+            <HandHeart className="w-2.5 h-2.5" />
+            Interested?
+          </span>
+        );
+      }
+      // Owner without a scheduled time keeps privacy pill (falls through below)
     }
     if (isOwner) {
       return d.is_public ? (
