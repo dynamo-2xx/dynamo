@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.detect-cross-refs]
 verify_jwt = false
+
+[functions.dispatch-debate-start-push]
+verify_jwt = false
