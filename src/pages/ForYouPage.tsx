@@ -7,6 +7,7 @@ import DebateCoverCard from "@/components/home/DebateCoverCard";
 import BulkActionBar from "@/components/home/BulkActionBar";
 import AppLayout from "@/components/AppLayout";
 import LocationPrompt from "@/components/home/LocationPrompt";
+import { useDeleteAnimation } from "@/hooks/useDeleteAnimation";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ const ForYouPage = () => {
   const [showAll, setShowAll] = useState(false);
   const { user, profile } = useAuth();
   const { items, loading, removeItem, patchItem } = useForYouDebates(mode, 60);
+  const { isRemoving, animateRemove } = useDeleteAnimation();
   const hasLocation = !!profile?.location;
   const visible = showAll ? items : items.slice(0, INITIAL_VISIBLE);
   const hasMore = items.length > INITIAL_VISIBLE;
@@ -100,7 +102,7 @@ const ForYouPage = () => {
       toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
       return;
     }
-    ids.forEach((id) => removeItem(id));
+    animateRemove(ids, removeItem);
     toast({ title: `${ids.length} archived`, description: "Find them in My Agenda → Archive" });
     reportSkipped(ids.length, selected.size);
     exitSelection();
@@ -121,7 +123,7 @@ const ForYouPage = () => {
       toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
       return;
     }
-    ids.forEach((id) => removeItem(id));
+    animateRemove(ids, removeItem);
     toast({ title: `${ids.length} deleted` });
     reportSkipped(ids.length, selected.size);
     exitSelection();
@@ -202,17 +204,21 @@ const ForYouPage = () => {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {visible.map((d) => (
-                <DebateCoverCard
+                <div
                   key={d.id}
-                  d={d}
-                  selectionMode={selectionMode}
-                  selected={selected.has(d.id)}
-                  onToggleSelected={toggle}
-                  onChanged={(action, id, patch) => {
-                    if (action === "removed") removeItem(id);
-                    else if (action === "updated" && patch) patchItem(id, patch);
-                  }}
-                />
+                  className={isRemoving(d.id) ? "deleting-item" : undefined}
+                >
+                  <DebateCoverCard
+                    d={d}
+                    selectionMode={selectionMode}
+                    selected={selected.has(d.id)}
+                    onToggleSelected={toggle}
+                    onChanged={(action, id, patch) => {
+                      if (action === "removed") animateRemove(id, removeItem);
+                      else if (action === "updated" && patch) patchItem(id, patch);
+                    }}
+                  />
+                </div>
               ))}
             </div>
 
