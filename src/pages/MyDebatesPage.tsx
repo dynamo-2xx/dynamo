@@ -55,7 +55,7 @@ const MyDebatesPage = () => {
       // Active debates I created (not draft, not archived)
       const { data: created } = await supabase
         .from("debates")
-        .select("id, topic, status, cover_image_url, created_at, is_public, created_by, debate_participants(count)")
+        .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
         .eq("created_by", user.id)
         .not("status", "in", "(draft,archived)")
         .order("created_at", { ascending: false });
@@ -73,7 +73,7 @@ const MyDebatesPage = () => {
       if (extraIds.length > 0) {
         const { data } = await supabase
           .from("debates")
-          .select("id, topic, status, cover_image_url, created_at, is_public, created_by, debate_participants(count)")
+          .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
           .in("id", extraIds)
           .not("status", "in", "(draft,archived)")
           .order("created_at", { ascending: false });
@@ -90,6 +90,7 @@ const MyDebatesPage = () => {
           status: d.status,
           cover_image_url: d.cover_image_url,
           created_at: d.created_at,
+          scheduled_at: d.scheduled_at,
           is_public: d.is_public,
           created_by: d.created_by,
           participant_count: d.debate_participants?.[0]?.count ?? 0,
@@ -99,7 +100,7 @@ const MyDebatesPage = () => {
       // Archive (drafts + archived) I created
       const { data: myArchive } = await supabase
         .from("debates")
-        .select("id, topic, status, cover_image_url, created_at, is_public, created_by, debate_participants(count)")
+        .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
         .eq("created_by", user.id)
         .in("status", ["draft", "archived"])
         .order("created_at", { ascending: false });
@@ -112,6 +113,7 @@ const MyDebatesPage = () => {
           status: d.status,
           cover_image_url: d.cover_image_url,
           created_at: d.created_at,
+          scheduled_at: d.scheduled_at,
           is_public: d.is_public,
           created_by: d.created_by,
           participant_count: d.debate_participants?.[0]?.count ?? 0,
