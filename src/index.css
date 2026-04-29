@@ -135,4 +135,30 @@
     0%   { background-color: hsl(48 96% 70% / 0.55); }
     100% { background-color: transparent; }
   }
+  /* Smooth fade + collapse used when a card is being deleted from a list. */
+  .deleting-item {
+    animation: delete-collapse 320ms ease-in forwards;
+    transform-origin: center top;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  @keyframes delete-collapse {
+    0% {
+      opacity: 1;
+      transform: scale(1) translateX(0);
+      max-height: 600px;
+      margin-bottom: inherit;
+    }
+    40% {
+      opacity: 0;
+      transform: scale(0.95) translateX(24px);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(0.9) translateX(40px);
+      max-height: 0;
+      margin: 0;
+      padding: 0;
+    }
+  }
 }
