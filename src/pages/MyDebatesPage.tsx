@@ -9,6 +9,7 @@ import BulkActionBar from "@/components/home/BulkActionBar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useDeleteAnimation } from "@/hooks/useDeleteAnimation";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -25,6 +26,7 @@ import {
 const MyDebatesPage = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const { isRemoving, animateRemove } = useDeleteAnimation();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const activeTab =
@@ -195,7 +197,7 @@ const MyDebatesPage = () => {
       toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
       return;
     }
-    removeFromList(item.id);
+    animateRemove(item.id, removeFromList);
     toast({ title: "Deleted" });
   };
 
@@ -330,7 +332,7 @@ const MyDebatesPage = () => {
     if (errors.length > 0) {
       toast({ title: "Some deletions failed", description: errors.join("; "), variant: "destructive" });
     }
-    items.forEach((i) => removeFromList(i.id));
+    animateRemove(items.map((i) => i.id), removeFromList);
     toast({ title: `${items.length} deleted` });
     exitSelection();
   };
@@ -455,6 +457,7 @@ const MyDebatesPage = () => {
           ) : (() => {
             const renderCard = (d: DebateCoverItem) => {
               const isOwner = !!user && d.created_by === user.id;
+              const removing = isRemoving(d.id);
               const card = (
                 <DebateCoverCard
                   d={d}
@@ -462,17 +465,27 @@ const MyDebatesPage = () => {
                   selected={selected.has(d.id)}
                   onToggleSelected={toggle}
                   onChanged={(action, id, patch) => {
-                    if (action === "removed") removeFromList(id);
+                    if (action === "removed") animateRemove(id, removeFromList);
                     else if (action === "updated" && patch) patchInList(id, patch);
                   }}
                 />
               );
               if (!isMobile || !isOwner || selectionMode) {
-                return <div key={`${d.kind || "debate"}-${d.id}`}>{card}</div>;
+                return (
+                  <div
+                    key={`${d.kind || "debate"}-${d.id}`}
+                    className={removing ? "deleting-item" : undefined}
+                  >
+                    {card}
+                  </div>
+                );
               }
               return (
-                <SwipeableDebateCard
+                <div
                   key={`${d.kind || "debate"}-${d.id}`}
+                  className={removing ? "deleting-item" : undefined}
+                >
+                <SwipeableDebateCard
                   enabled
                   isPublic={!!d.is_public}
                   forceClose={closeSignal}
@@ -486,6 +499,7 @@ const MyDebatesPage = () => {
                 >
                   {card}
                 </SwipeableDebateCard>
+                </div>
               );
             };
 
