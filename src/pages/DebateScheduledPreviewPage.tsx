@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, HandHeart, Loader2 } from "lucide-react";
+import { ArrowLeft, HandHeart, Loader2, Bell, MessageSquare, Check } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +9,9 @@ import InterestedComposer from "@/components/debate/InterestedComposer";
 import InterestedInboxPanel from "@/components/debate/InterestedInboxPanel";
 import TagPicker from "@/components/tags/TagPicker";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ensurePushSubscribed, pushSupported } from "@/lib/push";
+import { toast } from "@/hooks/use-toast";
 
 interface Subtopic {
   id: string;
@@ -33,6 +36,8 @@ const DebateScheduledPreviewPage = () => {
   const [publisherName, setPublisherName] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"overview" | "tags" | "interested">("overview");
   const [participantCount, setParticipantCount] = useState<number>(0);
+  const [notifySubscribed, setNotifySubscribed] = useState(false);
+  const [notifyBusy, setNotifyBusy] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -70,6 +75,16 @@ const DebateScheduledPreviewPage = () => {
         .select("id", { count: "exact", head: true })
         .eq("debate_id", id);
       if (!cancelled) setParticipantCount(count || 0);
+
+      if (user) {
+        const { data: sub } = await supabase
+          .from("debate_notify_subscriptions")
+          .select("id")
+          .eq("debate_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!cancelled) setNotifySubscribed(!!sub);
+      }
     })();
     return () => {
       cancelled = true;
@@ -99,6 +114,48 @@ const DebateScheduledPreviewPage = () => {
 
   const isOwner = !!user && user.id === debate.created_by;
   const showInterestedCta = !!user && !isOwner;
+
+  const handleToggleNotify = async () => {
+    if (!user || !id) return;
+    setNotifyBusy(true);
+    try {
+      if (notifySubscribed) {
+        await supabase
+          .from("debate_notify_subscriptions")
+          .delete()
+          .eq("debate_id", id)
+          .eq("user_id", user.id);
+        setNotifySubscribed(false);
+        toast({ description: "You won't be notified when this debate starts." });
+      } else {
+        const { error } = await supabase
+          .from("debate_notify_subscriptions")
+          .insert({ debate_id: id, user_id: user.id });
+        if (error) throw error;
+
+        // Try to set up browser push (background notifications). Falls back gracefully.
+        if (pushSupported()) {
+          const res = await ensurePushSubscribed();
+          if (!res.ok && res.reason === "denied") {
+            toast({
+              title: "Notifications blocked",
+              description: "Enable browser notifications in your site settings to get a push when this starts.",
+            });
+          } else if (!res.ok && res.reason === "preview") {
+            toast({
+              description: "You'll be notified in-app. Browser push works on the published site.",
+            });
+          }
+        }
+        setNotifySubscribed(true);
+        toast({ description: "We'll notify you when this debate starts." });
+      }
+    } catch (e: any) {
+      toast({ title: "Couldn't update notification", description: e?.message ?? "Try again." });
+    } finally {
+      setNotifyBusy(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -189,14 +246,47 @@ const DebateScheduledPreviewPage = () => {
         {/* Interested CTA — opens DM composer */}
         {showInterestedCta && (
           <div className="mt-8 sticky bottom-4 z-10">
-            <button
-              type="button"
-              onClick={() => setComposerOpen(true)}
-              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-foreground text-background text-sm font-body font-medium hover:opacity-90 transition-opacity shadow-lg"
-            >
-              <HandHeart className="w-4 h-4" />
-              Interested?
-            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-foreground text-background text-sm font-body font-medium hover:opacity-90 transition-opacity shadow-lg"
+                >
+                  <HandHeart className="w-4 h-4" />
+                  Interested?
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-1.5" align="center" side="top">
+                <button
+                  type="button"
+                  onClick={() => setComposerOpen(true)}
+                  className="w-full flex items-start gap-3 p-3 rounded-md hover:bg-accent transition-colors text-left"
+                >
+                  <MessageSquare className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <div className="text-sm font-body font-medium">Message the publisher</div>
+                    <div className="text-xs text-muted-foreground">Start a DM about joining or scheduling.</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  disabled={notifyBusy}
+                  onClick={handleToggleNotify}
+                  className="w-full flex items-start gap-3 p-3 rounded-md hover:bg-accent transition-colors text-left disabled:opacity-50"
+                >
+                  <Bell className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <div className="text-sm font-body font-medium flex items-center gap-1.5">
+                      Notify me when it starts
+                      {notifySubscribed && <Check className="w-3.5 h-3.5 text-foreground" />}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {notifySubscribed ? "On — tap to turn off." : "Browser push when this debate goes live."}
+                    </div>
+                  </div>
+                </button>
+              </PopoverContent>
+            </Popover>
           </div>
         )}
       </div>
