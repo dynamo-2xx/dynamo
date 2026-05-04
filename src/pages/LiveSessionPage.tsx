@@ -266,7 +266,7 @@ const LiveSessionPage = () => {
     }
 
     navigate(`/live/${d.id}`, { replace: true });
-  }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName]);
+  }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName, coverImageUrl]);
 
   const handleEndSession = useCallback(async () => {
     if (!isMulti) {
