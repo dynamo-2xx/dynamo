@@ -919,6 +919,7 @@ export type Database = {
       }
       live_sessions: {
         Row: {
+          cover_image_url: string | null
           created_at: string
           created_by: string
           ended_at: string | null
@@ -935,6 +936,7 @@ export type Database = {
           transcript_entries: Json
         }
         Insert: {
+          cover_image_url?: string | null
           created_at?: string
           created_by: string
           ended_at?: string | null
@@ -951,6 +953,7 @@ export type Database = {
           transcript_entries?: Json
         }
         Update: {
+          cover_image_url?: string | null
           created_at?: string
           created_by?: string
           ended_at?: string | null
@@ -1167,6 +1170,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      record_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          parent_id: string | null
+          record_id: string
+          record_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          record_id: string
+          record_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          record_id?: string
+          record_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "record_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "record_comments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       round_summaries: {
         Row: {
@@ -1469,7 +1513,7 @@ export type Database = {
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
       can_view_record: {
-        Args: { _id: string; _type: string }
+        Args: { _record_id: string; _record_type: string }
         Returns: boolean
       }
       cmm_end_round: {
