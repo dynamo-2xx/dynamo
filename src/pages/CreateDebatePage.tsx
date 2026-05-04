@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import TagPicker from "@/components/tags/TagPicker";
+import CoverImageUploader from "@/components/upload/CoverImageUploader";
 import type { Tag } from "@/hooks/useTags";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send, Play, Pencil, Check, Wifi } from "lucide-react";
@@ -86,6 +87,7 @@ const CreateDebatePage = () => {
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [description, setDescription] = useState("");
   const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   // Stable IDs for subtopic editor rows — prevents input remount on every keystroke.
   const [subtopicItems, setSubtopicItems] = useState<{ id: string; title: string }[]>([]);
 
