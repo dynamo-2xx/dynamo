@@ -424,6 +424,13 @@ const ExploreDebateDetailPage = () => {
               );
             })}
           </div>
+
+          <div className="mt-8">
+            <RecordCommentsSection
+              recordType={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
+              recordId={debate.id}
+            />
+          </div>
         </motion.div>
       </div>
     </AppLayout>
