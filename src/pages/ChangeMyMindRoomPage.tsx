@@ -14,6 +14,7 @@ import { useCmmLiveCapture } from "@/hooks/useCmmLiveCapture";
 import CmmLiveTranscript from "@/components/cmm/CmmLiveTranscript";
 import { useGrading } from "@/hooks/useGrading";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 
 interface DebateRow {
   id: string;
