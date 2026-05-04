@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/record/SessionRecordViewV2";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import LiveThreadView from "@/components/live/LiveThreadView";
 import TagPicker from "@/components/tags/TagPicker";
 import type { Tag } from "@/hooks/useTags";
@@ -342,6 +343,11 @@ const LiveSessionPage = () => {
           onEntriesUpdate={() => {}}
           onSpeakerNamesUpdate={setSpeakerNames}
         />
+        {sessionId && (
+          <div className="max-w-5xl mx-auto px-4 pb-12">
+            <RecordCommentsSection recordType="live_session" recordId={sessionId} />
+          </div>
+        )}
       </AppLayout>
     );
   }
