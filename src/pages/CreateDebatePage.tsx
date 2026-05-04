@@ -167,6 +167,7 @@ const CreateDebatePage = () => {
             feedback_enabled: feedbackEnabled,
             description: description.trim() || null,
             max_speakers_per_side: maxSpeakersPerSide,
+            cover_image_url: coverImageUrl,
           } as any)
           .select()
           .single();
