@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Users, MessageSquare, Clock, Shield, ChevronDown, ArrowRight, Quote } from "lucide-react";
 import { useState } from "react";
 import AppLayout from "@/components/AppLayout";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 
 /* ── Mock data ── */
 
