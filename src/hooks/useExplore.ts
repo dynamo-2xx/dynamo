@@ -238,6 +238,7 @@ export function useLiveSessionsByTag(tagId: string | null, limit = 50) {
         .select("id, title, status, created_at, ended_at, share_token")
         .in("id", ids)
         .not("share_token", "is", null)
+        .neq("status", "archived")
         .order("created_at", { ascending: false });
       if (!cancelled) {
         setItems((data || []) as ExploreLiveSession[]);
