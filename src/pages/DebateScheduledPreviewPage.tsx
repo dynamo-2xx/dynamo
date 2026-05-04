@@ -290,6 +290,13 @@ const DebateScheduledPreviewPage = () => {
             </Popover>
           </div>
         )}
+
+        <div className="mt-6">
+          <RecordCommentsSection
+            recordType={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
+            recordId={debate.id}
+          />
+        </div>
       </div>
 
       {showInterestedCta && (
