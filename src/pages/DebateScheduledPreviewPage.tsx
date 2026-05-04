@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import InterestedComposer from "@/components/debate/InterestedComposer";
 import InterestedInboxPanel from "@/components/debate/InterestedInboxPanel";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import TagPicker from "@/components/tags/TagPicker";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
