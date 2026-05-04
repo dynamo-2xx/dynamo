@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import TagPicker from "@/components/tags/TagPicker";
+import CoverImageUploader from "@/components/upload/CoverImageUploader";
 import type { Tag } from "@/hooks/useTags";
 import { useTagMutations } from "@/hooks/useTags";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +31,7 @@ const CreateChangeMyMindPage = () => {
   const [isPublic, setIsPublic] = useState(true);
   const [gradingEnabled, setGradingEnabled] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
   const { attachTag } = useTagMutations();
 
@@ -77,6 +79,7 @@ const CreateChangeMyMindPage = () => {
           status: "scheduled",
           format: "change_my_mind",
           grading_enabled: gradingEnabled,
+          cover_image_url: coverUrl,
         } as any)
         .select()
         .single();
@@ -197,6 +200,8 @@ const CreateChangeMyMindPage = () => {
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Tags</Label>
               <TagPicker kind="debate" recordId={null} buffered={bufferedTags} onBufferedChange={setBufferedTags} />
             </div>
+
+            <CoverImageUploader value={coverUrl} onChange={setCoverUrl} seed={topic || prompt} />
 
             <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2.5">
               <div className="flex items-center gap-2 text-sm">
