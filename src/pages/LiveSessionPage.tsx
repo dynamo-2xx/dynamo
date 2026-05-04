@@ -5,8 +5,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/record/SessionRecordViewV2";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import LiveThreadView from "@/components/live/LiveThreadView";
 import TagPicker from "@/components/tags/TagPicker";
+import CoverImageUploader from "@/components/upload/CoverImageUploader";
 import type { Tag } from "@/hooks/useTags";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +51,7 @@ const LiveSessionPage = () => {
   const [sessionData, setSessionData] = useState<any>(null);
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [setupTags, setSetupTags] = useState<Tag[]>([]);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [hostDisplayName, setHostDisplayName] = useState<string>("");
   const [hostSpeakerSlot, setHostSpeakerSlot] = useState<number>(1);
@@ -217,6 +220,7 @@ const LiveSessionPage = () => {
         title: title.trim() || null,
         mode,
         status: "recording",
+        cover_image_url: coverImageUrl,
       } as any)
       .select()
       .single();
@@ -262,7 +266,7 @@ const LiveSessionPage = () => {
     }
 
     navigate(`/live/${d.id}`, { replace: true });
-  }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName]);
+  }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName, coverImageUrl]);
 
   const handleEndSession = useCallback(async () => {
     if (!isMulti) {
@@ -342,6 +346,11 @@ const LiveSessionPage = () => {
           onEntriesUpdate={() => {}}
           onSpeakerNamesUpdate={setSpeakerNames}
         />
+        {sessionId && (
+          <div className="max-w-5xl mx-auto px-4 pb-12">
+            <RecordCommentsSection recordType="live_session" recordId={sessionId} />
+          </div>
+        )}
       </AppLayout>
     );
   }
@@ -415,6 +424,14 @@ const LiveSessionPage = () => {
                   onBufferedChange={setSetupTags}
                   max={5}
                   compact
+                />
+              </div>
+
+              <div className="bg-card border border-border rounded-xl p-5">
+                <CoverImageUploader
+                  value={coverImageUrl}
+                  onChange={setCoverImageUrl}
+                  seed={title || "live"}
                 />
               </div>
 

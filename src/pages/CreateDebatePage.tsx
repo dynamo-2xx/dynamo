@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import TagPicker from "@/components/tags/TagPicker";
+import CoverImageUploader from "@/components/upload/CoverImageUploader";
 import type { Tag } from "@/hooks/useTags";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { ArrowRight, Plus, Minus, X, Sparkles, Globe, Lock, Users, Mail, GripVertical, Clock, Mic, MapPin, Calendar as CalendarIcon, Swords, Handshake, Award, ChevronDown, ArrowLeft, Send, Play, Pencil, Check, Wifi } from "lucide-react";
@@ -86,6 +87,7 @@ const CreateDebatePage = () => {
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [description, setDescription] = useState("");
   const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   // Stable IDs for subtopic editor rows — prevents input remount on every keystroke.
   const [subtopicItems, setSubtopicItems] = useState<{ id: string; title: string }[]>([]);
 
@@ -165,6 +167,7 @@ const CreateDebatePage = () => {
             feedback_enabled: feedbackEnabled,
             description: description.trim() || null,
             max_speakers_per_side: maxSpeakersPerSide,
+            cover_image_url: coverImageUrl,
           } as any)
           .select()
           .single();
@@ -341,6 +344,7 @@ const CreateDebatePage = () => {
       );
       setFeedbackEnabled(!!d.feedback_enabled);
       setDescription(d.description || "");
+      setCoverImageUrl(d.cover_image_url || null);
       setResolutionAdded(true);
       setLoadedStatus(d.status ?? null);
       setEditLoading(false);
@@ -709,6 +713,7 @@ const CreateDebatePage = () => {
             scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
             feedback_enabled: feedbackEnabled,
             description: description.trim() || null,
+            cover_image_url: coverImageUrl,
           } as any)
           .eq("id", editId)
           .select()
@@ -757,6 +762,7 @@ const CreateDebatePage = () => {
             scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
             feedback_enabled: feedbackEnabled,
             description: description.trim() || null,
+            cover_image_url: coverImageUrl,
           } as any)
           .select()
           .single();
@@ -1084,6 +1090,15 @@ const CreateDebatePage = () => {
                     onBufferedChange={setSelectedTags}
                     max={5}
                     compact
+                  />
+                </div>
+
+                {/* Cover image */}
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <CoverImageUploader
+                    value={coverImageUrl}
+                    onChange={setCoverImageUrl}
+                    seed={debate?.topic || prompt}
                   />
                 </div>
 

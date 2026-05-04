@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Users, MessageSquare, Clock, Shield, ChevronDown, ArrowRight, Quote } from "lucide-react";
 import { useState } from "react";
 import AppLayout from "@/components/AppLayout";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 
 /* ── Mock data ── */
 
@@ -423,6 +424,13 @@ const ExploreDebateDetailPage = () => {
                 </motion.div>
               );
             })}
+          </div>
+
+          <div className="mt-8">
+            <RecordCommentsSection
+              recordType={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
+              recordId={debate.id}
+            />
           </div>
         </motion.div>
       </div>

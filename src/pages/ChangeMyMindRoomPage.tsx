@@ -14,6 +14,7 @@ import { useCmmLiveCapture } from "@/hooks/useCmmLiveCapture";
 import CmmLiveTranscript from "@/components/cmm/CmmLiveTranscript";
 import { useGrading } from "@/hooks/useGrading";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 
 interface DebateRow {
   id: string;
@@ -419,6 +420,10 @@ const ChangeMyMindRoomPage = () => {
           topic={debate.topic}
           onJoined={refresh}
         />
+
+        <div className="mt-8">
+          <RecordCommentsSection recordType="change_my_mind" recordId={debate.id} />
+        </div>
       </div>
       {user && (
         <RecordToolsMount

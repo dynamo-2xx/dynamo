@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
 import SessionRecordView from "@/components/live/record/SessionRecordViewV2";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 
 const SharedLiveSessionPage = () => {
   const { token } = useParams<{ token: string }>();
@@ -61,6 +62,9 @@ const SharedLiveSessionPage = () => {
         shareToken={session.share_token}
         readOnly
       />
+      <div className="max-w-5xl mx-auto px-4 pb-12">
+        <RecordCommentsSection recordType="live_session" recordId={session.id} />
+      </div>
     </AppLayout>
   );
 };

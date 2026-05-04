@@ -14,6 +14,7 @@ import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
+import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
@@ -1699,6 +1700,13 @@ function SpectatorPreviewShell({
           participantCount={participantCount}
           fallbackSideLabels={sides.map((s) => s.label)}
         />
+
+        <div className="mt-8">
+          <RecordCommentsSection
+            recordType={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
+            recordId={debate.id}
+          />
+        </div>
 
         {userId && userId !== debate.created_by && (
           <div className="mt-8 sticky bottom-4 z-10">
