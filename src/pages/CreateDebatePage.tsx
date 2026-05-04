@@ -343,6 +343,7 @@ const CreateDebatePage = () => {
       );
       setFeedbackEnabled(!!d.feedback_enabled);
       setDescription(d.description || "");
+      setCoverImageUrl(d.cover_image_url || null);
       setResolutionAdded(true);
       setLoadedStatus(d.status ?? null);
       setEditLoading(false);
@@ -711,6 +712,7 @@ const CreateDebatePage = () => {
             scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
             feedback_enabled: feedbackEnabled,
             description: description.trim() || null,
+            cover_image_url: coverImageUrl,
           } as any)
           .eq("id", editId)
           .select()
@@ -759,6 +761,7 @@ const CreateDebatePage = () => {
             scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
             feedback_enabled: feedbackEnabled,
             description: description.trim() || null,
+            cover_image_url: coverImageUrl,
           } as any)
           .select()
           .single();
@@ -1086,6 +1089,15 @@ const CreateDebatePage = () => {
                     onBufferedChange={setSelectedTags}
                     max={5}
                     compact
+                  />
+                </div>
+
+                {/* Cover image */}
+                <div className="bg-background border border-border rounded-lg p-5">
+                  <CoverImageUploader
+                    value={coverImageUrl}
+                    onChange={setCoverImageUrl}
+                    seed={debate?.topic || prompt}
                   />
                 </div>
 
