@@ -1,119 +1,102 @@
-
-## Goal
-
-1. **Block "End Session" spamming** during transcript analysis with a real progress bar + disabled button.
-2. **Resume a live session as a live session** (not as a debate). New entries appear after a clear "Resumed …" divider.
-3. **Quick "Generate sequel" shortcut on debate / change-my-mind records.** This does NOT touch live sessions. Sequel = a brand-new debate (or CMM) that's a copy of the original, auto-titled `Original Title #2`, `#3`, etc. Saves the user a trip through the home page generator.
+## Goals
+1. Add a comments section to debates, live sessions, and Change-My-Mind records (preview + post-record).
+2. Allow optional cover image upload during creation of debates, lives, and CMM — and editable later.
+3. Hide archived items from Home and Explore everywhere; only show in profile My Agenda.
 
 ---
 
-## Part 1 — Analysis progress bar (gates End Session)
+## 1. Comments
 
-Today, in `useLiveTranscription.endSession`:
-- `disconnect()` → final `runAnalysis(true)` → mark session `ended`. The user sees only `isSummarizing: boolean`. End button stays clickable.
+### Database
+New table `record_comments`:
+- `id uuid pk`, `created_at`, `updated_at`
+- `record_type text` — `'debate' | 'live_session' | 'change_my_mind'`
+- `record_id uuid` (debate_id or live_session_id)
+- `parent_id uuid` (nullable, for one level of replies)
+- `user_id uuid`, `body text`
 
-Changes:
+RLS:
+- SELECT: anon + authenticated, only when the parent record is publicly visible (debate `is_public = true` / `live_sessions.is_public = true`). Mirrors existing public-read pattern.
+- INSERT: authenticated; user_id = auth.uid(); record must be visible.
+- UPDATE / DELETE: only the comment author.
 
-- **Surface progress from the hook.** Add to the return:
-  ```ts
-  analysisProgress: {
-    phase: "idle" | "classifying" | "summarizing" | "finalizing" | "done";
-    current: number;  // batches finished
-    total: number;    // batches total (classify + N summary batches + finalize)
-    label: string;    // human-friendly
-  }
-  isEnding: boolean;
-  ```
-  - Replace `Promise.all(batches…)` with a sequential loop so we can bump `current` after each batch resolves.
-- **Idempotent `endSession`.** Hold the in-flight promise in a ref; subsequent calls return that promise instead of starting a second pass. (Today `lastAnalyzedCountRef.current = 0` resets and a second click would re-run everything.)
-- **`LiveSessionPage` UI**:
-  - `<Progress>` bar pinned at the top of the recording view while `isEnding`.
-  - End Session button: `disabled` while `isEnding`, label swaps to `Finalizing… (3/7)` with `aria-busy`.
-  - Lightweight transparent overlay over the transcript so accidental taps don't fire other actions.
+Realtime: enable on `record_comments` so threads update live.
 
-Files: `src/hooks/useLiveTranscription.ts`, `src/pages/LiveSessionPage.tsx`.
+### UI
+New component `RecordCommentsSection` rendered:
+- **Preview pages** (`DebateScheduledPreviewPage`, the live preview, CMM preview): directly **below the Interested button** (or below the owner's Edit button if creator).
+- **Post-record / completed pages** (`ExploreDebateDetailPage`, `DebateRecordPreview`, `SessionRecordViewV2` record view, CMM record): **below the threaded record**.
 
----
+Behavior:
+- Lists comments newest-first with author avatar + name + relative time.
+- One level of replies (parent_id).
+- Composer: textarea + submit; for unauthenticated users the composer is replaced with an `AuthPromptDialog` trigger ("Sign in to comment").
+- Author can delete own comment.
+- Realtime appends new comments.
 
-## Part 2 — Resume a live session (live → live)
-
-The data already supports this — `live_sessions.transcript_entries` is JSONB and `useLiveTranscription` already loads it on mount. Only UX is missing.
-
-### 2a. Continue button on ended sessions
-- In `LiveSessionPage` when `status === "ended"`, render `SessionRecordView` plus a **"Continue session"** button in the header.
-- Clicking it:
-  1. Updates the row to `status = "recording"`, sets `resumed_at = now()`.
-  2. Appends a synthetic divider entry to `transcript_entries`:
-     `{ id: uuid, kind: "session_resume_marker", resumed_at, created_at }`.
-  3. Switches `phase` back to `"recording"` and reconnects the mic.
-- Each subsequent resume inserts another marker, so the timeline shows multiple "since last session" dividers in order.
-
-### 2b. Render the dividers
-- `LiveThreadView`, `SpeakerBubble`, `TranscriptPane`: small branch — when `entry.kind === "session_resume_marker"`, render a centered horizontal rule:
-  *"Resumed Apr 28 · 2:14 PM — new entries below"*
-  instead of a speaker bubble. Existing entry shape is preserved; the field is optional.
-
-### 2c. "New since last visit" ribbon (owner-only)
-- Add `live_sessions.last_viewed_at`. On mount of `SessionRecordView` (when `!readOnly`), find the first entry newer than `last_viewed_at` and render a soft "Read up to here" line above it.
-- On unmount, write `now()`.
-- In My Agenda Live tab, render a small `+N new` pill on the cover when `last_viewed_at < latest entry timestamp` (covers multi-device adds).
-
-Files: `src/pages/LiveSessionPage.tsx`, `src/components/live/SessionRecordView.tsx`, `src/components/live/LiveThreadView.tsx`, `src/components/live/SpeakerBubble.tsx`, `src/components/live/record/TranscriptPane.tsx`, `src/pages/MyDebatesPage.tsx`.
+### Notifications (light)
+Insert a `notifications` row for the record owner when someone comments (type `comment`). Reuse existing notifications surface.
 
 ---
 
-## Part 3 — "Generate sequel" shortcut on Debate / Change My Mind records
+## 2. Cover image upload (optional, editable later)
 
-Goal: from a debate (or CMM) record, one click → a brand-new debate (or CMM) that's a copy of the original, auto-titled `<Original Title> #2`. Doesn't touch the original. No AI required — pure structural copy, opening the existing CreateDebatePage editor pre-populated so the user can tweak before publishing.
+### Storage
+New public bucket `record-covers` (single bucket for all three record types). RLS:
+- Public read.
+- Authenticated insert/update/delete restricted to objects under `${auth.uid()}/...` path prefix.
 
-### 3a. New RPC: `clone_debate(_source_id uuid) returns uuid`
-- SECURITY DEFINER, gated on `can_view_debate(_source_id)`.
-- Inserts a new `debates` row owned by `auth.uid()`:
-  - Topic: `<original.topic> #N` where N = next available integer for that owner (count of existing debates whose topic matches `^<original.topic> #\d+$` or equals the original, +1, starting at 2 if none).
-  - Status: `draft`.
-  - Copies over: `format`, `time_per_turn`, `turns_per_subtopic`, `prep_time_min/max`, `max_speakers_per_side`, `topic_category`, `community_tag`, `institution_tag`, `is_public = false`, `feedback_enabled`, `grading_enabled`, `description`, `cover_image_url`, `mode`-equivalent fields, `facilitator_type`.
-  - Copies `debate_sides` (preserving `label`, `sort_order`).
-  - Copies `debate_subtopics` (preserving `title`, `sort_order`).
-  - Copies `debate_tags`.
-  - **Does not copy** participants, invitations, transcripts, arguments, grades, scheduled_at, or any runtime state.
-  - Sets `source_record_type = 'debate'`, `source_record_id = _source_id` on the new row (new columns below).
-- Returns the new debate id.
+### Schema
+- `live_sessions.cover_image_url text null` — add column (debates already has it).
+- (CMM uses the `debates` table, so no change needed there.)
 
-Same shape for `clone_change_my_mind(_source_id uuid)` — same RPC body works since CMM is a debate row with `format = 'change_my_mind'`. Implement as a single `clone_debate` RPC; format is auto-copied.
+### UI: creation flows
+Add a new "Cover image (optional)" upload control:
+- `CreateDebatePage` — in the cover/details step.
+- `CreateChangeMyMindPage` — in the setup step before publish.
+- Live session start (in `SessionRecordView` / start sheet) — optional pre-record field; if record is started instantly, allow setting via the edit panel below.
 
-### 3b. Schema (one migration)
-```sql
-alter table public.live_sessions
-  add column if not exists resumed_at timestamptz,
-  add column if not exists last_viewed_at timestamptz;
+Component: `CoverImageUploader` (new) — drag/drop or click, preview, replace, remove. Falls back to `gradientFromSeed(topic)` if empty (existing behavior in `DebateCoverCard` is preserved).
 
-alter table public.debates
-  add column if not exists source_record_type text
-    check (source_record_type in ('debate','change_my_mind')),
-  add column if not exists source_record_id uuid;
-
-create index if not exists debates_source_idx
-  on public.debates (source_record_type, source_record_id);
-```
-No RLS changes needed; the new columns ride existing policies.
-
-### 3c. UI entry points
-- **Debate record page** (`DebateRoomPage` when status = `completed`, and the debate cover in My Agenda):
-  Add a small **"Generate sequel"** button (icon: `Copy`). On click → call `clone_debate` → navigate to `/create?edit=<newId>` so the user lands in the existing edit flow with everything filled in and can adjust before going live.
-- **Change My Mind record page** + cover: same button, same RPC, navigate to `/create-cmm?edit=<newId>` (or `/create?edit=<newId>` if CMM uses the same editor — verify on implementation).
-- **Backlink chip** on the new debate inside the editor and the room: *"Sequel of <original title>"* linking to the source record. Read from `source_record_id`.
-
-### 3d. Numbering rule (server side, inside the RPC)
-- Strip an existing trailing ` #N` from `original.topic` to get the base.
-- Find max N among the caller's debates whose topic is `base` or matches `^base #\d+$`.
-- New topic = `base #<max+1>`, with `<max+1>` ≥ 2.
-
-Files: new migration, `src/pages/MyDebatesPage.tsx` (sequel button on debate covers), `src/pages/DebateRoomPage.tsx` (sequel button when completed), `src/components/home/DebateCoverCard.tsx` if needed for the backlink chip.
+### UI: edit later
+- Debate: surface in existing debate edit panel (or a new "Edit cover" button on owner-only view of preview/record pages).
+- Live session: in the existing session settings menu (`EditSetupPanel`-equivalent for live).
+- CMM: same edit panel as debate (since CMM is a debate row).
 
 ---
 
-## Out of scope
+## 3. Hide archived items from Home + Explore
 
-- Sequel from live sessions (explicitly excluded per your clarification).
-- Multi-device "continue" coordination (purging stale presence rows). Single-device resume is fine for v1; for multi-device, resume just reopens the room and devices rejoin via the existing join code.
-- AI-generated sequels (this version is a structural copy; AI generation is a separate future feature).
+Audit and ensure every Home/Explore query excludes `status = 'archived'`. The current code already does for debates but **owner queries in `useMyRecentDebates` keep them out only via `.neq("status","archived")` for created, but the parts join filters in JS** — confirmed already excluded.
+
+Action items:
+- Verify and unify all Home/Explore hooks (`useHomeDebates`, `useExplore`, `useForYouDebates`, `useMyRecentDebates`, live session queries) to exclude `status = 'archived'` for both debates and live_sessions.
+- Profile page `MyDebatesPage` / "My Agenda" tab: explicitly include archived under a dedicated "Archived" subtab (or filter chip), so users still have access to their archived content there.
+
+---
+
+## Technical notes
+
+- Comments component is shared across all three record types via a `record_type` + `record_id` prop.
+- RLS for comments mirrors the public visibility checks already used by `debate_tags` / `live_session_tags`.
+- Cover bucket path convention: `record-covers/{user_id}/{uuid}.{ext}` for clean per-user RLS.
+- Auth gating uses existing `AuthPromptDialog` for unauthenticated commenters and uploaders.
+- No changes to `supabase/integrations/types.ts` (auto-generated after migration).
+
+---
+
+## Files to add / edit (high level)
+
+**New**
+- `supabase/migrations/<ts>_record_comments_and_covers.sql` (table, RLS, realtime, bucket, `live_sessions.cover_image_url`)
+- `src/components/comments/RecordCommentsSection.tsx`
+- `src/hooks/useRecordComments.ts`
+- `src/components/upload/CoverImageUploader.tsx`
+
+**Edit**
+- `src/pages/CreateDebatePage.tsx`, `src/pages/CreateChangeMyMindPage.tsx`, live start surface in `src/components/live/SessionRecordView.tsx` (or its V2)
+- `src/pages/DebateScheduledPreviewPage.tsx`, `src/pages/DebatePreviewPage.tsx`, `src/pages/ExploreDebateDetailPage.tsx`, `src/components/debate/DebateRecordPreview.tsx`, `src/components/live/record/SessionRecordViewV2.tsx`, `src/pages/ChangeMyMindRoomPage.tsx`
+- `src/hooks/useExplore.ts`, `src/hooks/useHomeDebates.ts` — confirm archived exclusion for debates AND live_sessions
+- `src/pages/ProfilePage.tsx` / `src/pages/MyDebatesPage.tsx` — add archived view under My Agenda
+
+After approval I'll implement in this order: migration → cover uploader + creation flows → comments table + component + integration → archive filter audit + profile archive view.
