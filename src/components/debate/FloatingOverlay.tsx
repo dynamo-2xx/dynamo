@@ -10,10 +10,14 @@ interface FloatingOverlayProps {
   children: ReactNode;
   /** Initial offset from the top-left of the parent (px). Defaults to 16/16. */
   initialPosition?: { x: number; y: number };
-  /** Width of the overlay (responsive). Defaults to 420 max. */
-  widthClass?: string;
+  /** Initial width (px). Defaults to 420. */
+  initialWidth?: number;
+  /** Initial height (px). Defaults to 420. */
+  initialHeight?: number;
   /** Storage key used to remember the last drag position across opens. */
   storageKey?: string;
+  /** Optional extra controls rendered on the right side of the header (e.g. tabs). */
+  headerExtras?: ReactNode;
 }
 
 /**
@@ -27,29 +31,45 @@ const FloatingOverlay = ({
   title,
   children,
   initialPosition,
-  widthClass = "w-[min(420px,calc(100%-2rem))]",
+  initialWidth = 420,
+  initialHeight = 420,
   storageKey,
+  headerExtras,
 }: FloatingOverlayProps) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const resizeState = useRef<{ startX: number; startY: number; baseW: number; baseH: number } | null>(null);
 
-  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+  const [state, setState] = useState<{ x: number; y: number; w: number; h: number }>(() => {
     if (storageKey && typeof window !== "undefined") {
       try {
         const raw = sessionStorage.getItem(`floating-overlay:${storageKey}`);
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return {
+            x: parsed.x ?? initialPosition?.x ?? 16,
+            y: parsed.y ?? initialPosition?.y ?? 16,
+            w: parsed.w ?? initialWidth,
+            h: parsed.h ?? initialHeight,
+          };
+        }
       } catch { /* ignore */ }
     }
-    return initialPosition ?? { x: 16, y: 16 };
+    return {
+      x: initialPosition?.x ?? 16,
+      y: initialPosition?.y ?? 16,
+      w: initialWidth,
+      h: initialHeight,
+    };
   });
 
-  // Persist position
+  // Persist position + size
   useEffect(() => {
     if (!storageKey) return;
     try {
-      sessionStorage.setItem(`floating-overlay:${storageKey}`, JSON.stringify(pos));
+      sessionStorage.setItem(`floating-overlay:${storageKey}`, JSON.stringify(state));
     } catch { /* ignore */ }
-  }, [pos, storageKey]);
+  }, [state, storageKey]);
 
   // Close on Escape
   useEffect(() => {
@@ -71,8 +91,8 @@ const FloatingOverlay = ({
     dragState.current = {
       startX: e.clientX,
       startY: e.clientY,
-      baseX: pos.x,
-      baseY: pos.y,
+      baseX: state.x,
+      baseY: state.y,
     };
   };
 
@@ -90,11 +110,40 @@ const FloatingOverlay = ({
       nextX = Math.max(0, Math.min(maxX, nextX));
       nextY = Math.max(0, Math.min(maxY, nextY));
     }
-    setPos({ x: nextX, y: nextY });
+    setState((s) => ({ ...s, x: nextX, y: nextY }));
   };
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     dragState.current = null;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+  };
+
+  const onResizeDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    resizeState.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      baseW: state.w,
+      baseH: state.h,
+    };
+  };
+  const onResizeMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizeState.current) return;
+    const dw = e.clientX - resizeState.current.startX;
+    const dh = e.clientY - resizeState.current.startY;
+    const parent = panelRef.current?.offsetParent as HTMLElement | null;
+    let nextW = Math.max(280, resizeState.current.baseW + dw);
+    let nextH = Math.max(220, resizeState.current.baseH + dh);
+    if (parent) {
+      nextW = Math.min(parent.clientWidth - state.x - 8, nextW);
+      nextH = Math.min(parent.clientHeight - state.y - 8, nextH);
+    }
+    setState((s) => ({ ...s, w: nextW, h: nextH }));
+  };
+  const onResizeUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    resizeState.current = null;
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
   };
 
@@ -117,8 +166,8 @@ const FloatingOverlay = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            style={{ left: pos.x, top: pos.y }}
-            className={`absolute z-40 ${widthClass} max-h-[70vh] flex flex-col rounded-2xl border border-foreground/10 bg-background/70 backdrop-blur-xl shadow-2xl overflow-hidden`}
+            style={{ left: state.x, top: state.y, width: state.w, height: state.h, maxWidth: "calc(100% - 16px)", maxHeight: "calc(100% - 16px)" }}
+            className="absolute z-40 flex flex-col rounded-2xl border border-foreground/10 bg-background/85 backdrop-blur-xl shadow-2xl overflow-hidden"
           >
             <div
               onPointerDown={onPointerDown}
@@ -140,18 +189,32 @@ const FloatingOverlay = ({
                   </h3>
                 </div>
               </div>
-              <button
-                data-no-drag
-                onClick={onClose}
-                className="p-1.5 rounded-md hover:bg-foreground/10 transition-colors shrink-0"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4 text-foreground" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0" data-no-drag>
+                {headerExtras}
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-md hover:bg-foreground/10 transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4 text-foreground" />
+                </button>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
               {children}
             </div>
+            <div
+              onPointerDown={onResizeDown}
+              onPointerMove={onResizeMove}
+              onPointerUp={onResizeUp}
+              onPointerCancel={onResizeUp}
+              className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize"
+              aria-label="Resize"
+              title="Drag to resize"
+              style={{
+                background: "linear-gradient(135deg, transparent 50%, hsl(var(--foreground) / 0.25) 50%)",
+              }}
+            />
           </motion.div>
         </>
       )}
