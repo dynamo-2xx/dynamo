@@ -31,7 +31,6 @@ import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ArgumentMapOverlay from "@/components/debate/ArgumentMapOverlay";
 import NotebookOverlay from "@/components/debate/NotebookOverlay";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
-import DebateRecordShell from "@/components/debate/DebateRecordShell";
 import { Map as MapIcon, NotebookPen } from "lucide-react";
 
 
