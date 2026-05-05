@@ -5,7 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { gradientFromSeed } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
 import GhostStatementCard from "./preview/GhostStatementCard";
-import { useDebatePreviewThreads, type PreviewStatement } from "@/hooks/useDebatePreviewThreads";
+import { useDebatePreviewThreads } from "@/hooks/useDebatePreviewThreads";
 
 interface DebateRecordPreviewProps {
   debateId: string;
@@ -47,48 +47,9 @@ const SIDE_CLASS = [
   "text-amber-600 dark:text-amber-400",
 ];
 
-const speakerColorClass = (speakerLabel: string, labels: string[]): string => {
-  // speakerLabel is like "Speaker 1 · Yes" — pull the index
-  const m = speakerLabel.match(/Speaker\s+(\d+)/i);
-  if (m) {
-    const idx = parseInt(m[1], 10) - 1;
-    return SIDE_CLASS[idx % SIDE_CLASS.length];
-  }
-  // fallback: try to match against labels
-  const idx = labels.findIndex((l) => speakerLabel.toLowerCase().includes(l.toLowerCase()));
+const sideColorClass = (sideLabel: string, labels: string[]): string => {
+  const idx = labels.findIndex((l) => l.toLowerCase() === sideLabel.toLowerCase());
   return SIDE_CLASS[(idx >= 0 ? idx : 0) % SIDE_CLASS.length];
-};
-
-const StatementRow = ({ s, labels }: { s: PreviewStatement; labels: string[] }) => {
-  const isResponse = s.kind !== "main";
-  const glyph = isResponse ? "↳" : "•";
-  const label =
-    s.kind === "main"
-      ? "Main"
-      : s.kind === "counter"
-        ? "Counter"
-        : s.kind === "rebuttal"
-          ? "Rebuttal"
-          : s.kind === "affirms"
-            ? "Affirms"
-            : "Concedes";
-  const colorClass = speakerColorClass(s.speakerLabel, labels);
-  return (
-    <div className={cn("relative py-2", isResponse ? "pl-6" : "pl-3")}>
-      <div className="flex items-baseline gap-2">
-        <span className="text-foreground/40 select-none text-sm leading-none">{glyph}</span>
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wider font-medium mb-1">
-            <span className="text-muted-foreground">{label}</span>{" "}
-            <span className={cn("font-semibold", colorClass)}>— {s.speakerLabel}</span>
-          </div>
-          <p className="text-sm font-body text-foreground leading-relaxed" data-annotatable>
-            {s.text}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 const DebateRecordPreview = ({
@@ -110,7 +71,7 @@ const DebateRecordPreview = ({
 
   const subs = liveSubs.length > 0
     ? liveSubs
-    : fallbackSubtopics.map((s) => ({ ...s, threads: [], keyArguments: [] as { side: string; content: string }[] }));
+    : fallbackSubtopics.map((s) => ({ ...s, threads: [], hasSummaries: false }));
   const labels = sideLabels.length > 0 ? sideLabels : fallbackSideLabels;
   const ghostLabelA = labels[0] ? `Speaker 1 · ${labels[0]}` : "Speaker 1";
   const ghostLabelB = labels[1] ? `Speaker 2 · ${labels[1]}` : "Speaker 2";
