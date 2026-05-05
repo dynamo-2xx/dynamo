@@ -25,6 +25,7 @@ import RoundSummaryCard from "@/components/debate/RoundSummaryCard";
 import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import { useGrading } from "@/hooks/useGrading";
+import { useMicPolicy } from "@/hooks/useMicPolicy";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
@@ -121,6 +122,16 @@ const DebateRoomPage = () => {
   // In-person joiner: pick up the live MediaStream the pre-flight mic test
   // handed off so we can show the persistent mic bar without re-prompting.
   const [handoffStream] = useState<MediaStream | null>(() => takeHandoffStream());
+  // Mic policy: enforce turn-locked mic for in-person joiners (handoff stream).
+  // For others (e.g. owner/facilitator) the existing MediaPermissions handles
+  // mic via isMicEnabled prop, which our policy will set.
+  useMicPolicy({
+    kind: "debate",
+    sessionId: id ?? null,
+    userId: user?.id ?? null,
+    isOwner: !!user && !!debate && user.id === debate.created_by,
+    stream: handoffStream,
+  });
      const timerWasActiveRef = useRef(false);
    const prepExitRef = useRef(false);
    const lastSyncedTurnStartRef = useRef<string | null>(null);
