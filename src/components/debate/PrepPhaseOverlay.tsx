@@ -54,9 +54,6 @@ const PrepPhaseOverlay = ({
   onReady,
   prepStartedAt,
   selectedPrepDuration,
-  allTranscriptEntries = [],
-  subtopics = [],
-  sides = [],
   isSummaryBeingEdited,
   notebookValue,
   onNotebookChange,
@@ -111,11 +108,9 @@ const PrepPhaseOverlay = ({
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  // Group transcript entries by subtopic
-  const entriesBySubtopic = subtopics.map(st => ({
-    subtopic: st,
-    entries: allTranscriptEntries.filter(e => e.is_final && e.subtopic === st.title),
-  })).filter(g => g.entries.length > 0);
+  // Prior-turn only: prep window must NOT show the full debate history.
+  // Use lastTranscript / lastAiSummary directly. Full history is reachable via the
+  // always-on Argument Map button.
 
   const readyButtonJsx = (
     <Button
@@ -163,87 +158,38 @@ const PrepPhaseOverlay = ({
               )}
               <p className="text-sm text-muted-foreground font-body">
                 {hasPrepTimerStarted
-                  ? "Review the debate and prepare your arguments."
+                  ? `Review what ${speakerSideLabel || "the previous speaker"} just said and prepare your response. Open the Argument Map for full debate history.`
                   : "Waiting for the other side to choose the prep time."}
               </p>
             </div>
 
-            {/* 3-column grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Column 1: Transcripts */}
-              <div className="bg-card border border-border rounded-xl p-4 max-h-[55vh] overflow-y-auto">
+            {/* 2-column grid: prior turn (transcript + summary) | my notes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-card border border-border rounded-xl p-4 max-h-[55vh] overflow-y-auto" data-annotatable>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                  Transcripts
+                  Prior turn{speakerSideLabel ? ` · ${speakerSideLabel}` : ""}
                 </p>
-                {entriesBySubtopic.length > 0 ? (
-                  <div className="space-y-3">
-                    {entriesBySubtopic.map(({ subtopic, entries }) => (
-                      <div key={subtopic.id}>
-                        <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">
-                          {subtopic.title}
-                        </p>
-                        <div className="space-y-1.5">
-                          {entries.map((entry) => (
-                            <div key={entry.id} className="text-xs font-body">
-                              <span className="font-semibold text-foreground">{entry.speaker_side}:</span>{" "}
-                              <span className="text-muted-foreground">{entry.text}</span>
-                            </div>
-                          ))}
-                        </div>
+                {lastTranscript ? (
+                  <p className="text-sm text-foreground font-body leading-relaxed whitespace-pre-wrap mb-3">
+                    {lastTranscript}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic font-body mb-3">No transcript captured.</p>
+                )}
+                {lastAiSummary && (
+                  <div className="border-t border-border pt-2">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">AI summary</p>
+                    <p className="text-xs text-foreground/80 font-body leading-relaxed">{lastAiSummary}</p>
+                    {isSummaryBeingEdited && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <Loader2 className="w-3 h-3 text-primary animate-spin" />
+                        <span className="text-[10px] text-primary font-semibold animate-pulse">Editing…</span>
                       </div>
-                    ))}
+                    )}
                   </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic font-body">No transcripts yet.</p>
                 )}
               </div>
 
-              {/* Column 2: Summaries */}
-              <div className="bg-card border border-border rounded-xl p-4 max-h-[55vh] overflow-y-auto">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                  Summaries
-                </p>
-                {entriesBySubtopic.length > 0 ? (
-                  <div className="space-y-3">
-                    {entriesBySubtopic.map(({ subtopic, entries }, groupIdx) => {
-                      const summaries = entries.filter(e => e.ai_summary);
-                      const isLastGroup = groupIdx === entriesBySubtopic.length - 1;
-                      return (
-                        <div key={subtopic.id}>
-                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">
-                            {subtopic.title}
-                          </p>
-                          {summaries.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {summaries.map((entry) => (
-                                <div key={entry.id} className="text-xs font-body">
-                                  <span className="font-semibold text-foreground">{entry.speaker_side}:</span>{" "}
-                                  <span className="text-muted-foreground">{entry.ai_summary}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                          {isLastGroup && isSummaryBeingEdited && (
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              <Loader2 className="w-3 h-3 text-primary animate-spin" />
-                              <span className="text-[10px] text-primary font-semibold animate-pulse">
-                                Editing…
-                              </span>
-                            </div>
-                          )}
-                          {summaries.length === 0 && !(isLastGroup && isSummaryBeingEdited) && (
-                            <p className="text-[10px] text-muted-foreground italic">No summaries yet.</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic font-body">No summaries yet.</p>
-                )}
-              </div>
-
-              {/* Column 3: My Notes */}
               <div className="bg-card border border-border rounded-xl p-4 flex flex-col">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
                   My Notes
