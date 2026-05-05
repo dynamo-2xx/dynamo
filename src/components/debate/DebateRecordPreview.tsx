@@ -214,31 +214,38 @@ const DebateRecordPreview = ({
                   <CollapsibleContent>
                     <div className="pl-6 pr-2 py-2 space-y-2">
                       {hasContent ? (
-                        sub.threads.map((t) => (
-                          <div key={t.id} className="rounded-lg border border-border/60 bg-background/60 p-3">
-                            <p className="text-xs font-display text-foreground/80 mb-1 leading-snug">
-                              {t.title}
-                            </p>
-                            <div className="space-y-0.5">
-                              {t.statements.map((s) => (
-                                <StatementRow key={s.id} s={s} labels={labels} />
-                              ))}
-                            </div>
-                            {sub.keyArguments.length > 0 && (
-                              <div className="mt-3 pt-2 border-t border-border/50 space-y-1">
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-body font-medium">
-                                  Argument summary
-                                </p>
-                                {sub.keyArguments.map((k, i) => (
-                                  <p key={i} className="text-xs font-body text-foreground/80 leading-relaxed">
-                                    <span className="font-semibold text-foreground/70">[{k.side}]</span>{" "}
-                                    {k.content}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))
+                        sub.threads.map((t) => {
+                          const colorClass = sideColorClass(t.title, labels);
+                          return (
+                            <Collapsible key={t.id}>
+                              <CollapsibleTrigger className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-foreground/[0.04] rounded-lg border border-border/60 bg-background/60 transition-colors">
+                                <ChevronDown className="w-3.5 h-3.5 text-foreground/40 shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                                <span className={cn("text-xs font-display font-semibold flex-1 truncate", colorClass)}>
+                                  {t.title}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground shrink-0">
+                                  {t.summaries.length} summar{t.summaries.length === 1 ? "y" : "ies"}
+                                </span>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <ul className="pl-7 pr-3 py-2 space-y-2">
+                                  {t.summaries.map((s) => (
+                                    <li key={s.id} className="flex items-start gap-2">
+                                      <span className={cn("mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-current", colorClass)} />
+                                      <p className="text-sm font-body text-foreground/90 leading-relaxed" data-annotatable>
+                                        {s.content}
+                                      </p>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          );
+                        })
+                      ) : status === "live" || status === "completed" ? (
+                        <p className="text-xs text-muted-foreground italic px-2 py-3">
+                          Summaries pending.
+                        </p>
                       ) : (
                         <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-3">
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-body mb-2">
