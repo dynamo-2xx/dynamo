@@ -1869,13 +1869,8 @@ const CreateDebatePage = () => {
                     if (!editId) return;
                     setSaving(true);
                     try {
-                      const { error } = await supabase
-                        .from("debates")
-                        .update({ status: "live", started_at: new Date().toISOString() } as any)
-                        .eq("id", editId);
-                      if (error) throw error;
-                      toast.success("Debate started!");
-                      navigate(`/debate/${editId}`);
+                      // Route into the Mic Lobby — start gate is in the lobby.
+                      navigate(`/debate/${editId}/lobby`);
                     } catch (err: any) {
                       toast.error(err.message || "Failed to start debate");
                       setSaving(false);

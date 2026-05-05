@@ -22,6 +22,7 @@ import JoinCodeCard from "@/components/live/JoinCodeCard";
 import PresenceList from "@/components/live/PresenceList";
 import VideoGrid from "@/components/live/VideoGrid";
 import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
+import { useMicPolicy } from "@/hooks/useMicPolicy";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
 import FloatingTranscript from "@/components/live/FloatingTranscript";
@@ -106,6 +107,16 @@ const LiveSessionPage = () => {
     { deviceId, heartbeat: isMulti && isRecordingActive },
   );
 
+  // Live policy: when echo_guard is on, voice-detect-only joiners get muted.
+  // Owner is always free; this hook is a no-op when conditions don't trigger.
+  useMicPolicy({
+    kind: "live",
+    sessionId,
+    userId: user?.id ?? null,
+    isOwner: true,
+    stream: rtc.localStream,
+  });
+
   // Host-side: when participants change, merge their {slot: display_name} into
   // live_sessions.speaker_names so transcripts show real names.
   useEffect(() => {
@@ -186,6 +197,9 @@ const LiveSessionPage = () => {
         setJoinCode(d.join_code || null);
         if (d.status === "ended") {
           setPhase("ended");
+        } else if (d.mode === "multi_device" && d.status !== "recording" && user?.id === d.created_by) {
+          navigate(`/live/${id}/lobby`, { replace: true });
+          return;
         } else {
           setPhase("recording");
         }
@@ -219,7 +233,7 @@ const LiveSessionPage = () => {
         created_by: user.id,
         title: title.trim() || null,
         mode,
-        status: "recording",
+        status: mode === "multi_device" ? "lobby" : "recording",
         cover_image_url: coverImageUrl,
       } as any)
       .select()
@@ -232,9 +246,7 @@ const LiveSessionPage = () => {
 
     const d = data as any;
     setSessionId(d.id);
-    setSessionStatus("recording");
     setJoinCode(d.join_code || null);
-    setPhase("recording");
 
     // Attach buffered tags
     if (setupTags.length > 0) {
@@ -243,7 +255,8 @@ const LiveSessionPage = () => {
         .insert(setupTags.map((t) => ({ live_session_id: d.id, tag_id: t.id })));
     }
 
-    // Multi-device: register the host as Speaker 1 via join RPC
+    // Multi-device: register host as Speaker 1, then route to lobby so they
+    // can review connected joiners + echo guard before starting.
     if (mode === "multi_device" && d.join_code) {
       const name = hostDisplayName || user.email?.split("@")[0] || "Host";
       const { data: joinData } = await (supabase as any).rpc("join_live_session", {
@@ -255,16 +268,18 @@ const LiveSessionPage = () => {
       const row = Array.isArray(joinData) ? joinData[0] : joinData;
       const slot = row?.speaker_slot ?? 1;
       setHostSpeakerSlot(slot);
-
-      // Seed speaker_names so transcripts show real name not "Speaker N"
       const seeded = { ...(d.speaker_names || {}), [String(slot)]: name };
       setSpeakerNames(seeded);
       await (supabase as any)
         .from("live_sessions")
         .update({ speaker_names: seeded })
         .eq("id", d.id);
+      navigate(`/live/${d.id}/lobby`, { replace: true });
+      return;
     }
 
+    setSessionStatus("recording");
+    setPhase("recording");
     navigate(`/live/${d.id}`, { replace: true });
   }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName, coverImageUrl]);
 

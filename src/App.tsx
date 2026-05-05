@@ -43,6 +43,10 @@ import SharedNotebookPage from "./pages/SharedNotebookPage";
 import CreateChangeMyMindPage from "./pages/CreateChangeMyMindPage";
 import ChangeMyMindRoomPage from "./pages/ChangeMyMindRoomPage";
 import JoinCodeProjectorPage from "./pages/JoinCodeProjectorPage";
+import DebateLobbyPage from "./pages/DebateLobbyPage";
+import LiveLobbyPage from "./pages/LiveLobbyPage";
+import CmmLobbyPage from "./pages/CmmLobbyPage";
+import JoinCmmPage from "./pages/JoinCmmPage";
 import ClubsPage from "./pages/ClubsPage";
 import CreateClubPage from "./pages/CreateClubPage";
 import ClubPage from "./pages/ClubPage";
@@ -78,8 +82,11 @@ const App = () => (
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />
               <Route path="/cmm/new" element={<ProtectedRoute><CreateChangeMyMindPage /></ProtectedRoute>} />
+              <Route path="/cmm/:id/lobby" element={<ProtectedRoute><CmmLobbyPage /></ProtectedRoute>} />
+              <Route path="/cmm/join/:code" element={<JoinCmmPage />} />
               <Route path="/cmm/:id" element={<ChangeMyMindRoomPage />} />
               <Route path="/debate/:id" element={<ProtectedRoute><DebateRoomPage /></ProtectedRoute>} />
+              <Route path="/debate/:id/lobby" element={<ProtectedRoute><DebateLobbyPage /></ProtectedRoute>} />
               <Route path="/debate/:id/preview" element={<ProtectedRoute><DebateScheduledPreviewPage /></ProtectedRoute>} />
               <Route path="/debate/:id/grade" element={<ProtectedRoute><DebateGradeReportPage /></ProtectedRoute>} />
               <Route path="/debate/:id/projector" element={<ProjectorPage />} />
@@ -88,6 +95,7 @@ const App = () => (
               <Route path="/join/:code" element={<JoinDebatePage />} />
               <Route path="/preview/:token" element={<DebatePreviewPage />} />
               <Route path="/live/new" element={<ProtectedRoute><LiveSessionPage /></ProtectedRoute>} />
+              <Route path="/live/:id/lobby" element={<ProtectedRoute><LiveLobbyPage /></ProtectedRoute>} />
               <Route path="/live/shared/:token" element={<SharedLiveSessionPage />} />
               <Route path="/live/join/:code" element={<LiveJoinPage />} />
               <Route path="/live/:id" element={<ProtectedRoute><LiveSessionPage /></ProtectedRoute>} />

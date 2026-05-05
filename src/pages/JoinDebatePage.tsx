@@ -9,6 +9,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Users, Mic } from "lucide-react";
 import MicTestStep from "@/components/join/MicTestStep";
 import { setHandoffStream } from "@/lib/micHandoff";
+import WaitingForHost from "@/components/lobby/WaitingForHost";
+import { useMicLobbyAttachment } from "@/hooks/useMicLobbyAttachment";
 
 interface Side {
   id: string;
@@ -37,7 +39,52 @@ const JoinDebatePage = () => {
   const [showPicker, setShowPicker] = useState(false);
   const [joining, setJoining] = useState(false);
   const [maxPerSide, setMaxPerSide] = useState<number>(2);
-  const [phase, setPhase] = useState<"pick" | "mic">("pick");
+  const [phase, setPhase] = useState<"pick" | "mic" | "waiting">("pick");
+  const [waitStream, setWaitStream] = useState<MediaStream | null>(null);
+  const [waitMode, setWaitMode] = useState<"own_mic" | "voice_detect_only">("own_mic");
+  const [debateStatus, setDebateStatus] = useState<string>("scheduled");
+
+  const deviceId = (typeof window !== "undefined")
+    ? (localStorage.getItem("dyn_device_id") || (() => {
+        const id = crypto.randomUUID();
+        localStorage.setItem("dyn_device_id", id);
+        return id;
+      })())
+    : "";
+
+  useMicLobbyAttachment({
+    kind: "debate",
+    sessionId: phase === "waiting" ? debateId : null,
+    slotKey: selectedSide && user ? `${selectedSide}:${user.id}` : null,
+    userId: user?.id ?? null,
+    deviceId,
+    displayName: user?.email?.split("@")[0] || "Speaker",
+    mode: waitMode,
+    stream: waitMode === "own_mic" ? waitStream : null,
+  });
+
+  // Watch for debate going live
+  useEffect(() => {
+    if (phase !== "waiting" || !debateId) return;
+    const ch = supabase
+      .channel(`join-watch-${debateId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "debates", filter: `id=eq.${debateId}` },
+        (payload) => {
+          const st = (payload.new as any).status;
+          setDebateStatus(st);
+          if (st === "live") {
+            if (waitStream) setHandoffStream(waitStream);
+            navigate(`/debate/${debateId}`, { replace: true });
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [phase, debateId, navigate, waitStream]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -136,12 +183,28 @@ const JoinDebatePage = () => {
       const result = Array.isArray(data) ? (data[0] as any) : (data as any);
       if (result?.became_audience) {
         toast("That side filled up — joining as audience.", { duration: 4000 });
+        navigate(`/debate/${debateId}/audience`, { replace: true });
+        return;
       } else {
         toast.success("Joined as speaker!");
       }
-      // Hand off the live stream so the debate room can use it without re-prompting
-      if (stream) setHandoffStream(stream);
-      navigate(`/debate/${debateId}`, { replace: true });
+      // Check status: if live, hand off and navigate; else wait in lobby.
+      const { data: d } = await supabase
+        .from("debates")
+        .select("status")
+        .eq("id", debateId)
+        .maybeSingle();
+      const st = d?.status || "scheduled";
+      setDebateStatus(st);
+      if (st === "live") {
+        if (stream) setHandoffStream(stream);
+        navigate(`/debate/${debateId}`, { replace: true });
+      } else {
+        setWaitStream(stream);
+        setWaitMode(stream ? "own_mic" : "voice_detect_only");
+        setPhase("waiting");
+        setJoining(false);
+      }
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message || "Failed to join debate.");
@@ -169,14 +232,24 @@ const JoinDebatePage = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="font-display text-xl">
-            {phase === "pick" ? "Join Debate" : "Test your mic"}
+            {phase === "pick" ? "Join Debate" : phase === "mic" ? "Test your mic" : "Joined!"}
           </CardTitle>
           <CardDescription className="font-body mt-1">
             {debateTopic}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {phase === "pick" ? (
+          {phase === "waiting" ? (
+            <WaitingForHost
+              sessionTitle={debateTopic}
+              stream={waitStream}
+              mode={waitMode}
+              onLeave={() => {
+                waitStream?.getTracks().forEach((t) => t.stop());
+                navigate("/");
+              }}
+            />
+          ) : phase === "pick" ? (
             <>
               <div>
                 <p className="text-sm font-medium text-foreground mb-3 font-body">

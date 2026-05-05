@@ -11,6 +11,8 @@ import VideoGrid from "@/components/live/VideoGrid";
 import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
 import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 import { toast } from "sonner";
+import WaitingForHost from "@/components/lobby/WaitingForHost";
+import { useMicLobbyAttachment } from "@/hooks/useMicLobbyAttachment";
 
 const AVATAR_EMOJIS = ["🦊", "🐼", "🐙", "🦉", "🐝", "🦄", "🐯", "🐳", "🦁", "🐧", "🐢", "🐬"];
 
@@ -43,6 +45,7 @@ const LiveJoinPage = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [speakerSlot, setSpeakerSlot] = useState<number>(0);
   const [sessionTitle, setSessionTitle] = useState<string>("");
+  const [sessionStatusState, setSessionStatusState] = useState<string>("recording");
 
   // Prefill name from profile
   useEffect(() => {
@@ -77,6 +80,14 @@ const LiveJoinPage = () => {
       setSessionId(row.session_id);
       setSpeakerSlot(row.speaker_slot);
       setSessionTitle(row.title || "Live Session");
+      // Inspect status: if host hasn't started yet, sit in waiting room.
+      const { data: s } = await (supabase as any)
+        .from("live_sessions")
+        .select("status")
+        .eq("id", row.session_id)
+        .maybeSingle();
+      const st = s?.status || "recording";
+      setSessionStatusState(st);
       setPhase("recording");
 
       // Wake lock (best-effort)
@@ -91,8 +102,27 @@ const LiveJoinPage = () => {
     }
   }, [code, deviceId, displayName, emoji]);
 
+  // Watch for status flip from lobby->recording
+  useEffect(() => {
+    if (!sessionId) return;
+    const ch = supabase
+      .channel(`live-join-status-${sessionId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "live_sessions", filter: `id=eq.${sessionId}` },
+        (payload) => {
+          const st = (payload.new as any).status;
+          if (st) setSessionStatusState(st);
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [sessionId]);
+
   // ── Recording phase ──
-  const isRecording = phase === "recording";
+  const isRecording = phase === "recording" && sessionStatusState === "recording";
   const rtc = useLiveSessionRTC({
     sessionId,
     deviceId,
@@ -115,6 +145,19 @@ const LiveJoinPage = () => {
   const presenceParticipants = useLiveSessionPresence(sessionId, {
     deviceId,
     heartbeat: isRecording,
+  });
+
+  // Attach mic_connections row so the host's lobby sees us
+  useMicLobbyAttachment({
+    kind: "live",
+    sessionId,
+    slotKey: user ? `slot:${speakerSlot}` : null,
+    userId: user?.id ?? null,
+    deviceId,
+    displayName,
+    avatarUrl: emoji,
+    mode: "own_mic",
+    stream: rtc.localStream,
   });
 
   // Leave-on-unmount: drop our participant row immediately so other devices
@@ -212,6 +255,20 @@ const LiveJoinPage = () => {
   }
 
   if (phase === "recording") {
+    if (sessionStatusState !== "recording") {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <div className="max-w-md w-full">
+            <WaitingForHost
+              sessionTitle={sessionTitle}
+              stream={rtc.localStream}
+              mode="own_mic"
+              onLeave={() => navigate("/")}
+            />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className={`min-h-screen bg-background flex flex-col ${themeWrapperClass(prefs.theme)}`}>
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">

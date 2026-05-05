@@ -13,6 +13,8 @@ import { useCmmQueue } from "@/hooks/useCmmQueue";
 import { useCmmLiveCapture } from "@/hooks/useCmmLiveCapture";
 import CmmLiveTranscript from "@/components/cmm/CmmLiveTranscript";
 import { useGrading } from "@/hooks/useGrading";
+import { useMicPolicy } from "@/hooks/useMicPolicy";
+import { takeHandoffStream } from "@/lib/micHandoff";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 
@@ -43,6 +45,16 @@ const ChangeMyMindRoomPage = () => {
   const [busy, setBusy] = useState(false);
   const lastGradedActiveIdRef = useRef<string | null>(null);
   const [ownerMuted, setOwnerMuted] = useState(false);
+  const [handoffStream] = useState<MediaStream | null>(() => takeHandoffStream());
+
+  // Enforce: only the active queue user (or owner) can have an open mic.
+  useMicPolicy({
+    kind: "cmm",
+    sessionId: id ?? null,
+    userId: user?.id ?? null,
+    isOwner: !!user && !!debate && user.id === debate.created_by,
+    stream: handoffStream,
+  });
 
   const { rows, refresh } = useCmmQueue(id);
   const { gradeTurn, gradeFinal } = useGrading();
