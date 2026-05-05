@@ -15,6 +15,7 @@ import ProfilePage from "./pages/ProfilePage";
 import AuthPage from "./pages/AuthPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DebateRoomPage from "./pages/DebateRoomPage";
+import DebateEditArgumentsPage from "./pages/DebateEditArgumentsPage";
 import DebateGradeReportPage from "./pages/DebateGradeReportPage";
 import JoinDebatePage from "./pages/JoinDebatePage";
 import NotificationsPage from "./pages/NotificationsPage";
@@ -89,6 +90,7 @@ const App = () => (
               <Route path="/my-recent" element={<ProtectedRoute><MyRecentPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="/profile/edit" element={<ProtectedRoute><EditProfilePage /></ProtectedRoute>} />
+              <Route path="/debate/:id/edit" element={<ProtectedRoute><DebateEditArgumentsPage /></ProtectedRoute>} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="*" element={<NotFound />} />
