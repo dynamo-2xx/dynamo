@@ -111,7 +111,7 @@ const CreateChangeMyMindPage = () => {
       }
 
       toast.success("Published");
-      navigate(`/cmm/${debate.id}`);
+      navigate(`/cmm/${debate.id}/lobby`);
     } catch (e: any) {
       toast.error(e.message || "Couldn't publish");
     } finally {
