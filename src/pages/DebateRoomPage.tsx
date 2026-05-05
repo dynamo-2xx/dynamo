@@ -1464,7 +1464,32 @@ const DebateRoomPage = () => {
 
             <div className="flex-1 overflow-y-auto" data-annotatable>
               <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
-                <DebateRecordShell
+                {debate.edit_window_ends_at && (
+                  <div className="mb-4">
+                    <EditWindowBanner
+                      editWindowEndsAt={debate.edit_window_ends_at}
+                      isParticipant={!!myParticipant}
+                    />
+                  </div>
+                )}
+                {debate.feedback_enabled && !!myParticipant && (
+                  <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Award className="w-4 h-4 text-foreground shrink-0" />
+                      <p className="text-xs font-body text-foreground truncate">
+                        Your private performance report is ready.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => navigate(`/debate/${id}/grade`)}
+                      className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
+                    >
+                      View Your Performance
+                    </button>
+                  </div>
+                )}
+
+                <DebateRecordPreview
                   debateId={debate.id}
                   topic={debate.topic}
                   description={(debate as any).description}
@@ -1472,136 +1497,88 @@ const DebateRoomPage = () => {
                   scheduledAt={(debate as any).scheduled_at}
                   coverImageUrl={(debate as any).cover_image_url}
                   participantCount={participants.length}
-                  rolePill={isFacilitator ? "Facilitator" : isSpeaker ? "Speaker" : undefined}
                   fallbackSubtopics={subtopics.map((s) => ({ id: s.id, title: s.title }))}
                   fallbackSideLabels={sides.map((s) => s.label)}
-                  subtopicCounts={Object.fromEntries(
-                    subtopics.map((st) => {
-                      const stTr = transcriptEntries.filter((e) => e.is_final && e.subtopic === st.title);
-                      const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
-                      return [st.id, stTr.length + stArgs.length];
-                    })
-                  )}
-                  banner={
-                    <>
-                      {debate.edit_window_ends_at && (
-                        <EditWindowBanner
-                          editWindowEndsAt={debate.edit_window_ends_at}
-                          isParticipant={!!myParticipant}
-                        />
-                      )}
-                      {debate.feedback_enabled && !!myParticipant && (
-                        <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mt-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <Award className="w-4 h-4 text-foreground shrink-0" />
-                              <p className="text-xs font-body text-foreground truncate">
-                                Your private performance report is ready.
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => navigate(`/debate/${id}/grade`)}
-                              className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
-                            >
-                              View Your Performance
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {(() => {
-                        const allSummaryTexts = Object.values(roundSummaries).map((rs) => rs.summary).filter(Boolean);
-                        const overallText = aiMessage || (allSummaryTexts.length > 0 ? allSummaryTexts.join("\n\n") : null);
-                        if (!overallText) return null;
-                        return (
-                          <div className="border border-primary/20 bg-primary/5 rounded-xl overflow-hidden mt-3">
-                            <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/10">
-                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                                <Zap className="w-3.5 h-3.5 text-primary" />
-                              </div>
-                              <span className="text-xs font-semibold uppercase tracking-widest text-primary font-display">
-                                {aiMessage ? "d. — Closing Synthesis" : "Overall Summary"}
-                              </span>
-                            </div>
-                            <div className="px-4 py-3">
-                              <p className="text-sm text-foreground leading-relaxed font-body whitespace-pre-wrap">{overallText}</p>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </>
-                  }
-                  renderSubtopicContent={(subtopicId, subtopicTitle) => {
-                    const st = subtopics.find((s) => s.id === subtopicId);
-                    if (!st) return null;
-                    const stTranscripts = transcriptEntries.filter((e) => e.is_final && e.subtopic === subtopicTitle);
-                    const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
-                    const roundSummary = roundSummaries[st.id];
-                    const getSideOrder = (sideLabel: string): number => {
-                      const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
-                      return side?.sort_order ?? 0;
-                    };
-                    const transcriptTexts = new Set(stTranscripts.map((t) => t.text.trim().toLowerCase()));
-                    const orphanArgs = stArgs.filter((arg) => !transcriptTexts.has(arg.content.trim().toLowerCase()));
-                    const hasContent = stTranscripts.length > 0 || orphanArgs.length > 0;
-                    if (!hasContent && !roundSummary) {
-                      return (
-                        <p className="text-xs text-muted-foreground italic font-body py-2">No statements recorded</p>
+                />
+
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowTranscript((v) => !v)}
+                    className="text-xs font-body font-medium px-3 py-1.5 rounded-full border border-border bg-background hover:bg-accent/40 transition-colors"
+                  >
+                    {showTranscript ? "Hide full transcript" : "Show full transcript"}
+                  </button>
+                </div>
+
+                {showTranscript && (
+                  <div className="mt-4 space-y-3">
+                    {subtopics.map((st, stIdx) => {
+                      const stTranscripts = transcriptEntries.filter(
+                        (e) => e.is_final && e.subtopic === st.title,
                       );
-                    }
-                    return (
-                      <div className="space-y-2">
-                        {roundSummary && (
-                          <RoundSummaryCard
-                            summary={roundSummary.summary}
-                            keyArguments={roundSummary.key_arguments}
-                            subtopicTitle={st.title}
-                          />
-                        )}
-                        {stTranscripts.map((entry) => (
-                          <TranscriptCard
-                            key={entry.id}
-                            entryId={entry.id}
-                            speakerSide={entry.speaker_side}
-                            sideOrder={getSideOrder(entry.speaker_side)}
-                            text={entry.text}
-                            aiSummary={entry.ai_summary}
-                            timestamp={entry.timestamp}
-                          />
-                        ))}
-                        {orphanArgs.map((arg) => {
-                          const participant = participants.find((p) => p.id === arg.participant_id);
-                          const side = sides.find((s) => s.id === participant?.side_id);
-                          return (
+                      const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
+                      const transcriptTexts = new Set(
+                        stTranscripts.map((t) => t.text.trim().toLowerCase()),
+                      );
+                      const orphanArgs = stArgs.filter(
+                        (arg) => !transcriptTexts.has(arg.content.trim().toLowerCase()),
+                      );
+                      const getSideOrder = (sideLabel: string): number => {
+                        const side = sides.find(
+                          (s) => s.label.toLowerCase() === sideLabel.toLowerCase(),
+                        );
+                        return side?.sort_order ?? 0;
+                      };
+                      if (stTranscripts.length === 0 && orphanArgs.length === 0) return null;
+                      return (
+                        <div
+                          key={st.id}
+                          className="rounded-xl border border-border bg-card p-4 space-y-2"
+                        >
+                          <h4 className="text-sm font-display font-semibold text-foreground">
+                            {stIdx + 1}. {st.title}
+                          </h4>
+                          {stTranscripts.map((entry) => (
                             <TranscriptCard
-                              key={arg.id}
-                              argumentId={arg.id}
-                              speakerSide={side?.label || "Unknown"}
-                              sideOrder={side?.sort_order ?? 0}
-                              text={arg.content}
+                              key={entry.id}
+                              entryId={entry.id}
+                              speakerSide={entry.speaker_side}
+                              sideOrder={getSideOrder(entry.speaker_side)}
+                              text={entry.text}
+                              aiSummary={entry.ai_summary}
+                              timestamp={entry.timestamp}
                             />
-                          );
-                        })}
-                      </div>
-                    );
-                  }}
-                  footer={
-                    <div className="text-center py-8">
-                      <h3 className="text-xl font-display font-bold text-primary mb-2">Debate Complete</h3>
-                      <p className="text-muted-foreground text-sm font-body">
-                        {debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now()
-                          ? "Participants may edit their arguments before the record is finalized."
-                          : "The debate record is permanently finalized."}
-                      </p>
-                    </div>
-                  }
-                >
-                  <div className="mt-8">
-                    <RecordCommentsSection
-                      recordType={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
-                      recordId={debate.id}
-                    />
+                          ))}
+                          {orphanArgs.map((arg) => {
+                            const participant = participants.find(
+                              (p) => p.id === arg.participant_id,
+                            );
+                            const side = sides.find((s) => s.id === participant?.side_id);
+                            return (
+                              <TranscriptCard
+                                key={arg.id}
+                                argumentId={arg.id}
+                                speakerSide={side?.label || "Unknown"}
+                                sideOrder={side?.sort_order ?? 0}
+                                text={arg.content}
+                              />
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                   </div>
-                </DebateRecordShell>
+                )}
+
+                <div className="mt-8">
+                  <RecordCommentsSection
+                    recordType={
+                      (debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"
+                    }
+                    recordId={debate.id}
+                  />
+                </div>
               </div>
             </div>
           </div>
