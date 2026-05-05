@@ -40,7 +40,8 @@ const FloatingTranscript = ({
         onClose={() => setOpen(false)}
         eyebrow="Live"
         title="Transcript"
-        widthClass="w-[min(360px,calc(100%-2rem))]"
+        initialWidth={360}
+        initialHeight={420}
         storageKey="live-transcript"
         initialPosition={{ x: 24, y: 24 }}
       >
