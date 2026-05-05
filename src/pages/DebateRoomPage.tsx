@@ -1466,9 +1466,9 @@ const DebateRoomPage = () => {
                 <DebateRecordShell
                   debateId={debate.id}
                   topic={debate.topic}
-                  description={debate.description}
+                  description={(debate as any).description}
                   status={debate.status}
-                  scheduledAt={debate.scheduled_at}
+                  scheduledAt={(debate as any).scheduled_at}
                   coverImageUrl={(debate as any).cover_image_url}
                   participantCount={participants.length}
                   rolePill={isFacilitator ? "Facilitator" : isSpeaker ? "Speaker" : undefined}
