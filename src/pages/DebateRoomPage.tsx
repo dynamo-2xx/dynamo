@@ -1198,6 +1198,9 @@ const DebateRoomPage = () => {
 
   return (
     <div className="h-screen w-full bg-background flex flex-col overflow-hidden" data-record-root>
+      {user && id && (
+        <DebateHighlightLayer recordType="debate" recordId={id} />
+      )}
       {handoffStream && (
         <InPersonMicBar
           initialStream={handoffStream}
