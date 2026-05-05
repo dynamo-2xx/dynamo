@@ -186,6 +186,9 @@ const LiveSessionPage = () => {
         setJoinCode(d.join_code || null);
         if (d.status === "ended") {
           setPhase("ended");
+        } else if (d.mode === "multi_device" && d.status !== "recording" && user?.id === d.created_by) {
+          navigate(`/live/${id}/lobby`, { replace: true });
+          return;
         } else {
           setPhase("recording");
         }
