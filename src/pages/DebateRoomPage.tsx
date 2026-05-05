@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap, NotebookPen, Award
+  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap, Award
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +31,7 @@ import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ArgumentMapOverlay from "@/components/debate/ArgumentMapOverlay";
 import NotebookOverlay from "@/components/debate/NotebookOverlay";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
+import DebateRecordShell from "@/components/debate/DebateRecordShell";
 import { Map as MapIcon, NotebookPen } from "lucide-react";
 
 
