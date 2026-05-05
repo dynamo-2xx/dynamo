@@ -219,7 +219,7 @@ const LiveSessionPage = () => {
         created_by: user.id,
         title: title.trim() || null,
         mode,
-        status: "recording",
+        status: mode === "multi_device" ? "lobby" : "recording",
         cover_image_url: coverImageUrl,
       } as any)
       .select()
@@ -232,9 +232,7 @@ const LiveSessionPage = () => {
 
     const d = data as any;
     setSessionId(d.id);
-    setSessionStatus("recording");
     setJoinCode(d.join_code || null);
-    setPhase("recording");
 
     // Attach buffered tags
     if (setupTags.length > 0) {
@@ -243,7 +241,8 @@ const LiveSessionPage = () => {
         .insert(setupTags.map((t) => ({ live_session_id: d.id, tag_id: t.id })));
     }
 
-    // Multi-device: register the host as Speaker 1 via join RPC
+    // Multi-device: register host as Speaker 1, then route to lobby so they
+    // can review connected joiners + echo guard before starting.
     if (mode === "multi_device" && d.join_code) {
       const name = hostDisplayName || user.email?.split("@")[0] || "Host";
       const { data: joinData } = await (supabase as any).rpc("join_live_session", {
@@ -255,16 +254,18 @@ const LiveSessionPage = () => {
       const row = Array.isArray(joinData) ? joinData[0] : joinData;
       const slot = row?.speaker_slot ?? 1;
       setHostSpeakerSlot(slot);
-
-      // Seed speaker_names so transcripts show real name not "Speaker N"
       const seeded = { ...(d.speaker_names || {}), [String(slot)]: name };
       setSpeakerNames(seeded);
       await (supabase as any)
         .from("live_sessions")
         .update({ speaker_names: seeded })
         .eq("id", d.id);
+      navigate(`/live/${d.id}/lobby`, { replace: true });
+      return;
     }
 
+    setSessionStatus("recording");
+    setPhase("recording");
     navigate(`/live/${d.id}`, { replace: true });
   }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName, coverImageUrl]);
 
