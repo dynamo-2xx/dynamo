@@ -6,7 +6,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import EditWindowBanner from "@/components/debate/EditWindowBanner";
 import EditWindowInline from "@/components/debate/EditWindowInline";
 import EditableArgument from "@/components/debate/EditableArgument";
 import MediaPermissions, { type MediaPermissionsHandle } from "@/components/debate/MediaPermissions";
