@@ -22,6 +22,7 @@ import JoinCodeCard from "@/components/live/JoinCodeCard";
 import PresenceList from "@/components/live/PresenceList";
 import VideoGrid from "@/components/live/VideoGrid";
 import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
+import { useMicPolicy } from "@/hooks/useMicPolicy";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
 import FloatingTranscript from "@/components/live/FloatingTranscript";
@@ -105,6 +106,16 @@ const LiveSessionPage = () => {
     isMulti ? sessionId : null,
     { deviceId, heartbeat: isMulti && isRecordingActive },
   );
+
+  // Live policy: when echo_guard is on, voice-detect-only joiners get muted.
+  // Owner is always free; this hook is a no-op when conditions don't trigger.
+  useMicPolicy({
+    kind: "live",
+    sessionId,
+    userId: user?.id ?? null,
+    isOwner: true,
+    stream: rtc.localStream,
+  });
 
   // Host-side: when participants change, merge their {slot: display_name} into
   // live_sessions.speaker_names so transcripts show real names.
