@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
-import { Home, Compass, PlusCircle, User, MessageCircle, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Home, Compass, PlusCircle, User, MessageCircle, PanelLeftClose, PanelLeft, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
@@ -11,6 +11,7 @@ import FloatingDMWindow from "@/components/messages/FloatingDMWindow";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
+  { to: "/clubs", icon: Users, label: "Clubs" },
   { to: "/explore", icon: Compass, label: "Explore" },
   { to: "/profile", icon: User, label: "Profile" },
   { to: "/messages", icon: MessageCircle, label: "Messages" },
