@@ -1,102 +1,77 @@
-## Goals
-1. Add a comments section to debates, live sessions, and Change-My-Mind records (preview + post-record).
-2. Allow optional cover image upload during creation of debates, lives, and CMM — and editable later.
-3. Hide archived items from Home and Explore everywhere; only show in profile My Agenda.
+## 1. Unify Preview ↔ Post-Session Record layout
 
----
+Build one shared component, `DebateRecordShell`, used by:
+- `DebateScheduledPreviewPage` (scheduled, ghost rows)
+- `DebateRoomPage` completed view (lines 1440–1608)
+- `SpectatorPreviewShell` inside `DebateRoomPage` (live + scheduled spectator)
 
-## 1. Comments
+Shared layout (matches image 50, dark/clean — no big gradient hero block):
+- Compact header: back, title, status pill, participant count, role pill, share button.
+- One-line edit-window banner if applicable.
+- Optional "View Your Performance" strip (participants only, completed).
+- Sides shown as small inline chips under the title, NOT large cards.
+- Subtopics rendered as the same `Collapsible` rows used in the completed view: numbered title + count badge + chevron, content fills with either real threads (live/completed) or `GhostStatementCard` (scheduled).
+- "Debate Complete" / "Coming soon" footnote rendered the same way.
+- `RecordCommentsSection` mounted under the threaded record (same in both states).
+- `Interested?` / `Edit debate` sticky CTA preserved on preview.
 
-### Database
-New table `record_comments`:
-- `id uuid pk`, `created_at`, `updated_at`
-- `record_type text` — `'debate' | 'live_session' | 'change_my_mind'`
-- `record_id uuid` (debate_id or live_session_id)
-- `parent_id uuid` (nullable, for one level of replies)
-- `user_id uuid`, `body text`
+`DebateRecordPreview.tsx` becomes a thin wrapper that delegates to `DebateRecordShell`, dropping the gradient hero + side cards. Cover image (if set) becomes a small thumbnail beside the title rather than a 16:9 banner.
 
-RLS:
-- SELECT: anon + authenticated, only when the parent record is publicly visible (debate `is_public = true` / `live_sessions.is_public = true`). Mirrors existing public-read pattern.
-- INSERT: authenticated; user_id = auth.uid(); record must be visible.
-- UPDATE / DELETE: only the comment author.
+## 2. Always-on debate-room tools
 
-Realtime: enable on `record_comments` so threads update live.
+### A. Argument map: draggable + resizable everywhere, including prep
 
-### UI
-New component `RecordCommentsSection` rendered:
-- **Preview pages** (`DebateScheduledPreviewPage`, the live preview, CMM preview): directly **below the Interested button** (or below the owner's Edit button if creator).
-- **Post-record / completed pages** (`ExploreDebateDetailPage`, `DebateRecordPreview`, `SessionRecordViewV2` record view, CMM record): **below the threaded record**.
+- Promote argument-map state from `ParticipantSharedView` up to `DebateRoomPage` so it persists across prep ↔ live transitions and is visible inside the prep overlay.
+- Convert `FloatingOverlay` to support resize: add a bottom-right resize handle, persist `{x, y, w, h}` to sessionStorage. Min 280×220, max viewport-bound.
+- Render the argument map mount at `DebateRoomPage` root (above prep overlay's z-index) so it's available during:
+  - normal speaker turns (every speaker, not just publisher)
+  - non-speakers' turns (give all speakers + facilitator the map button)
+  - the prep phase (button stays visible in prep overlay header)
+- Add tabs inside the argument-map bubble:
+  - **Map** (existing `LiveArgumentMap`)
+  - **Analysis** — replaces the old `round_summaries` surfacing. Shows per-subtopic AI analysis pulled from `round_summaries` (current data source) + the per-turn `ai_summary` already attached to transcript entries, grouped by subtopic. No new AI calls; this is just the new home for that data.
 
-Behavior:
-- Lists comments newest-first with author avatar + name + relative time.
-- One level of replies (parent_id).
-- Composer: textarea + submit; for unauthenticated users the composer is replaced with an `AuthPromptDialog` trigger ("Sign in to comment").
-- Author can delete own comment.
-- Realtime appends new comments.
+### B. Annotations: always-on, recorded to the notebook
 
-### Notifications (light)
-Insert a `notifications` row for the record owner when someone comments (type `comment`). Reuse existing notifications surface.
+Use `session_annotations` (already exists, used by live/CMM record + `consolidate-notebook` edge fn). Anchor by `record_type='debate'`, `record_id=<debateId>`. Highlight UX:
+- New `DebateHighlightLayer` mounted over (a) the main window content (transcript bubbles, messenger chat, current-turn text) and (b) the argument-map overlay body. Selection → small floating "Annotate" pill → opens a tiny composer (excerpt + optional note) → inserts row.
+- Available to all speakers any time the debate is live OR during prep phase (not just on their turn).
+- Notebook overlay gains tabs: **Notes** (existing free-text textarea) and **Annotations** (list of saved annotations w/ excerpt + note, delete own).
+- Post-debate: the existing live/CMM `AnnotationsTab` already renders these for `record_type='debate'`; surface a link in the completed view so users land in their study annotations.
 
----
+### C. Notebook stays as before, but reachable for ALL speakers throughout (currently `isSpeaker` only — keep that gate, but remove "must be your turn" implicit gating).
 
-## 2. Cover image upload (optional, editable later)
+## 3. Prep window: scope content to the prior turn only
 
-### Storage
-New public bucket `record-covers` (single bucket for all three record types). RLS:
-- Public read.
-- Authenticated insert/update/delete restricted to objects under `${auth.uid()}/...` path prefix.
+Current `PrepPhaseOverlay` (incoming role) lists ALL transcripts and ALL summaries across every subtopic. Fix:
 
-### Schema
-- `live_sessions.cover_image_url text null` — add column (debates already has it).
-- (CMM uses the `debates` table, so no change needed there.)
+- Pass only the prior turn's content to `PrepPhaseOverlay`:
+  - `lastTurnTranscript` (already done) and `lastTurnSummary` for the outgoing speaker (the turn that just ended).
+  - For incoming: show ONLY the same prior-turn transcript + summary (the immediately preceding turn from the other side), NOT the full debate history.
+- Replace the 3-column "Transcripts / Summaries / My Notes" with a 2-column "Prior turn (transcript + summary) / My Notes" for incoming. Match the simpler outgoing layout.
+- The argument-map button (always-on per §2) is the canonical way to access full history during prep.
+- Compute prior-turn entries in `DebateRoomPage` from `transcriptEntries` filtered to `subtopic === currentSubtopic` AND `speaker_side === outgoingSideLabel` AND most recent — already partly there, just stop forwarding `allTranscriptEntries` to the overlay.
 
-### UI: creation flows
-Add a new "Cover image (optional)" upload control:
-- `CreateDebatePage` — in the cover/details step.
-- `CreateChangeMyMindPage` — in the setup step before publish.
-- Live session start (in `SessionRecordView` / start sheet) — optional pre-record field; if record is started instantly, allow setting via the edit panel below.
-
-Component: `CoverImageUploader` (new) — drag/drop or click, preview, replace, remove. Falls back to `gradientFromSeed(topic)` if empty (existing behavior in `DebateCoverCard` is preserved).
-
-### UI: edit later
-- Debate: surface in existing debate edit panel (or a new "Edit cover" button on owner-only view of preview/record pages).
-- Live session: in the existing session settings menu (`EditSetupPanel`-equivalent for live).
-- CMM: same edit panel as debate (since CMM is a debate row).
-
----
-
-## 3. Hide archived items from Home + Explore
-
-Audit and ensure every Home/Explore query excludes `status = 'archived'`. The current code already does for debates but **owner queries in `useMyRecentDebates` keep them out only via `.neq("status","archived")` for created, but the parts join filters in JS** — confirmed already excluded.
-
-Action items:
-- Verify and unify all Home/Explore hooks (`useHomeDebates`, `useExplore`, `useForYouDebates`, `useMyRecentDebates`, live session queries) to exclude `status = 'archived'` for both debates and live_sessions.
-- Profile page `MyDebatesPage` / "My Agenda" tab: explicitly include archived under a dedicated "Archived" subtab (or filter chip), so users still have access to their archived content there.
-
----
-
-## Technical notes
-
-- Comments component is shared across all three record types via a `record_type` + `record_id` prop.
-- RLS for comments mirrors the public visibility checks already used by `debate_tags` / `live_session_tags`.
-- Cover bucket path convention: `record-covers/{user_id}/{uuid}.{ext}` for clean per-user RLS.
-- Auth gating uses existing `AuthPromptDialog` for unauthenticated commenters and uploaders.
-- No changes to `supabase/integrations/types.ts` (auto-generated after migration).
-
----
-
-## Files to add / edit (high level)
+## Files
 
 **New**
-- `supabase/migrations/<ts>_record_comments_and_covers.sql` (table, RLS, realtime, bucket, `live_sessions.cover_image_url`)
-- `src/components/comments/RecordCommentsSection.tsx`
-- `src/hooks/useRecordComments.ts`
-- `src/components/upload/CoverImageUploader.tsx`
+- `src/components/debate/DebateRecordShell.tsx`
+- `src/components/debate/DebateHighlightLayer.tsx`
+- `src/components/debate/ArgumentMapAnalysisTab.tsx`
+- `src/hooks/useDebateAnnotations.ts` (thin wrapper around `session_annotations` for `record_type='debate'`)
 
 **Edit**
-- `src/pages/CreateDebatePage.tsx`, `src/pages/CreateChangeMyMindPage.tsx`, live start surface in `src/components/live/SessionRecordView.tsx` (or its V2)
-- `src/pages/DebateScheduledPreviewPage.tsx`, `src/pages/DebatePreviewPage.tsx`, `src/pages/ExploreDebateDetailPage.tsx`, `src/components/debate/DebateRecordPreview.tsx`, `src/components/live/record/SessionRecordViewV2.tsx`, `src/pages/ChangeMyMindRoomPage.tsx`
-- `src/hooks/useExplore.ts`, `src/hooks/useHomeDebates.ts` — confirm archived exclusion for debates AND live_sessions
-- `src/pages/ProfilePage.tsx` / `src/pages/MyDebatesPage.tsx` — add archived view under My Agenda
+- `src/components/debate/FloatingOverlay.tsx` — add resize handle + persist size
+- `src/components/debate/ArgumentMapOverlay.tsx` — add Map/Analysis tabs
+- `src/components/debate/NotebookOverlay.tsx` — add Notes/Annotations tabs
+- `src/components/debate/PrepPhaseOverlay.tsx` — scope to prior turn only; mount argument-map button in header
+- `src/components/debate/ParticipantSharedView.tsx` — show map/notebook buttons for all speakers (not just publisher path); lift map state up
+- `src/pages/DebateRoomPage.tsx` — root-level argument map + highlight layer; pass scoped prep data; replace completed-view JSX with `DebateRecordShell`
+- `src/pages/DebateScheduledPreviewPage.tsx` — render `DebateRecordShell` instead of `DebateRecordPreview`'s gradient hero
+- `src/components/debate/DebateRecordPreview.tsx` — slim down to delegate to shell (or remove)
 
-After approval I'll implement in this order: migration → cover uploader + creation flows → comments table + component + integration → archive filter audit + profile archive view.
+**No DB migration required** — `session_annotations` already supports `record_type='debate'`/`record_id`. No new tables.
+
+## Open question
+
+Confirm the annotation approach (`session_annotations`) before I implement, or say "go" and I'll proceed with the plan as written.
