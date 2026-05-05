@@ -1461,103 +1461,94 @@ const DebateRoomPage = () => {
               />
             )}
 
-            {debate.edit_window_ends_at && (
-              <EditWindowBanner
-                editWindowEndsAt={debate.edit_window_ends_at}
-                isParticipant={!!myParticipant}
-              />
-            )}
-
-            {/* Persistent entry to private performance report (participants only, when feedback was enabled) */}
-            {debate.feedback_enabled && !!myParticipant && (
-              <div className="border-b border-border bg-accent/40 px-6 py-3 shrink-0">
-                <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Award className="w-4 h-4 text-foreground shrink-0" />
-                    <p className="text-xs font-body text-foreground truncate">
-                      Your private performance report is ready.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => navigate(`/debate/${id}/grade`)}
-                    className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
-                  >
-                    View Your Performance
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* AI closing synthesis */}
-            {aiMessage && (
-              <div className="border-b border-primary/20 bg-primary/5 px-6 py-4 shrink-0">
-                <div className="flex items-start gap-3 max-w-3xl mx-auto">
-                  <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                    <AlertCircle className="w-3.5 h-3.5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold text-primary mb-0.5 font-display">d. — Closing Synthesis</p>
-                    <p className="text-xs text-foreground leading-relaxed font-body">{aiMessage}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3" data-annotatable>
-              {/* Overall Summary */}
-              {(() => {
-                const allSummaryTexts = Object.values(roundSummaries).map(rs => rs.summary).filter(Boolean);
-                const overallText = aiMessage || (allSummaryTexts.length > 0 ? allSummaryTexts.join("\n\n") : null);
-                if (!overallText) return null;
-                return (
-                  <div className="border border-primary/20 bg-primary/5 rounded-xl overflow-hidden mb-2">
-                    <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/10">
-                      <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                        <Zap className="w-3.5 h-3.5 text-primary" />
-                      </div>
-                      <span className="text-xs font-semibold uppercase tracking-widest text-primary font-display">
-                        Overall Summary
-                      </span>
-                    </div>
-                    <div className="px-4 py-3">
-                      <p className="text-sm text-foreground leading-relaxed font-body whitespace-pre-wrap">{overallText}</p>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {subtopics.map((st, stIdx) => {
-                const stTranscripts = transcriptEntries.filter(e => e.is_final && e.subtopic === st.title);
-                const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
-                const hasContent = stTranscripts.length > 0 || stArgs.length > 0;
-                const roundSummary = roundSummaries[st.id];
-
-                const getSideOrder = (sideLabel: string): number => {
-                  const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
-                  return side?.sort_order ?? 0;
-                };
-
-                return (
-                  <Collapsible key={st.id} defaultOpen={stIdx === 0}>
-                    <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-5 py-4 text-left hover:bg-accent/50 transition-colors">
-                      <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
-                      <h3 className="text-sm font-display font-semibold text-foreground flex-1">
-                        {stIdx + 1}. {st.title}
-                      </h3>
-                      {roundSummary && (
-                        <span className="text-[9px] bg-primary/10 text-primary rounded-full px-2 py-0.5 font-semibold">
-                          Summarized
-                        </span>
+            <div className="flex-1 overflow-y-auto" data-annotatable>
+              <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
+                <DebateRecordShell
+                  debateId={debate.id}
+                  topic={debate.topic}
+                  description={debate.description}
+                  status={debate.status}
+                  scheduledAt={debate.scheduled_at}
+                  coverImageUrl={(debate as any).cover_image_url}
+                  participantCount={participants.length}
+                  rolePill={isFacilitator ? "Facilitator" : isSpeaker ? "Speaker" : undefined}
+                  fallbackSubtopics={subtopics.map((s) => ({ id: s.id, title: s.title }))}
+                  fallbackSideLabels={sides.map((s) => s.label)}
+                  subtopicCounts={Object.fromEntries(
+                    subtopics.map((st) => {
+                      const stTr = transcriptEntries.filter((e) => e.is_final && e.subtopic === st.title);
+                      const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
+                      return [st.id, stTr.length + stArgs.length];
+                    })
+                  )}
+                  banner={
+                    <>
+                      {debate.edit_window_ends_at && (
+                        <EditWindowBanner
+                          editWindowEndsAt={debate.edit_window_ends_at}
+                          isParticipant={!!myParticipant}
+                        />
                       )}
-                      {hasContent && (
-                        <span className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
-                          {stTranscripts.length + stArgs.length}
-                        </span>
+                      {debate.feedback_enabled && !!myParticipant && (
+                        <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mt-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Award className="w-4 h-4 text-foreground shrink-0" />
+                              <p className="text-xs font-body text-foreground truncate">
+                                Your private performance report is ready.
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/debate/${id}/grade`)}
+                              className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
+                            >
+                              View Your Performance
+                            </button>
+                          </div>
+                        </div>
                       )}
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="px-5 py-3 space-y-2">
-                        {/* Round summary pinned at top */}
+                      {(() => {
+                        const allSummaryTexts = Object.values(roundSummaries).map((rs) => rs.summary).filter(Boolean);
+                        const overallText = aiMessage || (allSummaryTexts.length > 0 ? allSummaryTexts.join("\n\n") : null);
+                        if (!overallText) return null;
+                        return (
+                          <div className="border border-primary/20 bg-primary/5 rounded-xl overflow-hidden mt-3">
+                            <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/10">
+                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                                <Zap className="w-3.5 h-3.5 text-primary" />
+                              </div>
+                              <span className="text-xs font-semibold uppercase tracking-widest text-primary font-display">
+                                {aiMessage ? "d. — Closing Synthesis" : "Overall Summary"}
+                              </span>
+                            </div>
+                            <div className="px-4 py-3">
+                              <p className="text-sm text-foreground leading-relaxed font-body whitespace-pre-wrap">{overallText}</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  }
+                  renderSubtopicContent={(subtopicId, subtopicTitle) => {
+                    const st = subtopics.find((s) => s.id === subtopicId);
+                    if (!st) return null;
+                    const stTranscripts = transcriptEntries.filter((e) => e.is_final && e.subtopic === subtopicTitle);
+                    const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
+                    const roundSummary = roundSummaries[st.id];
+                    const getSideOrder = (sideLabel: string): number => {
+                      const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
+                      return side?.sort_order ?? 0;
+                    };
+                    const transcriptTexts = new Set(stTranscripts.map((t) => t.text.trim().toLowerCase()));
+                    const orphanArgs = stArgs.filter((arg) => !transcriptTexts.has(arg.content.trim().toLowerCase()));
+                    const hasContent = stTranscripts.length > 0 || orphanArgs.length > 0;
+                    if (!hasContent && !roundSummary) {
+                      return (
+                        <p className="text-xs text-muted-foreground italic font-body py-2">No statements recorded</p>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2">
                         {roundSummary && (
                           <RoundSummaryCard
                             summary={roundSummary.summary}
@@ -1565,7 +1556,6 @@ const DebateRoomPage = () => {
                             subtopicTitle={st.title}
                           />
                         )}
-                        {/* Transcript cards */}
                         {stTranscripts.map((entry) => (
                           <TranscriptCard
                             key={entry.id}
@@ -1577,40 +1567,40 @@ const DebateRoomPage = () => {
                             timestamp={entry.timestamp}
                           />
                         ))}
-                        {/* Submitted arguments (skip those with matching transcript entries) */}
-                        {(() => {
-                          const transcriptTexts = new Set(stTranscripts.map(t => t.text.trim().toLowerCase()));
-                          return stArgs
-                            .filter(arg => !transcriptTexts.has(arg.content.trim().toLowerCase()))
-                            .map((arg) => {
-                              const participant = participants.find((p) => p.id === arg.participant_id);
-                              const side = sides.find((s) => s.id === participant?.side_id);
-                              return (
-                                <TranscriptCard
-                                  key={arg.id}
-                                  argumentId={arg.id}
-                                  speakerSide={side?.label || "Unknown"}
-                                  sideOrder={side?.sort_order ?? 0}
-                                  text={arg.content}
-                                />
-                              );
-                            });
-                        })()}
-                        {!hasContent && !roundSummary && (
-                          <p className="text-xs text-muted-foreground italic font-body py-2">No statements recorded</p>
-                        )}
+                        {orphanArgs.map((arg) => {
+                          const participant = participants.find((p) => p.id === arg.participant_id);
+                          const side = sides.find((s) => s.id === participant?.side_id);
+                          return (
+                            <TranscriptCard
+                              key={arg.id}
+                              argumentId={arg.id}
+                              speakerSide={side?.label || "Unknown"}
+                              sideOrder={side?.sort_order ?? 0}
+                              text={arg.content}
+                            />
+                          );
+                        })}
                       </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
-              <div className="text-center py-8">
-                <h3 className="text-xl font-display font-bold text-primary mb-2">Debate Complete</h3>
-                <p className="text-muted-foreground text-sm font-body">
-                  {debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now()
-                    ? "Participants may edit their arguments before the record is finalized."
-                    : "The debate record is permanently finalized."}
-                </p>
+                    );
+                  }}
+                  footer={
+                    <div className="text-center py-8">
+                      <h3 className="text-xl font-display font-bold text-primary mb-2">Debate Complete</h3>
+                      <p className="text-muted-foreground text-sm font-body">
+                        {debate.edit_window_ends_at && new Date(debate.edit_window_ends_at).getTime() > Date.now()
+                          ? "Participants may edit their arguments before the record is finalized."
+                          : "The debate record is permanently finalized."}
+                      </p>
+                    </div>
+                  }
+                >
+                  <div className="mt-8">
+                    <RecordCommentsSection
+                      recordType={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
+                      recordId={debate.id}
+                    />
+                  </div>
+                </DebateRecordShell>
               </div>
             </div>
           </div>
