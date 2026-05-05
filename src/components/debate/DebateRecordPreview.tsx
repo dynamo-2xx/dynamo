@@ -5,7 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { gradientFromSeed } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
 import GhostStatementCard from "./preview/GhostStatementCard";
-import { useDebatePreviewThreads, type PreviewStatement } from "@/hooks/useDebatePreviewThreads";
+import { useDebatePreviewThreads } from "@/hooks/useDebatePreviewThreads";
 
 interface DebateRecordPreviewProps {
   debateId: string;
@@ -47,48 +47,9 @@ const SIDE_CLASS = [
   "text-amber-600 dark:text-amber-400",
 ];
 
-const speakerColorClass = (speakerLabel: string, labels: string[]): string => {
-  // speakerLabel is like "Speaker 1 · Yes" — pull the index
-  const m = speakerLabel.match(/Speaker\s+(\d+)/i);
-  if (m) {
-    const idx = parseInt(m[1], 10) - 1;
-    return SIDE_CLASS[idx % SIDE_CLASS.length];
-  }
-  // fallback: try to match against labels
-  const idx = labels.findIndex((l) => speakerLabel.toLowerCase().includes(l.toLowerCase()));
+const sideColorClass = (sideLabel: string, labels: string[]): string => {
+  const idx = labels.findIndex((l) => l.toLowerCase() === sideLabel.toLowerCase());
   return SIDE_CLASS[(idx >= 0 ? idx : 0) % SIDE_CLASS.length];
-};
-
-const StatementRow = ({ s, labels }: { s: PreviewStatement; labels: string[] }) => {
-  const isResponse = s.kind !== "main";
-  const glyph = isResponse ? "↳" : "•";
-  const label =
-    s.kind === "main"
-      ? "Main"
-      : s.kind === "counter"
-        ? "Counter"
-        : s.kind === "rebuttal"
-          ? "Rebuttal"
-          : s.kind === "affirms"
-            ? "Affirms"
-            : "Concedes";
-  const colorClass = speakerColorClass(s.speakerLabel, labels);
-  return (
-    <div className={cn("relative py-2", isResponse ? "pl-6" : "pl-3")}>
-      <div className="flex items-baseline gap-2">
-        <span className="text-foreground/40 select-none text-sm leading-none">{glyph}</span>
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-wider font-medium mb-1">
-            <span className="text-muted-foreground">{label}</span>{" "}
-            <span className={cn("font-semibold", colorClass)}>— {s.speakerLabel}</span>
-          </div>
-          <p className="text-sm font-body text-foreground leading-relaxed" data-annotatable>
-            {s.text}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 const DebateRecordPreview = ({
@@ -110,7 +71,7 @@ const DebateRecordPreview = ({
 
   const subs = liveSubs.length > 0
     ? liveSubs
-    : fallbackSubtopics.map((s) => ({ ...s, threads: [], keyArguments: [] as { side: string; content: string }[] }));
+    : fallbackSubtopics.map((s) => ({ ...s, threads: [], hasSummaries: false }));
   const labels = sideLabels.length > 0 ? sideLabels : fallbackSideLabels;
   const ghostLabelA = labels[0] ? `Speaker 1 · ${labels[0]}` : "Speaker 1";
   const ghostLabelB = labels[1] ? `Speaker 2 · ${labels[1]}` : "Speaker 2";
@@ -253,31 +214,38 @@ const DebateRecordPreview = ({
                   <CollapsibleContent>
                     <div className="pl-6 pr-2 py-2 space-y-2">
                       {hasContent ? (
-                        sub.threads.map((t) => (
-                          <div key={t.id} className="rounded-lg border border-border/60 bg-background/60 p-3">
-                            <p className="text-xs font-display text-foreground/80 mb-1 leading-snug">
-                              {t.title}
-                            </p>
-                            <div className="space-y-0.5">
-                              {t.statements.map((s) => (
-                                <StatementRow key={s.id} s={s} labels={labels} />
-                              ))}
-                            </div>
-                            {sub.keyArguments.length > 0 && (
-                              <div className="mt-3 pt-2 border-t border-border/50 space-y-1">
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-body font-medium">
-                                  Argument summary
-                                </p>
-                                {sub.keyArguments.map((k, i) => (
-                                  <p key={i} className="text-xs font-body text-foreground/80 leading-relaxed">
-                                    <span className="font-semibold text-foreground/70">[{k.side}]</span>{" "}
-                                    {k.content}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))
+                        sub.threads.map((t) => {
+                          const colorClass = sideColorClass(t.title, labels);
+                          return (
+                            <Collapsible key={t.id}>
+                              <CollapsibleTrigger className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-foreground/[0.04] rounded-lg border border-border/60 bg-background/60 transition-colors">
+                                <ChevronDown className="w-3.5 h-3.5 text-foreground/40 shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+                                <span className={cn("text-xs font-display font-semibold flex-1 truncate", colorClass)}>
+                                  {t.title}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground shrink-0">
+                                  {t.summaries.length} summar{t.summaries.length === 1 ? "y" : "ies"}
+                                </span>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <ul className="pl-7 pr-3 py-2 space-y-2">
+                                  {t.summaries.map((s) => (
+                                    <li key={s.id} className="flex items-start gap-2">
+                                      <span className={cn("mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-current", colorClass)} />
+                                      <p className="text-sm font-body text-foreground/90 leading-relaxed" data-annotatable>
+                                        {s.content}
+                                      </p>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          );
+                        })
+                      ) : status === "live" || status === "completed" ? (
+                        <p className="text-xs text-muted-foreground italic px-2 py-3">
+                          Summaries pending.
+                        </p>
                       ) : (
                         <div className="rounded-lg border border-dashed border-border/70 bg-background/40 p-3">
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-body mb-2">
