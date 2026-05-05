@@ -1,0 +1,2 @@
+ALTER TABLE public.session_annotations DROP CONSTRAINT IF EXISTS session_annotations_node_kind_check;
+ALTER TABLE public.session_annotations ADD CONSTRAINT session_annotations_node_kind_check CHECK (node_kind = ANY (ARRAY['summary'::text, 'transcript'::text, 'argument'::text]));
