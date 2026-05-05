@@ -108,7 +108,9 @@ const DebateRecordPreview = ({
     status,
   });
 
-  const subs = liveSubs.length > 0 ? liveSubs : fallbackSubtopics.map((s) => ({ ...s, threads: [] }));
+  const subs = liveSubs.length > 0
+    ? liveSubs
+    : fallbackSubtopics.map((s) => ({ ...s, threads: [], keyArguments: [] as { side: string; content: string }[] }));
   const labels = sideLabels.length > 0 ? sideLabels : fallbackSideLabels;
   const ghostLabelA = labels[0] ? `Speaker 1 · ${labels[0]}` : "Speaker 1";
   const ghostLabelB = labels[1] ? `Speaker 2 · ${labels[1]}` : "Speaker 2";
