@@ -1,193 +1,151 @@
-# Clubs + Events — v1 Plan
+## What we're building
 
-A new top-level **Clubs** hub for organizing groups of users around recurring debate / live / CMM activity. Members coordinate via **Events**: scheduled calendar entries with RSVP and venue, which the host launches into the underlying debate/live/CMM session at start time.
+Today, the in-person flow already lets a joiner scan a QR / enter a join code, sign in, test their mic, and pick a side (debate) or display name (live). What's missing:
 
-## Decisions locked in
-- **Membership**: public clubs = one-click join; private clubs = request → admin approves/denies.
-- **Event creation**: any member of a club can publish an Event.
-- **Events**: dedicated entity (calendar metadata + RSVP + venue) that, when started, spawns/links a debate, live, or CMM session.
-- **Discovery**: surfaced only in the new Clubs tab (not on Explore in v1).
+1. The **owner has no pre-live lobby** showing "who is connected, with which mic, on which device" — they just see counts.
+2. **CMM has no in-person join flow at all** — challengers can only join via the queue from a logged-in browser tab.
+3. The **fallback path** (someone has no device or skips the mic) is implicit. We make it an explicit choice ("use the room mic / voice detection only") so Deepgram knows when to lean on diarization vs per-device streams.
+4. The owner can't currently **gate Start on connected mics**, nor **release / re-invite** a slot.
+5. **Mic gating is inconsistent across formats.** We bake the right mute policy into the per-device mic so a joiner's own phone behaves correctly, not just the room.
 
----
+The plan introduces one shared concept: **the Mic Lobby** — a pre-live screen for the owner, mirrored as "you're connected, waiting for host" for joiners. It also introduces a per-format **Mic Policy** that is enforced on every connected device.
 
-## 1. Navigation
+## User stories
 
-`AppLayout.tsx` — add a **Clubs** item between Home and Explore.
-- Desktop sidebar: below Home.
-- Mobile bottom nav: beside Home (5 items now: Home, Clubs, Explore, Profile, Messages).
-- Icon: `Users` from lucide-react. Route: `/clubs`.
+- As an **owner of a debate/live/CMM**, after I generate the room I see a Lobby with a slot per expected participant. Each slot shows: avatar, profile name, device label, mic level bar, and a ready check. **Start** is gated on at least one mic being connected per side (debate) / per seat (live, CMM).
+- As a **non-owner in the room**, I scan the QR on my own phone, sign in, run the mic test, claim my slot, and land on a "You're connected. Waiting for host…" screen with a live mic meter so I know I'm being heard.
+- As a **non-owner without a device** (or who declined mic), I tap **"I'll share the room mic"**. My profile attaches to a slot but is marked *voice-detection only* so Deepgram diarization disambiguates me from the room mic.
+- As an **owner**, if a slot is stuck unconnected, I can **release** it or **resend** the join link.
+- As a **CMM owner**, in-person challengers can queue *with their own mics already attached* so each challenger's audio is captured cleanly the moment they go active.
 
-## 2. Pages & routes
+## Mic policy by format (NEW)
 
-```
-/clubs                         Clubs hub (Explore-style discovery)
-/clubs/new                     Create Club (Club Generator)
-/clubs/:id                     Club page (about, members, events, feed)
-/clubs/:id/edit                Admin settings (admins only)
-/clubs/:id/events/new          Create Event (any member)
-/clubs/:id/events/:eventId     Event detail (RSVP, launch session)
-```
+The lobby attaches per-device mics; the room then governs them:
 
-All protected except `/clubs` and public club pages (which render gated content for non-members).
+### Debate — strict turn lock
+- Every connected device's mic starts **muted**.
+- Only the device whose `user_id` matches the current `current_speaker_side_id`'s active speaker is **unmuted automatically**.
+- Manual unmute is **disabled** for everyone else; the in-room mic toolbar shows a lock icon with "Wait for your turn".
+- When the turn rotates, the room flips `track.enabled` on every device based on the new speaker.
 
-## 3. Clubs hub (`/clubs`) — mirrors Explore
+### CMM — host + active challenger only
+- The **owner's** device mic is unmuted whenever a round is active.
+- The **active queue row's** device (`cmm_queue.status='active'` and `user_id = me`) is unmuted.
+- All other connected devices (waiting challengers, audience speakers) are hard-muted with manual unmute disabled.
+- When `cmm_end_round` runs, the previous challenger's mic is force-muted; when `cmm_start_next` promotes the next, theirs unlocks.
 
-Same structure as `ExplorePage.tsx`:
-- Header row with title "Clubs" + search input.
-- Sticky chip bar: **All · My Clubs · Public · Recently Active · Near Me** + tag chips (reusing `useAllTags` filtered to a `club_tags` join later — v1 just builtin chips).
-- Grid of `ClubCoverCard` (mirrors `DebateCoverCard`): cover image, club name, 1-line description, member count, public/private badge.
-- Floating/top-right **Create Club** button (visible to authenticated users).
+### Live — open with echo guard
+- All connected device mics are **unmuted by default** (live = conversational).
+- A new **"Reduce room echo"** toggle in the host's Lobby (and live in-session menu) does two things when enabled:
+  1. Forces any device whose `mic_connections.mode='voice_detect_only'` to mute (so only personal mics are open).
+  2. Tags the session with `echo_guard=true`, which makes `useDeviceTranscription` enable Deepgram's `multichannel=true` + per-device endpointing so two open mics in one room don't double-transcribe.
+- Voice-detection-only fallback stays on as the disambiguator when `echo_guard` is off and someone joined without a personal mic.
 
-## 4. Club page (`/clubs/:id`)
+### Enforcement
 
-Layout: hero (cover + name + about + join/request CTA + member count) → tab strip:
-- **Events** (default) — Upcoming list + Past list. RSVP toggle on each card. "+ New Event" button for members.
-- **Members** — grid with role badges (Owner / Admin / Member). Admins see "Pending requests" section.
-- **About** — long description, tags, location, links.
-- **Discussion** — simple feed (reuse `record_comments` pattern, scoped by `record_type='club'`).
+A new shared hook `useMicPolicy({ kind, sessionId, deviceId })`:
+- Subscribes to the relevant turn/round/echo state via Supabase Realtime.
+- Computes `{ canSpeak: boolean, locked: boolean, lockReason: string }`.
+- Drives `track.enabled` directly on the connected device's stream and disables the manual mute toggle when `locked=true`.
 
-Non-members on a private club see only hero + About + Request to Join button.
+Existing `MediaPermissions` / `InPersonMicBar` / `useLiveSessionRTC.toggleMic` are wrapped to consult this hook before flipping state. The room (`DebateRoomPage`, `ChangeMyMindRoomPage`, `LiveSessionPage`) emits the canonical "who can speak now" signal; nothing changes about how those rooms already track turns.
 
-## 5. Create Club (`/clubs/new`)
+## Pages & flows
 
-Modeled on `CreateDebatePage.tsx` flow:
-- Name, description, cover image (reuse `CoverImageUploader`).
-- Visibility: Public / Private toggle.
-- Location (optional).
-- Tags (reuse `TagPicker`).
-- Submit → creates club, sets creator as Owner, redirects to `/clubs/:id`.
+```text
+Owner
+─────────────────────────────────────────
+[Generate room]  ──►  [Lobby]  ──► [Start session]
+                       │
+                       ├── slot list (sides / seats / queue)
+                       ├── connection state per slot
+                       ├── "voice-detection only" toggle per slot
+                       └── (Live only) "Reduce room echo" toggle
 
-## 6. Create Event (`/clubs/:id/events/new`)
-
-Modeled on debate creation but lighter:
-- Title, description.
-- Type: **Debate · Live · CMM** (drives which generator the host launches at start).
-- Date/time, duration estimate.
-- Mode: In-person (venue text + optional map link) / Online / Hybrid.
-- Capacity (optional).
-- Optional: pre-fill underlying session (e.g. for Debate type, can pre-select topic + sides; can also defer until launch).
-
-When the host clicks **Launch** on the event detail page at/after start time:
-- Creates the underlying debate/live/CMM via existing creation flows.
-- Stores the resulting `session_id` + `session_type` on the event row.
-- All RSVP'd attendees see a "Join now" button.
-
-## 7. Membership flow
-
-- **Public club** + Join button → insert `club_members` row with role `member`, status `active`.
-- **Private club** + Request to Join → insert `club_join_requests` row, status `pending`. Notifies all admins via `notifications`.
-- Admin approves → request row deleted + `club_members` row inserted. Denies → request marked `denied`.
-- Leave Club → delete own `club_members` row (Owner cannot leave without transferring; v1 disables Leave for owner).
-
-## 8. Notifications
-
-New notification types reusing the `notifications` table:
-- `club_join_request` (to admins)
-- `club_join_approved` / `club_join_denied` (to requester)
-- `club_event_published` (to all members of the club)
-- `club_event_starting_soon` (15 min before, to RSVP'd users) — handled by a scheduled edge function later; v1 ships in-app only.
-
----
-
-## Technical section
-
-### New tables
-
-```sql
-clubs (
-  id uuid pk,
-  created_by uuid not null,
-  name text not null,
-  description text,
-  cover_image_url text,
-  is_public boolean not null default true,
-  location text,
-  created_at, updated_at
-)
-
-club_members (
-  id uuid pk,
-  club_id uuid not null,
-  user_id uuid not null,
-  role text not null default 'member',  -- 'owner' | 'admin' | 'member'
-  joined_at timestamptz not null default now(),
-  unique (club_id, user_id)
-)
-
-club_join_requests (
-  id uuid pk,
-  club_id uuid not null,
-  user_id uuid not null,
-  status text not null default 'pending',  -- 'pending' | 'denied'
-  message text,
-  created_at, responded_at,
-  unique (club_id, user_id)
-)
-
-club_tags (club_id uuid, tag_id uuid, primary key(club_id, tag_id))
-
-club_events (
-  id uuid pk,
-  club_id uuid not null,
-  created_by uuid not null,
-  title text not null,
-  description text,
-  event_type text not null,          -- 'debate' | 'live' | 'cmm'
-  starts_at timestamptz not null,
-  ends_at timestamptz,
-  mode text not null default 'online',  -- 'online' | 'in_person' | 'hybrid'
-  venue text,
-  capacity int,
-  status text not null default 'scheduled',  -- 'scheduled' | 'live' | 'completed' | 'cancelled'
-  session_id uuid,                   -- filled in when launched (debate/live/cmm id)
-  created_at, updated_at
-)
-
-club_event_rsvps (
-  event_id uuid, user_id uuid,
-  status text default 'going',       -- 'going' | 'maybe' | 'declined'
-  created_at,
-  primary key (event_id, user_id)
-)
+Joiner
+─────────────────────────────────────────
+QR/code ─► Auth ─► Mic test ─► Side/seat pick
+                                    │
+                                    ├── connected → "Waiting for host"
+                                    │       (mic meter live; mic muted by policy)
+                                    └── no device → "Share room mic"
 ```
 
-### RLS helpers (SECURITY DEFINER, mirroring `can_view_debate`)
+### Routes
 
-```sql
-public.is_club_member(_club_id uuid)  -- true if auth.uid() is in club_members
-public.is_club_admin(_club_id uuid)   -- true if role in ('owner','admin')
-public.can_view_club(_club_id uuid)   -- public OR member
-public.can_view_event(_event_id uuid) -- via parent club's can_view_club
+- `/debate/:id/lobby`, `/live/:id/lobby`, `/cmm/:id/lobby` — owner Lobby.
+- `/join/:code` — already exists; routes to a per-format "Waiting for host" screen after connect.
+- `/join/:code/cmm` — new, in-person CMM join (claim a queue seat).
+
+## Data model
+
+```text
+mic_connections
+─────────────────────────────────────────
+id              uuid pk
+session_kind    text  ('debate' | 'live' | 'cmm')
+session_id      uuid
+slot_key        text  (side_id, speaker_slot, or 'queue:<idx>')
+user_id         uuid (nullable)        -- null when 'voice_detect_only'
+device_id       text (nullable)
+display_name    text
+avatar_url      text nullable
+mode            text  ('own_mic' | 'voice_detect_only')
+status          text  ('connected' | 'released' | 'left')
+last_audio_rms  real default 0          -- broadcast by joiner for owner meter
+last_seen_at    timestamptz
+created_at      timestamptz default now()
+unique (session_kind, session_id, slot_key) where status='connected'
 ```
 
-### RLS policies (highlights)
-- `clubs` SELECT: `is_public OR is_club_member(id)`.
-- `clubs` UPDATE: `is_club_admin(id)`. DELETE: owner only.
-- `club_members` SELECT: `can_view_club(club_id)`. INSERT for self only on **public** clubs (`is_public AND user_id = auth.uid()`); private joins go through approval flow only. DELETE: self OR admin (and never the owner).
-- `club_join_requests` SELECT: requester OR club admins. INSERT: self on private clubs. UPDATE: admins. DELETE: requester.
-- `club_events` SELECT: `can_view_club(club_id)`. INSERT: `is_club_member(club_id)` (any member). UPDATE/DELETE: creator OR admin.
-- `club_event_rsvps` SELECT: `can_view_event(event_id)`. INSERT/DELETE: self only AND `is_club_member`.
-- `club_tags` mirrors `debate_tags`.
+Plus on `live_sessions`: `echo_guard boolean default false`.
 
-### New code
+RLS: SELECT via existing `can_view_*` helpers; INSERT/UPDATE limited to row's `user_id` or session owner; DELETE owner only. Realtime publication added.
 
-**Pages**: `ClubsPage`, `CreateClubPage`, `ClubPage`, `ClubEditPage`, `CreateClubEventPage`, `ClubEventDetailPage` (under `src/pages/`).
-**Components** (`src/components/clubs/`): `ClubCoverCard`, `ClubHero`, `ClubMembersList`, `JoinRequestRow`, `ClubEventCard`, `EventRSVPButton`, `LaunchEventButton`.
-**Hooks** (`src/hooks/`): `useClubs`, `useClub`, `useClubMembership`, `useClubEvents`, `useEventRSVP`, `useClubJoinRequests`.
-**Routes**: register all six in `src/App.tsx` (protected except public read).
-**Nav**: add Clubs item in `AppLayout.tsx`.
+`debate_participants`, `live_session_participants`, and `cmm_queue` are unchanged — `mic_connections` is purely the pre-live attachment layer plus the runtime meter feed.
 
-### Reuse
-- `DebateCoverCard` patterns for `ClubCoverCard`.
-- `CoverImageUploader`, `TagPicker`, `Collapsible`, existing chip styling from `ExplorePage`.
-- `notifications` table — no schema change needed for new types.
-- Existing debate/live/CMM creation entry points get called by `LaunchEventButton`.
+## UI work
 
-### Out of scope for v1 (follow-ups)
-- Recurring events.
-- Club discussion threads / posts (just RSS-style feed v1).
-- Event Generator AI suggestions.
-- Calendar sync (Google Calendar) — possible later; connector exists.
-- Clubs surfaced on Explore/Profile/Home.
-- Scheduled push for "starting soon".
-- Owner transfer UI.
+### Shared
+- `src/components/lobby/MicLobby.tsx` — owner screen, slot list, Start button.
+- `src/components/lobby/LobbySlotRow.tsx` — avatar, name, device, mic-level bar (`last_audio_rms`), ready check, kick/release.
+- `src/components/lobby/WaitingForHost.tsx` — non-owner mirror with live mic meter and lock-status hint.
+- `src/components/lobby/VoiceDetectOnlyToggle.tsx`.
+- `src/components/lobby/EchoGuardToggle.tsx` (Live).
+- `src/hooks/useMicPolicy.ts` — the per-format gate described above.
+
+### Per-format wiring
+- `CreateDebatePage`, `CreateChangeMyMindPage`, `LiveSessionPage` — after creating draft, route into the matching Lobby.
+- `JoinDebatePage` — after `MicTestStep` resolves, write `mic_connections` (`mode='own_mic'`), then `WaitingForHost`. Add "I'll use the room mic" → `mode='voice_detect_only'`.
+- `LiveJoinPage` — same lobby write before transitioning to `recording`. Recording phase triggers when owner presses Start (subscribe to `live_sessions.status` flip).
+- New `JoinCmmPage` — claims a queue seat + writes `mic_connections`.
+- `DebateRoomPage`, `ChangeMyMindRoomPage`, `LiveSessionPage` — wrap mic toggles via `useMicPolicy`; surface lock reason in the mic toolbar.
+
+### Owner controls in Lobby
+- "Start" disabled until policy minimum met.
+- Per-row: Release seat, Resend link, Kick (post-start).
+
+## Deepgram integration
+
+`useDeepgramTranscription` / `useDeviceTranscription` already key on `device_id` and `speaker_slot`. We extend the resolver:
+- Slot with `mic_connections.mode='own_mic'` → that device's stream feeds the slot directly (no diarization).
+- Slot only `voice_detect_only` → room device falls back to diarization.
+- Live + `echo_guard=true` → enable `multichannel=true` and stricter endpointing per the existing hardware-access memory.
+
+No new edge function needed.
+
+## Out of scope for v1
+
+- Per-device noise profiles (just the echo guard above).
+- Reassigning a connected mic to a different slot mid-session.
+- Audience members opting into mic capture.
+- Live multi-device WebRTC mesh changes (already shipped).
+
+## Files touched
+
+- **Migration**: new `mic_connections` table + RLS, helper `can_view_lobby(kind, id)`, `live_sessions.echo_guard` column, realtime publication.
+- **New pages**: `DebateLobbyPage`, `LiveLobbyPage`, `CmmLobbyPage`, `JoinCmmPage`.
+- **New components**: `src/components/lobby/*`.
+- **New hooks**: `useMicLobby` (owner list+realtime), `useMicLobbyAttachment` (joiner heartbeat + RMS broadcast), `useMicPolicy` (shared gate).
+- **Edited**: `App.tsx` (routes), `CreateDebatePage`, `CreateChangeMyMindPage`, `LiveSessionPage`, `JoinDebatePage`, `LiveJoinPage`, `InPersonJoinPanel`, `MediaPermissions`, `InPersonMicBar`, `useLiveSessionRTC` (mic policy hook integration), and the three room pages.
+- **Memory**: extend `mem://features/onboarding-invite-flow.md`; new `mem://features/mic-lobby.md` and `mem://features/mic-policy.md`.
