@@ -43,6 +43,12 @@ import SharedNotebookPage from "./pages/SharedNotebookPage";
 import CreateChangeMyMindPage from "./pages/CreateChangeMyMindPage";
 import ChangeMyMindRoomPage from "./pages/ChangeMyMindRoomPage";
 import JoinCodeProjectorPage from "./pages/JoinCodeProjectorPage";
+import ClubsPage from "./pages/ClubsPage";
+import CreateClubPage from "./pages/CreateClubPage";
+import ClubPage from "./pages/ClubPage";
+import ClubEditPage from "./pages/ClubEditPage";
+import CreateClubEventPage from "./pages/CreateClubEventPage";
+import ClubEventDetailPage from "./pages/ClubEventDetailPage";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +63,12 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/clubs" element={<ClubsPage />} />
+              <Route path="/clubs/new" element={<ProtectedRoute><CreateClubPage /></ProtectedRoute>} />
+              <Route path="/clubs/:id" element={<ClubPage />} />
+              <Route path="/clubs/:id/edit" element={<ProtectedRoute><ClubEditPage /></ProtectedRoute>} />
+              <Route path="/clubs/:id/events/new" element={<ProtectedRoute><CreateClubEventPage /></ProtectedRoute>} />
+              <Route path="/clubs/:id/events/:eventId" element={<ClubEventDetailPage />} />
               <Route path="/explore/topic/:slug" element={<TopicPage />} />
               <Route path="/explore/:debateId" element={<ExploreDebateDetailPage />} />
               <Route path="/u/:userId" element={<PublicProfilePage />} />
