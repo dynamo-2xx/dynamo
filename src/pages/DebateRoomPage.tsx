@@ -6,7 +6,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import EditWindowBanner from "@/components/debate/EditWindowBanner";
+import EditWindowInline from "@/components/debate/EditWindowInline";
 import EditableArgument from "@/components/debate/EditableArgument";
 import MediaPermissions, { type MediaPermissionsHandle } from "@/components/debate/MediaPermissions";
 import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechInput";
@@ -1464,14 +1464,6 @@ const DebateRoomPage = () => {
 
             <div className="flex-1 overflow-y-auto" data-annotatable>
               <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
-                {debate.edit_window_ends_at && (
-                  <div className="mb-4">
-                    <EditWindowBanner
-                      editWindowEndsAt={debate.edit_window_ends_at}
-                      isParticipant={!!myParticipant}
-                    />
-                  </div>
-                )}
                 {debate.feedback_enabled && !!myParticipant && (
                   <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mb-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
@@ -1501,7 +1493,7 @@ const DebateRoomPage = () => {
                   fallbackSideLabels={sides.map((s) => s.label)}
                 />
 
-                <div className="mt-6 flex justify-center">
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
                   <button
                     type="button"
                     onClick={() => setShowTranscript((v) => !v)}
@@ -1509,6 +1501,13 @@ const DebateRoomPage = () => {
                   >
                     {showTranscript ? "Hide full transcript" : "Show full transcript"}
                   </button>
+                  {debate.edit_window_ends_at && (
+                    <EditWindowInline
+                      editWindowEndsAt={debate.edit_window_ends_at}
+                      canEdit={!!myParticipant}
+                      onEdit={() => navigate(`/debate/${id}/edit`)}
+                    />
+                  )}
                 </div>
 
                 {showTranscript && (

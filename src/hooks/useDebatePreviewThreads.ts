@@ -18,6 +18,8 @@ export interface PreviewSubtopic {
   id: string;
   title: string;
   threads: PreviewThread[];
+  /** Per-side AI key arguments (from round_summaries). Empty when not yet generated. */
+  keyArguments: { side: string; content: string }[];
 }
 
 interface Args {
@@ -80,6 +82,7 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         id: s.id,
         title: s.title,
         threads: [],
+        keyArguments: [],
       }));
 
       if (status !== "live" && status !== "completed") {
@@ -88,8 +91,8 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         return;
       }
 
-      // Live: fetch arguments + participants to map side
-      const [{ data: args }, { data: parts }] = await Promise.all([
+      // Live/completed: fetch arguments + participants + AI round summaries
+      const [{ data: args }, { data: parts }, { data: roundSummaries }] = await Promise.all([
         supabase
           .from("arguments")
           .select(
@@ -101,8 +104,20 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
           .from("debate_participants")
           .select("id, side_id")
           .eq("debate_id", debateId),
+        supabase
+          .from("round_summaries")
+          .select("subtopic_id, key_arguments")
+          .eq("debate_id", debateId),
       ]);
       if (cancelled) return;
+
+      const summariesBySubtopic = new Map<string, { side: string; content: string }[]>();
+      (roundSummaries || []).forEach((rs: any) => {
+        const items = ((rs.key_arguments as any[]) || [])
+          .map((k) => ({ side: String(k?.side ?? ""), content: String(k?.content ?? "") }))
+          .filter((k) => k.content);
+        summariesBySubtopic.set(rs.subtopic_id, items);
+      });
 
       const partSide = new Map<string, string | null>();
       (parts || []).forEach((p: any) => partSide.set(p.id, p.side_id));
@@ -147,12 +162,14 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
             speakerLabel: speakerLabelFor(a.participant_id),
             text: a.content || "",
           }));
-          const title =
-            (root.content || "").slice(0, 80).trim() || `Thread ${i + 1}`;
+          const raw = (root.content || "").trim();
+          // Use first sentence or 140 chars; the UI will wrap (no truncation).
+          const firstSentence = raw.split(/(?<=[.!?])\s/)[0] || raw;
+          const title = (firstSentence.length > 140 ? raw.slice(0, 140) + "…" : firstSentence) || `Thread ${i + 1}`;
           return { id: root.id, title, statements };
         });
 
-        return { ...sub, threads };
+        return { ...sub, threads, keyArguments: summariesBySubtopic.get(sub.id) || [] };
       });
 
       setSubtopics(populated);
