@@ -28,6 +28,10 @@ import { useGrading } from "@/hooks/useGrading";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
+import ArgumentMapOverlay from "@/components/debate/ArgumentMapOverlay";
+import NotebookOverlay from "@/components/debate/NotebookOverlay";
+import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
+import { Map as MapIcon, NotebookPen } from "lucide-react";
 
 
 type UserRole = "facilitator" | "speaker" | "spectator";
@@ -136,6 +140,7 @@ const DebateRoomPage = () => {
   const [prepSpeakerSideLabel, setPrepSpeakerSideLabel] = useState<string>("");
   const [notebookContent, setNotebookContent] = useState<string>("");
   const [notebookOpen, setNotebookOpen] = useState(false);
+  const [argumentMapOpen, setArgumentMapOpen] = useState(false);
 
   // Grading
   const { gradeTurn, gradeFinal } = useGrading();
