@@ -253,7 +253,7 @@ const DebateRecordPreview = ({
                       {hasContent ? (
                         sub.threads.map((t) => (
                           <div key={t.id} className="rounded-lg border border-border/60 bg-background/60 p-3">
-                            <p className="text-xs font-display text-foreground/80 mb-1 line-clamp-1">
+                            <p className="text-xs font-display text-foreground/80 mb-1 leading-snug">
                               {t.title}
                             </p>
                             <div className="space-y-0.5">
@@ -261,6 +261,19 @@ const DebateRecordPreview = ({
                                 <StatementRow key={s.id} s={s} labels={labels} />
                               ))}
                             </div>
+                            {sub.keyArguments.length > 0 && (
+                              <div className="mt-3 pt-2 border-t border-border/50 space-y-1">
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-body font-medium">
+                                  Argument summary
+                                </p>
+                                {sub.keyArguments.map((k, i) => (
+                                  <p key={i} className="text-xs font-body text-foreground/80 leading-relaxed">
+                                    <span className="font-semibold text-foreground/70">[{k.side}]</span>{" "}
+                                    {k.content}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))
                       ) : (
