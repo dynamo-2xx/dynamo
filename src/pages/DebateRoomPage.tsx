@@ -1503,7 +1503,7 @@ const DebateRoomPage = () => {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3" data-annotatable>
               {/* Overall Summary */}
               {(() => {
                 const allSummaryTexts = Object.values(roundSummaries).map(rs => rs.summary).filter(Boolean);
