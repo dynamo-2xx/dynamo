@@ -82,7 +82,7 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         threads: [],
       }));
 
-      if (status !== "live") {
+      if (status !== "live" && status !== "completed") {
         setSubtopics(baseSubs);
         setLoading(false);
         return;
