@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap, NotebookPen, Award
+  Play, Share2, Copy, Check, ChevronRight, ChevronDown, AlertCircle, Zap, Award
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +31,7 @@ import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ArgumentMapOverlay from "@/components/debate/ArgumentMapOverlay";
 import NotebookOverlay from "@/components/debate/NotebookOverlay";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
+import DebateRecordShell from "@/components/debate/DebateRecordShell";
 import { Map as MapIcon, NotebookPen } from "lucide-react";
 
 
@@ -1197,6 +1198,9 @@ const DebateRoomPage = () => {
 
   return (
     <div className="h-screen w-full bg-background flex flex-col overflow-hidden" data-record-root>
+      {user && id && (
+        <DebateHighlightLayer recordType="debate" recordId={id} />
+      )}
       {handoffStream && (
         <InPersonMicBar
           initialStream={handoffStream}
@@ -1499,7 +1503,7 @@ const DebateRoomPage = () => {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3" data-annotatable>
               {/* Overall Summary */}
               {(() => {
                 const allSummaryTexts = Object.values(roundSummaries).map(rs => rs.summary).filter(Boolean);
