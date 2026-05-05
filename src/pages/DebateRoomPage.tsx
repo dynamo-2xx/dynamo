@@ -132,6 +132,7 @@ const DebateRoomPage = () => {
   const sidesRef = useRef<Side[]>([]);
   const participantsRef = useRef<Participant[]>([]);
   const [showCompletionOverlay, setShowCompletionOverlay] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
   const [roundSummaries, setRoundSummaries] = useState<Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>>({});
   const [prepPhaseRole, setPrepPhaseRole] = useState<"incoming" | "outgoing" | null>(null);
   const [prepStartedAt, setPrepStartedAt] = useState<number | null>(null);
