@@ -1524,45 +1524,52 @@ const DebateRoomPage = () => {
                       const orphanArgs = stArgs.filter(
                         (arg) => !transcriptTexts.has(arg.content.trim().toLowerCase()),
                       );
-                      const getSideOrder = (sideLabel: string): number => {
-                        const side = sides.find(
+                      const sideColor = (sideLabel: string): string => {
+                        const idx = sides.findIndex(
                           (s) => s.label.toLowerCase() === sideLabel.toLowerCase(),
                         );
-                        return side?.sort_order ?? 0;
+                        const palette = [
+                          "text-blue-600 dark:text-blue-400",
+                          "text-rose-600 dark:text-rose-400",
+                          "text-emerald-600 dark:text-emerald-400",
+                          "text-amber-600 dark:text-amber-400",
+                        ];
+                        return palette[(idx >= 0 ? idx : 0) % palette.length];
                       };
                       if (stTranscripts.length === 0 && orphanArgs.length === 0) return null;
                       return (
                         <div
                           key={st.id}
-                          className="rounded-xl border border-border bg-card p-4 space-y-2"
+                          className="rounded-xl border border-border bg-card p-4 space-y-3"
                         >
                           <h4 className="text-sm font-display font-semibold text-foreground">
                             {stIdx + 1}. {st.title}
                           </h4>
                           {stTranscripts.map((entry) => (
-                            <TranscriptCard
-                              key={entry.id}
-                              entryId={entry.id}
-                              speakerSide={entry.speaker_side}
-                              sideOrder={getSideOrder(entry.speaker_side)}
-                              text={entry.text}
-                              aiSummary={entry.ai_summary}
-                              timestamp={entry.timestamp}
-                            />
+                            <div key={entry.id} className="border-l-2 border-border pl-3 py-1">
+                              <p className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${sideColor(entry.speaker_side)}`}>
+                                {entry.speaker_side}
+                              </p>
+                              <p className="text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap" data-annotatable>
+                                {entry.text}
+                              </p>
+                            </div>
                           ))}
                           {orphanArgs.map((arg) => {
                             const participant = participants.find(
                               (p) => p.id === arg.participant_id,
                             );
                             const side = sides.find((s) => s.id === participant?.side_id);
+                            const label = side?.label || "Unknown";
                             return (
-                              <TranscriptCard
-                                key={arg.id}
-                                argumentId={arg.id}
-                                speakerSide={side?.label || "Unknown"}
-                                sideOrder={side?.sort_order ?? 0}
-                                text={arg.content}
-                              />
+                              <div key={arg.id} className="border-l-2 border-border pl-3 py-1">
+                                <p className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${sideColor(label)}`}>
+                                  {label}
+                                </p>
+                                <p className="text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap" data-annotatable>
+                                  {arg.content}
+                                </p>
+                              </div>
                             );
                           })}
                         </div>
