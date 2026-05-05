@@ -85,6 +85,229 @@ export type Database = {
           },
         ]
       }
+      club_event_rsvps: {
+        Row: {
+          created_at: string
+          event_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_event_rsvps_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "club_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_events: {
+        Row: {
+          capacity: number | null
+          club_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          ends_at: string | null
+          event_type: string
+          id: string
+          mode: string
+          session_id: string | null
+          starts_at: string
+          status: string
+          title: string
+          updated_at: string
+          venue: string | null
+        }
+        Insert: {
+          capacity?: number | null
+          club_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          ends_at?: string | null
+          event_type: string
+          id?: string
+          mode?: string
+          session_id?: string | null
+          starts_at: string
+          status?: string
+          title: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Update: {
+          capacity?: number | null
+          club_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          ends_at?: string | null
+          event_type?: string
+          id?: string
+          mode?: string
+          session_id?: string | null
+          starts_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          venue?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_events_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_join_requests: {
+        Row: {
+          club_id: string
+          created_at: string
+          id: string
+          message: string | null
+          responded_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          responded_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          responded_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_join_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_members: {
+        Row: {
+          club_id: string
+          id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_members_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_tags: {
+        Row: {
+          club_id: string
+          created_at: string
+          tag_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          tag_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_tags_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clubs: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_public: boolean
+          location: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          location?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          location?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cmm_queue: {
         Row: {
           created_at: string
@@ -1510,6 +1733,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_club: { Args: { _club_id: string }; Returns: boolean }
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
       can_view_record: {
@@ -1709,6 +1933,9 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_club_admin: { Args: { _club_id: string }; Returns: boolean }
+      is_club_member: { Args: { _club_id: string }; Returns: boolean }
+      is_club_owner: { Args: { _club_id: string }; Returns: boolean }
       is_dm_thread_party: { Args: { _thread_id: string }; Returns: boolean }
       is_follower_of: { Args: { _owner: string }; Returns: boolean }
       is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
