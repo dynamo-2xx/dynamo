@@ -1145,6 +1145,7 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           created_by: string
+          echo_guard: boolean
           ended_at: string | null
           id: string
           is_public: boolean
@@ -1162,6 +1163,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by: string
+          echo_guard?: boolean
           ended_at?: string | null
           id?: string
           is_public?: boolean
@@ -1179,6 +1181,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by?: string
+          echo_guard?: boolean
           ended_at?: string | null
           id?: string
           is_public?: boolean
@@ -1191,6 +1194,54 @@ export type Database = {
           summaries?: Json
           title?: string | null
           transcript_entries?: Json
+        }
+        Relationships: []
+      }
+      mic_connections: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          device_id: string | null
+          display_name: string
+          id: string
+          last_audio_rms: number
+          last_seen_at: string
+          mode: string
+          session_id: string
+          session_kind: string
+          slot_key: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          device_id?: string | null
+          display_name: string
+          id?: string
+          last_audio_rms?: number
+          last_seen_at?: string
+          mode?: string
+          session_id: string
+          session_kind: string
+          slot_key: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          device_id?: string | null
+          display_name?: string
+          id?: string
+          last_audio_rms?: number
+          last_seen_at?: string
+          mode?: string
+          session_id?: string
+          session_kind?: string
+          slot_key?: string
+          status?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1736,6 +1787,7 @@ export type Database = {
       can_view_club: { Args: { _club_id: string }; Returns: boolean }
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
+      can_view_lobby: { Args: { _id: string; _kind: string }; Returns: boolean }
       can_view_record: {
         Args: { _record_id: string; _record_type: string }
         Returns: boolean
@@ -1941,6 +1993,10 @@ export type Database = {
       is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
       is_live_session_host: { Args: { _session_id: string }; Returns: boolean }
       is_notebook_owner: { Args: { _notebook_id: string }; Returns: boolean }
+      is_session_owner: {
+        Args: { _id: string; _kind: string }
+        Returns: boolean
+      }
       join_debate_in_person: {
         Args: { _code: string; _side_id: string }
         Returns: {
