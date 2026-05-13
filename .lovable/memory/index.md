@@ -4,13 +4,14 @@
 - **Visuals**: Pure white (#ffffff) bg, black (#0a0a0a) text. Instrument Serif (headings, antialiased), DM Sans (body).
 - **UI Elements**: Borders 0.5px solid rgba(0,0,0,0.1). Primary buttons black/white; secondary minimal outline.
 - **Auth**: Exclusively use `onAuthStateChange`. Never use `getSession` to prevent lock contention.
-- **AI Behavior**: Facilitator ("d.") is strict "no-fluff" (1-2 sentences). Never generate global session summaries.
+- **AI Behavior**: Facilitator (brand mark **DYNAMO**, replaces "d.") is strict "no-fluff" (1-2 sentences). Never generate global session summaries.
 - **State**: Always use fetch-and-merge before transcript database upserts to prevent race conditions.
 - **Layout**: `h-screen` strict viewport constraint for debate rooms.
 - **RLS**: Debate-scoped tables gate SELECT via `public.can_view_debate(debate_id)`. Never `USING (true)` on debate data.
 
 ## Memories
 - [Release Criteria](mem://product/release-criteria) — Public-ready definition (waitlist, happy path, mic-prep, study)
+- [Session Formats](mem://product/session-formats) — Verified Debate/CMM/Live spec: roles, lifecycle, mic policy, v1 caps
 - [Branding Guidelines](mem://style/branding) — Monochrome palette, typography specs, and accent colors
 - [Signature Interactions](mem://style/signature-interactions) — Typewriter AI, pulsing timer, flipping transcript cards
 - [Debate Room Interface](mem://features/debate-room-interface) — 3-layer h-screen layout, dynamic Main Box vs Sidebar splits
