@@ -48,3 +48,4 @@
 - [Mic Lobby & Policy](mem://features/mic-lobby-and-policy) — Pre-live mic lobby + per-format mic enforcement
 - [Mic-Prep](mem://features/mic-prep) — Unified pre-session gate; persistent green/red audio pulse; multi-speaker side picker (vote, tie-breaker, side notebook tab)
 - [Core Happy Path](mem://features/core-happy-path) — Generate→Invite→Mic-Prep→Live→Record parity; Live template stripped (no sides/queue/in-person); host failover; private-default records; floating notebook
+- [My Study v2](mem://features/my-study-v2) — Notebook-as-appendage; draggable/resizable/fullscreen overlay matching published doc UI; two independent publish toggles (Notebook + My Take); share button; comments replace reader-notes; highlight-comment to spawn sub-notebook; always links back to source record
