@@ -19,6 +19,7 @@
 - [Explore Discovery](mem://features/explore-discovery-structure) — High-density, Apple Music-inspired layout sections
 - [Navigation Structure](mem://features/navigation-structure) — Hub structure, active states, My Agenda
 - [Onboarding Flow](mem://auth/onboarding) — Auth rules, roles, and location permission prompts
+- [Onboarding v2](mem://auth/onboarding-v2) — Location deferred to first account-bound action; SUPERCELL-ID display name + private friend code; HIBP on
 - [Invite Onboarding](mem://features/onboarding-invite-flow) — Unauthenticated preview room, side selection before auth
 - [Monetization](mem://product/monetization-tiers) — Free, Pro, Education, and Civic tier limits
 - [Civic Features](mem://features/civic-features) — Location discovery and Verified gold civic seals
