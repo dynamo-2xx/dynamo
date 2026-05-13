@@ -1,151 +1,168 @@
-## What we're building
 
-Today, the in-person flow already lets a joiner scan a QR / enter a join code, sign in, test their mic, and pick a side (debate) or display name (live). What's missing:
+## Plan — Release-criteria memory + user preferences (memory only, no code)
 
-1. The **owner has no pre-live lobby** showing "who is connected, with which mic, on which device" — they just see counts.
-2. **CMM has no in-person join flow at all** — challengers can only join via the queue from a logged-in browser tab.
-3. The **fallback path** (someone has no device or skips the mic) is implicit. We make it an explicit choice ("use the room mic / voice detection only") so Deepgram knows when to lean on diarization vs per-device streams.
-4. The owner can't currently **gate Start on connected mics**, nor **release / re-invite** a slot.
-5. **Mic gating is inconsistent across formats.** We bake the right mute policy into the per-device mic so a joiner's own phone behaves correctly, not just the room.
+Three deliverables. All are markdown memory files. No source code touched.
 
-The plan introduces one shared concept: **the Mic Lobby** — a pre-live screen for the owner, mirrored as "you're connected, waiting for host" for joiners. It also introduces a per-format **Mic Policy** that is enforced on every connected device.
+---
 
-## User stories
+### 1. `mem://product/release-criteria` (new)
 
-- As an **owner of a debate/live/CMM**, after I generate the room I see a Lobby with a slot per expected participant. Each slot shows: avatar, profile name, device label, mic level bar, and a ready check. **Start** is gated on at least one mic being connected per side (debate) / per seat (live, CMM).
-- As a **non-owner in the room**, I scan the QR on my own phone, sign in, run the mic test, claim my slot, and land on a "You're connected. Waiting for host…" screen with a live mic meter so I know I'm being heard.
-- As a **non-owner without a device** (or who declined mic), I tap **"I'll share the room mic"**. My profile attaches to a slot but is marked *voice-detection only* so Deepgram diarization disambiguates me from the room mic.
-- As an **owner**, if a slot is stuck unconnected, I can **release** it or **resend** the join link.
-- As a **CMM owner**, in-person challengers can queue *with their own mics already attached* so each challenger's audio is captured cleanly the moment they go active.
+```
+---
+name: Release Criteria
+description: Definition of "public-ready" for Dynamo. Checked before any release-prep work is called done.
+type: feature
+---
 
-## Mic policy by format (NEW)
+# Public Release Criteria
 
-The lobby attaches per-device mics; the room then governs them:
+## 0. Waitlist gate
+- Waitlist page replaces the current home page as the public landing until launch.
+- Hard wall: visitors cannot browse Explore or public profiles.
+- Allowed on the waitlist surface:
+  - Email field (entering email = signing up to the waitlist).
+  - Optional ID-card profile (US-government-ID layout). Optional fields: profile picture, bio.
+    Required fields: username/name (collected with email). ID number is reserved for friend-adding.
+  - A grid of waitlisted users' profile-picture bubbles + names.
+  - Clicking a bubble opens that user's full ID-card profile.
+  - From a profile view, the visitor is prompted to create their own (which forces email signup if not done).
+- Launch flag is a single config value the founder can flip without a deploy.
 
-### Debate — strict turn lock
-- Every connected device's mic starts **muted**.
-- Only the device whose `user_id` matches the current `current_speaker_side_id`'s active speaker is **unmuted automatically**.
-- Manual unmute is **disabled** for everyone else; the in-room mic toolbar shows a lock icon with "Wait for your turn".
-- When the turn rotates, the room flips `track.enabled` on every device based on the new speaker.
+## 1. Auth & onboarding
+- Email + Google sign-in work on mobile + desktop.
+- Email verification required.
+- Onboarding completes in under 90 seconds.
+- Logged-out invitees may preview a debate room but must auth before joining.
 
-### CMM — host + active challenger only
-- The **owner's** device mic is unmuted whenever a round is active.
-- The **active queue row's** device (`cmm_queue.status='active'` and `user_id = me`) is unmuted.
-- All other connected devices (waiting challengers, audience speakers) are hard-muted with manual unmute disabled.
-- When `cmm_end_round` runs, the previous challenger's mic is force-muted; when `cmm_start_next` promotes the next, theirs unlocks.
+## 2. Core happy path — end-to-end, zero console errors
+Canonical flow for Debate, CMM, and Live:
 
-### Live — open with echo guard
-- All connected device mics are **unmuted by default** (live = conversational).
-- A new **"Reduce room echo"** toggle in the host's Lobby (and live in-session menu) does two things when enabled:
-  1. Forces any device whose `mic_connections.mode='voice_detect_only'` to mute (so only personal mics are open).
-  2. Tags the session with `echo_guard=true`, which makes `useDeviceTranscription` enable Deepgram's `multichannel=true` + per-device endpointing so two open mics in one room don't double-transcribe.
-- Voice-detection-only fallback stays on as the disambiguator when `echo_guard` is off and someone joined without a personal mic.
+  Generate session in template
+    -> Owner sends invites from the Invitations tab inside the template (pre-publication).
+    -> Invitee receives a notification, can Accept or Decline.
+       - Decline: their bubble in the Invitations tab pulses red.
+       - Accept: their bubble pulses green, they pick a side/seat, then press Confirm
+                 (the extra click is intentional to prevent misclicks).
+       - The owner can drag an accepted bubble between sides/seats.
+    -> Accepted invitees are locked to the draft and auto-routed to Mic-Prep on publish.
+  -> Mic-Prep (replaces the current Mic Lobby — see section 2a)
+  -> Session runs (format-specific rules; argument map + AI analysis live).
+  -> Session ends; users transition to the Record.
+  -> Record contains transcript, threaded view, and the argument map compiled from the session.
+  -> Owner toggles public/private on the record.
+  -> Users see their own performance grading only when grading is enabled in session config.
 
-### Enforcement
+Each format must complete this loop with zero console errors and produce its archive artifact.
 
-A new shared hook `useMicPolicy({ kind, sessionId, deviceId })`:
-- Subscribes to the relevant turn/round/echo state via Supabase Realtime.
-- Computes `{ canSpeak: boolean, locked: boolean, lockReason: string }`.
-- Drives `track.enabled` directly on the connected device's stream and disables the manual mute toggle when `locked=true`.
+## 2a. Mic-Prep (replaces Mic Lobby)
+- Replaces today's owner-only Mic Lobby. Same screen for owner and invitees, with one delta.
+- Personal-device layout (phone/laptop):
+  - Primary view: the user's OWN mic test (level meter, unmute button).
+  - Other participants are shown as small profile-picture bubbles in a collapsible list.
+  - Bubble border rotates like a loading icon while not ready.
+  - When the user's mic test passes viability, their border becomes solid + checkmark = "readied up".
+  - Owner-only: Force-start button beneath the bubbles + mic-test area.
+- Projected/large-screen layout (room projector):
+  - No single user's mic is primary; all profile bubbles are shown equally with the same border-state rules.
+- When every bubble is solid + checked, the room auto-transitions to the session.
 
-Existing `MediaPermissions` / `InPersonMicBar` / `useLiveSessionRTC.toggleMic` are wrapped to consult this hook before flipping state. The room (`DebateRoomPage`, `ChangeMyMindRoomPage`, `LiveSessionPage`) emits the canonical "who can speak now" signal; nothing changes about how those rooms already track turns.
+## 3. My Study — co-equal pillar
+- Every Debate, CMM, Live session, and any Record can spawn a notebook from the notebook icon.
+- Notebooks live on the owning user's private My Study.
+- Notebooks have tabs and support publishing:
+  - publish a single Take to the profile, OR
+  - publish the full notebook (which then itself becomes a Record).
+- Other users may leave comments / reader notes on a published notebook.
+- Other users may create their own notebooks ABOUT a published notebook (notebook-on-notebook).
+- Only the owner can edit a notebook.
+- Profiles display published notebooks as hero cards, identical pattern to debate/live/CMM cards.
 
-## Pages & flows
+## 4. In-person reliability
+- Per-format mic policy enforced (debate = turn lock, CMM = host + active, live = open + echo guard).
+- Voice-detection-only fallback works when a joiner has no device.
+- Mic-Prep readiness state is the gate to leave the prep screen.
 
-```text
-Owner
-─────────────────────────────────────────
-[Generate room]  ──►  [Lobby]  ──► [Start session]
-                       │
-                       ├── slot list (sides / seats / queue)
-                       ├── connection state per slot
-                       ├── "voice-detection only" toggle per slot
-                       └── (Live only) "Reduce room echo" toggle
+## 5. Data safety (RLS)
+- No table is publicly readable except by intent (waitlist bubbles, Explore feed post-launch, public profiles, published notebooks).
+- All debate-scoped tables go through can_view_debate.
+- Notebook visibility respects published/private flag.
+- Security scan returns zero high/critical findings.
 
-Joiner
-─────────────────────────────────────────
-QR/code ─► Auth ─► Mic test ─► Side/seat pick
-                                    │
-                                    ├── connected → "Waiting for host"
-                                    │       (mic meter live; mic muted by policy)
-                                    └── no device → "Share room mic"
+## 6. Performance budgets (1000+ users)
+- Home, Explore, Debate Room first paint under 2.5s on 4G.
+- No query returns more than 1000 rows without pagination.
+- Realtime channels stay under 10 active subscriptions per session.
+
+## 7. Mobile + PWA
+- Installable as PWA, service worker registers, push notifications deliver.
+- All primary flows usable one-handed on a 375px-wide screen.
+
+## 8. Notifications & lifecycle
+- Debate start push fires reliably to INTERESTED? users.
+- Pre-publication invite notifications deliver and surface Accept/Decline.
+- 48-hour edit window banner is accurate.
+- Auto-advance, completion overlay, and archive transitions run cleanly.
+
+## 9. Content & legal
+- Terms, Privacy, Civic verification copy reviewed.
+- Account deletion works end-to-end.
+
+## Deferred (tracked, do not block launch)
+- Performance analysis specifics (placeholder task in tracker; defined during Part 1 walk).
+- Per-device noise profiles.
+- Mid-session mic reassignment.
+- Audience mic capture.
 ```
 
-### Routes
+---
 
-- `/debate/:id/lobby`, `/live/:id/lobby`, `/cmm/:id/lobby` — owner Lobby.
-- `/join/:code` — already exists; routes to a per-format "Waiting for host" screen after connect.
-- `/join/:code/cmm` — new, in-person CMM join (claim a queue seat).
+### 2. `mem://~user` (new — user preferences, tuned for complete deliverables)
 
-## Data model
+```
+I'm a non-technical founder. Use plain English; define jargon when used.
+For every change tell me: what the user sees, what risk it adds, what could break.
 
-```text
-mic_connections
-─────────────────────────────────────────
-id              uuid pk
-session_kind    text  ('debate' | 'live' | 'cmm')
-session_id      uuid
-slot_key        text  (side_id, speaker_slot, or 'queue:<idx>')
-user_id         uuid (nullable)        -- null when 'voice_detect_only'
-device_id       text (nullable)
-display_name    text
-avatar_url      text nullable
-mode            text  ('own_mic' | 'voice_detect_only')
-status          text  ('connected' | 'released' | 'left')
-last_audio_rms  real default 0          -- broadcast by joiner for owner meter
-last_seen_at    timestamptz
-created_at      timestamptz default now()
-unique (session_kind, session_id, slot_key) where status='connected'
+# Completeness rules — do not hand off half-done work
+Never end a build response with "next steps" that are part of the original request — finish them.
+If a feature has multiple surfaces (debate / live / cmm / record / study), build all of them in the same loop unless I say otherwise.
+After every code change run: build + targeted check (console logs or preview screenshot) and report what you verified.
+If you discover scope you did not finish, list it explicitly under "Not done yet" — never imply it's complete.
+Never claim "ready" without checking the matching item on mem://product/release-criteria.
+
+# Working style
+Default to Plan mode for anything touching more than 3 files.
+Default to Build mode for single-file fixes.
+Always run a security scan after touching any table or RLS policy.
+If I say "ship it" without specifics, ask which format (debate / live / cmm / clubs / study) I mean.
+Use the task tracker for any sprint with more than 2 distinct deliverables.
 ```
 
-Plus on `live_sessions`: `echo_guard boolean default false`.
+---
 
-RLS: SELECT via existing `can_view_*` helpers; INSERT/UPDATE limited to row's `user_id` or session owner; DELETE owner only. Realtime publication added.
+### 3. `mem://index.md` update
 
-`debate_participants`, `live_session_participants`, and `cmm_queue` are unchanged — `mic_connections` is purely the pre-live attachment layer plus the runtime meter feed.
+Append to the Memories section:
 
-## UI work
+- `[Release Criteria](mem://product/release-criteria)` — public-ready definition (waitlist, happy path, mic-prep, study).
 
-### Shared
-- `src/components/lobby/MicLobby.tsx` — owner screen, slot list, Start button.
-- `src/components/lobby/LobbySlotRow.tsx` — avatar, name, device, mic-level bar (`last_audio_rms`), ready check, kick/release.
-- `src/components/lobby/WaitingForHost.tsx` — non-owner mirror with live mic meter and lock-status hint.
-- `src/components/lobby/VoiceDetectOnlyToggle.tsx`.
-- `src/components/lobby/EchoGuardToggle.tsx` (Live).
-- `src/hooks/useMicPolicy.ts` — the per-format gate described above.
+(User preferences live at `mem://~user` and are auto-loaded; not added to index.)
 
-### Per-format wiring
-- `CreateDebatePage`, `CreateChangeMyMindPage`, `LiveSessionPage` — after creating draft, route into the matching Lobby.
-- `JoinDebatePage` — after `MicTestStep` resolves, write `mic_connections` (`mode='own_mic'`), then `WaitingForHost`. Add "I'll use the room mic" → `mode='voice_detect_only'`.
-- `LiveJoinPage` — same lobby write before transitioning to `recording`. Recording phase triggers when owner presses Start (subscribe to `live_sessions.status` flip).
-- New `JoinCmmPage` — claims a queue seat + writes `mic_connections`.
-- `DebateRoomPage`, `ChangeMyMindRoomPage`, `LiveSessionPage` — wrap mic toggles via `useMicPolicy`; surface lock reason in the mic toolbar.
+---
 
-### Owner controls in Lobby
-- "Start" disabled until policy minimum met.
-- Per-row: Release seat, Resend link, Kick (post-start).
+### 4. Task tracker — placeholder tasks created at implementation time
 
-## Deepgram integration
+- "Define performance analysis spec" (created and parked as `todo`).
+- "Walk Part 1 section-by-section to verify app understanding" (created and parked as `todo`; first session = the three formats).
 
-`useDeepgramTranscription` / `useDeviceTranscription` already key on `device_id` and `speaker_slot`. We extend the resolver:
-- Slot with `mic_connections.mode='own_mic'` → that device's stream feeds the slot directly (no diarization).
-- Slot only `voice_detect_only` → room device falls back to diarization.
-- Live + `echo_guard=true` → enable `multichannel=true` and stricter endpointing per the existing hardware-access memory.
+---
 
-No new edge function needed.
+## Out of scope for this plan
 
-## Out of scope for v1
+- No code changes.
+- No waitlist implementation, no Mic-Prep build, no profile/ID-card build — those become their own plans after Part 1 is verified.
 
-- Per-device noise profiles (just the echo guard above).
-- Reassigning a connected mic to a different slot mid-session.
-- Audience members opting into mic capture.
-- Live multi-device WebRTC mesh changes (already shipped).
+## What happens after you approve
 
-## Files touched
-
-- **Migration**: new `mic_connections` table + RLS, helper `can_view_lobby(kind, id)`, `live_sessions.echo_guard` column, realtime publication.
-- **New pages**: `DebateLobbyPage`, `LiveLobbyPage`, `CmmLobbyPage`, `JoinCmmPage`.
-- **New components**: `src/components/lobby/*`.
-- **New hooks**: `useMicLobby` (owner list+realtime), `useMicLobbyAttachment` (joiner heartbeat + RMS broadcast), `useMicPolicy` (shared gate).
-- **Edited**: `App.tsx` (routes), `CreateDebatePage`, `CreateChangeMyMindPage`, `LiveSessionPage`, `JoinDebatePage`, `LiveJoinPage`, `InPersonJoinPanel`, `MediaPermissions`, `InPersonMicBar`, `useLiveSessionRTC` (mic policy hook integration), and the three room pages.
-- **Memory**: extend `mem://features/onboarding-invite-flow.md`; new `mem://features/mic-lobby.md` and `mem://features/mic-policy.md`.
+1. I write the three memory files above.
+2. I create the two tracker tasks.
+3. I open the Part 1 walk with **Section 2 — the three session formats** (Debate, CMM, Live: rules, roles, lifecycle), one section per turn so you can correct as we go.
