@@ -46,6 +46,9 @@
 - [Debate Notify + Push](mem://features/debate-notify-and-push) — INTERESTED?/HAPPENING tag rules and Web Push pipeline (VAPID, SW, dispatch fn)
 - [Clubs feature](mem://features/clubs) — Clubs hub, membership/roles, Events that spawn debate/live/CMM
 - [Mic Lobby & Policy](mem://features/mic-lobby-and-policy) — Pre-live mic lobby + per-format mic enforcement
+- [Release Criteria §4 — In-person](mem://product/release-criteria-section-4-in-person) — Per-format mic policy, no-device piggyback, echo guard, slot hold, soft readiness
+- [Release Criteria §5 — Data safety](mem://product/release-criteria-section-5-data-safety) — Soft wall preview, 48h delete grace, guest retention, club audit log + 48h recover
+- [Release Criteria §8 — Notifications](mem://product/release-criteria-section-8-notifications) — Push channels, no quiet hours, bell + toast, edit-window banner + T-2h
 - [Mic-Prep](mem://features/mic-prep) — Unified pre-session gate; persistent green/red audio pulse; multi-speaker side picker (vote, tie-breaker, side notebook tab)
 - [Core Happy Path](mem://features/core-happy-path) — Generate→Invite→Mic-Prep→Live→Record parity; Live template stripped (no sides/queue/in-person); host failover; private-default records; floating notebook
 - [My Study v2](mem://features/my-study-v2) — Notebook-as-appendage; draggable/resizable/fullscreen overlay matching published doc UI; two independent publish toggles (Notebook + My Take); share button; comments replace reader-notes; highlight-comment to spawn sub-notebook; always links back to source record
