@@ -46,6 +46,7 @@
 - [Debate Notify + Push](mem://features/debate-notify-and-push) — INTERESTED?/HAPPENING tag rules and Web Push pipeline (VAPID, SW, dispatch fn)
 - [Clubs feature](mem://features/clubs) — Clubs hub, membership/roles, Events that spawn debate/live/CMM
 - [Mic Lobby & Policy](mem://features/mic-lobby-and-policy) — Pre-live mic lobby + per-format mic enforcement
+- [Release Criteria — Content & Legal](mem://product/release-criteria-section-9-content-legal) — ToS inline acceptance, /seals transparency page, 30-day account deletion with anonymized contributions, per-message report queue
 - [Release Criteria §4 — In-person](mem://product/release-criteria-section-4-in-person) — Per-format mic policy, no-device piggyback, echo guard, slot hold, soft readiness
 - [Release Criteria §5 — Data safety](mem://product/release-criteria-section-5-data-safety) — Soft wall preview, 48h delete grace, guest retention, club audit log + 48h recover
 - [Release Criteria §8 — Notifications](mem://product/release-criteria-section-8-notifications) — Push channels, no quiet hours, bell + toast, edit-window banner + T-2h
