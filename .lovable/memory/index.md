@@ -56,3 +56,4 @@
 - [Section 8 — Notifications & lifecycle](mem://product/release-criteria-section-8-notifications) — 5 push channels (invite/T-5/published/T-2h edit) + bell-icon arrival toast; pg_cron lifecycle dispatcher; no quiet hours
 - [Section 4 — In-person reliability](mem://product/release-criteria-section-4-in-person) — Per-format mic enforcement; no-device piggyback (account or guest temp profile w/ "Speaking as" pill); advisory echo banner; soft readiness gate; slot held until owner releases
 - [Section 6 — Performance budgets](mem://product/release-criteria-section-6-performance) — DYNAMO splash first paint; throttle realtime above 300; virtualized Explore (20/page, 50 cap); one channel per visible tab
+- [Section 8 — Lifecycle transitions](mem://product/release-criteria-section-8-lifecycle) — 5s grace + chime on round end; celebration overlay w/ reactions; live edit countdown; owner no-show auto-cancel at +15m
