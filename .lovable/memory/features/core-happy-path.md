@@ -22,6 +22,20 @@ Single `consolidate-session` edge function produces argument map + grouped subto
 ## E. Record screen parity
 Same hero, threaded transcript, Q&A chat. **One floating notebook button** anchored bottom-right whenever a record is present (no per-entry icons). Per-user grading drawer (owner-enabled only).
 
+## E2. In-room overlay parity (Argument Map + Notebook) — REQUIRED FIX
+The Argument Map bubble and Notebook bubble must be **identical across Debate, CMM, and Live**. The record archive is the 1:1 output of the in-room Argument Map, so the in-room overlay mirrors the record format exactly.
+
+**Argument Map bubble — two tabs (rename required):**
+- **Threaded Record** (replaces "Map") — collapsible AI-titled argument threads grouped by subtopic. Same component shape as `LiveThreadView`.
+- **Transcript** (replaces "Analysis") — flat per-subtopic transcript, grouped consecutive entries. Same component shape as the post-session transcript pane.
+- Current "Map" / "Analysis" labels in `ArgumentMapOverlay.tsx` are a build error — fix.
+
+**Notebook bubble — three tabs (per `my-study-v2`):**
+- **My Take**, **Thoughts**, **Annotations** — must match the published notebook display page exactly.
+- Current single-textarea bubble is incomplete — fix to render the same tab layout as `MyTakeTab` / `ThoughtsTab` / `AnnotationsTab`.
+
+**Parity rule:** both bubbles mount from the same component in Debate, CMM, and Live rooms — no per-format forks. Tab content, draggable/resizable behavior, and fullscreen toggle behave identically.
+
 ## F. Host failover (not ownership transfer)
 Owner heartbeat lost >60s during live → host role passes to next-most-recent active speaker. Ownership stays with original owner; on reconnect, host role returns to owner automatically. If no replacement available, freeze + auto-end + still produce a record.
 
