@@ -8,6 +8,8 @@
 - **State**: Always use fetch-and-merge before transcript database upserts to prevent race conditions.
 - **Layout**: `h-screen` strict viewport constraint for debate rooms.
 - **RLS**: Debate-scoped tables gate SELECT via `public.can_view_debate(debate_id)`. Never `USING (true)` on debate data.
+- **Motion**: Card flip animation is removed product-wide. Transcript ↔ Summary uses two-tab pattern (Argument Map bubble pattern) everywhere.
+- **A11y**: Honor `prefers-reduced-motion` + manual settings toggle. All user-facing strings routed through `i18n` wrapper from launch.
 
 ## Memories
 - [Release Criteria](mem://product/release-criteria) — Public-ready definition (waitlist, happy path, mic-prep, study)
@@ -58,3 +60,4 @@
 - [Section 4 — In-person reliability](mem://product/release-criteria-section-4-in-person) — Per-format mic enforcement; no-device piggyback (account or guest temp profile w/ "Speaking as" pill); advisory echo banner; soft readiness gate; slot held until owner releases
 - [Section 6 — Performance budgets](mem://product/release-criteria-section-6-performance) — DYNAMO splash first paint; throttle realtime above 300; virtualized Explore (20/page, 50 cap); one channel per visible tab
 - [Section 8 — Lifecycle transitions](mem://product/release-criteria-section-8-lifecycle) — 5s grace + chime on round end; celebration overlay w/ reactions; live edit countdown; owner no-show auto-cancel at +15m
+- [Section 7 — Accessibility](mem://product/release-criteria-section-7-accessibility) — Keyboard map, ARIA live regions (speaker + DYNAMO only), colorblind faces in popup, flip removed product-wide, Projector captions toggle, i18n wrapper from launch
