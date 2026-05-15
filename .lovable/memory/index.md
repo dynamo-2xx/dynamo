@@ -48,6 +48,8 @@
 - [Debate Notify + Push](mem://features/debate-notify-and-push) — INTERESTED?/HAPPENING tag rules and Web Push pipeline (VAPID, SW, dispatch fn)
 - [Clubs feature](mem://features/clubs) — Clubs hub, membership/roles, Events that spawn debate/live/CMM
 - [Mic Lobby & Policy](mem://features/mic-lobby-and-policy) — Pre-live mic lobby + per-format mic enforcement
+- [Release §10 Analytics](mem://product/release-criteria-section-10-analytics) — PostHog + Sentry + email-only alerts at launch
+- [Release §11 Launch & Growth](mem://product/release-criteria-section-11-launch) — Soft waitlist, invite credits, OG cards, marketing+records SEO
 - [§10 Analytics & Observability](mem://product/release-criteria-section-10-analytics) — PostHog events + KPIs, Sentry errors, email-only alerts
 - [§22 Clubs at launch](mem://product/release-criteria-section-22-clubs) — Owner/Admin/Member hierarchy, Featured/Local directory, all 3 event types + recurring, in-club event launch, admin-approval toggle
 - [Release Criteria — Content & Legal](mem://product/release-criteria-section-9-content-legal) — ToS inline acceptance, /seals transparency page, 30-day account deletion with anonymized contributions, per-message report queue
