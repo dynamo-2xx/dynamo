@@ -50,6 +50,7 @@
 - [Mic Lobby & Policy](mem://features/mic-lobby-and-policy) — Pre-live mic lobby + per-format mic enforcement
 - [Release §10 Analytics](mem://product/release-criteria-section-10-analytics) — PostHog + Sentry + email-only alerts at launch
 - [Release §11 Launch & Growth](mem://product/release-criteria-section-11-launch) — Soft waitlist, invite credits, OG cards, marketing+records SEO
+- [Release §12 Monetization & Payments](mem://product/release-criteria-section-12-monetization) — All 4 tiers, Stripe built-in, monthly only, hard paywall, Edu/Civic sales-led, pricing TBD post-cost-pass
 - [§10 Analytics & Observability](mem://product/release-criteria-section-10-analytics) — PostHog events + KPIs, Sentry errors, email-only alerts
 - [§22 Clubs at launch](mem://product/release-criteria-section-22-clubs) — Owner/Admin/Member hierarchy, Featured/Local directory, all 3 event types + recurring, in-club event launch, admin-approval toggle
 - [Release Criteria — Content & Legal](mem://product/release-criteria-section-9-content-legal) — ToS inline acceptance, /seals transparency page, 30-day account deletion with anonymized contributions, per-message report queue
