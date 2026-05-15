@@ -62,13 +62,8 @@ Free users are **blocked at the limit**, not nudged. Pattern:
 ## KPIs (PostHog per §10)
 `paywall_hit`, `upgrade_modal_shown`, `checkout_started`, `subscription_created`, `subscription_canceled`, `sales_lead_submitted`.
 
-## OPEN — pricing-decision queue (blocks launch but not this section)
-1. **Per-feature unit costs** — Deepgram min/session, Gemini token spend per AI call, Supabase egress per session, push send cost. Founder runs cost-modeling pass.
-2. **Pro monthly price** — set after cost pass + target margin.
-3. **Free caps** — sessions/mo, notebooks total, AI calls/mo. Set after cost pass; should give ~7-day evaluation window before paywall hits typical user.
-4. **Edu/Civic per-seat price ranges** — sales talk-track only, no public price.
-
-These are tracked here, **not** decided in §12 spec.
+## Pricing inputs
+Pro monthly price, Free caps, and Edu/Civic seat ranges are **owned by §18 (Cost Tracking)**. §12 consumes those numbers once the cost-modeling pass completes; it does not own them. See `mem://product/release-criteria-section-18-cost-tracking`.
 
 ## Out of scope at launch
 - Annual billing.
