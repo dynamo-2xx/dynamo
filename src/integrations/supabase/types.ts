@@ -898,6 +898,8 @@ export type Database = {
           facilitator_type: string
           facilitator_user_id: string | null
           feedback_enabled: boolean
+          forked_at: string | null
+          forked_from_id: string | null
           format: string
           grading_enabled: boolean
           id: string
@@ -907,6 +909,8 @@ export type Database = {
           join_code: string | null
           location: string | null
           max_speakers_per_side: number
+          pause_reason: string | null
+          paused_at: string | null
           prep_duration_seconds: number | null
           prep_phase_active: boolean
           prep_phase_started_at: string | null
@@ -938,6 +942,8 @@ export type Database = {
           facilitator_type?: string
           facilitator_user_id?: string | null
           feedback_enabled?: boolean
+          forked_at?: string | null
+          forked_from_id?: string | null
           format?: string
           grading_enabled?: boolean
           id?: string
@@ -947,6 +953,8 @@ export type Database = {
           join_code?: string | null
           location?: string | null
           max_speakers_per_side?: number
+          pause_reason?: string | null
+          paused_at?: string | null
           prep_duration_seconds?: number | null
           prep_phase_active?: boolean
           prep_phase_started_at?: string | null
@@ -978,6 +986,8 @@ export type Database = {
           facilitator_type?: string
           facilitator_user_id?: string | null
           feedback_enabled?: boolean
+          forked_at?: string | null
+          forked_from_id?: string | null
           format?: string
           grading_enabled?: boolean
           id?: string
@@ -987,6 +997,8 @@ export type Database = {
           join_code?: string | null
           location?: string | null
           max_speakers_per_side?: number
+          pause_reason?: string | null
+          paused_at?: string | null
           prep_duration_seconds?: number | null
           prep_phase_active?: boolean
           prep_phase_started_at?: string | null
@@ -1010,6 +1022,13 @@ export type Database = {
             columns: ["current_speaker_side_id"]
             isOneToOne: false
             referencedRelation: "debate_sides"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debates_forked_from_id_fkey"
+            columns: ["forked_from_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
             referencedColumns: ["id"]
           },
         ]
@@ -1285,10 +1304,13 @@ export type Database = {
           created_by: string
           echo_guard: boolean
           ended_at: string | null
+          forked_at: string | null
+          forked_from_id: string | null
           id: string
           is_public: boolean
           join_code: string | null
           mode: string
+          paused_at: string | null
           share_token: string | null
           speaker_names: Json
           status: string
@@ -1303,10 +1325,13 @@ export type Database = {
           created_by: string
           echo_guard?: boolean
           ended_at?: string | null
+          forked_at?: string | null
+          forked_from_id?: string | null
           id?: string
           is_public?: boolean
           join_code?: string | null
           mode?: string
+          paused_at?: string | null
           share_token?: string | null
           speaker_names?: Json
           status?: string
@@ -1321,10 +1346,13 @@ export type Database = {
           created_by?: string
           echo_guard?: boolean
           ended_at?: string | null
+          forked_at?: string | null
+          forked_from_id?: string | null
           id?: string
           is_public?: boolean
           join_code?: string | null
           mode?: string
+          paused_at?: string | null
           share_token?: string | null
           speaker_names?: Json
           status?: string
@@ -1333,7 +1361,15 @@ export type Database = {
           title?: string | null
           transcript_entries?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "live_sessions_forked_from_id_fkey"
+            columns: ["forked_from_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mic_connections: {
         Row: {
@@ -1604,6 +1640,48 @@ export type Database = {
         }
         Relationships: []
       }
+      record_change_proposals: {
+        Row: {
+          change_type: Database["public"]["Enums"]["record_change_type"]
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          id: string
+          payload: Json
+          proposed_by: string
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          status: Database["public"]["Enums"]["record_change_status"]
+        }
+        Insert: {
+          change_type: Database["public"]["Enums"]["record_change_type"]
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          payload?: Json
+          proposed_by: string
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          status?: Database["public"]["Enums"]["record_change_status"]
+        }
+        Update: {
+          change_type?: Database["public"]["Enums"]["record_change_type"]
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          id?: string
+          payload?: Json
+          proposed_by?: string
+          record_id?: string
+          record_type?: Database["public"]["Enums"]["shareable_record_type"]
+          status?: Database["public"]["Enums"]["record_change_status"]
+        }
+        Relationships: []
+      }
       record_comments: {
         Row: {
           body: string
@@ -1644,6 +1722,81 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      record_share_invitations: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          invite_token_hash: string
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          revoked_at: string | null
+          role: Database["public"]["Enums"]["record_share_role"]
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          id?: string
+          invite_token_hash: string
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          revoked_at?: string | null
+          role: Database["public"]["Enums"]["record_share_role"]
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          invite_token_hash?: string
+          record_id?: string
+          record_type?: Database["public"]["Enums"]["shareable_record_type"]
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["record_share_role"]
+        }
+        Relationships: []
+      }
+      record_shares: {
+        Row: {
+          accepted_at: string | null
+          id: string
+          invited_at: string
+          invited_by: string | null
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          role: Database["public"]["Enums"]["record_share_role"]
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          role: Database["public"]["Enums"]["record_share_role"]
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          record_id?: string
+          record_type?: Database["public"]["Enums"]["shareable_record_type"]
+          role?: Database["public"]["Enums"]["record_share_role"]
+          user_id?: string
+        }
+        Relationships: []
       }
       round_summaries: {
         Row: {
@@ -1814,6 +1967,8 @@ export type Database = {
           deleted_at: string | null
           display_title: string | null
           folder_id: string | null
+          forked_at: string | null
+          forked_from_id: string | null
           id: string
           my_take: string | null
           published: boolean
@@ -1832,6 +1987,8 @@ export type Database = {
           deleted_at?: string | null
           display_title?: string | null
           folder_id?: string | null
+          forked_at?: string | null
+          forked_from_id?: string | null
           id?: string
           my_take?: string | null
           published?: boolean
@@ -1850,6 +2007,8 @@ export type Database = {
           deleted_at?: string | null
           display_title?: string | null
           folder_id?: string | null
+          forked_at?: string | null
+          forked_from_id?: string | null
           id?: string
           my_take?: string | null
           published?: boolean
@@ -1869,6 +2028,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "notebook_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_notebooks_forked_from_id_fkey"
+            columns: ["forked_from_id"]
+            isOneToOne: false
+            referencedRelation: "session_notebooks"
             referencedColumns: ["id"]
           },
         ]
@@ -1970,6 +2136,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_share_invitation: {
+        Args: { _token: string }
+        Returns: {
+          fork_id: string
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          role: Database["public"]["Enums"]["record_share_role"]
+        }[]
+      }
       anonymize_expired_accounts: { Args: never; Returns: number }
       can_view_club: { Args: { _club_id: string }; Returns: boolean }
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
@@ -2060,7 +2235,48 @@ export type Database = {
           invite_token: string
         }[]
       }
+      create_record_share_invitation: {
+        Args: {
+          _id: string
+          _role: Database["public"]["Enums"]["record_share_role"]
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+        }
+        Returns: {
+          id: string
+          invite_token: string
+        }[]
+      }
       debate_tag_count: { Args: { _debate_id: string }; Returns: number }
+      decide_record_change: {
+        Args: { _approve: boolean; _proposal_id: string; _reason?: string }
+        Returns: {
+          change_type: Database["public"]["Enums"]["record_change_type"]
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          id: string
+          payload: Json
+          proposed_by: string
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          status: Database["public"]["Enums"]["record_change_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "record_change_proposals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      fork_record_for_user: {
+        Args: {
+          _id: string
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+          _user: string
+        }
+        Returns: string
+      }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
@@ -2181,6 +2397,27 @@ export type Database = {
       is_interest_party: { Args: { _interest_id: string }; Returns: boolean }
       is_live_session_host: { Args: { _session_id: string }; Returns: boolean }
       is_notebook_owner: { Args: { _notebook_id: string }; Returns: boolean }
+      is_record_co_owner: {
+        Args: {
+          _id: string
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+        }
+        Returns: boolean
+      }
+      is_record_creator: {
+        Args: {
+          _id: string
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+        }
+        Returns: boolean
+      }
+      is_record_viewer: {
+        Args: {
+          _id: string
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+        }
+        Returns: boolean
+      }
       is_session_owner: {
         Args: { _id: string; _kind: string }
         Returns: boolean
@@ -2212,11 +2449,52 @@ export type Database = {
         Args: { _device_id: string; _session_id: string }
         Returns: undefined
       }
+      propose_record_change: {
+        Args: {
+          _change_type: Database["public"]["Enums"]["record_change_type"]
+          _id: string
+          _payload: Json
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+        }
+        Returns: {
+          change_type: Database["public"]["Enums"]["record_change_type"]
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          id: string
+          payload: Json
+          proposed_by: string
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          status: Database["public"]["Enums"]["record_change_status"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "record_change_proposals"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       purge_stale_live_participants: {
         Args: { _session_id: string }
         Returns: undefined
       }
       realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
+      record_creator: {
+        Args: {
+          _id: string
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+        }
+        Returns: string
+      }
+      record_is_completed: {
+        Args: {
+          _id: string
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+        }
+        Returns: boolean
+      }
       request_account_deletion: { Args: never; Returns: undefined }
       request_follow: {
         Args: { _target: string }
@@ -2242,6 +2520,30 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }[]
+      }
+      share_record_with_user: {
+        Args: {
+          _id: string
+          _role: Database["public"]["Enums"]["record_share_role"]
+          _type: Database["public"]["Enums"]["shareable_record_type"]
+          _user_id: string
+        }
+        Returns: {
+          accepted_at: string | null
+          id: string
+          invited_at: string
+          invited_by: string | null
+          record_id: string
+          record_type: Database["public"]["Enums"]["shareable_record_type"]
+          role: Database["public"]["Enums"]["record_share_role"]
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "record_shares"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       submit_reader_note: {
         Args: {
@@ -2278,6 +2580,21 @@ export type Database = {
     Enums: {
       app_role: "personal" | "education" | "community" | "admin"
       debate_status: "draft" | "scheduled" | "live" | "completed" | "archived"
+      record_change_status: "pending" | "approved" | "rejected" | "withdrawn"
+      record_change_type:
+        | "edit_metadata"
+        | "edit_content"
+        | "invite_user"
+        | "remove_user"
+        | "toggle_publish"
+        | "propose_delete"
+        | "propose_transfer"
+      record_share_role: "viewer" | "co_owner"
+      shareable_record_type:
+        | "debate"
+        | "change_my_mind"
+        | "live_session"
+        | "notebook"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2407,6 +2724,23 @@ export const Constants = {
     Enums: {
       app_role: ["personal", "education", "community", "admin"],
       debate_status: ["draft", "scheduled", "live", "completed", "archived"],
+      record_change_status: ["pending", "approved", "rejected", "withdrawn"],
+      record_change_type: [
+        "edit_metadata",
+        "edit_content",
+        "invite_user",
+        "remove_user",
+        "toggle_publish",
+        "propose_delete",
+        "propose_transfer",
+      ],
+      record_share_role: ["viewer", "co_owner"],
+      shareable_record_type: [
+        "debate",
+        "change_my_mind",
+        "live_session",
+        "notebook",
+      ],
     },
   },
 } as const
