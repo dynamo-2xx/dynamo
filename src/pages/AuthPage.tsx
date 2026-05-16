@@ -16,6 +16,7 @@ const AuthPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [tosAccepted, setTosAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -26,6 +27,10 @@ const AuthPage = () => {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "signup" && !tosAccepted) {
+      toast.error("Please accept the Terms and Privacy Policy to continue");
+      return;
+    }
     setLoading(true);
     try {
       if (mode === "signup") {
@@ -35,6 +40,12 @@ const AuthPage = () => {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
+        if (data.user) {
+          await supabase
+            .from("profiles")
+            .update({ tos_accepted_at: new Date().toISOString(), tos_version: "2026-05-16" })
+            .eq("user_id", data.user.id);
+        }
         if (data.session) {
           navigate(redirectTo || "/onboarding");
         } else {
@@ -53,6 +64,10 @@ const AuthPage = () => {
   };
 
   const handleGoogleAuth = async () => {
+    if (mode === "signup" && !tosAccepted) {
+      toast.error("Please accept the Terms and Privacy Policy to continue");
+      return;
+    }
     const safeRedirect = redirectTo && redirectTo.startsWith("/") ? redirectTo : "";
     const target = `${window.location.origin}${safeRedirect}`;
     const { error } = await lovable.auth.signInWithOAuth("google", {
