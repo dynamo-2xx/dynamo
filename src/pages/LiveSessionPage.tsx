@@ -29,6 +29,7 @@ import FloatingTranscript from "@/components/live/FloatingTranscript";
 import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import PauseButton from "@/components/sharing/PauseButton";
+import { usePauseControl } from "@/hooks/usePauseControl";
 
 const getDeviceId = () => {
   let id = localStorage.getItem("dyn_device_id");
@@ -63,7 +64,10 @@ const LiveSessionPage = () => {
 
   const deviceId = useMemo(() => getDeviceId(), []);
   const isMulti = mode === "multi_device";
-  const isRecordingActive = phase === "recording" && sessionStatus === "recording";
+  const rawIsRecordingActive = phase === "recording" && sessionStatus === "recording";
+  const { isPaused: liveIsPaused } = usePauseControl({ kind: "live", id: sessionId, isHost: true });
+  // Halt transcription + analysis whenever the host pauses the session.
+  const isRecordingActive = rawIsRecordingActive && !liveIsPaused;
 
   // Load host's display name from profile
   useEffect(() => {
