@@ -1,168 +1,89 @@
+# §18 Founder Cost Dashboard — Implementation Plan
 
-## Plan — Release-criteria memory + user preferences (memory only, no code)
+## What we're building
+A founder-only `/admin/costs` page with per-source budget tracking, revenue goal, Free/Pro user attribution tables, and stacked progress bars. Gated by hardcoded `FOUNDER_USER_ID`.
 
-Three deliverables. All are markdown memory files. No source code touched.
+## Database changes (migration)
+1. **`founder_settings`** (singleton)
+   - `budget_ai_usd` (default 100), `budget_speech_usd` (60), `budget_cloud_usd` (30), `budget_stripe_usd` (10)
+   - `monthly_revenue_goal_usd` (nullable)
+   - `updated_at`
+   - RLS: only FOUNDER_USER_ID can SELECT/UPDATE
 
----
+2. **`ai_usage_log`** (per-call ledger)
+   - `user_id`, `session_id`, `function_name`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `created_at`
+   - Admin-only RLS
 
-### 1. `mem://product/release-criteria` (new)
+3. **`speech_usage_log`** (per-session ledger)
+   - `user_id`, `session_id`, `minutes`, `cost_usd`, `created_at`
+   - Admin-only RLS
 
+4. **`daily_costs`** (rolled-up daily snapshot)
+   - `date`, `source` (ai|speech|cloud|stripe), `cost_usd`, `created_at`
+   - Admin-only RLS
+
+5. **`cost_alerts`** (deduplication log)
+   - `alert_type`, `threshold`, `fired_at`
+   - Admin-only RLS
+
+## Edge functions
+- `log-ai-usage` — called by existing functions (ai-facilitator, analyze-transcript, record-qa, consolidate-notebook, detect-cross-refs) to write `ai_usage_log` rows
+- `log-speech-usage` — called on Deepgram session end to write `speech_usage_log`
+- `export-account-data` — built in §19 (out of scope for this plan)
+
+## Frontend
+- New page: `src/pages/AdminCostsPage.tsx`
+- Route: `/admin/costs` in `App.tsx`
+- Guard: 404 if `auth.uid() !== FOUNDER_USER_ID`
+
+**Layout:**
 ```
----
-name: Release Criteria
-description: Definition of "public-ready" for Dynamo. Checked before any release-prep work is called done.
-type: feature
----
+Top row (side-by-side):
+  [Cost progress bar]  [Revenue progress bar]
+    - Editable budgets via inline pencil → modal
+    - Color: green (<50%), amber (50-90%), red (>90%)
 
-# Public Release Criteria
+Stacked below:
+  [AI bar] [Speech bar] [Cloud bar] [Stripe bar]
+    - Each editable, same color rule
+    - Total = sum of 4 sources
 
-## 0. Waitlist gate
-- Waitlist page replaces the current home page as the public landing until launch.
-- Hard wall: visitors cannot browse Explore or public profiles.
-- Allowed on the waitlist surface:
-  - Email field (entering email = signing up to the waitlist).
-  - Optional ID-card profile (US-government-ID layout). Optional fields: profile picture, bio.
-    Required fields: username/name (collected with email). ID number is reserved for friend-adding.
-  - A grid of waitlisted users' profile-picture bubbles + names.
-  - Clicking a bubble opens that user's full ID-card profile.
-  - From a profile view, the visitor is prompted to create their own (which forces email signup if not done).
-- Launch flag is a single config value the founder can flip without a deploy.
+Two-table row (side-by-side):
+  | Free Users              | Pro Users                |
+  | name, 30d spend,        | name, 30d spend,         |
+  | AI calls, speech min,   | AI calls, speech min,    |
+  | debates, live, last     | debates, live, last, MRR |
+  | active                  | contribution             |
+  | Pagination 25/page      | Pagination 25/page       |
 
-## 1. Auth & onboarding
-- Email + Google sign-in work on mobile + desktop.
-- Email verification required.
-- Onboarding completes in under 90 seconds.
-- Logged-out invitees may preview a debate room but must auth before joining.
-
-## 2. Core happy path — end-to-end, zero console errors
-Canonical flow for Debate, CMM, and Live:
-
-  Generate session in template
-    -> Owner sends invites from the Invitations tab inside the template (pre-publication).
-    -> Invitee receives a notification, can Accept or Decline.
-       - Decline: their bubble in the Invitations tab pulses red.
-       - Accept: their bubble pulses green, they pick a side/seat, then press Confirm
-                 (the extra click is intentional to prevent misclicks).
-       - The owner can drag an accepted bubble between sides/seats.
-    -> Accepted invitees are locked to the draft and auto-routed to Mic-Prep on publish.
-  -> Mic-Prep (replaces the current Mic Lobby — see section 2a)
-  -> Session runs (format-specific rules; argument map + AI analysis live).
-  -> Session ends; users transition to the Record.
-  -> Record contains transcript, threaded view, and the argument map compiled from the session.
-  -> Owner toggles public/private on the record.
-  -> Users see their own performance grading only when grading is enabled in session config.
-
-Each format must complete this loop with zero console errors and produce its archive artifact.
-
-## 2a. Mic-Prep (replaces Mic Lobby)
-- Replaces today's owner-only Mic Lobby. Same screen for owner and invitees, with one delta.
-- Personal-device layout (phone/laptop):
-  - Primary view: the user's OWN mic test (level meter, unmute button).
-  - Other participants are shown as small profile-picture bubbles in a collapsible list.
-  - Bubble border rotates like a loading icon while not ready.
-  - When the user's mic test passes viability, their border becomes solid + checkmark = "readied up".
-  - Owner-only: Force-start button beneath the bubbles + mic-test area.
-- Projected/large-screen layout (room projector):
-  - No single user's mic is primary; all profile bubbles are shown equally with the same border-state rules.
-- When every bubble is solid + checked, the room auto-transitions to the session.
-
-## 3. My Study — co-equal pillar
-- Every Debate, CMM, Live session, and any Record can spawn a notebook from the notebook icon.
-- Notebooks live on the owning user's private My Study.
-- Notebooks have tabs and support publishing:
-  - publish a single Take to the profile, OR
-  - publish the full notebook (which then itself becomes a Record).
-- Other users may leave comments / reader notes on a published notebook.
-- Other users may create their own notebooks ABOUT a published notebook (notebook-on-notebook).
-- Only the owner can edit a notebook.
-- Profiles display published notebooks as hero cards, identical pattern to debate/live/CMM cards.
-
-## 4. In-person reliability
-- Per-format mic policy enforced (debate = turn lock, CMM = host + active, live = open + echo guard).
-- Voice-detection-only fallback works when a joiner has no device.
-- Mic-Prep readiness state is the gate to leave the prep screen.
-
-## 5. Data safety (RLS)
-- No table is publicly readable except by intent (waitlist bubbles, Explore feed post-launch, public profiles, published notebooks).
-- All debate-scoped tables go through can_view_debate.
-- Notebook visibility respects published/private flag.
-- Security scan returns zero high/critical findings.
-
-## 6. Performance budgets (1000+ users)
-- Home, Explore, Debate Room first paint under 2.5s on 4G.
-- No query returns more than 1000 rows without pagination.
-- Realtime channels stay under 10 active subscriptions per session.
-
-## 7. Mobile + PWA
-- Installable as PWA, service worker registers, push notifications deliver.
-- All primary flows usable one-handed on a 375px-wide screen.
-
-## 8. Notifications & lifecycle
-- Debate start push fires reliably to INTERESTED? users.
-- Pre-publication invite notifications deliver and surface Accept/Decline.
-- 48-hour edit window banner is accurate.
-- Auto-advance, completion overlay, and archive transitions run cleanly.
-
-## 9. Content & legal
-- Terms, Privacy, Civic verification copy reviewed.
-- Account deletion works end-to-end.
-
-## Deferred (tracked, do not block launch)
-- Performance analysis specifics (placeholder task in tracker; defined during Part 1 walk).
-- Per-device noise profiles.
-- Mid-session mic reassignment.
-- Audience mic capture.
+Below tables:
+  - 30-day stacked area chart (4 sources)
+  - Anomaly log (last 30 days)
+  - Export CSV buttons (per table)
 ```
 
----
+## Wiring existing functions
+- `ai-facilitator` → POST to `log-ai-usage` with token/cost data
+- `analyze-transcript` → same
+- `record-qa` → same
+- `deepgram-token` → on mint, log session start; on session end, POST to `log-speech-usage`
 
-### 2. `mem://~user` (new — user preferences, tuned for complete deliverables)
+## Cron jobs (out of scope for code, just schema)
+- `daily_costs` rollup at 00:10 UTC
+- Budget check at 00:15 UTC
+- Anomaly check at 23:55 UTC
+- These will be configured in a follow-up after the schema is live
 
-```
-I'm a non-technical founder. Use plain English; define jargon when used.
-For every change tell me: what the user sees, what risk it adds, what could break.
+## Acceptance criteria
+- `/admin/costs` renders without console errors
+- Non-founder gets 404
+- Budget editing saves and recomputes bars live
+- Free/Pro tables populate from real usage data
 
-# Completeness rules — do not hand off half-done work
-Never end a build response with "next steps" that are part of the original request — finish them.
-If a feature has multiple surfaces (debate / live / cmm / record / study), build all of them in the same loop unless I say otherwise.
-After every code change run: build + targeted check (console logs or preview screenshot) and report what you verified.
-If you discover scope you did not finish, list it explicitly under "Not done yet" — never imply it's complete.
-Never claim "ready" without checking the matching item on mem://product/release-criteria.
-
-# Working style
-Default to Plan mode for anything touching more than 3 files.
-Default to Build mode for single-file fixes.
-Always run a security scan after touching any table or RLS policy.
-If I say "ship it" without specifics, ask which format (debate / live / cmm / clubs / study) I mean.
-Use the task tracker for any sprint with more than 2 distinct deliverables.
-```
-
----
-
-### 3. `mem://index.md` update
-
-Append to the Memories section:
-
-- `[Release Criteria](mem://product/release-criteria)` — public-ready definition (waitlist, happy path, mic-prep, study).
-
-(User preferences live at `mem://~user` and are auto-loaded; not added to index.)
-
----
-
-### 4. Task tracker — placeholder tasks created at implementation time
-
-- "Define performance analysis spec" (created and parked as `todo`).
-- "Walk Part 1 section-by-section to verify app understanding" (created and parked as `todo`; first session = the three formats).
-
----
-
-## Out of scope for this plan
-
-- No code changes.
-- No waitlist implementation, no Mic-Prep build, no profile/ID-card build — those become their own plans after Part 1 is verified.
-
-## What happens after you approve
-
-1. I write the three memory files above.
-2. I create the two tracker tasks.
-3. I open the Part 1 walk with **Section 2 — the three session formats** (Debate, CMM, Live: rules, roles, lifecycle), one section per turn so you can correct as we go.
+## Not in this plan
+- Per-user cost caps (founder chose none)
+- Real-time dashboard (daily snapshot only)
+- Cost-aware model routing
+- Forecasting charts
+- §19 export edge function or deletion flow
+- §20 legal pages
