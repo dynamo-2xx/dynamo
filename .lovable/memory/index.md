@@ -1,6 +1,7 @@
 # Project Memory
 
 ## Core
+- **Mission**: Scale face-to-face discourse; words matter only when owned. Persuasion is power — bring people to the power. See [Mission](mem://product/mission).
 - **Visuals**: Pure white (#ffffff) bg, black (#0a0a0a) text. Instrument Serif (headings, antialiased), DM Sans (body).
 - **UI Elements**: Borders 0.5px solid rgba(0,0,0,0.1). Primary buttons black/white; secondary minimal outline.
 - **Auth**: Exclusively use `onAuthStateChange`. Never use `getSession` to prevent lock contention.
