@@ -16,6 +16,7 @@ import { useEmptyStateHint } from "@/hooks/useEmptyStateHint";
 import AuthPromptDialog from "@/components/AuthPromptDialog";
 import HomeMyStudyRow from "@/components/home/HomeMyStudyRow";
 import HeroActionShazam from "@/components/home/HeroActionShazam";
+import LegalFooter from "@/components/legal/LegalFooter";
 
 type Mode = "trending" | "local";
 
@@ -203,6 +204,7 @@ const HomePage = () => {
         onSaved={() => setMode("local")}
       />
       <AuthPromptDialog open={authPromptOpen} onOpenChange={setAuthPromptOpen} />
+      <LegalFooter />
     </div>
   );
 };
