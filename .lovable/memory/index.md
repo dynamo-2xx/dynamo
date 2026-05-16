@@ -13,6 +13,10 @@
 
 ## Memories
 - [Release Criteria](mem://product/release-criteria) — Public-ready definition (waitlist, happy path, mic-prep, study)
+- [Release §0 Waitlist Gate](mem://product/release-criteria-section-0-waitlist) — Single config flag, ID-card profiles, bubble grid, no Explore pre-launch
+- [Release §1 Auth & Onboarding](mem://product/release-criteria-section-1-auth-onboarding) — Email magic link + Google, verification gates, sub-90s onboarding, invitee preview
+- [Release §2 Core Happy Path](mem://product/release-criteria-section-2-core-happy-path) — Generate→Invite→Mic-Prep→Live→Record loop, 4×3 platform smoke, host failover
+- [Release §3 My Study](mem://product/release-criteria-section-3-my-study) — Notebook spawn surfaces, two independent publish toggles, notebook-on-notebook, floating overlay
 - [Session Formats](mem://product/session-formats) — Verified Debate/CMM/Live spec: roles, lifecycle, mic policy, v1 caps
 - [Branding Guidelines](mem://style/branding) — Monochrome palette, typography specs, and accent colors
 - [Signature Interactions](mem://style/signature-interactions) — Typewriter AI, pulsing timer, flipping transcript cards
