@@ -1,116 +1,74 @@
-## §23 — Record Sharing, Co-ownership & Universal Pause (v1)
+## Goal
 
-Add a universal sharing layer to **debates** (incl. CMM), **live sessions**, and **notebooks**. Two tiers: **Viewer** and **Co-owner** (propose-and-approve). Forking happens only on **completed** records. Also adds host-only **Pause/Resume** uniformly across Debate, CMM, and Live.
-
----
-
-### Sharing model
-
-**Tiers**
-- **Viewer** — sees private record; cannot edit. No fork.
-- **Co-owner** — can propose edits, invites, publish toggles, deletes, transfers. Every mutation lands in a **pending change** queue; original creator approves/rejects. On record completion, co-owner auto-receives a **personal fork** they fully own.
-
-**Original creator** — sole power to delete, transfer, approve/reject proposals, remove co-owners.
-
-**Forking rule (locked)**
-- Fork is created **only when the parent record reaches a completed state**:
-  - Debate / CMM: `status = 'completed'` (end of session)
-  - Live: `status = 'recording_complete'`
-  - Notebook: on `published = true`
-- During an in-progress session, co-owner has the role but no fork yet.
-- Fork is a one-way snapshot: independent row, `forked_from_id` + `forked_at` set, no ongoing sync.
-- Debates fork: topic/subtopics/sides config copied; participants reset.
-- Live fork: metadata + transcript snapshot copied; analysis re-runnable by new owner.
-- Notebook fork: `thoughts` + `my_take` copied.
-
-**Invite flow (all three)**
-1. Pick from followers/connections
-2. Search any user by handle/email
-3. Shareable link `/share/<token>?role=viewer|co_owner` (token-hashed like `debate_invitations`)
+Capture the final two pre-build features as memory entries only. **No code or DB changes in this pass** — just memory files. Build phase begins right after approval.
 
 ---
 
-### Database
+## §24 — "Continue" button on completed records
 
-New tables (RLS-on):
-- `record_shares (record_type, record_id, user_id, role, invited_by, accepted_at)` — role enum `viewer | co_owner`. Unique on `(record_type, record_id, user_id)`.
-- `record_share_invitations` — hashed-token links, expiry, claim tracking.
-- `record_change_proposals (record_type, record_id, proposed_by, change_type, payload jsonb, status, decided_by, decision_reason)` — change_type enum: `edit_metadata | edit_content | invite_user | remove_user | toggle_publish | propose_delete | propose_transfer`.
+New memory file: `mem://features/continue-records`
 
-Columns added to `debates`, `live_sessions`, `session_notebooks`:
-- `forked_from_id uuid null`, `forked_at timestamptz null`
+**Rule**: Available on completed Debate, CMM, and Live records. **Never on Notebooks** (always editable). Owner-only trigger at v1 (co-owners propose via existing §23 flow).
 
-New columns for Pause:
-- `debates.paused_at timestamptz null`, `debates.pause_reason text null`
-- `live_sessions.paused_at timestamptz null`
-- (CMM piggybacks on `debates.paused_at` since CMM is a debate format)
+**Per-format behavior**
+- **Live** → opens a brand-new Live session, marked as a continuation. New transcript entries are appended *into the same record view* below a divider (see Threading).
+- **Debate / CMM** → clones the original template (topic, subtopics, sides, settings, cover, tags) into a new record; original stays immutable.
 
-Helper functions (SECURITY DEFINER):
-- `is_record_co_owner(_type, _id)` / `is_record_viewer(_type, _id)`
-- Extend `can_view_debate` / `can_view_live_session` / shared-notebook helpers to OR in `is_record_viewer(...)`.
-- `accept_share_invitation(_token)` — claims slot; if record already completed and role = co_owner, immediately forks; otherwise sets `accepted_at` and defers fork to completion trigger.
-- `propose_record_change(_type, _id, _change_type, _payload)` — co-owner only.
-- `decide_record_change(_proposal_id, _approve, _reason)` — creator only; applies payload on approve.
-- `fork_record_on_complete()` — trigger fired when status flips to completed; forks for all accepted co-owners.
+**Scope prompt (modal on click)**: "Bring participants from previous session?" → Yes (auto re-invite original speakers/invitees) / No (empty, owner only). User decision per-click.
 
-RLS pattern: SELECT gated by `can_view_*`. UPDATE allowed for creator; co-owner raw UPDATEs blocked by trigger — must go through `propose_record_change`.
+**Linkage model**: Linear chain only. Each continuation stores `continued_from_id` + `continuation_index` (v1, v2, v3…). No branching/tree at launch.
 
----
+**Threaded record UI**
+- Divider row in transcript: thin black line + chip `"Continuation 2 · May 16, 2026 · 14:32"`.
+- Every transcript entry shows a small `v1` / `v2` badge in the speaker row.
+- Header chip: `"Continuation 2 of 3 →"` linking to next/prev in chain.
+- Argument Map, Q&A, comments operate over the full merged chain by default; toggle to scope to one version.
 
-### Pause / Resume — uniform across Debate, CMM, Live
+**Data model (for build phase)**
+- Add `continued_from_id uuid`, `continuation_index int default 1`, `continuation_root_id uuid` to `debates` and `live_sessions`.
+- For Live: entries stay in same `live_session_entries` table keyed by `session_id`; divider is a synthetic row derived from `live_sessions.continuation_started_at` events array — OR new `session_id` per continuation joined via root.  **Decide at build time**; memory locks the user-facing behavior, not the storage shape.
 
-Host-only button rendered identically in all three room toolbars (next to End / Next Turn / etc.).
-
-**Common behavior**
-- Sets `paused_at = now()` on the record; broadcasts via Realtime
-- Deepgram socket closes; mic indicators turn amber; subtitles hide
-- Analysis intervals halt (Live + CMM); turn timer freezes (Debate)
-- All participants see a "Paused by host" badge with elapsed pause time
-- **Resume** clears `paused_at`, reopens socket, resumes analysis from current transcript tail (no re-summarization of past), unfreezes timer
-- Auto-resume if host disconnects during pause and reconnects within 5 min
-- Pause duration excluded from time-per-turn accounting (Debate/CMM)
-
-**Where added**
-- `FacilitatorView.tsx` (Debate) — already has Pause for the turn timer; extend to also halt transcription/analysis (currently only pauses timer)
-- `ChangeMyMindRoomPage.tsx` (CMM) — add Pause button to host control panel
-- `LiveSessionPage.tsx` (Live) — add Pause button next to End
+**Tier limits**: each Continue consumes one record from the user's monthly quota (§12). No special discount.
 
 ---
 
-### UI — Sharing
+## §25 — Import-to-Record (second dropbox on `/create`)
 
-**Share button** added to record headers (Debate room, CMM room, Live room, Notebook overlay, Record/Archive view). Opens `ShareDialog`:
-- Tab 1: **People with access** — list with role pills, remove (creator only)
-- Tab 2: **Invite** — search + dropdown + role selector + send
-- Tab 3: **Get link** — generate role-scoped token URL, copy, revoke
+New memory file: `mem://features/import-to-record`
 
-**Pending changes inbox** — `/agenda?tab=approvals`. Each proposal shows proposer avatar, diff summary, Approve / Reject / Reject-with-reason. Bell notification on new proposal.
+**Two inputs on the Debate generator page** (`/create`):
+1. **Existing prompt textbox** → now also accepts drag-and-drop of files (images, PDFs, audio, video) and pasted URLs. Used as additional *context* for template generation.
+2. **NEW second dropbox below** labeled **"Already have a debate? Drop it here."** This does NOT generate a template — it **ingests** the source and produces a complete, threaded *record* (transcript + argument map + threads), identical in shape and behavior to any other completed record.
 
-**Co-owner edit affordance** — Save button relabeled **"Propose change"**; toast confirms it was sent. Pending proposals shown as ghost overlay on affected field.
+**Accepted sources at launch** (all four):
+- YouTube / video URLs (yt-dlp-style fetch in edge function, then Deepgram)
+- Audio/video file uploads (mp3/mp4/wav/m4a, capped)
+- PDF / DOCX transcripts (text extraction → AI threading)
+- Plain web article URLs (scrape → AI structures into debate threads)
 
-**Fork indicator** — forked records show a "Forked from {original}" chip linking to parent.
+**Flow**
+1. User drops file / pastes link → presses Enter or Create.
+2. Full-screen **"People to the Power!"** loader (DYNAMO splash variant) shown for entire processing duration. Progress text reflects current stage: *Fetching → Transcribing → Structuring → Building threads*.
+3. On finish → redirect to the new record, presented identically to any completed Debate (transcript, argument map, Q&A, notebook, comments, sharing, Continue button — all enabled).
+
+**Ownership & defaults**
+- **Private by default**, toggleable to public anytime.
+- Counted as a standard Debate against the user's tier quota (§12).
+- Imported records carry a small `Imported` chip + source attribution (URL / filename) in metadata, visible on the record header.
+
+**Cost controls (§18)**
+- Hard per-user monthly cap on import minutes (Free: 0, Pro: 120 min, Edu/Civic: TBD).
+- Deepgram + AI costs logged to `ai_usage_log` with `function_name='import_to_record'`.
+- File size cap (e.g. 500 MB) and duration cap (e.g. 3 h) enforced server-side.
+
+**Edge function**: new `import-to-record/index.ts` orchestrates fetch → transcribe → structure → persist. Existing `analyze-transcript` reused for threading.
 
 ---
 
-### Acceptance criteria
+## Deliverable for this plan
 
-- Viewer can open a private debate/live/notebook they were shared on; cannot edit.
-- Co-owner edit produces a proposal row; original record unchanged until creator approves.
-- Co-owner accept on an in-progress record does NOT fork; fork is created automatically when record completes.
-- Co-owner accept on an already-completed record forks immediately.
-- Only creator can delete; co-owner delete attempt creates `propose_delete` proposal.
-- Share link works authed + unauthed (unauthed → auth gate → claim on return).
-- Pause works identically in Debate, CMM, and Live: halts transcription + analysis + timers; Resume continues without context loss.
-- Pause duration excluded from Debate/CMM turn-time accounting.
-- All new tables have RLS; co-owner cannot bypass approval via raw API.
+1. Create `.lovable/memory/features/continue-records.md` with the §24 spec above.
+2. Create `.lovable/memory/features/import-to-record.md` with the §25 spec above.
+3. Update `.lovable/memory/index.md` Memories list to reference both.
 
----
-
-### Not in this plan
-
-- Real-time collaborative editing (OT/CRDT)
-- Fork-to-parent sync (snapshot only)
-- Field-level granular permissions
-- Multi-creator (transfer is full handoff)
-- Co-owner subdelegation
-- Recovering a Live session paused for >24h (treated as ended)
+No source code, DB migration, or edge function work in this pass. After approval, the next user message starts the build phase across all §23 / §24 / §25 features.
