@@ -1,69 +1,72 @@
 ---
 name: Release §16 Email & Transactional Comms
-description: Auth emails, invites, digests, unsubscribe, deliverability infra (SPF/DKIM/DMARC).
+description: Auth, invites, safety, digest, billing, club emails via Lovable Emails on mail.dynamo.today.
 type: feature
 ---
 
 # §16 — Email & Transactional Comms
 
-## Provider
-- **Resend** as ESP at launch (already used by `send-invite-email`).
-- Single sending domain: `mail.dynamo.today`. Marketing/auth/transactional all share it at launch; can split later.
-- All templates rendered server-side in edge functions (React Email components in `supabase/functions/_shared/email/`).
+**Decisions locked by founder:**
+- Provider: **Lovable Emails (built-in)**. No third-party ESP account, no Resend/Brevo/Mailgun API key.
+- Sending domain: **mail.dynamo.today** (subdomain — keeps root domain reputation isolated).
+- Email types at launch: **Everything** — auth, invites, safety, weekly digest, billing receipts, club updates.
+- Unsubscribe: **Simple** — single global toggle for non-essential mail. Auth + safety always send.
 
-## Deliverability infra (must pass before waitlist-off)
-- SPF: `v=spf1 include:_spf.resend.com -all` on `mail.dynamo.today`.
-- DKIM: Resend-provided CNAMEs published.
-- DMARC: `v=DMARC1; p=quarantine; rua=mailto:dmarc@dynamo.today; pct=100`.
-- BIMI: deferred (requires VMC cert).
-- Verified with `mail-tester.com` ≥9/10 and Google Postmaster Tools enrolled.
+## Provider setup (Lovable Emails)
+- Configure via Lovable Cloud → Emails → set domain `mail.dynamo.today`. DNS records (SPF, DKIM, DMARC) provisioned automatically by Lovable.
+- DNS verification must show green in Cloud → Emails before waitlist flips off.
+- Auth email templates: scaffold via Lovable's auth-email-hook, branded per `mem://style/branding` (Instrument Serif headings, DM Sans body, monochrome).
+- Transactional templates: scaffold via Lovable's `send-transactional-email` edge function pipeline. Templates live in `supabase/functions/_shared/email-templates/`.
 
 ## Email types at launch
-| Template | Trigger | From | Reply-to |
-|---|---|---|---|
-| `auth_verify` | signup | `no-reply@mail.dynamo.today` | none |
-| `auth_magic_link` | passwordless / recovery | `no-reply@` | none |
-| `auth_password_reset` | forgot password | `no-reply@` | none |
-| `invite_debate` | owner invites to debate/cmm/live | `invites@mail.dynamo.today` | inviter's profile-masked address |
-| `invite_accepted` | invitee accepts | `notifications@` | none |
-| `club_join_approved` | admin approves request | `notifications@` | none |
-| `report_acknowledged` | reporter submits | `safety@mail.dynamo.today` | safety@ |
-| `sanction_notice` | moderation action | `safety@` | appeal@ |
-| `appeal_decision` | appeal resolved | `safety@` | none |
-| `weekly_digest` | Sun 10am user-local | `digest@mail.dynamo.today` | none |
-| `payment_receipt` | Stripe webhook success | `billing@mail.dynamo.today` | billing@ |
-| `payment_failed` | dunning (§17) | `billing@` | billing@ |
+As user stories:
 
-## Auth emails
-- Supabase Auth SMTP configured to Resend (already documented in onboarding-v2 prerequisites).
-- Custom HTML templates uploaded via Supabase auth dashboard — branded with DYNAMO wordmark + black/white palette.
-- Magic-link / reset links land on `/auth/callback` with single-use token.
+| Template | User story |
+|---|---|
+| `auth_verify` | As a new signup, I want a verification link so that I can prove my email and unlock gated actions. |
+| `auth_magic_link` | As a returning user, I want a one-tap signin link so that I don't need a password. |
+| `auth_password_reset` | As a user who set a password, I want a reset link so that I can recover access. |
+| `invite_debate` | As an invitee, I want to see who invited me and what session, so that I can accept/decline confidently. |
+| `invite_accepted` | As an inviter, I want to know when someone accepts, so that I know my session is filling. |
+| `club_join_approved` | As an applicant, I want to know my club request was approved, so that I can start participating. |
+| `club_event_announced` | As a club member, I want to know about new events, so that I don't miss them. |
+| `report_acknowledged` | As a reporter, I want confirmation my report was received, so that I trust the safety pipeline. |
+| `sanction_notice` | As a sanctioned user, I want to know what happened and how to appeal, so that I have due process. |
+| `appeal_decision` | As an appellant, I want the outcome in writing, so that I have a record. |
+| `weekly_digest` | As a user, I want a Sunday recap of what I missed, so that I stay engaged without checking the app daily. |
+| `payment_receipt` | As a paying user, I want receipts for tax/expense purposes. |
+| `payment_failed` | As a paying user with a failed card, I want a warning before I lose access (§17 dunning). |
 
 ## Weekly digest
-- pg_cron Sundays 14:00 UTC → enqueues per-user digest jobs respecting `profiles.timezone` to land near 10am local.
-- Content (only if non-empty for that user): debates you were invited to, records published by people you follow, club events this week, your unread DM count.
-- Suppress entirely if user inactive >30d (deliverability hygiene).
+- pg_cron Sundays 14:00 UTC → enqueues per-user jobs respecting `profiles.timezone` to land near 10am local.
+- Content (only if non-empty): debates you were invited to, records published by people you follow, club events this week, unread DM count.
+- Suppress entirely if user inactive >30 days (deliverability hygiene).
 
-## Preferences & unsubscribe
-- `profiles.email_prefs` jsonb: `{transactional: true (locked), invites: true, weekly_digest: true, club_updates: true, safety: true (locked)}`.
-- Every non-locked email contains one-click List-Unsubscribe header (RFC 8058) + visible unsubscribe link to `/settings/email`.
-- `/settings/email` mirrors prefs; toggling persists immediately.
-- Bounced + complained addresses auto-flipped to suppression list via Resend webhook → `email_suppressions` table; suppresses all future sends except `auth_*` and `safety_*`.
+## Unsubscribe behavior (Simple — locked)
+- `profiles.email_prefs` jsonb: `{essential: true (locked), marketing: true}`.
+- **Essential (always send, cannot be turned off):** auth, safety, invites you're a participant in, billing receipts, payment-failed.
+- **Marketing (single toggle):** weekly digest, club event announcements (when you're a member, not when you're invited), invite-accepted notifications.
+- Every marketing email contains a footer "Unsubscribe" link to `/settings/email` (one-click confirm, no extra screen).
+- One-click List-Unsubscribe header (RFC 8058) included on marketing mail so Gmail/Apple Mail honor it.
+- Bounced + complained addresses auto-flipped to suppression via Lovable Emails webhook → `email_suppressions` table; suppresses all future sends except essential.
 
 ## Localization
-- EN-only at launch (§14). Templates structured with `t()` keys ready for future locales.
+- EN-only at launch (carried from §14). Templates structured for future locales (`t()` keys ready).
 
 ## Out of scope at launch
-- Drip/onboarding sequences beyond verify.
-- Re-engagement campaigns.
-- Push-to-email fallback.
+- Per-category granular toggles (single marketing toggle only — that's the "Simple" decision).
+- Drip/onboarding sequences beyond auth verify.
+- Re-engagement campaigns for inactive users.
 - A/B subject-line testing.
 - BIMI logo verification.
+- Reply handling (all senders are no-reply at launch).
 
 ## Acceptance checklist
-- DNS records green in Resend dashboard.
-- mail-tester ≥9/10 on each template type.
-- Postmaster Tools shows spam rate <0.1% over 7d post-launch.
-- Every template renders in Gmail/Apple Mail/Outlook web (manual smoke).
-- Unsubscribe link round-trips and persists.
-- Suppression list blocks subsequent non-critical sends within 1 send cycle.
+- Cloud → Emails shows `mail.dynamo.today` green (SPF, DKIM, DMARC verified).
+- All 13 templates above render correctly in Gmail web, Apple Mail iOS, Outlook web (manual smoke).
+- Auth verify lands within 30 seconds on Gmail/Apple/Outlook test inboxes.
+- Unsubscribe link round-trips: clicking it flips `marketing` to false and suppresses next digest within one cycle.
+- Bounce + complaint suppression confirmed by sending to known-bad test address.
+- Weekly digest cron fires Sunday and respects per-user timezone.
+- Banned/suspended user (§15) still receives `sanction_notice` (essential override).
+- mail-tester.com score ≥9/10 on each template type.
