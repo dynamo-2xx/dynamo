@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage_log: {
+        Row: {
+          cost_usd: number
+          created_at: string
+          function_name: string
+          id: string
+          input_tokens: number
+          model: string | null
+          output_tokens: number
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          cost_usd?: number
+          created_at?: string
+          function_name: string
+          id?: string
+          input_tokens?: number
+          model?: string | null
+          output_tokens?: number
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          cost_usd?: number
+          created_at?: string
+          function_name?: string
+          id?: string
+          input_tokens?: number
+          model?: string | null
+          output_tokens?: number
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       arguments: {
         Row: {
           argument_type: string
@@ -362,6 +398,57 @@ export type Database = {
           created_at?: string
           followed_id?: string
           follower_id?: string
+        }
+        Relationships: []
+      }
+      cost_alerts: {
+        Row: {
+          alert_type: string
+          fired_at: string
+          id: string
+          period_key: string
+          source: string | null
+          threshold: number | null
+        }
+        Insert: {
+          alert_type: string
+          fired_at?: string
+          id?: string
+          period_key: string
+          source?: string | null
+          threshold?: number | null
+        }
+        Update: {
+          alert_type?: string
+          fired_at?: string
+          id?: string
+          period_key?: string
+          source?: string | null
+          threshold?: number | null
+        }
+        Relationships: []
+      }
+      daily_costs: {
+        Row: {
+          cost_usd: number
+          created_at: string
+          date: string
+          id: string
+          source: string
+        }
+        Insert: {
+          cost_usd?: number
+          created_at?: string
+          date: string
+          id?: string
+          source: string
+        }
+        Update: {
+          cost_usd?: number
+          created_at?: string
+          date?: string
+          id?: string
+          source?: string
         }
         Relationships: []
       }
@@ -1016,6 +1103,39 @@ export type Database = {
           responded_at?: string | null
           status?: string
           target_id?: string
+        }
+        Relationships: []
+      }
+      founder_settings: {
+        Row: {
+          budget_ai_usd: number
+          budget_cloud_usd: number
+          budget_speech_usd: number
+          budget_stripe_usd: number
+          id: string
+          monthly_revenue_goal_usd: number | null
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          budget_ai_usd?: number
+          budget_cloud_usd?: number
+          budget_speech_usd?: number
+          budget_stripe_usd?: number
+          id?: string
+          monthly_revenue_goal_usd?: number | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          budget_ai_usd?: number
+          budget_cloud_usd?: number
+          budget_speech_usd?: number
+          budget_stripe_usd?: number
+          id?: string
+          monthly_revenue_goal_usd?: number | null
+          singleton?: boolean
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1713,6 +1833,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      speech_usage_log: {
+        Row: {
+          cost_usd: number
+          created_at: string
+          id: string
+          minutes: number
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          cost_usd?: number
+          created_at?: string
+          id?: string
+          minutes?: number
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          cost_usd?: number
+          created_at?: string
+          id?: string
+          minutes?: number
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       tags: {
         Row: {

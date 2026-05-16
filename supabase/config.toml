@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.dispatch-debate-start-push]
 verify_jwt = false
+
+[functions.log-usage]
+verify_jwt = false
