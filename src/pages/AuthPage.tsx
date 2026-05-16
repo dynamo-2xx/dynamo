@@ -149,6 +149,23 @@ const AuthPage = () => {
             </button>
           </form>
 
+          {mode === "signup" && (
+            <label className="flex items-start gap-2 mt-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={tosAccepted}
+                onChange={(e) => setTosAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+              />
+              <span className="text-[11px] text-muted-foreground leading-relaxed">
+                I agree to the{" "}
+                <Link to="/terms" className="underline hover:text-foreground">Terms</Link>,{" "}
+                <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>, and{" "}
+                <Link to="/guidelines" className="underline hover:text-foreground">Community Guidelines</Link>.
+              </span>
+            </label>
+          )}
+
           <p className="text-xs text-muted-foreground text-center mt-4">
             {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
@@ -159,12 +176,14 @@ const AuthPage = () => {
             </button>
           </p>
 
-          <p className="text-[11px] text-muted-foreground text-center mt-6">
-            By continuing, you agree to our{" "}
-            <Link to="/terms" className="underline hover:text-foreground transition-colors">Terms</Link>{" "}
-            and{" "}
-            <Link to="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
-          </p>
+          {mode === "login" && (
+            <p className="text-[11px] text-muted-foreground text-center mt-6">
+              By continuing, you agree to our{" "}
+              <Link to="/terms" className="underline hover:text-foreground transition-colors">Terms</Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
+            </p>
+          )}
         </div>
       </motion.div>
     </div>
