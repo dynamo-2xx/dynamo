@@ -44,8 +44,8 @@ As user stories:
 
 ## Unsubscribe behavior (Simple — locked)
 - `profiles.email_prefs` jsonb: `{essential: true (locked), marketing: true}`.
-- **Essential (always send, cannot be turned off):** auth, safety, invites you're a participant in, billing receipts, payment-failed.
-- **Marketing (single toggle):** weekly digest, club event announcements (when you're a member, not when you're invited), invite-accepted notifications.
+- **Essential (always send, cannot be turned off):** auth, safety, invites you're a participant in, invite-accepted (inviter sees who joined), billing receipts, payment-failed.
+- **Marketing (single toggle):** weekly digest, club event announcements (when you're a member, not when you're invited).
 - Every marketing email contains a footer "Unsubscribe" link to `/settings/email` (one-click confirm, no extra screen).
 - One-click List-Unsubscribe header (RFC 8058) included on marketing mail so Gmail/Apple Mail honor it.
 - Bounced + complained addresses auto-flipped to suppression via Lovable Emails webhook → `email_suppressions` table; suppresses all future sends except essential.
