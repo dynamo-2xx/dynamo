@@ -1079,6 +1079,24 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_flags: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       follow_requests: {
         Row: {
           created_at: string
@@ -1495,10 +1513,15 @@ export type Database = {
           affiliation: string | null
           avatar_url: string | null
           banner_url: string | null
+          bio: string | null
           created_at: string
+          deleted_at: string | null
+          deletion_initiated_at: string | null
+          deletion_status: string | null
           display_name: string | null
           id: string
           is_public: boolean
+          last_export_at: string | null
           location: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
@@ -1508,10 +1531,15 @@ export type Database = {
           affiliation?: string | null
           avatar_url?: string | null
           banner_url?: string | null
+          bio?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deletion_initiated_at?: string | null
+          deletion_status?: string | null
           display_name?: string | null
           id?: string
           is_public?: boolean
+          last_export_at?: string | null
           location?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -1521,10 +1549,15 @@ export type Database = {
           affiliation?: string | null
           avatar_url?: string | null
           banner_url?: string | null
+          bio?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deletion_initiated_at?: string | null
+          deletion_status?: string | null
           display_name?: string | null
           id?: string
           is_public?: boolean
+          last_export_at?: string | null
           location?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -1931,6 +1964,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      anonymize_expired_accounts: { Args: never; Returns: number }
       can_view_club: { Args: { _club_id: string }; Returns: boolean }
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
@@ -1939,6 +1973,7 @@ export type Database = {
         Args: { _record_id: string; _record_type: string }
         Returns: boolean
       }
+      cancel_account_deletion: { Args: never; Returns: undefined }
       cmm_end_round: {
         Args: { _debate_id: string; _outcome?: string }
         Returns: {
@@ -2176,6 +2211,7 @@ export type Database = {
         Returns: undefined
       }
       realtime_topic_debate_id: { Args: { _topic: string }; Returns: string }
+      request_account_deletion: { Args: never; Returns: undefined }
       request_follow: {
         Args: { _target: string }
         Returns: {

@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.log-usage]
 verify_jwt = false
+
+[functions.anonymize-expired]
+verify_jwt = false

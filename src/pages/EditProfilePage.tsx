@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Loader2, MapPin, User as UserIcon, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, MapPin, User as UserIcon, Trash2, Download, AlertCircle } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,7 +47,7 @@ const emptyForm = (): FormState => ({
 });
 
 const EditProfilePage = () => {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, session, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -60,6 +60,14 @@ const EditProfilePage = () => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [cancellingDeletion, setCancellingDeletion] = useState(false);
+
+  const pendingDeletion = (profile as any)?.deletion_status === "pending_review";
+  const deletedAt = (profile as any)?.deleted_at as string | null | undefined;
+  const daysLeft = deletedAt
+    ? Math.max(0, 30 - Math.floor((Date.now() - new Date(deletedAt).getTime()) / 86_400_000))
+    : null;
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -195,7 +203,10 @@ const EditProfilePage = () => {
       const { error } = await supabase.functions.invoke("delete-account");
       if (error) throw error;
       await supabase.auth.signOut();
-      toast({ title: "Account deleted" });
+      toast({
+        title: "Account scheduled for deletion",
+        description: "You have 30 days to sign back in to cancel.",
+      });
       navigate("/auth");
     } catch (err: any) {
       setDeleting(false);
@@ -204,6 +215,54 @@ const EditProfilePage = () => {
         description: err?.message ?? "Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleCancelDeletion = async () => {
+    setCancellingDeletion(true);
+    const { error } = await supabase.rpc("cancel_account_deletion");
+    setCancellingDeletion(false);
+    if (error) {
+      toast({ title: "Couldn't cancel deletion", description: error.message, variant: "destructive" });
+      return;
+    }
+    await refreshProfile();
+    toast({ title: "Deletion cancelled", description: "Your account is active again." });
+  };
+
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-account-data`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      if (res.status === 429) {
+        const body = await res.json();
+        toast({ title: "Rate limited", description: body.message ?? "Try again later.", variant: "destructive" });
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Export failed");
+      }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `dynamo-export-${user?.id ?? "me"}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast({ title: "Export ready", description: "Your data download has started." });
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err?.message ?? "Try again.", variant: "destructive" });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -421,21 +480,68 @@ const EditProfilePage = () => {
             <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
           </div>
 
+          {pendingDeletion && (
+            <section className="mt-8 border border-destructive/40 rounded-lg p-5 bg-destructive/5">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-display text-base mb-1 text-destructive">
+                    Account scheduled for deletion
+                  </h3>
+                  <p className="text-xs text-muted-foreground font-body mb-3">
+                    {daysLeft != null && daysLeft > 0
+                      ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left to recover. After that, your profile will be anonymized and your DMs deleted.`
+                      : "Anonymization is imminent. Cancel now to keep your account."}
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={handleCancelDeletion}
+                    disabled={cancellingDeletion}
+                    className="font-body min-h-[40px]"
+                  >
+                    {cancellingDeletion ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cancel deletion"}
+                  </Button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Data export */}
+          <section className="mt-8 border border-border rounded-lg p-5">
+            <h3 className="font-display text-base mb-1">Download my data</h3>
+            <p className="text-xs text-muted-foreground font-body mb-4">
+              Get a JSON file with your profile, debates you created, live sessions you hosted,
+              your DMs, participations, and grades. Limited to one export per 7 days.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleExportData}
+              disabled={exporting}
+              className="font-body min-h-[40px]"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Download className="w-4 h-4 mr-1.5" />}
+              Download my data
+            </Button>
+          </section>
+
           {/* Danger zone */}
           <section className="mt-8 border border-destructive/30 rounded-lg p-5">
             <h3 className="font-display text-base mb-1 text-destructive">Delete account</h3>
             <p className="text-xs text-muted-foreground font-body mb-4">
-              Permanently remove your account, profile, debates you created, live sessions,
-              participations, and notifications. This cannot be undone.
+              Schedules your account for deletion. You have 30 days to sign back in and cancel.
+              After 30 days your profile is anonymized to "Former user" and your DMs are deleted;
+              your debates and live sessions are kept for the public record.
             </p>
             <Button
               type="button"
               variant="outline"
               onClick={() => { setConfirmDelete(true); setDeleteConfirmText(""); }}
+              disabled={pendingDeletion}
               className="font-body border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="w-4 h-4 mr-1.5" />
-              Delete my account
+              {pendingDeletion ? "Deletion pending" : "Delete my account"}
             </Button>
           </section>
         </motion.div>
@@ -444,10 +550,11 @@ const EditProfilePage = () => {
       <AlertDialog open={confirmDelete} onOpenChange={(o) => { setConfirmDelete(o); if (!o) setDeleteConfirmText(""); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogTitle>Schedule account deletion?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently deletes your profile and all debates, live sessions, participations,
-              and notifications tied to your account. Type <span className="font-semibold text-foreground">DELETE</span> to confirm.
+              You'll be signed out immediately. You have <span className="font-semibold text-foreground">30 days</span> to sign back in and cancel.
+              After that, your profile is anonymized and DMs are deleted; debates and live sessions you created remain public.
+              Type <span className="font-semibold text-foreground">DELETE</span> to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Input
@@ -464,7 +571,7 @@ const EditProfilePage = () => {
               disabled={deleting || deleteConfirmText !== "DELETE"}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete forever"}
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Schedule deletion"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -35,6 +35,7 @@ import ConnectionsPage from "./pages/ConnectionsPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import AdminTagsPage from "./pages/AdminTagsPage";
 import AdminCostsPage from "./pages/AdminCostsPage";
+import AdminDeletionReviewPage from "./pages/AdminDeletionReviewPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import MessagesPage from "./pages/MessagesPage";
@@ -80,6 +81,7 @@ const App = () => (
               <Route path="/profile/connections" element={<ProtectedRoute><ConnectionsPage /></ProtectedRoute>} />
               <Route path="/admin/tags" element={<ProtectedRoute><AdminTagsPage /></ProtectedRoute>} />
               <Route path="/admin/costs" element={<ProtectedRoute><AdminCostsPage /></ProtectedRoute>} />
+              <Route path="/admin/deletion-review" element={<ProtectedRoute><AdminDeletionReviewPage /></ProtectedRoute>} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />
