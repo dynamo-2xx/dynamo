@@ -47,7 +47,7 @@ const emptyForm = (): FormState => ({
 });
 
 const EditProfilePage = () => {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, session, profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -233,7 +233,6 @@ const EditProfilePage = () => {
   const handleExportData = async () => {
     setExporting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-account-data`;
       const res = await fetch(url, {
         method: "POST",
