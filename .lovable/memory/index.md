@@ -54,6 +54,11 @@
 - [Release §18 Cost Tracking & Spend](mem://product/release-criteria-section-18-cost-tracking) — Per-feature unit costs, founder spend dashboard, owns pricing-decision queue feeding §12
 - [Release §13 Error Handling & Offline](mem://product/release-criteria-section-13-error-handling) — Branded 404/500, indefinite live reconnect + host evict, read-only offline, toast+inline+retry
 - [Release §14 i18n & Localization](mem://product/release-criteria-section-14-i18n) — EN-only launch, mandatory t() wrapper, locale-aware data layer + AI/Deepgram routing, RTL deferred
+- [Release §15 Trust & Safety](mem://product/release-criteria-section-15-trust-safety) — Per-message reports, founder-run mod queue, 5-step sanctions ladder, appeals, civic-seal revocation, rate limits + image moderation
+- [Release §16 Email & Transactional Comms](mem://product/release-criteria-section-16-email) — Resend on mail.dynamo.today, SPF/DKIM/DMARC, 12 templates, weekly digest pg_cron, List-Unsubscribe + suppression list
+- [Release §17 Billing Operations](mem://product/release-criteria-section-17-billing-ops) — Stripe Checkout + Customer Portal, idempotent webhook, dunning ladder, Stripe Tax (EU OSS), no self-serve refunds
+- [Release §19 Backup & DR](mem://product/release-criteria-section-19-backup-dr) — RPO 24h / RTO 4h, Supabase PITR + weekly cold pg_dump to second-region S3, mandatory pre-launch restore drill, status subdomain
+- [Release §20 Legal & Compliance](mem://product/release-criteria-section-20-legal-compliance) — US entity required, lawyer-reviewed ToS/Privacy/DPA, EU data residency, 16+ age gate, GDPR/CCPA rights via export+delete
 - [§10 Analytics & Observability](mem://product/release-criteria-section-10-analytics) — PostHog events + KPIs, Sentry errors, email-only alerts
 - [§22 Clubs at launch](mem://product/release-criteria-section-22-clubs) — Owner/Admin/Member hierarchy, Featured/Local directory, all 3 event types + recurring, in-club event launch, admin-approval toggle
 - [Release Criteria — Content & Legal](mem://product/release-criteria-section-9-content-legal) — ToS inline acceptance, /seals transparency page, 30-day account deletion with anonymized contributions, per-message report queue
