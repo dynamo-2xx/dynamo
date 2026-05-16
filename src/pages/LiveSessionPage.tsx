@@ -27,6 +27,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
 import FloatingTranscript from "@/components/live/FloatingTranscript";
 import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
+import ShareDialog from "@/components/sharing/ShareDialog";
+import PauseButton from "@/components/sharing/PauseButton";
 
 const getDeviceId = () => {
   let id = localStorage.getItem("dyn_device_id");
@@ -625,6 +627,12 @@ const LiveSessionPage = () => {
           </div>
           <div className="flex items-center gap-2">
             <DisplayOptionsMenu prefs={prefs} update={updatePrefs} />
+            {sessionId && user && (
+              <>
+                <PauseButton kind="live" id={sessionId} isHost={true} />
+                <ShareDialog type="live_session" recordId={sessionId} isCreator={true} />
+              </>
+            )}
             <button
               onClick={handleEndSession}
               className="flex items-center gap-1.5 bg-destructive text-destructive-foreground px-3 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
