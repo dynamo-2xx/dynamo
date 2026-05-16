@@ -1,5 +1,6 @@
-// Edge function: deletes the calling user's account and all their data.
-// Auth: requires a valid Supabase JWT (verify_jwt = true via default config).
+// Edge function: soft-deletes the calling user's account (§19 flow).
+// Marks the profile pending_review; hard delete + anonymization happens after 30 days
+// via the anonymize-expired cron. User can cancel within the grace window.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -30,35 +31,26 @@ Deno.serve(async (req) => {
     }
     const userId = userRes.user.id;
 
-    // Service-role client for cascading data delete.
+    // Service-role client so RLS doesn't get in the way of the soft-delete flag.
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-
-    // Delete user-owned content. Order matters where FKs exist; most tables
-    // are not FK-linked but contain user_id columns we want to clear.
-    // We swallow individual table errors to avoid blocking account deletion.
-    const tableDeletes: Array<Promise<unknown>> = [
-      admin.from("connections").delete().or(`follower_id.eq.${userId},followed_id.eq.${userId}`),
-      admin.from("user_presence").delete().eq("user_id", userId),
-      admin.from("debate_invitations").delete().eq("invited_user_id", userId),
-      admin.from("debate_participants").delete().eq("user_id", userId),
-      admin.from("debate_grades").delete().eq("user_id", userId),
-      admin.from("live_sessions").delete().eq("created_by", userId),
-      admin.from("debate_templates").delete().eq("created_by", userId),
-      admin.from("debates").delete().eq("created_by", userId),
-      admin.from("profiles").delete().eq("user_id", userId),
-    ];
-    await Promise.allSettled(tableDeletes);
-
-    // Finally remove the auth user. Requires service role.
-    const { error: delErr } = await admin.auth.admin.deleteUser(userId);
-    if (delErr) {
-      return new Response(JSON.stringify({ error: delErr.message }), {
+    const now = new Date().toISOString();
+    const { error: updErr } = await admin
+      .from("profiles")
+      .update({
+        deleted_at: now,
+        deletion_initiated_at: now,
+        deletion_status: "pending_review",
+        is_public: false,
+      })
+      .eq("user_id", userId);
+    if (updErr) {
+      return new Response(JSON.stringify({ error: updErr.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, soft_deleted: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
