@@ -9,7 +9,7 @@ type: feature
 **Decisions locked by founder:**
 - Tracking depth: **Per-user cost attribution** — every AI call and Deepgram session writes a row tagged with `user_id` + `session_id`.
 - Alerts: **Budget + anomaly** — tiered alerts at 50/75/90/100% of monthly budget AND a daily-spike anomaly alert.
-- Monthly budget: **Editable in UI, default $200/month total** (Lovable Cloud + Lovable AI + Deepgram + Stripe fees combined). Single value, resets the 1st.
+- Monthly budget: **Per-source, editable in UI.** Defaults: Lovable AI **$100**, Deepgram **$60**, Lovable Cloud **$30**, Stripe fees **$10** → **$200 total**. Each resets the 1st.
 - Per-user cap: **None.** Rely on §15 rate limits to prevent abuse.
 - Dashboard access: **Hardcoded to founder's `user_id`** (not role-based). Single env var / constant.
 - Free vs Pro display: **Two separate tables side-by-side** on the same page.
@@ -63,6 +63,11 @@ Access check: server-side comparison `auth.uid() === FOUNDER_USER_ID`. Anyone el
 1. **Cost progress bar** — current month spend / editable budget (default $200). Inline pencil icon → modal to edit budget. Color shifts: green (<50%), amber (50–90%), red (>90%). Tooltip on hover shows exact $ and % of budget.
 2. **Revenue progress bar** — current month MRR / editable monthly goal. Inline pencil icon → modal to edit goal. Always green; shows $ collected and % of goal.
 
+**Per-source bars (stacked below the headline):**
+- 4 thin progress bars, one per source (AI / Deepgram / Cloud / Stripe), each with its own editable budget and the same green/amber/red color rule.
+- Headline total bar = sum of the 4 source budgets. Editing any source recomputes total live.
+- Alerts fire **per source** at 50/75/90/100% (so the email says "Deepgram at 90%"). One additional "total at 100%" sweep alert if the combined total hits ceiling.
+
 **Two-table row (Free | Pro, side-by-side):**
 | Free users table | Pro users table |
 |---|---|
@@ -77,7 +82,10 @@ Access check: server-side comparison `auth.uid() === FOUNDER_USER_ID`. Anyone el
 - "Export CSV" for accounting (separate exports per table).
 
 **Settings table** `founder_settings` (singleton row):
-- `monthly_budget_usd numeric` (default 200)
+- `budget_ai_usd numeric` (default 100)
+- `budget_speech_usd numeric` (default 60)
+- `budget_cloud_usd numeric` (default 30)
+- `budget_stripe_usd numeric` (default 10)
 - `monthly_revenue_goal_usd numeric` (default null — must be set first time)
 - `updated_at`
 - RLS: only `FOUNDER_USER_ID` can SELECT/UPDATE.
@@ -96,7 +104,6 @@ Access check: server-side comparison `auth.uid() === FOUNDER_USER_ID`. Anyone el
 - Forecasting / projection charts (just historical).
 - Multi-currency display.
 - Historical retention of past budgets/goals (current value only; if you change mid-month, the new value applies immediately and is what alerts fire against).
-- Per-source budget split (single total only).
 - Multi-admin access (hardcoded single founder).
 
 ## Acceptance checklist
