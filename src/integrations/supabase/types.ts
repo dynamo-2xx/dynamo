@@ -1555,6 +1555,7 @@ export type Database = {
           deletion_initiated_at: string | null
           deletion_status: string | null
           display_name: string | null
+          friend_code: string
           id: string
           is_public: boolean
           last_export_at: string | null
@@ -1575,6 +1576,7 @@ export type Database = {
           deletion_initiated_at?: string | null
           deletion_status?: string | null
           display_name?: string | null
+          friend_code: string
           id?: string
           is_public?: boolean
           last_export_at?: string | null
@@ -1595,6 +1597,7 @@ export type Database = {
           deletion_initiated_at?: string | null
           deletion_status?: string | null
           display_name?: string | null
+          friend_code?: string
           id?: string
           is_public?: boolean
           last_export_at?: string | null
@@ -2277,6 +2280,7 @@ export type Database = {
         }
         Returns: string
       }
+      generate_friend_code: { Args: never; Returns: string }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
