@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Loader2, MapPin, User as UserIcon, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, MapPin, User as UserIcon, Trash2, Download, AlertCircle } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +60,14 @@ const EditProfilePage = () => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [cancellingDeletion, setCancellingDeletion] = useState(false);
+
+  const pendingDeletion = (profile as any)?.deletion_status === "pending_review";
+  const deletedAt = (profile as any)?.deleted_at as string | null | undefined;
+  const daysLeft = deletedAt
+    ? Math.max(0, 30 - Math.floor((Date.now() - new Date(deletedAt).getTime()) / 86_400_000))
+    : null;
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -195,7 +203,10 @@ const EditProfilePage = () => {
       const { error } = await supabase.functions.invoke("delete-account");
       if (error) throw error;
       await supabase.auth.signOut();
-      toast({ title: "Account deleted" });
+      toast({
+        title: "Account scheduled for deletion",
+        description: "You have 30 days to sign back in to cancel.",
+      });
       navigate("/auth");
     } catch (err: any) {
       setDeleting(false);
@@ -204,6 +215,55 @@ const EditProfilePage = () => {
         description: err?.message ?? "Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleCancelDeletion = async () => {
+    setCancellingDeletion(true);
+    const { error } = await supabase.rpc("cancel_account_deletion");
+    setCancellingDeletion(false);
+    if (error) {
+      toast({ title: "Couldn't cancel deletion", description: error.message, variant: "destructive" });
+      return;
+    }
+    await refreshProfile();
+    toast({ title: "Deletion cancelled", description: "Your account is active again." });
+  };
+
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-account-data`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+      if (res.status === 429) {
+        const body = await res.json();
+        toast({ title: "Rate limited", description: body.message ?? "Try again later.", variant: "destructive" });
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Export failed");
+      }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `dynamo-export-${user?.id ?? "me"}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast({ title: "Export ready", description: "Your data download has started." });
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err?.message ?? "Try again.", variant: "destructive" });
+    } finally {
+      setExporting(false);
     }
   };
 
