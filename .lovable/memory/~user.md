@@ -16,3 +16,8 @@ If I say "ship it" without specifics, ask which format (debate / live / cmm / cl
 Use the task tracker for any sprint with more than 2 distinct deliverables.
 # Explanation style
 Prefer user-story explanations ("As a [role] I want [action] so that [outcome]") when clarifying product rules or trigger conditions.
+
+# Spec & memory writing — ask before deciding
+Before writing any release-criteria, product-spec, or "definition" memory, ask me the open decisions first (via ask_questions, max 4 at a time).
+Never assume defaults silently. If you guess, label it "GUESS — confirm?" inline and stop.
+When you propose anything, separate "what you decided" from "what you assumed" in the response.
