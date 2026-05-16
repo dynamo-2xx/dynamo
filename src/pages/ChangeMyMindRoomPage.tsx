@@ -17,6 +17,8 @@ import { useMicPolicy } from "@/hooks/useMicPolicy";
 import { takeHandoffStream } from "@/lib/micHandoff";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
+import ShareDialog from "@/components/sharing/ShareDialog";
+import PauseButton from "@/components/sharing/PauseButton";
 
 interface DebateRow {
   id: string;
@@ -309,6 +311,10 @@ const ChangeMyMindRoomPage = () => {
             {debate.is_public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
           </div>
           <h1 className="font-display text-2xl sm:text-3xl leading-tight">{debate.topic}</h1>
+          <div className="flex items-center gap-2 pt-1">
+            <PauseButton kind="debate" id={debate.id} isHost={isOwner} />
+            <ShareDialog type="change_my_mind" recordId={debate.id} isCreator={isOwner} />
+          </div>
           {ownerSide && (
             <div className="rounded-xl border border-foreground/30 bg-foreground/[0.02] p-3">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Owner's position</div>
