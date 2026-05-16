@@ -1,6 +1,6 @@
 ---
 name: Release §18 Cost Tracking
-description: Per-user cost attribution, $200/mo budget, tiered + anomaly alerts, no per-user cap.
+description: Founder dashboard with Free/Pro tables, editable budget + revenue goal, per-user attribution, tiered + anomaly alerts, no per-user cap.
 type: feature
 ---
 
@@ -9,8 +9,11 @@ type: feature
 **Decisions locked by founder:**
 - Tracking depth: **Per-user cost attribution** — every AI call and Deepgram session writes a row tagged with `user_id` + `session_id`.
 - Alerts: **Budget + anomaly** — tiered alerts at 50/75/90/100% of monthly budget AND a daily-spike anomaly alert.
-- Monthly budget: **$200/month total** (Lovable Cloud + Lovable AI + Deepgram + Stripe fees combined).
+- Monthly budget: **Editable in UI, default $200/month total** (Lovable Cloud + Lovable AI + Deepgram + Stripe fees combined). Single value, resets the 1st.
 - Per-user cap: **None.** Rely on §15 rate limits to prevent abuse.
+- Dashboard access: **Hardcoded to founder's `user_id`** (not role-based). Single env var / constant.
+- Free vs Pro display: **Two separate tables side-by-side** on the same page.
+- Revenue goal: **Single editable monthly number, resets the 1st.** No historical retention of past goals.
 
 **Assumed by me (challenge any):**
 - That you accept the **abuse risk** of no per-user cap — a determined user hitting rate limits at the ceiling all month could theoretically rack up tens of dollars in AI + Deepgram costs alone. §15 limits (DMs 30/min, reports 10/hr, signup 5/IP/day) don't directly cap AI or speech calls. Worth a follow-up later if budget keeps blowing.
@@ -53,11 +56,31 @@ Four cost sources, one unified daily snapshot:
 All alerts use `cost_alert` template (§16 essential bucket — founder always receives).
 
 ## /admin/costs page (founder-only, gated by `is_admin`)
-- Header: current month spend / $200 budget with progress bar.
-- 30-day stacked area chart: 4 sources color-coded.
-- Top 20 users table: name, 30d spend, AI:Speech:Other split, last active.
-- Anomaly log: any spike alerts fired in the last 30 days.
-- "Export CSV" for accounting.
+## /admin/costs page (founder-only, gated by hardcoded `FOUNDER_USER_ID`)
+Access check: server-side comparison `auth.uid() === FOUNDER_USER_ID`. Anyone else → 404 (not 403, don't reveal existence).
+
+**Header row (two progress bars, side-by-side):**
+1. **Cost progress bar** — current month spend / editable budget (default $200). Inline pencil icon → modal to edit budget. Color shifts: green (<50%), amber (50–90%), red (>90%). Tooltip on hover shows exact $ and % of budget.
+2. **Revenue progress bar** — current month MRR / editable monthly goal. Inline pencil icon → modal to edit goal. Always green; shows $ collected and % of goal.
+
+**Two-table row (Free | Pro, side-by-side):**
+| Free users table | Pro users table |
+|---|---|
+| All users where `subscription_status = 'free'` | All users where `subscription_status IN ('pro_active','pro_past_due','pro_grace')` |
+| Sorted by 30d spend desc | Sorted by 30d spend desc |
+| Cols: name, 30d spend, AI calls, Speech minutes, debate count, live count, last active | Same cols + MRR contribution column |
+| Pagination 25/page | Pagination 25/page |
+
+**Other widgets below:**
+- 30-day stacked area chart: 4 cost sources color-coded.
+- Anomaly log: spike alerts fired in last 30 days.
+- "Export CSV" for accounting (separate exports per table).
+
+**Settings table** `founder_settings` (singleton row):
+- `monthly_budget_usd numeric` (default 200)
+- `monthly_revenue_goal_usd numeric` (default null — must be set first time)
+- `updated_at`
+- RLS: only `FOUNDER_USER_ID` can SELECT/UPDATE.
 
 ## Cron jobs
 - **Daily snapshot** (pg_cron 00:10 UTC): rolls yesterday's per-call logs into one `daily_costs` row.
@@ -72,6 +95,9 @@ All alerts use `cost_alert` template (§16 essential bucket — founder always r
 - Per-feature P&L breakdowns.
 - Forecasting / projection charts (just historical).
 - Multi-currency display.
+- Historical retention of past budgets/goals (current value only; if you change mid-month, the new value applies immediately and is what alerts fire against).
+- Per-source budget split (single total only).
+- Multi-admin access (hardcoded single founder).
 
 ## Acceptance checklist
 - All 4 cost sources writing to their respective tables; verified by spot-checking 24h of `ai_usage_log` rows after a test session.
