@@ -12,6 +12,7 @@ import {
 import { useAllTags } from "@/hooks/useTags";
 import DebateCoverCard from "@/components/home/DebateCoverCard";
 import { cn } from "@/lib/utils";
+import LegalFooter from "@/components/legal/LegalFooter";
 
 type ChipId = "all" | "live" | "today" | "latest" | `tag:${string}`;
 
@@ -132,6 +133,7 @@ const ExplorePage = () => {
           )}
         </motion.div>
       </div>
+      <LegalFooter />
     </AppLayout>
   );
 };
