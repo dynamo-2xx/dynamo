@@ -38,6 +38,8 @@ import AdminCostsPage from "./pages/AdminCostsPage";
 import AdminDeletionReviewPage from "./pages/AdminDeletionReviewPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
+import GuidelinesPage from "./pages/GuidelinesPage";
+import SubprocessorsPage from "./pages/SubprocessorsPage";
 import MessagesPage from "./pages/MessagesPage";
 import MyStudyPage from "./pages/MyStudyPage";
 import MyStudyDetailPage from "./pages/MyStudyDetailPage";
@@ -117,6 +119,8 @@ const App = () => (
               <Route path="/debate/:id/edit" element={<ProtectedRoute><DebateEditArgumentsPage /></ProtectedRoute>} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/guidelines" element={<GuidelinesPage />} />
+              <Route path="/legal/subprocessors" element={<SubprocessorsPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

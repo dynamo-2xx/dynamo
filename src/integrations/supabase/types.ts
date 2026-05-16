@@ -1524,6 +1524,8 @@ export type Database = {
           last_export_at: string | null
           location: string | null
           role: Database["public"]["Enums"]["app_role"]
+          tos_accepted_at: string | null
+          tos_version: string | null
           updated_at: string
           user_id: string
         }
@@ -1542,6 +1544,8 @@ export type Database = {
           last_export_at?: string | null
           location?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          tos_accepted_at?: string | null
+          tos_version?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1560,6 +1564,8 @@ export type Database = {
           last_export_at?: string | null
           location?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          tos_accepted_at?: string | null
+          tos_version?: string | null
           updated_at?: string
           user_id?: string
         }

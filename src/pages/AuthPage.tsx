@@ -16,6 +16,7 @@ const AuthPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [tosAccepted, setTosAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -26,6 +27,10 @@ const AuthPage = () => {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "signup" && !tosAccepted) {
+      toast.error("Please accept the Terms and Privacy Policy to continue");
+      return;
+    }
     setLoading(true);
     try {
       if (mode === "signup") {
@@ -35,6 +40,12 @@ const AuthPage = () => {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
+        if (data.user) {
+          await supabase
+            .from("profiles")
+            .update({ tos_accepted_at: new Date().toISOString(), tos_version: "2026-05-16" })
+            .eq("user_id", data.user.id);
+        }
         if (data.session) {
           navigate(redirectTo || "/onboarding");
         } else {
@@ -53,6 +64,10 @@ const AuthPage = () => {
   };
 
   const handleGoogleAuth = async () => {
+    if (mode === "signup" && !tosAccepted) {
+      toast.error("Please accept the Terms and Privacy Policy to continue");
+      return;
+    }
     const safeRedirect = redirectTo && redirectTo.startsWith("/") ? redirectTo : "";
     const target = `${window.location.origin}${safeRedirect}`;
     const { error } = await lovable.auth.signInWithOAuth("google", {
@@ -134,6 +149,23 @@ const AuthPage = () => {
             </button>
           </form>
 
+          {mode === "signup" && (
+            <label className="flex items-start gap-2 mt-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={tosAccepted}
+                onChange={(e) => setTosAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+              />
+              <span className="text-[11px] text-muted-foreground leading-relaxed">
+                I agree to the{" "}
+                <Link to="/terms" className="underline hover:text-foreground">Terms</Link>,{" "}
+                <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>, and{" "}
+                <Link to="/guidelines" className="underline hover:text-foreground">Community Guidelines</Link>.
+              </span>
+            </label>
+          )}
+
           <p className="text-xs text-muted-foreground text-center mt-4">
             {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
@@ -144,12 +176,14 @@ const AuthPage = () => {
             </button>
           </p>
 
-          <p className="text-[11px] text-muted-foreground text-center mt-6">
-            By continuing, you agree to our{" "}
-            <Link to="/terms" className="underline hover:text-foreground transition-colors">Terms</Link>{" "}
-            and{" "}
-            <Link to="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
-          </p>
+          {mode === "login" && (
+            <p className="text-[11px] text-muted-foreground text-center mt-6">
+              By continuing, you agree to our{" "}
+              <Link to="/terms" className="underline hover:text-foreground transition-colors">Terms</Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
+            </p>
+          )}
         </div>
       </motion.div>
     </div>

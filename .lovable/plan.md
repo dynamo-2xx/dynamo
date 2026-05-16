@@ -1,89 +1,40 @@
-# §18 Founder Cost Dashboard — Implementation Plan
+## §20 — Legal & Compliance (v1)
 
-## What we're building
-A founder-only `/admin/costs` page with per-source budget tracking, revenue goal, Free/Pro user attribution tables, and stacked progress bars. Gated by hardcoded `FOUNDER_USER_ID`.
+Ship template legal pages so the app is presentable for public/published use. Not legal advice — every page carries a "template, replace before commercial launch" banner.
 
-## Database changes (migration)
-1. **`founder_settings`** (singleton)
-   - `budget_ai_usd` (default 100), `budget_speech_usd` (60), `budget_cloud_usd` (30), `budget_stripe_usd` (10)
-   - `monthly_revenue_goal_usd` (nullable)
-   - `updated_at`
-   - RLS: only FOUNDER_USER_ID can SELECT/UPDATE
+### Decisions locked
+- **Jurisdiction**: USA, Delaware governing law (standard startup default)
+- **Contact**: `privacy@dynamo.today` (placeholder — set up email forwarding later)
+- **Copy**: AI-drafted templates, CCPA-aware, AI disclosure included, marked as template
+- **Skipped**: cookie consent banner, imprint (not required in US)
 
-2. **`ai_usage_log`** (per-call ledger)
-   - `user_id`, `session_id`, `function_name`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `created_at`
-   - Admin-only RLS
+### New routes
+- `/terms` — Terms of Service
+- `/privacy` — Privacy Policy (references §19 export/delete flow)
+- `/guidelines` — Community Guidelines (debate conduct, harassment, moderation)
+- `/legal/subprocessors` — Subprocessors list (Lovable Cloud, Lovable AI Gateway, Deepgram, Web Push providers)
 
-3. **`speech_usage_log`** (per-session ledger)
-   - `user_id`, `session_id`, `minutes`, `cost_usd`, `created_at`
-   - Admin-only RLS
+### Components
+- `LegalLayout.tsx` — shared wrapper: max-w prose, Instrument Serif h1, DM Sans body, "Last updated" date, "Template — not legal advice" callout at top
+- `LegalFooter.tsx` — discreet footer rendered on public pages (landing, auth, explore) with ToS / Privacy / Guidelines / Subprocessors links + © year
+- Mount footer in public layouts only — do not pollute the debate-room `h-screen` views
 
-4. **`daily_costs`** (rolled-up daily snapshot)
-   - `date`, `source` (ai|speech|cloud|stripe), `cost_usd`, `created_at`
-   - Admin-only RLS
+### Signup consent (#5)
+- Add required checkbox to auth signup form: "I agree to the [Terms](/terms) and [Privacy Policy](/privacy)"
+- Block submit until checked
+- On successful signup, write `tos_accepted_at` + `tos_version` to `profiles`
+- Migration adds those two columns (default null; trigger backfills nothing — existing users prompted on next login via a lightweight modal — **optional, ask before adding**)
 
-5. **`cost_alerts`** (deduplication log)
-   - `alert_type`, `threshold`, `fired_at`
-   - Admin-only RLS
+### Acceptance criteria
+- All 4 pages render at their routes, no console errors
+- Footer visible on `/`, `/auth`, `/explore`; hidden in debate/live rooms
+- New signups cannot complete without checking the consent box
+- `profiles.tos_accepted_at` populated for new signups
+- All pages carry the "template" banner
 
-## Edge functions
-- `log-ai-usage` — called by existing functions (ai-facilitator, analyze-transcript, record-qa, consolidate-notebook, detect-cross-refs) to write `ai_usage_log` rows
-- `log-speech-usage` — called on Deepgram session end to write `speech_usage_log`
-- `export-account-data` — built in §19 (out of scope for this plan)
-
-## Frontend
-- New page: `src/pages/AdminCostsPage.tsx`
-- Route: `/admin/costs` in `App.tsx`
-- Guard: 404 if `auth.uid() !== FOUNDER_USER_ID`
-
-**Layout:**
-```
-Top row (side-by-side):
-  [Cost progress bar]  [Revenue progress bar]
-    - Editable budgets via inline pencil → modal
-    - Color: green (<50%), amber (50-90%), red (>90%)
-
-Stacked below:
-  [AI bar] [Speech bar] [Cloud bar] [Stripe bar]
-    - Each editable, same color rule
-    - Total = sum of 4 sources
-
-Two-table row (side-by-side):
-  | Free Users              | Pro Users                |
-  | name, 30d spend,        | name, 30d spend,         |
-  | AI calls, speech min,   | AI calls, speech min,    |
-  | debates, live, last     | debates, live, last, MRR |
-  | active                  | contribution             |
-  | Pagination 25/page      | Pagination 25/page       |
-
-Below tables:
-  - 30-day stacked area chart (4 sources)
-  - Anomaly log (last 30 days)
-  - Export CSV buttons (per table)
-```
-
-## Wiring existing functions
-- `ai-facilitator` → POST to `log-ai-usage` with token/cost data
-- `analyze-transcript` → same
-- `record-qa` → same
-- `deepgram-token` → on mint, log session start; on session end, POST to `log-speech-usage`
-
-## Cron jobs (out of scope for code, just schema)
-- `daily_costs` rollup at 00:10 UTC
-- Budget check at 00:15 UTC
-- Anomaly check at 23:55 UTC
-- These will be configured in a follow-up after the schema is live
-
-## Acceptance criteria
-- `/admin/costs` renders without console errors
-- Non-founder gets 404
-- Budget editing saves and recomputes bars live
-- Free/Pro tables populate from real usage data
-
-## Not in this plan
-- Per-user cost caps (founder chose none)
-- Real-time dashboard (daily snapshot only)
-- Cost-aware model routing
-- Forecasting charts
-- §19 export edge function or deletion flow
-- §20 legal pages
+### Not in this plan
+- Cookie banner (skipped)
+- Imprint (skipped)
+- Existing-user reconsent modal (will ask separately)
+- Real lawyer review (you'll do post-profitability)
+- DPA download for Education tier (deferred until first edu customer)
