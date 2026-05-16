@@ -13,6 +13,7 @@ Default to Plan mode for anything touching more than 3 files.
 Default to Build mode for single-file fixes.
 Always run a security scan after touching any table or RLS policy.
 If I say "ship it" without specifics, ask which format (debate / live / cmm / clubs / study) I mean.
+If I reply with only a section number (e.g. "19") or "ready", treat it as selecting scope / continuing questions, not permission to implement. Ask before building.
 Use the task tracker for any sprint with more than 2 distinct deliverables.
 # Explanation style
 Prefer user-story explanations ("As a [role] I want [action] so that [outcome]") when clarifying product rules or trigger conditions.
