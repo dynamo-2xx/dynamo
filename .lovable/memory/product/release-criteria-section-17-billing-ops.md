@@ -1,78 +1,83 @@
 ---
-name: Release §17 Billing Operations
-description: Stripe webhooks, dunning, receipts, refunds, proration, tax — the operational layer under §12 pricing.
+name: Release §17 Billing & Payments Ops
+description: Pro tier live at launch on Lovable built-in Stripe, monthly-only, smart retries then downgrade.
 type: feature
 ---
 
-# §17 — Billing Operations
+# §17 — Billing & Payments Ops
 
-Scope boundary: **§12** owns tiers, prices, paywall surfaces, caps. **§18** owns unit costs and pricing inputs. **§17** owns everything that happens *after* a user clicks "Subscribe" — the plumbing that keeps Stripe + our DB in sync.
+**Decisions locked by founder:**
+- Pro tier is **live at launch** (waitlist-off requires working billing).
+- Payments: **Lovable built-in Stripe** — no separate Stripe account, no API key to manage.
+- Pricing model: **Monthly only.** No annual, no trial, no founding-member tier at launch.
+- Failed payment: **Smart retries, then downgrade to Free.** Account + data preserved; just lose Pro limits.
 
-## Stripe integration
-- **Stripe Checkout** (hosted) for subscription start. No custom card form at launch (PCI scope = SAQ-A).
-- **Stripe Customer Portal** for plan changes, payment-method updates, cancellation, invoice history. Single button in `/settings/billing` opens portal session.
-- Pro = single monthly recurring price (set by §12). Edu/Civic = sales-led, manual invoicing via Stripe Invoicing (no Checkout flow at launch).
+**Still open — flagged for you:**
+- **Exact monthly price (e.g. $8/mo, $12/mo, $20/mo).** I refuse to guess. Decide before stripe products are created.
+- **What Pro unlocks vs Free.** §12 Monetization memory has draft tier limits but you've never confirmed them with me. Recommend a fresh ask_questions pass on §12 before §17 ships.
 
-## Webhook handler
-- Edge function `stripe-webhook` (verify_jwt = false, signature-verified via `STRIPE_WEBHOOK_SECRET`).
-- Idempotent: every event upserted into `stripe_events` by `event.id` before processing; replays no-op.
-- Events handled:
-  - `checkout.session.completed` → upgrade `profiles.tier` to `pro`, set `pro_since`, send `payment_receipt` email.
-  - `customer.subscription.updated` → mirror status (`active`/`past_due`/`canceled`) into `profiles.subscription_status`.
-  - `customer.subscription.deleted` → downgrade tier to `free` at period end; preserve content (no immediate cap enforcement on existing assets).
-  - `invoice.payment_succeeded` → log to `billing_events`, email receipt.
-  - `invoice.payment_failed` → kick off dunning (below).
-  - `charge.refunded` → log; if full refund + within 7d of upgrade, downgrade immediately.
-- All handlers complete <2s or enqueue follow-up; webhook returns 200 quickly to avoid Stripe retries.
+## Provider setup
+- Enable via `payments--enable_stripe_payments` (Lovable-managed Stripe). Test mode immediately; live mode after Lovable account claim.
+- No `STRIPE_SECRET_KEY` secret needed in this project.
+- Domain link: `dynamo.today` (root) added to Stripe Checkout allowed origins.
 
-## Data model
-- `profiles.tier` enum: `free | pro | education | civic`.
-- `profiles.stripe_customer_id`, `profiles.subscription_status`, `profiles.current_period_end`.
-- `stripe_events` — id (Stripe event id, PK), type, payload jsonb, processed_at.
-- `billing_events` — append-only user-facing log: user_id, kind, amount_cents, currency, invoice_url, created_at. Surfaced in `/settings/billing` history.
+## Product catalog (to create after enable)
+- ONE recurring product: "Dynamo Pro" — monthly recurring.
+- Price: **TBD (founder must decide before product creation).**
+- Tax: full compliance handling (Stripe acts as merchant of record) — assuming US digital service eligibility. Confirm at enable time.
 
-## Dunning (failed payment)
-- Day 0: email `payment_failed` + in-app banner "Update payment method" linking to portal.
-- Day 3: second email + push notification.
-- Day 7: third email, "Subscription will lapse in 24h".
-- Day 8: Stripe cancels (smart retries exhausted) → `subscription.deleted` → downgrade.
-- During `past_due`: Pro features stay on (grace period).
+## Checkout flow (user stories)
+- As a free user hitting a Pro-gated action, I want a clear upsell card explaining what Pro unlocks and a one-tap "Upgrade" button so I can subscribe in <30 seconds.
+- As a checkout user, I want to land on Stripe Checkout (Lovable-managed), pay, and be returned to the in-app page that triggered the upgrade — not a generic /success page.
+- As a Pro user, I want a "Manage subscription" link in `/settings/billing` that opens the Stripe Customer Portal so I can update card, view invoices, or cancel.
 
-## Refunds
-- No self-serve refunds at launch. Founder issues from Stripe dashboard.
-- Policy in ToS: 7-day no-questions-asked on first Pro charge; case-by-case after.
-- `charge.refunded` webhook handles downgrade if applicable.
+## Subscription state machine
+- `profiles.subscription_status`: `free` | `pro_active` | `pro_past_due` | `pro_canceled` | `pro_grace`.
+- Status transitions driven by Stripe webhooks (handled by Lovable's built-in webhook → mirrored into our table):
+  - `checkout.session.completed` → `pro_active`.
+  - `invoice.payment_failed` → `pro_past_due` (still has Pro access during retry window).
+  - `invoice.payment_succeeded` after past_due → back to `pro_active`.
+  - End of retry window (Stripe smart retries: 4 attempts over 21 days by default) → `pro_canceled` → downgrade to `free`.
+  - User-initiated cancel → remains `pro_active` until `current_period_end`, then `free`.
 
-## Proration
-- Stripe default: prorate on plan changes. At launch there's only one Pro tier so this only matters for cancellations mid-period (no refund, access until `current_period_end`).
+## Failed-payment policy (Smart retries then downgrade — locked)
+- Use Stripe's default smart-retry schedule (4 attempts, escalating intervals over ~21 days).
+- **Emails sent during this window (§16 essential, override unsubscribe):**
+  - Day 0 (first fail): `payment_failed` — "Your card was declined. We'll try again in 3 days."
+  - Day 7: reminder — "Second attempt failed. Update your card in Settings → Billing."
+  - Day 18: final warning — "Last attempt in 3 days. After that you'll move to the Free plan."
+  - Day 21 (downgrade): `subscription_downgraded` — "Your card couldn't be charged. You're on Free now. Your account + data are safe."
+- **In-app banner during past_due:** yellow strip on every page, "Payment issue — update your card", deeplink to Stripe Portal.
+- **No suspension, no data loss.** Downgrade only enforces Pro-gated feature limits.
 
-## Tax
-- Stripe Tax enabled. Auto-collects VAT for EU, GST for AU/IN/CA, US sales tax for required nexus states.
-- Customer enters billing address in Checkout; Stripe handles registration thresholds.
-- Tax IDs collectible in Customer Portal for B2B EU customers (reverse charge).
-- Founder must register for EU OSS before any EU sale clears — gate flagged in launch checklist.
+## Tax & invoicing
+- Receipts: Stripe sends automatically on every successful charge. Branded with `mail.dynamo.today` sender (§16 `payment_receipt`).
+- Tax handling: Stripe full-compliance mode (charges + remits on founder's behalf where eligible).
+- Refunds: **Not self-serve.** User emails `billing@mail.dynamo.today`, founder issues via Stripe dashboard. No refund window committed in ToS at launch.
 
-## Receipts & invoices
-- Stripe-hosted receipts for every successful charge (link in `payment_receipt` email + `/settings/billing`).
-- Edu/Civic: PDF invoices from Stripe Invoicing, NET-30 terms.
-
-## Secrets
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID` (test + live pairs via environment).
+## Settings → Billing page (must exist before waitlist-off)
+- Shows: current plan, status, next renewal date (if pro_active), payment method last 4 digits, "Manage in Stripe Portal" link, list of past invoices (link out).
+- Free user: shows Pro feature list + "Upgrade" CTA.
+- Past-due: red banner with "Update payment" CTA.
 
 ## Out of scope at launch
-- Annual plans (deferred to post-launch; §12 may green-light earlier).
-- Coupons / promo codes (Stripe supports, but no UI surface).
-- Team/org billing (Edu uses manual seat invoicing).
-- Crypto / alt payment methods.
-- Self-serve refund button.
-- Currency switching (USD only at launch).
-- Affiliate / referral payouts (referral *credits* live in §11, not cash).
+- Annual plan (revisit at 3 months if monthly churn signal is strong).
+- Free trial period.
+- Team / multi-seat Pro.
+- Discounts / coupons / referral credits.
+- Education and Civic tiers (mentioned in §12 — separate product, post-launch).
+- Self-serve refunds.
+- Proration on mid-cycle plan changes (no plan changes exist at launch — monthly only).
+- In-app receipt history (link out to Stripe Portal).
 
 ## Acceptance checklist
-- Test-mode Checkout → upgrade → portal cancel → downgrade at period end, all reflected in `profiles.tier`.
-- Webhook signature rejection on tampered payload.
-- Idempotent replay of `checkout.session.completed` does not double-charge tier flag or re-send receipt.
-- Failed-payment dunning sequence fires on simulated `invoice.payment_failed`.
-- Stripe Tax shows VAT line for EU test address.
-- `/settings/billing` shows correct status + opens Customer Portal.
-- Refund in Stripe dashboard logs `billing_events` row and (if within 7d) downgrades.
+- `enable_stripe_payments` complete, test mode confirmed working with test card 4242…
+- ONE Pro product created at decided monthly price.
+- Checkout flow round-trips: free user → upgrade → Stripe Checkout → returns to triggering page → status flips to `pro_active` within 30s.
+- Stripe Customer Portal accessible from `/settings/billing`.
+- Webhook handlers update `profiles.subscription_status` on all 4 lifecycle events; verified via test events.
+- Payment-failed simulation triggers all 4 emails on schedule.
+- Past-due banner renders sitewide while in that state.
+- Downgrade enforces Free-tier limits (per §12) within 1 minute of state change.
+- Tax displayed correctly on test checkout for US, UK, DE buyers.
+- Refund flow documented in `docs/billing-runbook.md` for founder.
