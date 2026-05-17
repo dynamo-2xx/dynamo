@@ -8,6 +8,8 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import OfflineBanner from "@/components/OfflineBanner";
+import InstallAppChip from "@/components/InstallAppChip";
+import { LiveRegionProvider } from "@/components/a11y/LiveRegion";
 import Index from "./pages/Index";
 import ExplorePage from "./pages/ExplorePage";
 import ExploreDebateDetailPage from "./pages/ExploreDebateDetailPage";
@@ -68,10 +70,12 @@ const App = () => (
     <ThemeProvider>
       <AuthProvider>
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <OfflineBanner />
-          <ErrorBoundary>
+          <LiveRegionProvider>
+            <Toaster />
+            <Sonner />
+            <OfflineBanner />
+            <InstallAppChip />
+            <ErrorBoundary>
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -130,7 +134,8 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-          </ErrorBoundary>
+            </ErrorBoundary>
+          </LiveRegionProvider>
         </TooltipProvider>
       </AuthProvider>
     </ThemeProvider>
