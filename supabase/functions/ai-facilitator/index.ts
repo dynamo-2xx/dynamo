@@ -537,6 +537,17 @@ Grade this speaker using the grade_final tool.`;
 
     const data = await response.json();
 
+    // §18 cost tracking — fire-and-forget
+    try {
+      const { logAiUsage } = await import("../_shared/usage.ts");
+      logAiUsage({
+        function_name: "ai-facilitator",
+        model: "google/gemini-3-flash-preview",
+        usage: (data as any).usage,
+        user_id: userData.user.id,
+      });
+    } catch (_) {}
+
     // Extract tool call result
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall) {
