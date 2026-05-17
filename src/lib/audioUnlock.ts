@@ -44,3 +44,33 @@ export async function playUnlocked(src: string) {
     await a.play();
   } catch {}
 }
+
+/**
+ * §8 — Celebration / grace chime. Synthesized in WebAudio so it ships with no
+ * binary asset. Two short ascending tones (C5 → G5) with soft envelope.
+ */
+export async function playChime(kind: "celebration" | "grace" = "celebration") {
+  if (!unlocked) return;
+  try {
+    const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    if (!ctx || ctx.state === "closed") ctx = new AC();
+    if (ctx.state === "suspended") await ctx.resume();
+    const now = ctx.currentTime;
+    const notes = kind === "celebration" ? [523.25, 659.25, 783.99] : [659.25, 523.25];
+    notes.forEach((freq, i) => {
+      const o = ctx!.createOscillator();
+      const g = ctx!.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      const t0 = now + i * 0.14;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+      o.connect(g);
+      g.connect(ctx!.destination);
+      o.start(t0);
+      o.stop(t0 + 0.34);
+    });
+  } catch {}
+}

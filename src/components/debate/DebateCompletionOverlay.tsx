@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { Trophy, Clock, MessageSquare, Home, Award } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { playChime } from "@/lib/audioUnlock";
 
 interface DebateCompletionOverlayProps {
   topic: string;
@@ -22,6 +24,10 @@ const DebateCompletionOverlay = ({
   onDismiss,
 }: DebateCompletionOverlayProps) => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    playChime("celebration");
+  }, []);
 
   const editHoursLeft = editWindowEndsAt
     ? Math.max(0, Math.round((new Date(editWindowEndsAt).getTime() - Date.now()) / (1000 * 60 * 60)))

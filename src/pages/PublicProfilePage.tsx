@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFollowMutations, useMyPendingRequests } from "@/hooks/useConnections";
 import { toast } from "sonner";
+import { useDocumentMeta } from "@/hooks/useDocumentMeta";
+import ReportButton from "@/components/ReportButton";
 
 interface PublicProfile {
   user_id: string;
@@ -80,6 +82,20 @@ const PublicProfilePage = () => {
   }, [pendingIds, userId]);
 
   const isMe = user?.id === userId;
+
+  useDocumentMeta(
+    profile
+      ? {
+          title: `${profile.display_name ?? "Profile"} — Dynamo`,
+          description: profile.affiliation
+            ? `${profile.display_name ?? "User"} on Dynamo · ${profile.affiliation}`
+            : `${profile.display_name ?? "User"} on Dynamo. Bring people to the power.`,
+          image: profile.avatar_url ?? undefined,
+          type: "profile",
+          canonical: typeof window !== "undefined" ? `${window.location.origin}/u/${userId}` : undefined,
+        }
+      : { title: "Profile — Dynamo" }
+  );
 
   const handleFollow = async () => {
     if (!userId || !user) {
@@ -158,17 +174,20 @@ const PublicProfilePage = () => {
                 )}
               </div>
               {!isMe && (
-                <button
-                  onClick={handleFollow}
-                  className={`px-4 py-2 rounded-md text-sm font-body inline-flex items-center gap-1.5 transition-colors ${
-                    following || requested
-                      ? "border border-border text-foreground hover:border-foreground/30"
-                      : "bg-foreground text-background hover:opacity-90"
-                  }`}
-                >
-                  {requested ? <Clock className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
-                  {following ? "Following" : requested ? "Requested" : profile.is_public ? "Follow" : "Request to follow"}
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleFollow}
+                    className={`px-4 py-2 rounded-md text-sm font-body inline-flex items-center gap-1.5 transition-colors ${
+                      following || requested
+                        ? "border border-border text-foreground hover:border-foreground/30"
+                        : "bg-foreground text-background hover:opacity-90"
+                    }`}
+                  >
+                    {requested ? <Clock className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
+                    {following ? "Following" : requested ? "Requested" : profile.is_public ? "Follow" : "Request to follow"}
+                  </button>
+                  {userId && <ReportButton target={{ targetType: "profile", targetId: userId }} />}
+                </div>
               )}
             </div>
 
