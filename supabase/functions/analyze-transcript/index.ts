@@ -143,6 +143,10 @@ serve(async (req) => {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const { logAiUsage } = await import("../_shared/usage.ts");
+    const logUse = (model: string, usage: any) => {
+      try { logAiUsage({ function_name: "analyze-transcript", model, usage }); } catch (_) {}
+    };
 
     const { transcriptChunk, existingMap, sides, currentSubtopic, speakerSide, mode, fullTranscript, subtopic, entries, previous_subtopics } = await req.json();
 
