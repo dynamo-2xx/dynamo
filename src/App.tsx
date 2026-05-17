@@ -62,6 +62,8 @@ import ClubEditPage from "./pages/ClubEditPage";
 import CreateClubEventPage from "./pages/CreateClubEventPage";
 import ClubEventDetailPage from "./pages/ClubEventDetailPage";
 import ShareClaimPage from "./pages/ShareClaimPage";
+import PricingPage from "./pages/PricingPage";
+import ContactSalesPage from "./pages/ContactSalesPage";
 
 const queryClient = new QueryClient();
 
