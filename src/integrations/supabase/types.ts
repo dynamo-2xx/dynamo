@@ -2272,6 +2272,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      evict_live_participant: {
+        Args: { _device_id: string; _session_id: string }
+        Returns: undefined
+      }
       fork_record_for_user: {
         Args: {
           _id: string
