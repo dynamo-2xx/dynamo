@@ -7,11 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
-import { TIER_LABELS } from "@/lib/tiers";
+import { TIER_LABEL } from "@/lib/tiers";
 
 export default function SettingsBillingPage() {
   const { user } = useAuth();
-  const { tier, subscription } = useSubscription();
+  const { tier, sub } = useSubscription();
   const [events, setEvents] = useState<any[]>([]);
 
   useDocumentMeta({ title: "Billing · Dynamo", description: "Manage your Dynamo subscription and view payment history." });
@@ -22,7 +22,7 @@ export default function SettingsBillingPage() {
       .then(({ data }) => setEvents(data ?? []));
   }, [user]);
 
-  const status = subscription?.status ?? "free";
+  const status = (sub as any)?.status ?? "free";
   const isPastDue = status === "pro_past_due";
 
   return (
@@ -41,7 +41,7 @@ export default function SettingsBillingPage() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Current plan</div>
-            <div className="font-display text-2xl">{TIER_LABELS[tier]}</div>
+            <div className="font-display text-2xl">{TIER_LABEL[tier]}</div>
           </div>
           <Badge variant="secondary">{status}</Badge>
         </div>
