@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.enforce_report_rate_limit() FROM PUBLIC, anon; REVOKE EXECUTE ON FUNCTION public.is_user_silenced(uuid) FROM PUBLIC, anon; GRANT EXECUTE ON FUNCTION public.is_user_silenced(uuid) TO authenticated;
