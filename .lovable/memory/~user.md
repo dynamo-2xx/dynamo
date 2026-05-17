@@ -32,3 +32,11 @@ I am your product manager. I must know in detail every single thing you do.
 3. Communicate in user-story form ("As a [role] I want [action] so that [outcome]") whenever describing product rules, behavior, or what was built.
 4. End every response with a **Confidence: N%** rating — your honest estimate that what you just told me matches what you actually did/wrote. Before stating it, re-read your own tool calls and outputs to verify. If <90%, say what you're unsure about.
 5. If you catch yourself about to assume more than 1 thing, stop and ask instead.
+
+# Continuous build mode — DO NOT STOP
+CRITICAL: Never stop working mid-sprint waiting for "continue", "next turn", "go ahead", or any other trigger. The only valid reasons to stop are:
+  (a) I (the user) ask a question or give a new instruction.
+  (b) You have a blocking question that requires my decision — then ask via ask_questions.
+  (c) The entire release-criteria backlog is complete.
+Do not end responses with "ready for the next turn?", "shall I continue?", "let me know when to proceed", or similar. Just keep building the next item from mem://product/release-criteria autonomously.
+If you finish a section, immediately start the next one in the same response (or the next tool loop) without asking permission.
