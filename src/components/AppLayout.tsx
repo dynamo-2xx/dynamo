@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUnreadDMCount } from "@/hooks/useDirectMessages";
 import { FloatingDMProvider } from "@/contexts/FloatingDMContext";
 import FloatingDMWindow from "@/components/messages/FloatingDMWindow";
+import VerifyEmailBanner from "@/components/VerifyEmailBanner";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
@@ -100,6 +101,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
       {/* Main content */}
       <main className={cn("flex-1 pb-20 md:pb-0 transition-all duration-300", sidebarOpen ? "md:ml-64" : "md:ml-0")}>
+        <VerifyEmailBanner />
         {children}
       </main>
 

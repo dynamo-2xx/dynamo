@@ -1,0 +1,10 @@
+{
+  "app.name": "DYNAMO",
+  "auth.verifyEmail": "Verify your email to unlock all features.",
+  "auth.resend": "Resend",
+  "common.tryAgain": "Try again",
+  "common.goHome": "Go home",
+  "errors.somethingBroke": "Something broke on our end.",
+  "errors.pageNotFound": "Page not found",
+  "offline.banner": "You're offline — changes won't save until you reconnect."
+}

@@ -121,6 +121,47 @@ export type Database = {
           },
         ]
       }
+      club_audit_log: {
+        Row: {
+          action: string
+          actor_id: string
+          club_id: string
+          created_at: string
+          id: string
+          snapshot: Json | null
+          target_id: string | null
+          target_kind: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          club_id: string
+          created_at?: string
+          id?: string
+          snapshot?: Json | null
+          target_id?: string | null
+          target_kind?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          club_id?: string
+          created_at?: string
+          id?: string
+          snapshot?: Json | null
+          target_id?: string | null
+          target_kind?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_audit_log_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_event_rsvps: {
         Row: {
           created_at: string
@@ -156,6 +197,8 @@ export type Database = {
           club_id: string
           created_at: string
           created_by: string
+          deleted_at: string | null
+          deleted_by: string | null
           description: string | null
           ends_at: string | null
           event_type: string
@@ -173,6 +216,8 @@ export type Database = {
           club_id: string
           created_at?: string
           created_by: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string | null
           ends_at?: string | null
           event_type: string
@@ -190,6 +235,8 @@ export type Database = {
           club_id?: string
           created_at?: string
           created_by?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string | null
           ends_at?: string | null
           event_type?: string
@@ -253,6 +300,8 @@ export type Database = {
       club_members: {
         Row: {
           club_id: string
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
           joined_at: string
           role: string
@@ -260,6 +309,8 @@ export type Database = {
         }
         Insert: {
           club_id: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           joined_at?: string
           role?: string
@@ -267,6 +318,8 @@ export type Database = {
         }
         Update: {
           club_id?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           joined_at?: string
           role?: string
@@ -286,16 +339,22 @@ export type Database = {
         Row: {
           club_id: string
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
           tag_id: string
         }
         Insert: {
           club_id: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           tag_id: string
         }
         Update: {
           club_id?: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           tag_id?: string
         }
         Relationships: [
@@ -313,6 +372,8 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           created_by: string
+          deleted_at: string | null
+          deleted_by: string | null
           description: string | null
           id: string
           is_public: boolean
@@ -324,6 +385,8 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string | null
           id?: string
           is_public?: boolean
@@ -335,6 +398,8 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string | null
           id?: string
           is_public?: boolean
@@ -451,6 +516,47 @@ export type Database = {
           source?: string
         }
         Relationships: []
+      }
+      debate_access_requests: {
+        Row: {
+          created_at: string
+          debate_id: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          message: string | null
+          requester_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          message?: string | null
+          requester_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          message?: string | null
+          requester_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debate_access_requests_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       debate_grades: {
         Row: {
@@ -892,6 +998,7 @@ export type Database = {
           current_speaker_side_id: string | null
           current_subtopic_index: number
           current_turn: number
+          deletion_scheduled_at: string | null
           description: string | null
           edit_window_ends_at: string | null
           ended_at: string | null
@@ -936,6 +1043,7 @@ export type Database = {
           current_speaker_side_id?: string | null
           current_subtopic_index?: number
           current_turn?: number
+          deletion_scheduled_at?: string | null
           description?: string | null
           edit_window_ends_at?: string | null
           ended_at?: string | null
@@ -980,6 +1088,7 @@ export type Database = {
           current_speaker_side_id?: string | null
           current_subtopic_index?: number
           current_turn?: number
+          deletion_scheduled_at?: string | null
           description?: string | null
           edit_window_ends_at?: string | null
           ended_at?: string | null
@@ -1559,6 +1668,7 @@ export type Database = {
           id: string
           is_public: boolean
           last_export_at: string | null
+          locale: string
           location: string | null
           role: Database["public"]["Enums"]["app_role"]
           tos_accepted_at: string | null
@@ -1580,6 +1690,7 @@ export type Database = {
           id?: string
           is_public?: boolean
           last_export_at?: string | null
+          locale?: string
           location?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           tos_accepted_at?: string | null
@@ -1601,6 +1712,7 @@ export type Database = {
           id?: string
           is_public?: boolean
           last_export_at?: string | null
+          locale?: string
           location?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           tos_accepted_at?: string | null
@@ -2149,6 +2261,7 @@ export type Database = {
         }[]
       }
       anonymize_expired_accounts: { Args: never; Returns: number }
+      can_preview_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_club: { Args: { _club_id: string }; Returns: boolean }
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
@@ -2271,6 +2384,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      evict_live_participant: {
+        Args: { _device_id: string; _session_id: string }
+        Returns: undefined
       }
       fork_record_for_user: {
         Args: {
@@ -2583,7 +2700,13 @@ export type Database = {
     }
     Enums: {
       app_role: "personal" | "education" | "community" | "admin"
-      debate_status: "draft" | "scheduled" | "live" | "completed" | "archived"
+      debate_status:
+        | "draft"
+        | "scheduled"
+        | "live"
+        | "completed"
+        | "archived"
+        | "pending_deletion"
       record_change_status: "pending" | "approved" | "rejected" | "withdrawn"
       record_change_type:
         | "edit_metadata"
@@ -2727,7 +2850,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["personal", "education", "community", "admin"],
-      debate_status: ["draft", "scheduled", "live", "completed", "archived"],
+      debate_status: [
+        "draft",
+        "scheduled",
+        "live",
+        "completed",
+        "archived",
+        "pending_deletion",
+      ],
       record_change_status: ["pending", "approved", "rejected", "withdrawn"],
       record_change_type: [
         "edit_metadata",
