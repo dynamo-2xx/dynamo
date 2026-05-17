@@ -107,6 +107,15 @@ serve(async (req) => {
     }
     const aiJson = await aiResp.json();
     const myTake: string = aiJson.choices?.[0]?.message?.content?.trim() || "";
+    try {
+      const { logAiUsage } = await import("../_shared/usage.ts");
+      logAiUsage({
+        function_name: "consolidate-notebook",
+        model: "google/gemini-2.5-flash",
+        usage: aiJson.usage,
+        user_id: userId,
+      });
+    } catch (_) {}
     if (!myTake) {
       return new Response(JSON.stringify({ error: "empty_take" }), {
         status: 502,
