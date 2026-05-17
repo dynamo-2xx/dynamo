@@ -466,6 +466,107 @@ export type Database = {
         }
         Relationships: []
       }
+      content_reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id: string
+          resolution_note: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          severity: number
+          status: Database["public"]["Enums"]["report_status"]
+          target_id: string
+          target_type: Database["public"]["Enums"]["report_target_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id: string
+          resolution_note?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          severity?: number
+          status?: Database["public"]["Enums"]["report_status"]
+          target_id: string
+          target_type: Database["public"]["Enums"]["report_target_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: Database["public"]["Enums"]["report_reason"]
+          reporter_id?: string
+          resolution_note?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          severity?: number
+          status?: Database["public"]["Enums"]["report_status"]
+          target_id?: string
+          target_type?: Database["public"]["Enums"]["report_target_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      content_sanctions: {
+        Row: {
+          appeal_note: string | null
+          appeal_status: string | null
+          appealed_at: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          issued_by: string
+          kind: Database["public"]["Enums"]["sanction_kind"]
+          reason: string | null
+          related_report_id: string | null
+          revoked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          appeal_note?: string | null
+          appeal_status?: string | null
+          appealed_at?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          issued_by: string
+          kind: Database["public"]["Enums"]["sanction_kind"]
+          reason?: string | null
+          related_report_id?: string | null
+          revoked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          appeal_note?: string | null
+          appeal_status?: string | null
+          appealed_at?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          issued_by?: string
+          kind?: Database["public"]["Enums"]["sanction_kind"]
+          reason?: string | null
+          related_report_id?: string | null
+          revoked_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_sanctions_related_report_id_fkey"
+            columns: ["related_report_id"]
+            isOneToOne: false
+            referencedRelation: "content_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cost_alerts: {
         Row: {
           alert_type: string
@@ -2543,6 +2644,7 @@ export type Database = {
         Args: { _id: string; _kind: string }
         Returns: boolean
       }
+      is_user_silenced: { Args: { _user_id: string }; Returns: boolean }
       join_debate_in_person: {
         Args: { _code: string; _side_id: string }
         Returns: {
@@ -2717,6 +2819,29 @@ export type Database = {
         | "propose_delete"
         | "propose_transfer"
       record_share_role: "viewer" | "co_owner"
+      report_reason:
+        | "spam"
+        | "harassment"
+        | "hate"
+        | "sexual"
+        | "violence"
+        | "misinformation"
+        | "self_harm"
+        | "other"
+      report_status: "open" | "triaged" | "actioned" | "dismissed"
+      report_target_type:
+        | "message"
+        | "transcript_entry"
+        | "debate"
+        | "live_session"
+        | "change_my_mind"
+        | "profile"
+        | "club"
+        | "club_event"
+        | "notebook"
+        | "my_take"
+        | "comment"
+      sanction_kind: "warning" | "mute_24h" | "mute_7d" | "suspend" | "ban"
       shareable_record_type:
         | "debate"
         | "change_my_mind"
@@ -2869,6 +2994,31 @@ export const Constants = {
         "propose_transfer",
       ],
       record_share_role: ["viewer", "co_owner"],
+      report_reason: [
+        "spam",
+        "harassment",
+        "hate",
+        "sexual",
+        "violence",
+        "misinformation",
+        "self_harm",
+        "other",
+      ],
+      report_status: ["open", "triaged", "actioned", "dismissed"],
+      report_target_type: [
+        "message",
+        "transcript_entry",
+        "debate",
+        "live_session",
+        "change_my_mind",
+        "profile",
+        "club",
+        "club_event",
+        "notebook",
+        "my_take",
+        "comment",
+      ],
+      sanction_kind: ["warning", "mute_24h", "mute_7d", "suspend", "ban"],
       shareable_record_type: [
         "debate",
         "change_my_mind",
