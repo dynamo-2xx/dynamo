@@ -13,12 +13,20 @@ import { useAllTags } from "@/hooks/useTags";
 import DebateCoverCard from "@/components/home/DebateCoverCard";
 import { cn } from "@/lib/utils";
 import LegalFooter from "@/components/legal/LegalFooter";
+import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 
 type ChipId = "all" | "live" | "today" | "latest" | `tag:${string}`;
 
 const ExplorePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeChip, setActiveChip] = useState<ChipId>("all");
+
+  useDocumentMeta({
+    title: "Explore Debates — Dynamo",
+    description: "Discover live debates, trending topics, and the best public records on Dynamo. Bring people to the power.",
+    type: "website",
+    canonical: typeof window !== "undefined" ? `${window.location.origin}/explore` : undefined,
+  });
 
   const { items: featured } = useFeaturedDebates(6);
   const { items: trending } = useTrendingDebates(24);
