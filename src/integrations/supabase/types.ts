@@ -2056,6 +2056,48 @@ export type Database = {
           },
         ]
       }
+      sales_leads: {
+        Row: {
+          contact_email: string
+          contact_name: string | null
+          created_at: string
+          id: string
+          org_name: string
+          resolved_at: string | null
+          resolved_by: string | null
+          seat_count: number | null
+          status: string
+          tier_requested: Database["public"]["Enums"]["subscription_tier"]
+          use_case: string | null
+        }
+        Insert: {
+          contact_email: string
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          org_name: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          seat_count?: number | null
+          status?: string
+          tier_requested: Database["public"]["Enums"]["subscription_tier"]
+          use_case?: string | null
+        }
+        Update: {
+          contact_email?: string
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          org_name?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          seat_count?: number | null
+          status?: string
+          tier_requested?: Database["public"]["Enums"]["subscription_tier"]
+          use_case?: string | null
+        }
+        Relationships: []
+      }
       session_annotations: {
         Row: {
           char_end: number | null
@@ -2282,6 +2324,45 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tags: {
         Row: {
           created_at: string
@@ -2328,6 +2409,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      usage_counters: {
+        Row: {
+          ai_calls: number
+          created_at: string
+          id: string
+          import_minutes: number
+          notebooks_created: number
+          period_start: string
+          sessions_created: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_calls?: number
+          created_at?: string
+          id?: string
+          import_minutes?: number
+          notebooks_created?: number
+          period_start: string
+          sessions_created?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_calls?: number
+          created_at?: string
+          id?: string
+          import_minutes?: number
+          notebooks_created?: number
+          period_start?: string
+          sessions_created?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_presence: {
         Row: {
@@ -2515,6 +2632,26 @@ export type Database = {
         Args: { _debate_id?: string; _other_user: string }
         Returns: string
       }
+      get_or_create_usage_counter: {
+        Args: { _user_id: string }
+        Returns: {
+          ai_calls: number
+          created_at: string
+          id: string
+          import_minutes: number
+          notebooks_created: number
+          period_start: string
+          sessions_created: number
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "usage_counters"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_profile_card: {
         Args: { _user_id: string }
         Returns: {
@@ -2603,6 +2740,11 @@ export type Database = {
           thoughts: Json
           updated_at: string
         }[]
+      }
+      get_user_tier: { Args: { _user_id: string }; Returns: string }
+      increment_usage: {
+        Args: { _metric: string; _user_id: string }
+        Returns: undefined
       }
       invitation_is_visible: {
         Args: {
@@ -2847,6 +2989,14 @@ export type Database = {
         | "change_my_mind"
         | "live_session"
         | "notebook"
+      subscription_status:
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "incomplete"
+        | "trialing"
+        | "unpaid"
+      subscription_tier: "free" | "pro" | "education" | "civic"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3025,6 +3175,15 @@ export const Constants = {
         "live_session",
         "notebook",
       ],
+      subscription_status: [
+        "active",
+        "past_due",
+        "canceled",
+        "incomplete",
+        "trialing",
+        "unpaid",
+      ],
+      subscription_tier: ["free", "pro", "education", "civic"],
     },
   },
 } as const
