@@ -121,6 +121,42 @@ export type Database = {
           },
         ]
       }
+      billing_events: {
+        Row: {
+          amount_cents: number | null
+          created_at: string
+          currency: string | null
+          event_type: string
+          fee_cents: number | null
+          id: string
+          raw: Json | null
+          stripe_event_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string
+          currency?: string | null
+          event_type: string
+          fee_cents?: number | null
+          id?: string
+          raw?: Json | null
+          stripe_event_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string
+          currency?: string | null
+          event_type?: string
+          fee_cents?: number | null
+          id?: string
+          raw?: Json | null
+          stripe_event_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       club_audit_log: {
         Row: {
           action: string
@@ -1308,6 +1344,27 @@ export type Database = {
         }
         Relationships: []
       }
+      email_suppressions: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          reason?: string
+        }
+        Relationships: []
+      }
       feature_flags: {
         Row: {
           key: string
@@ -1754,6 +1811,60 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_annotations: {
+        Row: {
+          attribute_group: Database["public"]["Enums"]["perf_group"]
+          char_end: number | null
+          char_start: number | null
+          created_at: string
+          explanation: string
+          id: string
+          participant_id: string | null
+          pass_kind: Database["public"]["Enums"]["perf_pass"]
+          recommendation: string | null
+          session_id: string
+          session_kind: string
+          severity: Database["public"]["Enums"]["perf_severity"]
+          sub_attribute: string | null
+          subtopic_id: string | null
+          transcript_entry_id: string | null
+        }
+        Insert: {
+          attribute_group: Database["public"]["Enums"]["perf_group"]
+          char_end?: number | null
+          char_start?: number | null
+          created_at?: string
+          explanation: string
+          id?: string
+          participant_id?: string | null
+          pass_kind: Database["public"]["Enums"]["perf_pass"]
+          recommendation?: string | null
+          session_id: string
+          session_kind: string
+          severity: Database["public"]["Enums"]["perf_severity"]
+          sub_attribute?: string | null
+          subtopic_id?: string | null
+          transcript_entry_id?: string | null
+        }
+        Update: {
+          attribute_group?: Database["public"]["Enums"]["perf_group"]
+          char_end?: number | null
+          char_start?: number | null
+          created_at?: string
+          explanation?: string
+          id?: string
+          participant_id?: string | null
+          pass_kind?: Database["public"]["Enums"]["perf_pass"]
+          recommendation?: string | null
+          session_id?: string
+          session_kind?: string
+          severity?: Database["public"]["Enums"]["perf_severity"]
+          sub_attribute?: string | null
+          subtopic_id?: string | null
+          transcript_entry_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           affiliation: string | null
@@ -1765,6 +1876,7 @@ export type Database = {
           deletion_initiated_at: string | null
           deletion_status: string | null
           display_name: string | null
+          email_prefs: Json
           friend_code: string
           id: string
           is_public: boolean
@@ -1772,6 +1884,7 @@ export type Database = {
           locale: string
           location: string | null
           role: Database["public"]["Enums"]["app_role"]
+          timezone: string | null
           tos_accepted_at: string | null
           tos_version: string | null
           updated_at: string
@@ -1787,6 +1900,7 @@ export type Database = {
           deletion_initiated_at?: string | null
           deletion_status?: string | null
           display_name?: string | null
+          email_prefs?: Json
           friend_code: string
           id?: string
           is_public?: boolean
@@ -1794,6 +1908,7 @@ export type Database = {
           locale?: string
           location?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          timezone?: string | null
           tos_accepted_at?: string | null
           tos_version?: string | null
           updated_at?: string
@@ -1809,6 +1924,7 @@ export type Database = {
           deletion_initiated_at?: string | null
           deletion_status?: string | null
           display_name?: string | null
+          email_prefs?: Json
           friend_code?: string
           id?: string
           is_public?: boolean
@@ -1816,6 +1932,7 @@ export type Database = {
           locale?: string
           location?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          timezone?: string | null
           tos_accepted_at?: string | null
           tos_version?: string | null
           updated_at?: string
@@ -2951,6 +3068,13 @@ export type Database = {
         | "completed"
         | "archived"
         | "pending_deletion"
+      perf_group:
+        | "argumentative_integrity"
+        | "rhetorical_effectiveness"
+        | "engagement_quality"
+        | "cognitive_depth"
+      perf_pass: "live" | "deep"
+      perf_severity: "green" | "orange" | "red"
       record_change_status: "pending" | "approved" | "rejected" | "withdrawn"
       record_change_type:
         | "edit_metadata"
@@ -3133,6 +3257,14 @@ export const Constants = {
         "archived",
         "pending_deletion",
       ],
+      perf_group: [
+        "argumentative_integrity",
+        "rhetorical_effectiveness",
+        "engagement_quality",
+        "cognitive_depth",
+      ],
+      perf_pass: ["live", "deep"],
+      perf_severity: ["green", "orange", "red"],
       record_change_status: ["pending", "approved", "rejected", "withdrawn"],
       record_change_type: [
         "edit_metadata",
