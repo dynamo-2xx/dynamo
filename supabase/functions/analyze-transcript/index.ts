@@ -230,6 +230,7 @@ serve(async (req) => {
       }
 
       const data = await response.json();
+      logUse("google/gemini-2.5-pro", (data as any).usage);
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       if (toolCall) {
         const result = JSON.parse(toolCall.function.arguments);
@@ -326,6 +327,7 @@ serve(async (req) => {
       }
 
       const d = await resp.json();
+      logUse("google/gemini-2.5-pro", (d as any).usage);
       const tc = d.choices?.[0]?.message?.tool_calls?.[0];
       if (tc) {
         const result = JSON.parse(tc.function.arguments);
@@ -395,6 +397,7 @@ serve(async (req) => {
       }
 
       const d = await resp.json();
+      logUse("google/gemini-2.5-pro", (d as any).usage);
       const tc = d.choices?.[0]?.message?.tool_calls?.[0];
       if (tc) {
         const result = JSON.parse(tc.function.arguments);
@@ -495,6 +498,7 @@ Extract all arguments, quotes, stakes, and counter-arguments from this chunk.`;
     }
 
     const data = await response.json();
+    logUse("google/gemini-2.5-pro", (data as any).usage);
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall) {
       const result = JSON.parse(toolCall.function.arguments);
