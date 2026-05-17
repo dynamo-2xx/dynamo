@@ -133,6 +133,8 @@ const App = () => (
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/guidelines" element={<GuidelinesPage />} />
               <Route path="/legal/subprocessors" element={<SubprocessorsPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/contact-sales" element={<ContactSalesPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
