@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { identify, reset } from "@/lib/analytics";
 
 type Profile = Tables<"profiles">;
 
@@ -54,8 +55,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           // Use setTimeout to avoid Supabase auth lock contention
           setTimeout(() => fetchProfile(session.user.id), 0);
+          identify(session.user.id);
         } else {
           setProfile(null);
+          reset();
         }
         setLoading(false);
       }
