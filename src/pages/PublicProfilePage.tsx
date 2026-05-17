@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFollowMutations, useMyPendingRequests } from "@/hooks/useConnections";
 import { toast } from "sonner";
+import { useDocumentMeta } from "@/hooks/useDocumentMeta";
+import ReportButton from "@/components/ReportButton";
 
 interface PublicProfile {
   user_id: string;
@@ -80,6 +82,20 @@ const PublicProfilePage = () => {
   }, [pendingIds, userId]);
 
   const isMe = user?.id === userId;
+
+  useDocumentMeta(
+    profile
+      ? {
+          title: `${profile.display_name ?? "Profile"} — Dynamo`,
+          description: profile.affiliation
+            ? `${profile.display_name ?? "User"} on Dynamo · ${profile.affiliation}`
+            : `${profile.display_name ?? "User"} on Dynamo. Bring people to the power.`,
+          image: profile.avatar_url ?? undefined,
+          type: "profile",
+          canonical: typeof window !== "undefined" ? `${window.location.origin}/u/${userId}` : undefined,
+        }
+      : { title: "Profile — Dynamo" }
+  );
 
   const handleFollow = async () => {
     if (!userId || !user) {
