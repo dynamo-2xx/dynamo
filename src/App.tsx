@@ -99,8 +99,8 @@ const App = () => (
               <Route path="/admin/deletion-review" element={<ProtectedRoute><AdminDeletionReviewPage /></ProtectedRoute>} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
-              <Route path="/create" element={<ProtectedRoute><CreateDebatePage /></ProtectedRoute>} />
-              <Route path="/cmm/new" element={<ProtectedRoute><CreateChangeMyMindPage /></ProtectedRoute>} />
+              <Route path="/create" element={<ProtectedRoute><PaywallGate metric="sessions_created"><CreateDebatePage /></PaywallGate></ProtectedRoute>} />
+              <Route path="/cmm/new" element={<ProtectedRoute><PaywallGate metric="sessions_created"><CreateChangeMyMindPage /></PaywallGate></ProtectedRoute>} />
               <Route path="/cmm/:id/lobby" element={<ProtectedRoute><CmmLobbyPage /></ProtectedRoute>} />
               <Route path="/cmm/join/:code" element={<JoinCmmPage />} />
               <Route path="/cmm/:id" element={<ChangeMyMindRoomPage />} />
@@ -113,7 +113,7 @@ const App = () => (
               <Route path="/debate/:id/audience" element={<AudiencePage />} />
               <Route path="/join/:code" element={<JoinDebatePage />} />
               <Route path="/preview/:token" element={<DebatePreviewPage />} />
-              <Route path="/live/new" element={<ProtectedRoute><LiveSessionPage /></ProtectedRoute>} />
+              <Route path="/live/new" element={<ProtectedRoute><PaywallGate metric="sessions_created"><LiveSessionPage /></PaywallGate></ProtectedRoute>} />
               <Route path="/live/:id/lobby" element={<ProtectedRoute><LiveLobbyPage /></ProtectedRoute>} />
               <Route path="/live/shared/:token" element={<SharedLiveSessionPage />} />
               <Route path="/live/join/:code" element={<LiveJoinPage />} />
