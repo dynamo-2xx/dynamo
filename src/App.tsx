@@ -64,6 +64,7 @@ import ClubEventDetailPage from "./pages/ClubEventDetailPage";
 import ShareClaimPage from "./pages/ShareClaimPage";
 import PricingPage from "./pages/PricingPage";
 import ContactSalesPage from "./pages/ContactSalesPage";
+import { PaywallGate } from "@/components/paywall/PaywallGate";
 
 const queryClient = new QueryClient();
 
