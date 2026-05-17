@@ -437,6 +437,8 @@ const ParticipantSharedView = ({
             onClose={() => onCloseNotebook?.()}
             value={notebookContent}
             onChange={(v) => onNotebookContentChange?.(v)}
+            recordType="debate"
+            recordId={debate.id}
           />
         </div>
       </div>
