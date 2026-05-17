@@ -1,0 +1,16 @@
+{
+  "name": "Dynamo — People to the Power",
+  "short_name": "Dynamo",
+  "description": "Where human intelligence becomes permanent, searchable, civic record.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/og-image.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" }
+  ],
+  "categories": ["social", "education", "productivity"]
+}
