@@ -73,6 +73,16 @@ serve(async (req) => {
     if (!aiRes.ok) return new Response(JSON.stringify({ error: `ai_${aiRes.status}` }), { status: 500, headers: corsHeaders });
 
     const aiJson = await aiRes.json();
+    try {
+      const { logAiUsage } = await import("../_shared/usage.ts");
+      logAiUsage({
+        function_name: "analyze-performance",
+        model,
+        usage: aiJson.usage,
+        user_id: user.id,
+        session_id: body.session_id,
+      });
+    } catch (_) {}
     const content = aiJson?.choices?.[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content);
     const anns: any[] = Array.isArray(parsed?.annotations) ? parsed.annotations : [];

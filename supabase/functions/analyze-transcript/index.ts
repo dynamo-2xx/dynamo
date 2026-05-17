@@ -143,6 +143,10 @@ serve(async (req) => {
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const { logAiUsage } = await import("../_shared/usage.ts");
+    const logUse = (model: string, usage: any) => {
+      try { logAiUsage({ function_name: "analyze-transcript", model, usage }); } catch (_) {}
+    };
 
     const { transcriptChunk, existingMap, sides, currentSubtopic, speakerSide, mode, fullTranscript, subtopic, entries, previous_subtopics } = await req.json();
 
@@ -226,6 +230,7 @@ serve(async (req) => {
       }
 
       const data = await response.json();
+      logUse("google/gemini-2.5-pro", (data as any).usage);
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       if (toolCall) {
         const result = JSON.parse(toolCall.function.arguments);
@@ -322,6 +327,7 @@ serve(async (req) => {
       }
 
       const d = await resp.json();
+      logUse("google/gemini-2.5-pro", (d as any).usage);
       const tc = d.choices?.[0]?.message?.tool_calls?.[0];
       if (tc) {
         const result = JSON.parse(tc.function.arguments);
@@ -391,6 +397,7 @@ serve(async (req) => {
       }
 
       const d = await resp.json();
+      logUse("google/gemini-2.5-pro", (d as any).usage);
       const tc = d.choices?.[0]?.message?.tool_calls?.[0];
       if (tc) {
         const result = JSON.parse(tc.function.arguments);
@@ -491,6 +498,7 @@ Extract all arguments, quotes, stakes, and counter-arguments from this chunk.`;
     }
 
     const data = await response.json();
+    logUse("google/gemini-2.5-pro", (data as any).usage);
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall) {
       const result = JSON.parse(toolCall.function.arguments);

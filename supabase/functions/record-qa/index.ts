@@ -238,6 +238,16 @@ ${subtopicList}
     const aiData = await aiResponse.json();
     const reply = aiData.choices?.[0]?.message?.content || "I couldn't generate a response.";
 
+    // §18 cost tracking — fire-and-forget
+    try {
+      const { logAiUsage } = await import("../_shared/usage.ts");
+      logAiUsage({
+        function_name: "record-qa",
+        model: "google/gemini-3-flash-preview",
+        usage: aiData.usage,
+      });
+    } catch (_) { /* swallow */ }
+
     return new Response(JSON.stringify({ reply }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

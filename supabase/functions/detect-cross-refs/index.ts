@@ -98,6 +98,15 @@ serve(async (req) => {
       });
     }
     const data = await aiResp.json();
+    try {
+      const { logAiUsage } = await import("../_shared/usage.ts");
+      logAiUsage({
+        function_name: "detect-cross-refs",
+        model: "google/gemini-2.5-pro",
+        usage: data.usage,
+        session_id: sessionId,
+      });
+    } catch (_) {}
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
       return new Response(JSON.stringify({ ok: true, refs: [] }), {
