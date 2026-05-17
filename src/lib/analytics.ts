@@ -17,7 +17,8 @@ async function init() {
   if (ready || !key) return;
   try {
     // Dynamic import keeps bundle slim until a key is configured.
-    const mod: any = await import(/* @vite-ignore */ "posthog-js").catch(() => null);
+    // @ts-ignore — module installed lazily once VITE_POSTHOG_KEY is provisioned
+    const mod: any = await import(/* @vite-ignore */ "posthog-js" as any).catch(() => null);
     if (!mod?.default) return;
     ph = mod.default;
     ph.init(key, { api_host: host, capture_pageview: true, autocapture: false });
