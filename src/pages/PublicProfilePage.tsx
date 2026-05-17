@@ -174,17 +174,20 @@ const PublicProfilePage = () => {
                 )}
               </div>
               {!isMe && (
-                <button
-                  onClick={handleFollow}
-                  className={`px-4 py-2 rounded-md text-sm font-body inline-flex items-center gap-1.5 transition-colors ${
-                    following || requested
-                      ? "border border-border text-foreground hover:border-foreground/30"
-                      : "bg-foreground text-background hover:opacity-90"
-                  }`}
-                >
-                  {requested ? <Clock className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
-                  {following ? "Following" : requested ? "Requested" : profile.is_public ? "Follow" : "Request to follow"}
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleFollow}
+                    className={`px-4 py-2 rounded-md text-sm font-body inline-flex items-center gap-1.5 transition-colors ${
+                      following || requested
+                        ? "border border-border text-foreground hover:border-foreground/30"
+                        : "bg-foreground text-background hover:opacity-90"
+                    }`}
+                  >
+                    {requested ? <Clock className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
+                    {following ? "Following" : requested ? "Requested" : profile.is_public ? "Follow" : "Request to follow"}
+                  </button>
+                  {userId && <ReportButton target={{ targetType: "profile", targetId: userId }} />}
+                </div>
               )}
             </div>
 
