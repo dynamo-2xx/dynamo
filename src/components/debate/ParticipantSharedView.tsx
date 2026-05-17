@@ -33,6 +33,7 @@ interface Participant {
 
 interface ParticipantSharedViewProps {
   debate: {
+    id: string;
     current_subtopic_index: number;
     current_turn: number;
     current_speaker_side_id: string | null;
@@ -437,6 +438,8 @@ const ParticipantSharedView = ({
             onClose={() => onCloseNotebook?.()}
             value={notebookContent}
             onChange={(v) => onNotebookContentChange?.(v)}
+            recordType="debate"
+            recordId={debate.id}
           />
         </div>
       </div>
