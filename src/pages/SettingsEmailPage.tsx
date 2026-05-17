@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
-import LegalLayout from "@/components/legal/LegalLayout";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 
 type Prefs = { essential: boolean; marketing: boolean };
@@ -33,10 +32,10 @@ export default function SettingsEmailPage() {
     if (error) toast({ title: "Couldn't save", description: error.message, variant: "destructive" });
   }
 
-  if (loading) return <LegalLayout title="Email preferences"><div className="text-muted-foreground">Loading…</div></LegalLayout>;
-
   return (
-    <LegalLayout title="Email preferences">
+    <div className="max-w-2xl mx-auto px-4 py-10">
+      <h1 className="font-display text-3xl mb-6">Email preferences</h1>
+      {loading ? <div className="text-muted-foreground">Loading…</div> : (
       <div className="space-y-4">
         <Card className="p-4 flex items-center justify-between">
           <div>
@@ -53,6 +52,7 @@ export default function SettingsEmailPage() {
           <Switch checked={prefs.marketing} onCheckedChange={(v) => update({ ...prefs, marketing: v })} />
         </Card>
       </div>
-    </LegalLayout>
+      )}
+    </div>
   );
 }
