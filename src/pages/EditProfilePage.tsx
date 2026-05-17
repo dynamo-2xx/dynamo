@@ -508,6 +508,11 @@ const EditProfilePage = () => {
 
           {/* Data export */}
           <section className="mt-8 border border-border rounded-lg p-5">
+            <h3 className="font-display text-base mb-3">Account settings</h3>
+            <div className="flex flex-wrap gap-2 mb-5">
+              <Link to="/settings/email"><Button type="button" variant="outline" size="sm">Email preferences</Button></Link>
+              <Link to="/settings/billing"><Button type="button" variant="outline" size="sm">Billing</Button></Link>
+            </div>
             <h3 className="font-display text-base mb-1">Download my data</h3>
             <p className="text-xs text-muted-foreground font-body mb-4">
               Get a JSON file with your profile, debates you created, live sessions you hosted,
