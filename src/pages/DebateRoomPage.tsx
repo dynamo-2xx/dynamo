@@ -1480,6 +1480,7 @@ const DebateRoomPage = () => {
                 editWindowEndsAt={debate.edit_window_ends_at}
                 debateId={id!}
                 feedbackEnabled={!!debate.feedback_enabled}
+                isOwner={isCreator}
                 onDismiss={() => setShowCompletionOverlay(false)}
               />
             )}
