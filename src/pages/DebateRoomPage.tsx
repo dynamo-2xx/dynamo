@@ -31,6 +31,7 @@ import { useMicPolicy } from "@/hooks/useMicPolicy";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
+import ContinueButton from "@/components/record/ContinueButton";
 import ArgumentMapOverlay from "@/components/debate/ArgumentMapOverlay";
 import NotebookOverlay from "@/components/debate/NotebookOverlay";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
@@ -1480,6 +1481,7 @@ const DebateRoomPage = () => {
                 editWindowEndsAt={debate.edit_window_ends_at}
                 debateId={id!}
                 feedbackEnabled={!!debate.feedback_enabled}
+                isOwner={isCreator}
                 onDismiss={() => setShowCompletionOverlay(false)}
               />
             )}
@@ -1530,6 +1532,12 @@ const DebateRoomPage = () => {
                       onEdit={() => navigate(`/debate/${id}/edit`)}
                     />
                   )}
+                  <ContinueButton
+                    kind="debate"
+                    sourceId={debate.id}
+                    isOwner={isCreator}
+                    isCompleted={isCompleted}
+                  />
                 </div>
 
                 {showTranscript && (

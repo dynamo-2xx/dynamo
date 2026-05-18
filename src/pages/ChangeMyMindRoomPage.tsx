@@ -18,6 +18,7 @@ import { takeHandoffStream } from "@/lib/micHandoff";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import ShareDialog from "@/components/sharing/ShareDialog";
+import ContinueButton from "@/components/record/ContinueButton";
 import PauseButton from "@/components/sharing/PauseButton";
 
 interface DebateRow {
@@ -314,6 +315,12 @@ const ChangeMyMindRoomPage = () => {
           <div className="flex items-center gap-2 pt-1">
             <PauseButton kind="debate" id={debate.id} isHost={isOwner} />
             <ShareDialog type="change_my_mind" recordId={debate.id} isCreator={isOwner} />
+            <ContinueButton
+              kind="debate"
+              sourceId={debate.id}
+              isOwner={isOwner}
+              isCompleted={debate.status === "completed"}
+            />
           </div>
           {ownerSide && (
             <div className="rounded-xl border border-foreground/30 bg-foreground/[0.02] p-3">

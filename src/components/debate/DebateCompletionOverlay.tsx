@@ -3,6 +3,7 @@ import { Trophy, Clock, MessageSquare, Home, Award } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { playChime } from "@/lib/audioUnlock";
+import ContinueButton from "@/components/record/ContinueButton";
 
 interface DebateCompletionOverlayProps {
   topic: string;
@@ -11,6 +12,7 @@ interface DebateCompletionOverlayProps {
   editWindowEndsAt: string | null;
   debateId: string;
   feedbackEnabled?: boolean;
+  isOwner?: boolean;
   onDismiss: () => void;
 }
 
@@ -21,6 +23,7 @@ const DebateCompletionOverlay = ({
   editWindowEndsAt,
   debateId,
   feedbackEnabled = false,
+  isOwner = false,
   onDismiss,
 }: DebateCompletionOverlayProps) => {
   const navigate = useNavigate();
@@ -118,6 +121,17 @@ const DebateCompletionOverlay = ({
             <Home className="w-4 h-4" />
             Back to Home
           </button>
+          {isOwner && (
+            <div className="pt-1">
+              <ContinueButton
+                kind="debate"
+                sourceId={debateId}
+                isOwner
+                isCompleted
+                variant="outline"
+              />
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>

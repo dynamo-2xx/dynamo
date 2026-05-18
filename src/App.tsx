@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import OfflineBanner from "@/components/OfflineBanner";
+import IncidentBanner from "@/components/IncidentBanner";
 import InstallAppChip from "@/components/InstallAppChip";
 import { LiveRegionProvider } from "@/components/a11y/LiveRegion";
 import Index from "./pages/Index";
@@ -79,6 +80,7 @@ const App = () => (
           <LiveRegionProvider>
             <Toaster />
             <Sonner />
+            <IncidentBanner />
             <OfflineBanner />
             <InstallAppChip />
             <ErrorBoundary>

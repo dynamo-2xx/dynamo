@@ -28,6 +28,7 @@ import { useSessionAnnotations } from "@/hooks/useSessionAnnotations";
 import { useSessionCitations } from "@/hooks/useSessionCitations";
 import { useSessionCrossRefs } from "@/hooks/useSessionCrossRefs";
 import { useAuth } from "@/contexts/AuthContext";
+import ContinueButton from "@/components/record/ContinueButton";
 
 interface Props {
   sessionId: string;
@@ -41,6 +42,10 @@ interface Props {
   shareToken: string | null;
   readOnly?: boolean;
   threadTitles?: Record<string, LiveThreadMeta>;
+  /** Owner-only: enable §24 Continue button in header. */
+  canContinue?: boolean;
+  /** 1-based version index in the continuation chain. */
+  continuationIndex?: number | null;
   onEntriesUpdate?: (entries: LiveTranscriptEntry[]) => void;
   onSpeakerNamesUpdate?: (names: Record<string, string>) => void;
 }
@@ -62,6 +67,8 @@ const SessionRecordViewV2 = ({
   shareToken,
   readOnly = false,
   threadTitles: threadTitlesProp,
+  canContinue = false,
+  continuationIndex = null,
   onEntriesUpdate,
   onSpeakerNamesUpdate,
 }: Props) => {
@@ -512,15 +519,28 @@ const SessionRecordViewV2 = ({
           {duration !== null && <span>· {duration} min</span>}
           <span>·</span>
           <span className="text-xs uppercase tracking-wider">Ended</span>
+          {continuationIndex && continuationIndex > 1 && (
+            <>
+              <span>·</span>
+              <span className="text-xs uppercase tracking-wider border border-foreground/10 px-2 py-0.5 rounded-full">
+                Continuation {continuationIndex}
+              </span>
+            </>
+          )}
           {!readOnly && (
-            <button
-              onClick={handleShare}
-              disabled={isSharing}
-              className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium border border-foreground/10 px-3 py-1.5 rounded-full hover:bg-foreground/[0.04] transition-colors disabled:opacity-50"
-            >
-              {currentShareToken ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
-              {currentShareToken ? "Copy link" : "Share"}
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              {canContinue && (
+                <ContinueButton kind="live_session" sourceId={sessionId} isOwner isCompleted />
+              )}
+              <button
+                onClick={handleShare}
+                disabled={isSharing}
+                className="inline-flex items-center gap-1.5 text-xs font-medium border border-foreground/10 px-3 py-1.5 rounded-full hover:bg-foreground/[0.04] transition-colors disabled:opacity-50"
+              >
+                {currentShareToken ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+                {currentShareToken ? "Copy link" : "Share"}
+              </button>
+            </div>
           )}
         </div>
 
