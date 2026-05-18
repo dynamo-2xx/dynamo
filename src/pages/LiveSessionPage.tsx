@@ -664,7 +664,7 @@ const LiveSessionPage = () => {
               </Popover>
             )}
             <div className="flex-1 min-w-0">
-              <PresenceList participants={presenceParticipants} />
+              <PresenceList participants={presenceParticipants} isHost sessionId={sessionId} />
             </div>
           </div>
         )}
