@@ -144,6 +144,7 @@ const App = () => (
               <Route path="/contact-sales" element={<ContactSalesPage />} />
               <Route path="/settings/email" element={<ProtectedRoute><SettingsEmailPage /></ProtectedRoute>} />
               <Route path="/settings/billing" element={<ProtectedRoute><SettingsBillingPage /></ProtectedRoute>} />
+              <Route path="/intelligence/:kind/:id" element={<ProtectedRoute><IntelligencePage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
