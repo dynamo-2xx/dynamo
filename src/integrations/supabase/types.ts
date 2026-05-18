@@ -1129,6 +1129,9 @@ export type Database = {
       debates: {
         Row: {
           community_tag: string | null
+          continuation_index: number
+          continuation_root_id: string | null
+          continued_from_id: string | null
           cover_image_url: string | null
           created_at: string
           created_by: string
@@ -1174,6 +1177,9 @@ export type Database = {
         }
         Insert: {
           community_tag?: string | null
+          continuation_index?: number
+          continuation_root_id?: string | null
+          continued_from_id?: string | null
           cover_image_url?: string | null
           created_at?: string
           created_by: string
@@ -1219,6 +1225,9 @@ export type Database = {
         }
         Update: {
           community_tag?: string | null
+          continuation_index?: number
+          continuation_root_id?: string | null
+          continued_from_id?: string | null
           cover_image_url?: string | null
           created_at?: string
           created_by?: string
@@ -1263,6 +1272,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "debates_continuation_root_id_fkey"
+            columns: ["continuation_root_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debates_continued_from_id_fkey"
+            columns: ["continued_from_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "debates_current_speaker_side_id_fkey"
             columns: ["current_speaker_side_id"]
@@ -1566,6 +1589,9 @@ export type Database = {
       }
       live_sessions: {
         Row: {
+          continuation_index: number
+          continuation_root_id: string | null
+          continued_from_id: string | null
           cover_image_url: string | null
           created_at: string
           created_by: string
@@ -1587,6 +1613,9 @@ export type Database = {
           transcript_entries: Json
         }
         Insert: {
+          continuation_index?: number
+          continuation_root_id?: string | null
+          continued_from_id?: string | null
           cover_image_url?: string | null
           created_at?: string
           created_by: string
@@ -1608,6 +1637,9 @@ export type Database = {
           transcript_entries?: Json
         }
         Update: {
+          continuation_index?: number
+          continuation_root_id?: string | null
+          continued_from_id?: string | null
           cover_image_url?: string | null
           created_at?: string
           created_by?: string
@@ -1629,6 +1661,20 @@ export type Database = {
           transcript_entries?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "live_sessions_continuation_root_id_fkey"
+            columns: ["continuation_root_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_sessions_continued_from_id_fkey"
+            columns: ["continued_from_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "live_sessions_forked_from_id_fkey"
             columns: ["forked_from_id"]
