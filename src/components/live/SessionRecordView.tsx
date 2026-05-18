@@ -194,15 +194,25 @@ const SessionRecordView = ({
           <span>{new Date(createdAt).toLocaleDateString()}</span>
           {duration !== null && <span>{duration} min</span>}
           <span className="bg-secondary px-2.5 py-0.5 rounded-full text-xs font-semibold">Ended</span>
+          {continuationIndex && continuationIndex > 1 && (
+            <span className="bg-foreground/5 border border-border px-2.5 py-0.5 rounded-full text-xs font-semibold">
+              Continuation {continuationIndex}
+            </span>
+          )}
           {!readOnly && (
-            <button
-              onClick={handleShare}
-              disabled={isSharing}
-              className="ml-auto flex items-center gap-1.5 text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors disabled:opacity-50"
-            >
-              {currentShareToken ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
-              {currentShareToken ? "Copy Link" : "Share"}
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              {canContinue && (
+                <ContinueButton kind="live_session" sourceId={sessionId} isOwner isCompleted />
+              )}
+              <button
+                onClick={handleShare}
+                disabled={isSharing}
+                className="flex items-center gap-1.5 text-xs font-semibold bg-primary/10 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors disabled:opacity-50"
+              >
+                {currentShareToken ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+                {currentShareToken ? "Copy Link" : "Share"}
+              </button>
+            </div>
           )}
         </div>
 
