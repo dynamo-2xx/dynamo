@@ -802,6 +802,11 @@ const SessionRecordViewV2 = ({
         </button>
       )}
 
+      {/* §21 Performance Intelligence floating bubble */}
+      <div className="fixed bottom-6 right-20 z-40">
+        <FloatingIntelligence sessionId={sessionId} sessionKind="live" />
+      </div>
+
       {!readOnly && user && (
         <NotebookPanel
           open={notebookOpen}
