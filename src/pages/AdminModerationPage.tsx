@@ -25,7 +25,7 @@ type Report = {
   created_at: string;
 };
 
-const STATUS_FILTERS = ["open", "reviewing", "resolved", "dismissed"] as const;
+const STATUS_FILTERS = ["open", "triaged", "actioned", "dismissed"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
 const AdminModerationPage = () => {
@@ -66,7 +66,7 @@ const AdminModerationPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowed, statusFilter]);
 
-  const resolve = async (id: string, newStatus: "resolved" | "dismissed", note?: string) => {
+  const resolve = async (id: string, newStatus: "actioned" | "dismissed" | "triaged", note?: string) => {
     setBusy(id);
     const { error } = await supabase
       .from("content_reports")
@@ -86,7 +86,7 @@ const AdminModerationPage = () => {
     }
   };
 
-  const sanction = async (report: Report, kind: "warn" | "mute_24h" | "suspend_7d") => {
+  const sanction = async (report: Report, kind: "warning" | "mute_24h" | "suspend") => {
     setBusy(report.id);
     // Resolve the report which user this targets — for message/comment targets we
     // can't trivially infer author here, so we sanction the reporter's target only
@@ -103,7 +103,7 @@ const AdminModerationPage = () => {
     }
     const expires =
       kind === "mute_24h" ? new Date(Date.now() + 24 * 3600_000).toISOString()
-      : kind === "suspend_7d" ? new Date(Date.now() + 7 * 86400_000).toISOString()
+      : kind === "suspend" ? new Date(Date.now() + 7 * 86400_000).toISOString()
       : null;
     const { error } = await supabase.from("content_sanctions").insert({
       user_id: report.target_id,
@@ -112,13 +112,13 @@ const AdminModerationPage = () => {
       related_report_id: report.id,
       issued_by: user!.id,
       expires_at: expires,
-    });
+    } as any);
     if (error) {
       toast({ title: "Sanction failed", description: error.message, variant: "destructive" });
       setBusy(null);
       return;
     }
-    await resolve(report.id, "resolved", `Sanction issued: ${kind}`);
+    await resolve(report.id, "actioned", `Sanction issued: ${kind}`);
   };
 
   if (allowed === false) {
@@ -195,14 +195,14 @@ const AdminModerationPage = () => {
                     <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => resolve(r.id, "dismissed", "Not actionable")}>
                       <X className="w-3.5 h-3.5 mr-1" /> Dismiss
                     </Button>
-                    <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => resolve(r.id, "resolved")}>
+                      <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => resolve(r.id, "actioned")}>
                       <Check className="w-3.5 h-3.5 mr-1" /> Resolve
                     </Button>
                     {r.target_type === "profile" && (
                       <>
-                        <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => sanction(r, "warn")}>Warn</Button>
+                        <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => sanction(r, "warning")}>Warn</Button>
                         <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => sanction(r, "mute_24h")}>Mute 24h</Button>
-                        <Button size="sm" variant="destructive" disabled={busy === r.id} onClick={() => sanction(r, "suspend_7d")}>Suspend 7d</Button>
+                        <Button size="sm" variant="destructive" disabled={busy === r.id} onClick={() => sanction(r, "suspend")}>Suspend 7d</Button>
                       </>
                     )}
                   </div>
