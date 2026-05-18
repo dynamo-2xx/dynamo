@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { handleSilencedError } from "@/lib/silencedError";
 
 export type RecordType = "debate" | "live_session" | "change_my_mind";
 
@@ -86,7 +87,8 @@ export function useRecordComments(recordType: RecordType, recordId: string | nul
         user_id: user.id,
         body: trimmed.slice(0, 4000),
       });
-      if (!error) await refresh();
+      if (error) handleSilencedError(error);
+      else await refresh();
       return { error };
     },
     [recordType, recordId, user, refresh],
