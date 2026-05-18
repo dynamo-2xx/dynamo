@@ -1531,6 +1531,12 @@ const DebateRoomPage = () => {
                       onEdit={() => navigate(`/debate/${id}/edit`)}
                     />
                   )}
+                  <ContinueButton
+                    kind="debate"
+                    sourceId={debate.id}
+                    isOwner={isCreator}
+                    isCompleted={isCompleted}
+                  />
                 </div>
 
                 {showTranscript && (
