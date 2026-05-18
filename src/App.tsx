@@ -9,6 +9,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import OfflineBanner from "@/components/OfflineBanner";
 import IncidentBanner from "@/components/IncidentBanner";
+import PastDueBanner from "@/components/PastDueBanner";
 import InstallAppChip from "@/components/InstallAppChip";
 import { LiveRegionProvider } from "@/components/a11y/LiveRegion";
 import Index from "./pages/Index";
@@ -82,6 +83,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <IncidentBanner />
+            <PastDueBanner />
             <OfflineBanner />
             <InstallAppChip />
             <ErrorBoundary>
