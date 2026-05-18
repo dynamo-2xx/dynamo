@@ -68,6 +68,7 @@ import PricingPage from "./pages/PricingPage";
 import ContactSalesPage from "./pages/ContactSalesPage";
 import SettingsEmailPage from "./pages/SettingsEmailPage";
 import SettingsBillingPage from "./pages/SettingsBillingPage";
+import IntelligencePage from "./pages/IntelligencePage";
 import { PaywallGate } from "@/components/paywall/PaywallGate";
 
 const queryClient = new QueryClient();
