@@ -41,6 +41,10 @@ interface Props {
   shareToken: string | null;
   readOnly?: boolean;
   threadTitles?: Record<string, LiveThreadMeta>;
+  /** Owner-only: enable §24 Continue button in header. */
+  canContinue?: boolean;
+  /** 1-based version index in the continuation chain. */
+  continuationIndex?: number | null;
   onEntriesUpdate?: (entries: LiveTranscriptEntry[]) => void;
   onSpeakerNamesUpdate?: (names: Record<string, string>) => void;
 }
@@ -62,6 +66,8 @@ const SessionRecordViewV2 = ({
   shareToken,
   readOnly = false,
   threadTitles: threadTitlesProp,
+  canContinue = false,
+  continuationIndex = null,
   onEntriesUpdate,
   onSpeakerNamesUpdate,
 }: Props) => {
