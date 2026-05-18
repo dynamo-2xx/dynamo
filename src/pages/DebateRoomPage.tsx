@@ -31,6 +31,7 @@ import { useMicPolicy } from "@/hooks/useMicPolicy";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
+import ContinueButton from "@/components/record/ContinueButton";
 import ArgumentMapOverlay from "@/components/debate/ArgumentMapOverlay";
 import NotebookOverlay from "@/components/debate/NotebookOverlay";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
