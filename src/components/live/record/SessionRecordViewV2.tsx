@@ -29,6 +29,7 @@ import { useSessionCitations } from "@/hooks/useSessionCitations";
 import { useSessionCrossRefs } from "@/hooks/useSessionCrossRefs";
 import { useAuth } from "@/contexts/AuthContext";
 import ContinueButton from "@/components/record/ContinueButton";
+import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 
 interface Props {
   sessionId: string;
@@ -801,6 +802,11 @@ const SessionRecordViewV2 = ({
           <BookOpen className="w-5 h-5 text-foreground" />
         </button>
       )}
+
+      {/* §21 Performance Intelligence floating bubble */}
+      <div className="fixed bottom-6 right-20 z-40">
+        <FloatingIntelligence sessionId={sessionId} sessionKind="live" />
+      </div>
 
       {!readOnly && user && (
         <NotebookPanel
