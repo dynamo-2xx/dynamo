@@ -1150,6 +1150,8 @@ export type Database = {
           format: string
           grading_enabled: boolean
           id: string
+          imported_source_kind: string | null
+          imported_source_url: string | null
           institution_tag: string | null
           is_public: boolean
           is_verified: boolean
@@ -1198,6 +1200,8 @@ export type Database = {
           format?: string
           grading_enabled?: boolean
           id?: string
+          imported_source_kind?: string | null
+          imported_source_url?: string | null
           institution_tag?: string | null
           is_public?: boolean
           is_verified?: boolean
@@ -1246,6 +1250,8 @@ export type Database = {
           format?: string
           grading_enabled?: boolean
           id?: string
+          imported_source_kind?: string | null
+          imported_source_url?: string | null
           institution_tag?: string | null
           is_public?: boolean
           is_verified?: boolean
