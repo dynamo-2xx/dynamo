@@ -29,6 +29,7 @@ import { useSessionCitations } from "@/hooks/useSessionCitations";
 import { useSessionCrossRefs } from "@/hooks/useSessionCrossRefs";
 import { useAuth } from "@/contexts/AuthContext";
 import ContinueButton from "@/components/record/ContinueButton";
+import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 
 interface Props {
   sessionId: string;
