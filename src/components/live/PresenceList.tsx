@@ -1,11 +1,37 @@
 import type { LiveParticipant } from "@/hooks/useLiveSessionPresence";
+import { X } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface Props {
   participants: LiveParticipant[];
   speakingDeviceIds?: Set<string>;
+  /** Host-only: shows an evict (×) button on each participant chip. */
+  isHost?: boolean;
+  /** Required when isHost. Used to call evict_live_participant RPC. */
+  sessionId?: string | null;
 }
 
-const PresenceList = ({ participants, speakingDeviceIds }: Props) => {
+const PresenceList = ({ participants, speakingDeviceIds, isHost, sessionId }: Props) => {
+  const [evicting, setEvicting] = useState<string | null>(null);
+
+  const handleEvict = async (deviceId: string, name: string) => {
+    if (!sessionId) return;
+    if (!window.confirm(`Remove ${name} from this session?`)) return;
+    setEvicting(deviceId);
+    const { error } = await (supabase as any).rpc("evict_live_participant", {
+      _session_id: sessionId,
+      _device_id: deviceId,
+    });
+    setEvicting(null);
+    if (error) {
+      toast({ title: "Couldn't remove participant", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Participant removed" });
+    }
+  };
+
   if (participants.length === 0) {
     return (
       <p className="text-xs text-muted-foreground italic px-1">
@@ -54,6 +80,18 @@ const PresenceList = ({ participants, speakingDeviceIds }: Props) => {
                 Speaker {p.speaker_slot}
               </span>
             </div>
+            {isHost && (
+              <button
+                type="button"
+                disabled={evicting === p.device_id}
+                onClick={() => handleEvict(p.device_id, p.display_name || "this participant")}
+                className="ml-1 -mr-1 w-5 h-5 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50"
+                aria-label={`Remove ${p.display_name}`}
+                title="Remove from session"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
         );
       })}
