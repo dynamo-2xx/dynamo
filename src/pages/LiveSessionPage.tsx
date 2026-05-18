@@ -364,6 +364,8 @@ const LiveSessionPage = () => {
           speakerNames={speakerNames}
           shareToken={sd.share_token || null}
           threadTitles={threads}
+          canContinue={!!user?.id && user.id === sd.created_by}
+          continuationIndex={(sd as any).continuation_index ?? null}
           onEntriesUpdate={() => {}}
           onSpeakerNamesUpdate={setSpeakerNames}
         />
