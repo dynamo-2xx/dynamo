@@ -2764,7 +2764,7 @@ export type Database = {
       }
       evict_live_participant: {
         Args: { _device_id: string; _session_id: string }
-        Returns: undefined
+        Returns: boolean
       }
       fork_record_for_user: {
         Args: {
