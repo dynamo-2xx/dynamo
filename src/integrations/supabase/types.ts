@@ -2761,6 +2761,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      continue_debate: {
+        Args: { _bring_participants?: boolean; _source_id: string }
+        Returns: string
+      }
+      continue_live_session: {
+        Args: { _bring_participants?: boolean; _source_id: string }
+        Returns: string
+      }
       create_debate_invitation: {
         Args: {
           _debate_id: string
