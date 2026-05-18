@@ -18,6 +18,7 @@ import { takeHandoffStream } from "@/lib/micHandoff";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import ShareDialog from "@/components/sharing/ShareDialog";
+import ContinueButton from "@/components/record/ContinueButton";
 import PauseButton from "@/components/sharing/PauseButton";
 
 interface DebateRow {
