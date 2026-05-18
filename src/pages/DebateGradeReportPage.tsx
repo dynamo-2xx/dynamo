@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Award, Handshake, Sparkles, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -119,6 +120,12 @@ const DebateGradeReportPage = () => {
           <p className="text-sm text-muted-foreground font-body italic">
             Private to you. Dynamo grades performance, never declares a winner.
           </p>
+          <Link
+            to={`/intelligence/debate/${id}`}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mt-3 border border-border rounded-full px-3 py-1"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Performance Intelligence
+          </Link>
         </div>
 
         {loading ? (

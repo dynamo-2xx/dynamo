@@ -68,6 +68,7 @@ import PricingPage from "./pages/PricingPage";
 import ContactSalesPage from "./pages/ContactSalesPage";
 import SettingsEmailPage from "./pages/SettingsEmailPage";
 import SettingsBillingPage from "./pages/SettingsBillingPage";
+import IntelligencePage from "./pages/IntelligencePage";
 import { PaywallGate } from "@/components/paywall/PaywallGate";
 
 const queryClient = new QueryClient();
@@ -144,6 +145,7 @@ const App = () => (
               <Route path="/contact-sales" element={<ContactSalesPage />} />
               <Route path="/settings/email" element={<ProtectedRoute><SettingsEmailPage /></ProtectedRoute>} />
               <Route path="/settings/billing" element={<ProtectedRoute><SettingsBillingPage /></ProtectedRoute>} />
+              <Route path="/intelligence/:kind/:id" element={<ProtectedRoute><IntelligencePage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
