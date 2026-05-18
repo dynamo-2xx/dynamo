@@ -1879,6 +1879,7 @@ export type Database = {
           email_prefs: Json
           friend_code: string
           id: string
+          invite_credits: number
           is_public: boolean
           last_export_at: string | null
           locale: string
@@ -1903,6 +1904,7 @@ export type Database = {
           email_prefs?: Json
           friend_code: string
           id?: string
+          invite_credits?: number
           is_public?: boolean
           last_export_at?: string | null
           locale?: string
@@ -1927,6 +1929,7 @@ export type Database = {
           email_prefs?: Json
           friend_code?: string
           id?: string
+          invite_credits?: number
           is_public?: boolean
           last_export_at?: string | null
           locale?: string
@@ -2578,6 +2581,45 @@ export type Database = {
           last_seen_at?: string
           user_id?: string
           visibility?: string
+        }
+        Relationships: []
+      }
+      waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_at: string | null
+          position: number
+          referrer: string | null
+          source: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_at?: string | null
+          position?: number
+          referrer?: string | null
+          source?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_at?: string | null
+          position?: number
+          referrer?: string | null
+          source?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
         }
         Relationships: []
       }
