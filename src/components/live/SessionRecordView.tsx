@@ -10,6 +10,7 @@ import SpeakerBubble from "./SpeakerBubble";
 import LiveThreadView from "./LiveThreadView";
 import RecordQAChat from "./RecordQAChat";
 import TagPicker from "@/components/tags/TagPicker";
+import ContinueButton from "@/components/record/ContinueButton";
 
 interface SessionRecordViewProps {
   sessionId: string;
@@ -23,6 +24,10 @@ interface SessionRecordViewProps {
   shareToken: string | null;
   readOnly?: boolean;
   threadTitles?: Record<string, LiveThreadMeta>;
+  /** Owner-only: enable §24 Continue button in the header. */
+  canContinue?: boolean;
+  /** 1-based version index in the continuation chain. */
+  continuationIndex?: number | null;
   onEntriesUpdate?: (entries: LiveTranscriptEntry[]) => void;
   onSpeakerNamesUpdate?: (names: Record<string, string>) => void;
 }
@@ -39,6 +44,8 @@ const SessionRecordView = ({
   shareToken,
   readOnly = false,
   threadTitles: threadTitlesProp,
+  canContinue = false,
+  continuationIndex = null,
   onEntriesUpdate,
   onSpeakerNamesUpdate,
 }: SessionRecordViewProps) => {
