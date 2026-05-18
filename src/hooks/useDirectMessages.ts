@@ -224,6 +224,10 @@ export function useThreadMessages(threadId: string | undefined) {
         sender_id: user.id,
         body: body.trim(),
       });
+      if (error) {
+        const { handleSilencedError } = await import("@/lib/silencedError");
+        handleSilencedError(error);
+      }
       return !error;
     },
     [user, threadId],
