@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { usePerformanceAnnotations, type PerfAnnotation } from "@/hooks/usePerformanceAnnotations";
 import { useSubscription } from "@/hooks/useSubscription";
+import { toast } from "@/hooks/use-toast";
 
 /**
  * §21 Performance Intelligence — standalone page.
@@ -139,14 +140,24 @@ export default function IntelligencePage() {
                                   {a.recommendation}
                                 </p>
                               )}
-                              <Link
-                                to={`${backHref(kind, id)}?dynamo=${encodeURIComponent(
-                                  `> ${a.explanation}${a.recommendation ? `\n> \n> Recommendation: ${a.recommendation}` : ""}`,
-                                )}`}
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const snippet = `> ${a.explanation}${a.recommendation ? `\n> \n> Recommendation: ${a.recommendation}` : ""}`;
+                                  try {
+                                    await navigator.clipboard.writeText(snippet);
+                                    toast({
+                                      title: "Quoted insight copied",
+                                      description: "Open Dynamo on this record and paste to discuss.",
+                                    });
+                                  } catch {
+                                    toast({ title: "Couldn't copy", variant: "destructive" });
+                                  }
+                                }}
                                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-2"
                               >
                                 <MessageSquare className="h-3 w-3" /> Discuss in Dynamo
-                              </Link>
+                              </button>
                             </div>
                           </div>
                         </Card>
