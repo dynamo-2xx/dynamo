@@ -83,6 +83,17 @@ const SessionRecordViewV2 = ({
   const location = useLocation();
   const { user } = useAuth();
 
+  // §21 — auto-trigger the deep performance analysis once when this user
+  // opens a completed live session record. Idempotent server-side.
+  useEffect(() => {
+    if (!user || !sessionId || !endedAt) return;
+    supabase.functions
+      .invoke("trigger-deep-perf", {
+        body: { session_id: sessionId, session_kind: "live" },
+      })
+      .catch(() => {});
+  }, [user, sessionId, endedAt]);
+
   // Desktop record/transcript split state — persisted per session
   const SPLIT_KEY = `dynamo:record-split:${sessionId}`;
   const [recordSplit, setRecordSplit] = useState<{
