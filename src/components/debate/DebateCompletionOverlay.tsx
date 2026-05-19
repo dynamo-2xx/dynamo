@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { playChime } from "@/lib/audioUnlock";
 import ContinueButton from "@/components/record/ContinueButton";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DebateCompletionOverlayProps {
   topic: string;
@@ -30,7 +31,12 @@ const DebateCompletionOverlay = ({
 
   useEffect(() => {
     playChime("celebration");
-  }, []);
+    // §21 fire-and-forget: kick off deep performance analysis for the current
+    // user. Idempotent server-side; safe to call multiple times.
+    (supabase as any).functions
+      .invoke("trigger-deep-perf", { body: { session_id: debateId, session_kind: "debate" } })
+      .catch(() => {});
+  }, [debateId]);
 
   const editHoursLeft = editWindowEndsAt
     ? Math.max(0, Math.round((new Date(editWindowEndsAt).getTime() - Date.now()) / (1000 * 60 * 60)))
