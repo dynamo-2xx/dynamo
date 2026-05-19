@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { logAiUsage } from "../_shared/usage.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,7 +68,7 @@ SOURCE TEXT (truncated):\n${text.slice(0, 20000)}`;
   const json = await res.json();
   const content: string = json.choices?.[0]?.message?.content ?? "";
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-  return JSON.parse(cleaned);
+  return { parsed: JSON.parse(cleaned), usage: json.usage };
 }
 
 serve(async (req) => {
@@ -118,7 +119,13 @@ serve(async (req) => {
       });
     }
 
-    const structured = await structure(text, body.title_hint);
+    const { parsed: structured, usage } = await structure(text, body.title_hint);
+    logAiUsage({
+      function_name: "import-to-record",
+      model: "google/gemini-2.5-flash",
+      usage,
+      user_id: user.id,
+    });
 
     // Insert debate as completed/private/imported
     const { data: debate, error: insErr } = await supabase
