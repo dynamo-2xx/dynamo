@@ -147,6 +147,12 @@ serve(async (req) => {
     if (insErr) throw insErr;
     const debateId = debate.id as string;
 
+    // Count this import toward the user's monthly session quota (§12).
+    // Fire-and-forget; failure must not break the import.
+    createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!)
+      .rpc("increment_usage", { _user_id: user.id, _metric: "sessions_created" })
+      .then(({ error }: any) => { if (error) console.error("import quota inc failed", error.message); });
+
     // Subtopics
     const subs: string[] = Array.isArray(structured.subtopics) && structured.subtopics.length
       ? structured.subtopics.slice(0, 4) : ["Main thread"];
