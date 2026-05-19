@@ -1,0 +1,100 @@
+// §21 Performance Intelligence — auto-trigger the deep pass for the calling
+// user on a completed debate. Idempotent: skips if annotations already exist
+// for the (session, participant, pass=deep) tuple. Premium-only (analyze
+// gate enforces 402 for free).
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+type Body = { session_id: string; session_kind: "debate" | "live" | "cmm" };
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  try {
+    const SUPA_URL = Deno.env.get("SUPABASE_URL")!;
+    const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const auth = req.headers.get("Authorization") ?? "";
+    const userSupa = createClient(SUPA_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: auth } },
+    });
+    const { data: { user } } = await userSupa.auth.getUser();
+    if (!user) return new Response(JSON.stringify({ error: "auth_required" }), { status: 401, headers: corsHeaders });
+
+    const { session_id, session_kind } = (await req.json()) as Body;
+    if (!session_id || !session_kind) {
+      return new Response(JSON.stringify({ error: "bad_payload" }), { status: 400, headers: corsHeaders });
+    }
+
+    const supa = createClient(SUPA_URL, SRK);
+
+    // Idempotency: skip if deep annotations already exist for this user on this session.
+    const { count } = await supa
+      .from("performance_annotations")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", session_id)
+      .eq("session_kind", session_kind)
+      .eq("participant_id", user.id)
+      .eq("pass_kind", "deep");
+    if ((count ?? 0) > 0) {
+      return new Response(JSON.stringify({ ok: true, skipped: "already_analyzed" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Gather passages for the user.
+    let passages: Array<{ transcript_entry_id?: string; text: string; subtopic_id?: string | null }> = [];
+    if (session_kind === "debate" || session_kind === "cmm") {
+      const { data: tr } = await supa
+        .from("debate_transcripts")
+        .select("transcript_entries")
+        .eq("debate_id", session_id)
+        .maybeSingle();
+      const entries: any[] = Array.isArray((tr as any)?.transcript_entries) ? (tr as any).transcript_entries : [];
+      passages = entries
+        .filter((e) => e?.user_id === user.id && typeof e?.text === "string" && e.text.trim().length > 30)
+        .map((e) => ({ transcript_entry_id: e?.id, text: String(e.text).slice(0, 2000), subtopic_id: e?.subtopic_id ?? null }));
+    } else {
+      // live: read entries table
+      const { data: rows } = await supa
+        .from("live_session_entries")
+        .select("id, text, speaker_user_id, subtopic_id")
+        .eq("session_id", session_id)
+        .eq("speaker_user_id", user.id);
+      passages = (rows ?? [])
+        .filter((r: any) => typeof r?.text === "string" && r.text.trim().length > 30)
+        .map((r: any) => ({ transcript_entry_id: r.id, text: String(r.text).slice(0, 2000), subtopic_id: r.subtopic_id ?? null }));
+    }
+
+    if (passages.length === 0) {
+      return new Response(JSON.stringify({ ok: true, skipped: "no_passages" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Cap to first 30 passages to control cost.
+    passages = passages.slice(0, 30);
+
+    const res = await fetch(`${SUPA_URL}/functions/v1/analyze-performance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: JSON.stringify({
+        session_id, session_kind, participant_id: user.id, pass: "deep", passages,
+      }),
+    });
+    const text = await res.text();
+    return new Response(JSON.stringify({ ok: res.ok, status: res.status, body: text.slice(0, 500) }), {
+      status: res.ok ? 200 : 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("trigger-deep-perf error", e);
+    return new Response(JSON.stringify({ error: "trigger_failed", message: String((e as any)?.message ?? e) }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
