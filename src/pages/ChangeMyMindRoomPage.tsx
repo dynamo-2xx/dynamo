@@ -20,6 +20,7 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import ContinueButton from "@/components/record/ContinueButton";
 import PauseButton from "@/components/sharing/PauseButton";
+import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 
 interface DebateRow {
   id: string;
@@ -297,6 +298,10 @@ const ChangeMyMindRoomPage = () => {
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Session ended.");
+    // §21 Fire-and-forget deep performance analysis once the session closes.
+    supabase.functions
+      .invoke("trigger-deep-perf", { body: { session_id: debate.id, session_kind: "cmm" } })
+      .catch(() => {});
     load();
     refresh();
   };
@@ -322,6 +327,9 @@ const ChangeMyMindRoomPage = () => {
               isCompleted={debate.status === "completed"}
             />
           </div>
+          {debate.status === "completed" && (
+            <FloatingIntelligence sessionId={debate.id} sessionKind="cmm" />
+          )}
           {ownerSide && (
             <div className="rounded-xl border border-foreground/30 bg-foreground/[0.02] p-3">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Owner's position</div>
