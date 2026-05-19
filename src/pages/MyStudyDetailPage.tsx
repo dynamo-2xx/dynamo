@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -157,6 +157,20 @@ const MyStudyDetailPage = () => {
   const [renameOpen, setRenameOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const reader = useReaderNotes(notebookId ?? null);
+
+  // §21 — "Discuss in Dynamo" deep link. IntelligencePage and other surfaces
+  // can pass a quoted snippet via ?dynamo=... — we prefill the chat input and
+  // jump to the Dynamo tab.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const quoted = searchParams.get("dynamo");
+    if (!quoted) return;
+    qa.setInput(quoted);
+    setTab("dynamo");
+    const next = new URLSearchParams(searchParams);
+    next.delete("dynamo");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, qa, setSearchParams]);
 
   const handleJumpReaderNote = (n: ReaderNote) => {
     setTab(n.anchor_kind === "my_take" ? "my_take" : "thoughts");
