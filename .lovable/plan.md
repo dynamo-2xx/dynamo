@@ -94,9 +94,9 @@ Template `/terms`, `/privacy`, `/guidelines`, `/legal/subprocessors`. Signup wri
 *"As a Pro user, I see a color/face-coded breakdown of my debate performance and can hand a moment to DYNAMO for coaching."*
 Live light pass + post-session deep pass, 3 dashboard surfaces, DYNAMO handoff via quoted message, blurred-preview paywall for free tier. AI pipeline is the unknown.
 
-## §22 Clubs — 🟡
+## §22 Clubs — 🟢
 *"As a club organizer, I run recurring debates with my members and approve who joins."*
-Owner/Admin/Member hierarchy, Featured/Local directory, all 3 event types + recurring, in-club event launch, admin-approval toggle.
+Owner/Admin/Member hierarchy ✅, Featured directory row on `/clubs` ✅, 3 event types + recurrence_rule column ✅, in-club event launch ✅, admin-approval toggle on ClubEditPage + gated join ✅.
 
 ## §23 Sharing, Co-ownership & Pause — 🟢
 Viewer/Co-owner share tiers, fork-on-complete only (no live co-edit at v1), uniform host-only Pause/Resume across Debate/Live/CMM.
