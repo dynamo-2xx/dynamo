@@ -54,6 +54,11 @@ export default function ImportToRecordPage() {
         navigate("/pricing");
         return;
       }
+      if (payload?.error === "daily_cap_reached" || (error as any)?.status === 429) {
+        toast.error(payload?.message ?? "Daily import limit reached. Try again tomorrow.");
+        setBusy(false);
+        return;
+      }
       if (error) throw error;
       const id = payload?.debate_id;
       if (!id) throw new Error(payload?.message ?? "No record returned");
