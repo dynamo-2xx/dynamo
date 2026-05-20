@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
 import { logAiUsage } from "../_shared/usage.ts";
 
 const corsHeaders = {
@@ -132,10 +133,20 @@ serve(async (req) => {
           message: "Audio and video imports are coming soon. For now, paste an article URL or the transcript text.",
         }), { status: 501, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      sourceKind = "article";
       const r = await fetch(body.source_url, { headers: { "User-Agent": "DynamoBot/1.0" } });
       if (!r.ok) throw new Error(`fetch_failed_${r.status}`);
-      text = stripHtml(await r.text());
+      const contentType = r.headers.get("content-type") ?? "";
+      const isPdf = /\.pdf($|\?)/i.test(body.source_url) || contentType.includes("application/pdf");
+      if (isPdf) {
+        sourceKind = "pdf";
+        const buf = new Uint8Array(await r.arrayBuffer());
+        const pdf = await getDocumentProxy(buf);
+        const { text: pdfText } = await extractText(pdf, { mergePages: true });
+        text = (Array.isArray(pdfText) ? pdfText.join("\n") : pdfText).replace(/\s+/g, " ").trim();
+      } else {
+        sourceKind = "article";
+        text = stripHtml(await r.text());
+      }
     } else if (body.kind === "text" && body.raw_text) {
       text = body.raw_text;
     } else {
