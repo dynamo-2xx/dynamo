@@ -19,6 +19,7 @@ import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
 import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
+import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
@@ -1541,6 +1542,13 @@ const DebateRoomPage = () => {
                     isOwner={isCreator}
                     isCompleted={isCompleted}
                   />
+                  {isCompleted && (
+                    <PerformanceInsightsToggle
+                      sessionId={debate.id}
+                      sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
+                      participantId={user?.id}
+                    />
+                  )}
                 </div>
 
                 {showTranscript && (
