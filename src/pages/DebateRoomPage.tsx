@@ -1515,6 +1515,8 @@ const DebateRoomPage = () => {
                   participantCount={participants.length}
                   fallbackSubtopics={subtopics.map((s) => ({ id: s.id, title: s.title }))}
                   fallbackSideLabels={sides.map((s) => s.label)}
+                  importedSourceUrl={(debate as any).imported_source_url}
+                  importedSourceKind={(debate as any).imported_source_kind}
                 />
 
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
@@ -1712,6 +1714,8 @@ function SpectatorPreviewShell({
           publisherName={publisherName}
           participantCount={participantCount}
           fallbackSideLabels={sides.map((s) => s.label)}
+          importedSourceUrl={(debate as any).imported_source_url}
+          importedSourceKind={(debate as any).imported_source_kind}
         />
 
         <div className="mt-8">
