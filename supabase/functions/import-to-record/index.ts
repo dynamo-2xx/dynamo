@@ -265,7 +265,7 @@ serve(async (req) => {
         created_by: user.id,
         title: topic,
         mode: "single_device",
-        status: "completed",
+        status: "ended",
         ended_at: new Date().toISOString(),
         transcript_entries: entries,
         summaries,
