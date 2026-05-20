@@ -1546,7 +1546,7 @@ const DebateRoomPage = () => {
                     <PerformanceInsightsToggle
                       sessionId={debate.id}
                       sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
-                      participantId={userId ?? undefined}
+                      participantId={user?.id}
                     />
                   )}
                 </div>
