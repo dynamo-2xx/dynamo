@@ -143,6 +143,7 @@ const App = () => (
               <Route path="/debate/:id/edit" element={<ProtectedRoute><DebateEditArgumentsPage /></ProtectedRoute>} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/status" element={<StatusPage />} />
               <Route path="/guidelines" element={<GuidelinesPage />} />
               <Route path="/legal/subprocessors" element={<SubprocessorsPage />} />
               <Route path="/pricing" element={<PricingPage />} />
