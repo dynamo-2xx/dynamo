@@ -71,7 +71,7 @@ Branded 404/500, indefinite live reconnect + host evict, read-only offline, toas
 ## §14 i18n — 🟢
 EN-only at launch but every string routed through `t()`; locale-aware data + AI/Deepgram routing; RTL deferred.
 
-## §15 Trust & Safety — 🟡
+## §15 Trust & Safety — 🟢
 Per-message reports, founder-run mod queue, 5-step sanctions ladder, appeals, civic-seal revocation, rate limits + image moderation.
 
 ## §16 Email — 🟢
@@ -86,6 +86,7 @@ Per-source budgets, usage logs, founder cost dashboard, pricing-decision queue f
 
 ## §19 Backup & DR — 🟡
 RPO 24h / RTO 4h, Supabase PITR + weekly cold `pg_dump` to second-region S3, **mandatory pre-launch restore drill**, status subdomain. GDPR export + soft-delete/anonymize flow.
+Status page ✅ at `/status` (DB + auth + backup row), backup workflow stub ✅ in `.github/workflows/db-backup.yml`, `backup_runs` table ✅. Still pending: actual restore drill on staging.
 
 ## §20 Legal & Compliance — 🟢
 Template `/terms`, `/privacy`, `/guidelines`, `/legal/subprocessors`. Signup writes `tos_accepted_at` + `tos_version`. Already partially shipped.
@@ -107,7 +108,7 @@ Linear-chain v1/v2/v3 continuations on completed Debate/CMM/Live (never Notebook
 ## §25 Import-to-Record — 🟡
 *"As a user, I drop a YouTube link or a PDF and Dynamo gives me back a fully threaded debate record I can annotate, share, and continue."*
 Second dropbox on `/create` accepting YouTube/file/PDF/article. Full-screen "People to the Power!" loader. Private by default. Counts as 1 Debate quota. Per-tier minute caps. New `import-to-record` edge function orchestrating fetch → transcribe → structure → persist.
-v1 status: article-URL + raw-text path live, tier-gated (Pro+), 20/day soft cap, quota increment wired. A/V/PDF still 501 stubs.
+v1 status: article-URL + raw-text + **PDF (unpdf)** paths live, tier-gated (Pro+), 20/day soft cap, quota increment wired. Audio/video still 501 stubs pending Deepgram transcription.
 
 ---
 
