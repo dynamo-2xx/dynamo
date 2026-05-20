@@ -18,6 +18,7 @@ import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
+import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
@@ -1717,6 +1718,14 @@ function SpectatorPreviewShell({
           importedSourceUrl={(debate as any).imported_source_url}
           importedSourceKind={(debate as any).imported_source_kind}
         />
+
+        {debate.status === "completed" && (
+          <FloatingIntelligence
+            sessionId={debate.id}
+            sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
+            participantId={userId ?? undefined}
+          />
+        )}
 
         <div className="mt-8">
           <RecordCommentsSection
