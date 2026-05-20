@@ -15,6 +15,7 @@ const ClubEditPage = () => {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [isPublic, setIsPublic] = useState(true);
+  const [requiresApproval, setRequiresApproval] = useState(false);
   const [cover, setCover] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -24,6 +25,7 @@ const ClubEditPage = () => {
       setDescription(club.description || "");
       setLocation(club.location || "");
       setIsPublic(club.is_public);
+      setRequiresApproval(Boolean((club as any).requires_approval));
       setCover(club.cover_image_url);
     }
   }, [club]);
@@ -44,8 +46,9 @@ const ClubEditPage = () => {
         description: description.trim() || null,
         location: location.trim() || null,
         is_public: isPublic,
+        requires_approval: requiresApproval,
         cover_image_url: cover,
-      })
+      } as any)
       .eq("id", club.id);
     setBusy(false);
     if (error) toast({ title: "Couldn't save", description: error.message, variant: "destructive" });
@@ -96,6 +99,23 @@ const ClubEditPage = () => {
                 </button>
               ))}
             </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium">Joining</label>
+            <label className="flex items-start gap-3 p-3 border border-border rounded-lg cursor-pointer">
+              <input
+                type="checkbox"
+                checked={requiresApproval}
+                onChange={(e) => setRequiresApproval(e.target.checked)}
+                className="mt-0.5"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-body text-foreground">Require admin approval</p>
+                <p className="text-[11px] text-muted-foreground font-body mt-0.5 leading-snug">
+                  New requests land in a pending queue. Admins approve or decline before access is granted.
+                </p>
+              </div>
+            </label>
           </div>
           <button type="submit" disabled={busy} className="w-full bg-foreground text-background py-3 rounded-lg font-body text-sm font-medium disabled:opacity-50">
             {busy ? "Saving…" : "Save changes"}
