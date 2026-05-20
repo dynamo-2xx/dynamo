@@ -30,9 +30,9 @@ Generate → Invite → Mic-Prep → Live → Record loop wired end-to-end with 
 *"As a participant, I annotate any record, spawn a notebook, publish my take separately from my notebook."*
 Floating draggable/resizable/fullscreen notebook overlay, two independent publish toggles, notebook-on-notebook, highlight-to-comment.
 
-## §4 In-person reliability — 🟠
+## §4 In-person reliability — 🟡
 *"As an in-person host, only the right people get a mic; no two devices echo; a no-show slot frees itself."*
-Per-format mic enforcement, no-device piggyback ("Speaking as" pill), echo guard banner, soft readiness gate, slot-hold logic. Hardware variability = real risk.
+Per-format mic enforcement ✅, echo guard toggle ✅, mic lobby + silence warning ✅, owner +15m no-show banner ✅. Deferred to v1.1: "Speaking as" piggyback pill, per-seat hold timeout.
 
 ## §5 Data safety — 🟢
 *"As a user, I get a 48-hour grace to undo deletes; my data export works."*

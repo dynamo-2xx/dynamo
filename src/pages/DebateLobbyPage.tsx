@@ -23,13 +23,15 @@ export default function DebateLobbyPage() {
   const [maxPerSide, setMaxPerSide] = useState(2);
   const [sides, setSides] = useState<Side[]>([]);
   const [starting, setStarting] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState<string | null>(null);
+  const [overdueMin, setOverdueMin] = useState<number>(0);
 
   useEffect(() => {
     if (!id) return;
     (async () => {
       const { data: d } = await supabase
         .from("debates")
-        .select("topic, join_code, max_speakers_per_side, created_by, status")
+        .select("topic, join_code, max_speakers_per_side, created_by, status, scheduled_at")
         .eq("id", id)
         .maybeSingle();
       if (!d) {
@@ -48,6 +50,7 @@ export default function DebateLobbyPage() {
       setTopic(d.topic);
       setJoinCode(d.join_code);
       setMaxPerSide(d.max_speakers_per_side ?? 2);
+      setScheduledAt((d as any).scheduled_at ?? null);
       const { data: s } = await supabase
         .from("debate_sides")
         .select("*")
@@ -56,6 +59,31 @@ export default function DebateLobbyPage() {
       setSides((s ?? []) as Side[]);
     })();
   }, [id, user, navigate]);
+
+  // §4 owner no-show banner — surfaces +15m past scheduled start.
+  useEffect(() => {
+    if (!scheduledAt) { setOverdueMin(0); return; }
+    const tick = () => {
+      const diffMs = Date.now() - new Date(scheduledAt).getTime();
+      setOverdueMin(Math.max(0, Math.floor(diffMs / 60000)));
+    };
+    tick();
+    const t = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(t);
+  }, [scheduledAt]);
+
+  const handleCancel = async () => {
+    if (!id) return;
+    const ok = window.confirm("Cancel this debate? Invitees will be notified.");
+    if (!ok) return;
+    const { error } = await supabase
+      .from("debates")
+      .update({ status: "archived", ended_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Debate cancelled");
+    navigate("/", { replace: true });
+  };
 
   const slots = sides.flatMap((s) =>
     Array.from({ length: maxPerSide }).map((_, i) => ({
@@ -87,6 +115,21 @@ export default function DebateLobbyPage() {
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Lobby</p>
           <h1 className="font-display text-2xl text-foreground">{topic}</h1>
         </div>
+        {overdueMin >= 15 && (
+          <div className="border border-foreground/10 rounded-lg p-3 bg-amber-50 text-sm font-body text-foreground flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-semibold">Running {overdueMin}m late</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Start now, or cancel to free everyone's slot.</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="shrink-0 text-xs underline underline-offset-2 hover:no-underline"
+            >
+              Cancel debate
+            </button>
+          </div>
+        )}
         <InPersonJoinPanel
           debateId={id ?? null}
           joinCode={joinCode}
