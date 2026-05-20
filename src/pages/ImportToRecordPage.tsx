@@ -99,8 +99,9 @@ export default function ImportToRecordPage() {
       const liveId = payload?.live_session_id;
       if (!debateId && !liveId) throw new Error(payload?.message ?? "No record returned");
       toast.success("Record ready");
+      // Skip the live/debate "room" UI and go straight to the final analyzed record.
       if (liveId) navigate(`/live/${liveId}`);
-      else navigate(`/debate/${debateId}`);
+      else navigate(`/explore/${debateId}`);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Import failed. Try a different source.");
