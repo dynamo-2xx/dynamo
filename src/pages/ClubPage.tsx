@@ -83,7 +83,8 @@ const ClubPage = () => {
       return;
     }
     setBusy(true);
-    if (club.is_public) {
+    const gated = !club.is_public || Boolean((club as any).requires_approval);
+    if (!gated) {
       const { error } = await supabase.from("club_members").insert({ club_id: club.id, user_id: user.id, role: "member" });
       if (error) toast({ title: "Couldn't join", description: error.message, variant: "destructive" });
       else toast({ title: "Welcome to the club" });

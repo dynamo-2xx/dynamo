@@ -240,6 +240,7 @@ export type Database = {
           event_type: string
           id: string
           mode: string
+          recurrence_rule: string | null
           session_id: string | null
           starts_at: string
           status: string
@@ -259,6 +260,7 @@ export type Database = {
           event_type: string
           id?: string
           mode?: string
+          recurrence_rule?: string | null
           session_id?: string | null
           starts_at: string
           status?: string
@@ -278,6 +280,7 @@ export type Database = {
           event_type?: string
           id?: string
           mode?: string
+          recurrence_rule?: string | null
           session_id?: string | null
           starts_at?: string
           status?: string
@@ -412,9 +415,11 @@ export type Database = {
           deleted_by: string | null
           description: string | null
           id: string
+          is_featured: boolean
           is_public: boolean
           location: string | null
           name: string
+          requires_approval: boolean
           updated_at: string
         }
         Insert: {
@@ -425,9 +430,11 @@ export type Database = {
           deleted_by?: string | null
           description?: string | null
           id?: string
+          is_featured?: boolean
           is_public?: boolean
           location?: string | null
           name: string
+          requires_approval?: boolean
           updated_at?: string
         }
         Update: {
@@ -438,9 +445,11 @@ export type Database = {
           deleted_by?: string | null
           description?: string | null
           id?: string
+          is_featured?: boolean
           is_public?: boolean
           location?: string | null
           name?: string
+          requires_approval?: boolean
           updated_at?: string
         }
         Relationships: []
