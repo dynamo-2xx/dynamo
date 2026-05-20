@@ -48,9 +48,15 @@ export default function ImportToRecordPage() {
           title_hint: title.trim() || fileName || undefined,
         },
       });
+      const payload: any = data ?? {};
+      if (payload?.error === "tier_required" || (error as any)?.status === 402) {
+        toast.error("Importing records is a Pro feature.");
+        navigate("/pricing");
+        return;
+      }
       if (error) throw error;
-      const id = (data as any)?.debate_id;
-      if (!id) throw new Error((data as any)?.message ?? "No record returned");
+      const id = payload?.debate_id;
+      if (!id) throw new Error(payload?.message ?? "No record returned");
       toast.success("Record ready");
       navigate(`/debate/${id}`);
     } catch (e: any) {
