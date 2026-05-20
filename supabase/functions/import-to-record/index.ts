@@ -102,6 +102,23 @@ serve(async (req) => {
       }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Daily soft cap — 20 imports/24h to bound runaway cost (§18).
+    {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count } = await supabase
+        .from("debates")
+        .select("id", { count: "exact", head: true })
+        .eq("created_by", user.id)
+        .not("imported_source_kind", "is", null)
+        .gte("created_at", since);
+      if ((count ?? 0) >= 20) {
+        return new Response(JSON.stringify({
+          error: "daily_cap_reached",
+          message: "You've hit today's import limit (20/day). Try again tomorrow.",
+        }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     // Fetch source text
     let text = "";
     let sourceUrl: string | null = null;
