@@ -57,9 +57,9 @@ ToS inline acceptance, `/seals` transparency page, 30-day account deletion with 
 ## §10 Analytics & Observability — 🟢
 PostHog events + KPIs, Sentry errors, email-only alerts at launch.
 
-## §11 Launch & Growth — 🟡
+## §11 Launch & Growth — 🟢
 *"As a curious lurker, I land on a beautiful OG card and join the waitlist; as a Pro user, I have invite credits."*
-Soft waitlist, invite credits, OG cards for every record, marketing + records SEO.
+Soft waitlist ✅, invite credits ✅, OG cards wired on Debate/Record/Live via `og-image` edge function ✅, per-page meta + canonical via `useDocumentMeta` ✅.
 
 ## §12 Monetization & Payments — 🟡
 *"As a free user, I hit a clear wall and can upgrade in two clicks."*
