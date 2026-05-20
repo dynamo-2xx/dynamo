@@ -13,6 +13,8 @@ export interface ClubItem {
   created_at: string;
   member_count?: number;
   is_member?: boolean;
+  is_featured?: boolean;
+  requires_approval?: boolean;
 }
 
 export function useClubs() {
