@@ -145,6 +145,24 @@ const DebateRecordPreview = ({
                 {participantCount} participant{participantCount === 1 ? "" : "s"}
               </span>
             )}
+            {importedSourceUrl && (
+              <a
+                href={importedSourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 underline-offset-2 hover:underline truncate max-w-[18rem]"
+              >
+                source: {(() => {
+                  try { return new URL(importedSourceUrl).hostname.replace(/^www\./, ""); }
+                  catch { return importedSourceUrl; }
+                })()}
+              </a>
+            )}
+            {!importedSourceUrl && importedSourceKind && (
+              <span className="inline-flex items-center gap-1">
+                source: {importedSourceKind}
+              </span>
+            )}
           </div>
         </div>
       </div>
