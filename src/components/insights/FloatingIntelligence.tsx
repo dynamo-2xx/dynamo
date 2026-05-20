@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Sparkles, Smile, Meh, Frown, Lock, MessageSquare } from "lucide-react";
+import { Sparkles, Smile, Meh, Frown, Lock, MessageSquare, Copy } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import FloatingOverlay from "@/components/debate/FloatingOverlay";
 import { usePerformanceAnnotations, type PerfAnnotation } from "@/hooks/usePerformanceAnnotations";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -92,6 +93,19 @@ export default function FloatingIntelligence({
                           <span className="font-medium text-foreground">Try: </span>{a.recommendation}
                         </p>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const quote = `> ${a.explanation}${a.recommendation ? `\n> Try: ${a.recommendation}` : ""}`;
+                          navigator.clipboard?.writeText(quote).then(
+                            () => toast.success("Copied — paste into Dynamo chat to discuss."),
+                            () => toast.error("Copy failed"),
+                          );
+                        }}
+                        className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                      >
+                        <Copy className="w-3 h-3" /> Discuss in Dynamo
+                      </button>
                     </div>
                   </div>
                 </li>
