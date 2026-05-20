@@ -84,12 +84,12 @@ const App = () => (
           <LiveRegionProvider>
             <Toaster />
             <Sonner />
+            <ErrorBoundary>
+          <BrowserRouter>
             <IncidentBanner />
             <PastDueBanner />
             <OfflineBanner />
             <InstallAppChip />
-            <ErrorBoundary>
-          <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/explore" element={<ExplorePage />} />
