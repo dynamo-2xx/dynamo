@@ -1,0 +1,60 @@
+# §19 Backup & DR — nightly logical pg_dump of the production database
+# pushed to an off-region S3 bucket. Pair with PITR (Supabase platform)
+# for full RPO 24h / RTO 4h coverage.
+#
+# Required GitHub Secrets:
+#   SUPABASE_DB_URL          - postgresql://...:6543/postgres (pooler URL OK)
+#   AWS_ACCESS_KEY_ID        - IAM user with PutObject on the bucket
+#   AWS_SECRET_ACCESS_KEY
+#   AWS_REGION               - e.g. eu-west-3 (must differ from primary)
+#   BACKUP_S3_BUCKET         - e.g. dynamo-backups-eu-west-3
+name: db-backup
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC nightly
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional tag suffix"
+        required: false
+
+jobs:
+  pg_dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install Postgres client (matches Supabase major)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16 zstd
+      - name: Dump
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          FILE="dynamo-${STAMP}${{ inputs.tag && format('-{0}', inputs.tag) || '' }}.sql.zst"
+          pg_dump "${{ secrets.SUPABASE_DB_URL }}" \
+            --no-owner --no-privileges --format=plain \
+          | zstd -19 -T0 -o "$FILE"
+          ls -lh "$FILE"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+      - name: Upload to S3
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Copy to bucket
+        run: |
+          aws s3 cp "$FILE" "s3://${{ secrets.BACKUP_S3_BUCKET }}/nightly/$FILE" \
+            --storage-class STANDARD_IA
+      - name: Record success in DB
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          psql "${{ secrets.SUPABASE_DB_URL }}" -v ON_ERROR_STOP=1 <<SQL
+          INSERT INTO public.backup_runs (kind, status, finished_at, artifact, bytes)
+          VALUES ('pg_dump_nightly', 'success', now(), '$FILE',
+                  $(stat -c%s "$FILE"));
+          SQL
