@@ -9,6 +9,7 @@ import { useUnreadDMCount } from "@/hooks/useDirectMessages";
 import { FloatingDMProvider } from "@/contexts/FloatingDMContext";
 import FloatingDMWindow from "@/components/messages/FloatingDMWindow";
 import VerifyEmailBanner from "@/components/VerifyEmailBanner";
+import MySanctionBanner from "@/components/sanctions/MySanctionBanner";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
