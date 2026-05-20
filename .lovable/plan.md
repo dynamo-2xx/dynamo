@@ -80,7 +80,7 @@ Resend on `mail.dynamo.today` with SPF/DKIM/DMARC, 12 transactional templates, w
 ## §17 Billing Ops — 🟡
 Stripe Customer Portal, idempotent webhook, dunning ladder, Stripe Tax (EU OSS). No self-serve refunds at launch.
 
-## §18 Cost Tracking & Spend — 🟠
+## §18 Cost Tracking & Spend — 🟡
 *"As the founder, I see per-feature unit costs and a spend dashboard before the bill hits."*
 Per-source budgets, usage logs, founder cost dashboard, pricing-decision queue feeding §12. Heavy backend wiring.
 
@@ -90,7 +90,7 @@ RPO 24h / RTO 4h, Supabase PITR + weekly cold `pg_dump` to second-region S3, **m
 ## §20 Legal & Compliance — 🟢
 Template `/terms`, `/privacy`, `/guidelines`, `/legal/subprocessors`. Signup writes `tos_accepted_at` + `tos_version`. Already partially shipped.
 
-## §21 Performance Intelligence (Premium) — 🟠
+## §21 Performance Intelligence (Premium) — 🟡
 *"As a Pro user, I see a color/face-coded breakdown of my debate performance and can hand a moment to DYNAMO for coaching."*
 Live light pass + post-session deep pass, 3 dashboard surfaces, DYNAMO handoff via quoted message, blurred-preview paywall for free tier. AI pipeline is the unknown.
 
@@ -98,10 +98,10 @@ Live light pass + post-session deep pass, 3 dashboard surfaces, DYNAMO handoff v
 *"As a club organizer, I run recurring debates with my members and approve who joins."*
 Owner/Admin/Member hierarchy, Featured/Local directory, all 3 event types + recurring, in-club event launch, admin-approval toggle.
 
-## §23 Sharing, Co-ownership & Pause — 🟡
+## §23 Sharing, Co-ownership & Pause — 🟢
 Viewer/Co-owner share tiers, fork-on-complete only (no live co-edit at v1), uniform host-only Pause/Resume across Debate/Live/CMM.
 
-## §24 Continue button — 🟡
+## §24 Continue button — 🟢
 Linear-chain v1/v2/v3 continuations on completed Debate/CMM/Live (never Notebooks). Per-click "bring participants?" modal. Divider row + version badges in transcript. Quota: 1 record per continue.
 
 ## §25 Import-to-Record — 🟡
