@@ -48,14 +48,14 @@ function admin() {
 async function loadMeta(type: string, id: string): Promise<{ meta: Meta; stamp: string } | null> {
   const s = admin();
   if (type === "debate") {
-    const { data } = await s.from("debates").select("title, updated_at, status").eq("id", id).maybeSingle();
+    const { data } = await s.from("debates").select("topic, updated_at, status").eq("id", id).maybeSingle();
     if (!data) return null;
-    return { meta: { eyebrow: "DEBATE", title: data.title || "Untitled debate", subtitle: (data.status || "").toString().toUpperCase() }, stamp: data.updated_at || "" };
+    return { meta: { eyebrow: "DEBATE", title: data.topic || "Untitled debate", subtitle: (data.status || "").toString().toUpperCase() }, stamp: data.updated_at || "" };
   }
   if (type === "record") {
-    const { data } = await s.from("debates").select("title, updated_at").eq("id", id).maybeSingle();
+    const { data } = await s.from("debates").select("topic, updated_at").eq("id", id).maybeSingle();
     if (!data) return null;
-    return { meta: { eyebrow: "RECORD", title: data.title || "Untitled record", subtitle: "Transcript & analysis" }, stamp: data.updated_at || "" };
+    return { meta: { eyebrow: "RECORD", title: data.topic || "Untitled record", subtitle: "Transcript & analysis" }, stamp: data.updated_at || "" };
   }
   if (type === "live") {
     const { data } = await s.from("live_sessions").select("title, updated_at").eq("id", id).maybeSingle();
