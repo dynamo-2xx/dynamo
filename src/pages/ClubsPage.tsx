@@ -26,6 +26,11 @@ const ClubsPage = () => {
     return list;
   }, [items, chip, q]);
 
+  const featured = useMemo(
+    () => (q || chip !== "all" ? [] : items.filter((c) => c.is_featured).slice(0, 6)),
+    [items, q, chip],
+  );
+
   const chips: { id: ChipId; label: string }[] = [
     { id: "all", label: "All" },
     { id: "mine", label: "My Clubs" },
@@ -90,11 +95,23 @@ const ClubsPage = () => {
               {q ? `No clubs match "${q}"` : "No clubs yet — be the first to create one."}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-7">
-              {filtered.map((c) => (
-                <ClubCoverCard key={c.id} c={c} />
-              ))}
-            </div>
+            <>
+              {featured.length > 0 && (
+                <div className="mb-8">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium mb-3">Featured</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-7">
+                    {featured.map((c) => (
+                      <ClubCoverCard key={`feat-${c.id}`} c={c} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-7">
+                {filtered.map((c) => (
+                  <ClubCoverCard key={c.id} c={c} />
+                ))}
+              </div>
+            </>
           )}
         </motion.div>
       </div>
