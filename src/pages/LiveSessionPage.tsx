@@ -30,6 +30,7 @@ import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPr
 import ShareDialog from "@/components/sharing/ShareDialog";
 import PauseButton from "@/components/sharing/PauseButton";
 import { usePauseControl } from "@/hooks/usePauseControl";
+import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 
 const getDeviceId = () => {
   let id = localStorage.getItem("dyn_device_id");
