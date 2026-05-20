@@ -88,6 +88,20 @@ serve(async (req) => {
 
     const body = (await req.json()) as Body;
 
+    // Tier preflight — free tier may not import (per §25 monetization gate).
+    const { data: sub } = await supabase
+      .from("subscriptions")
+      .select("tier,status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const tier = (sub as any)?.tier ?? "free";
+    if (tier === "free") {
+      return new Response(JSON.stringify({
+        error: "tier_required",
+        message: "Importing records is a Pro feature. Upgrade to import debates from links or transcripts.",
+      }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Fetch source text
     let text = "";
     let sourceUrl: string | null = null;
