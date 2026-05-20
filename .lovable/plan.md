@@ -104,9 +104,10 @@ Viewer/Co-owner share tiers, fork-on-complete only (no live co-edit at v1), unif
 ## §24 Continue button — 🟡
 Linear-chain v1/v2/v3 continuations on completed Debate/CMM/Live (never Notebooks). Per-click "bring participants?" modal. Divider row + version badges in transcript. Quota: 1 record per continue.
 
-## §25 Import-to-Record — 🟠
+## §25 Import-to-Record — 🟡
 *"As a user, I drop a YouTube link or a PDF and Dynamo gives me back a fully threaded debate record I can annotate, share, and continue."*
 Second dropbox on `/create` accepting YouTube/file/PDF/article. Full-screen "People to the Power!" loader. Private by default. Counts as 1 Debate quota. Per-tier minute caps. New `import-to-record` edge function orchestrating fetch → transcribe → structure → persist.
+v1 status: article-URL + raw-text path live, tier-gated (Pro+), 20/day soft cap, quota increment wired. A/V/PDF still 501 stubs.
 
 ---
 
