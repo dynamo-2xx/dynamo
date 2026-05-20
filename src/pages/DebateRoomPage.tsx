@@ -20,6 +20,7 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
 import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
+import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
