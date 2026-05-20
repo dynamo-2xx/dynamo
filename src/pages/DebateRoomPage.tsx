@@ -103,6 +103,21 @@ const DebateRoomPage = () => {
   const [userRole, setUserRole] = useState<UserRole>("spectator");
   const [facilitatorSpeaking, setFacilitatorSpeaking] = useState(false);
 
+  // §11 SEO — per-record OG card via og-image edge function.
+  const ogType = debate?.status === "completed" || debate?.status === "archived" ? "record" : "debate";
+  useDocumentMeta(
+    debate
+      ? {
+          title: `${debate.topic} · Dynamo`,
+          description: debate.topic,
+          image: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/og-image?type=${ogType}&id=${debate.id}`,
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+          type: "article",
+          canonical: typeof window !== "undefined" ? window.location.origin + window.location.pathname : undefined,
+        }
+      : {},
+  );
+
   const [timeLeft, setTimeLeft] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
