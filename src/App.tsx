@@ -45,6 +45,7 @@ import AdminDeletionReviewPage from "./pages/AdminDeletionReviewPage";
 import AdminModerationPage from "./pages/AdminModerationPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
+import StatusPage from "./pages/StatusPage";
 import GuidelinesPage from "./pages/GuidelinesPage";
 import SubprocessorsPage from "./pages/SubprocessorsPage";
 import MessagesPage from "./pages/MessagesPage";
@@ -142,6 +143,7 @@ const App = () => (
               <Route path="/debate/:id/edit" element={<ProtectedRoute><DebateEditArgumentsPage /></ProtectedRoute>} />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/status" element={<StatusPage />} />
               <Route path="/guidelines" element={<GuidelinesPage />} />
               <Route path="/legal/subprocessors" element={<SubprocessorsPage />} />
               <Route path="/pricing" element={<PricingPage />} />

@@ -86,7 +86,10 @@ const AdminModerationPage = () => {
     }
   };
 
-  const sanction = async (report: Report, kind: "warning" | "mute_24h" | "suspend") => {
+  const sanction = async (
+    report: Report,
+    kind: "warning" | "mute_24h" | "mute_7d" | "suspend" | "ban",
+  ) => {
     setBusy(report.id);
     // Resolve the report which user this targets — for message/comment targets we
     // can't trivially infer author here, so we sanction the reporter's target only
@@ -103,7 +106,9 @@ const AdminModerationPage = () => {
     }
     const expires =
       kind === "mute_24h" ? new Date(Date.now() + 24 * 3600_000).toISOString()
+      : kind === "mute_7d" ? new Date(Date.now() + 7 * 86400_000).toISOString()
       : kind === "suspend" ? new Date(Date.now() + 7 * 86400_000).toISOString()
+      : kind === "ban" ? null
       : null;
     const { error } = await supabase.from("content_sanctions").insert({
       user_id: report.target_id,
@@ -202,7 +207,9 @@ const AdminModerationPage = () => {
                       <>
                         <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => sanction(r, "warning")}>Warn</Button>
                         <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => sanction(r, "mute_24h")}>Mute 24h</Button>
+                        <Button size="sm" variant="outline" disabled={busy === r.id} onClick={() => sanction(r, "mute_7d")}>Mute 7d</Button>
                         <Button size="sm" variant="destructive" disabled={busy === r.id} onClick={() => sanction(r, "suspend")}>Suspend 7d</Button>
+                        <Button size="sm" variant="destructive" disabled={busy === r.id} onClick={() => sanction(r, "ban")}>Ban</Button>
                       </>
                     )}
                   </div>
