@@ -121,6 +121,39 @@ export type Database = {
           },
         ]
       }
+      backup_runs: {
+        Row: {
+          artifact: string | null
+          bytes: number | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          artifact?: string | null
+          bytes?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          kind: string
+          started_at?: string
+          status: string
+        }
+        Update: {
+          artifact?: string | null
+          bytes?: number | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       billing_events: {
         Row: {
           amount_cents: number | null
