@@ -48,18 +48,23 @@ export default function ImportToRecordPage() {
           title_hint: title.trim() || fileName || undefined,
         },
       });
-      const payload: any = data ?? {};
-      if (payload?.error === "tier_required" || (error as any)?.status === 402) {
+      // supabase-js throws on non-2xx; the body is on error.context (a Response).
+      let payload: any = data ?? {};
+      let status: number | undefined = (error as any)?.context?.status;
+      if (error && (error as any)?.context && typeof (error as any).context.json === "function") {
+        try { payload = await (error as any).context.clone().json(); } catch {}
+      }
+      if (payload?.error === "tier_required" || status === 402) {
         toast.error("Importing records is a Pro feature.");
         navigate("/pricing");
         return;
       }
-      if (payload?.error === "daily_cap_reached" || (error as any)?.status === 429) {
+      if (payload?.error === "daily_cap_reached" || status === 429) {
         toast.error(payload?.message ?? "Daily import limit reached. Try again tomorrow.");
         setBusy(false);
         return;
       }
-      if (error) throw error;
+      if (error) throw new Error(payload?.message ?? (error as any)?.message ?? "Import failed");
       const id = payload?.debate_id;
       if (!id) throw new Error(payload?.message ?? "No record returned");
       toast.success("Record ready");
