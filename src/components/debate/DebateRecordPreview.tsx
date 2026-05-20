@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, Calendar as CalendarIcon, Users } from "lucide-react";
+import { ChevronDown, Calendar as CalendarIcon, Users, Download } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { gradientFromSeed } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,8 @@ interface DebateRecordPreviewProps {
   fallbackSubtopics?: { id: string; title: string }[];
   /** Side labels used for ghost speakers when no live data exists. */
   fallbackSideLabels?: string[];
+  importedSourceUrl?: string | null;
+  importedSourceKind?: string | null;
 }
 
 const StatusPill = ({ status }: { status: string }) => {
@@ -63,6 +65,8 @@ const DebateRecordPreview = ({
   participantCount,
   fallbackSubtopics = [],
   fallbackSideLabels = [],
+  importedSourceUrl = null,
+  importedSourceKind = null,
 }: DebateRecordPreviewProps) => {
   const { subtopics: liveSubs, sideLabels, loading } = useDebatePreviewThreads({
     debateId,
@@ -114,6 +118,15 @@ const DebateRecordPreview = ({
         <div className="absolute bottom-5 left-5 right-5">
           <div className="flex items-center gap-2 mb-3">
             <StatusPill status={status} />
+            {(importedSourceUrl || importedSourceKind) && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-body font-semibold uppercase tracking-wider border bg-background/95 text-foreground border-border"
+                title={importedSourceUrl ?? undefined}
+              >
+                <Download className="w-3 h-3" />
+                Imported
+              </span>
+            )}
             {scheduledLabel && (
               <span className="text-white/90 text-[11px] font-body inline-flex items-center gap-1">
                 <CalendarIcon className="w-3 h-3" />
