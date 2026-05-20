@@ -57,6 +57,19 @@ const LiveSessionPage = () => {
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
   const [setupTags, setSetupTags] = useState<Tag[]>([]);
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+
+  // §11 SEO — live session OG card.
+  useDocumentMeta(
+    sessionId
+      ? {
+          title: `${title || "Live session"} · Dynamo`,
+          description: title || "Live conversation on Dynamo",
+          image: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/og-image?type=live&id=${sessionId}`,
+          url: typeof window !== "undefined" ? window.location.href : undefined,
+          type: "article",
+        }
+      : {},
+  );
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [hostDisplayName, setHostDisplayName] = useState<string>("");
   const [hostSpeakerSlot, setHostSpeakerSlot] = useState<number>(1);
