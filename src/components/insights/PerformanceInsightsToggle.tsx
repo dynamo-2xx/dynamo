@@ -64,6 +64,13 @@ export function PerformanceInsightsToggle({
         <Marker icon={<Smile className="h-4 w-4 text-emerald-600" />} label="Strong" count={counts.green} active={active.has("green")} onClick={() => toggle("green")} />
         <Marker icon={<Meh className="h-4 w-4 text-amber-600" />} label="Concern" count={counts.orange} active={active.has("orange")} onClick={() => toggle("orange")} />
         <Marker icon={<Frown className="h-4 w-4 text-red-600" />} label="Problem" count={counts.red} active={active.has("red")} onClick={() => toggle("red")} />
+        <div className="border-t border-border my-1" />
+        <Link
+          to={`/intelligence/${sessionKind}/${sessionId}`}
+          className="block px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          Open full report →
+        </Link>
       </PopoverContent>
     </Popover>
   );
