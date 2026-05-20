@@ -45,6 +45,7 @@ import AdminDeletionReviewPage from "./pages/AdminDeletionReviewPage";
 import AdminModerationPage from "./pages/AdminModerationPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
+import StatusPage from "./pages/StatusPage";
 import GuidelinesPage from "./pages/GuidelinesPage";
 import SubprocessorsPage from "./pages/SubprocessorsPage";
 import MessagesPage from "./pages/MessagesPage";
