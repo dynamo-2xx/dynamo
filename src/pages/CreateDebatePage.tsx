@@ -1020,18 +1020,6 @@ const CreateDebatePage = () => {
                   Create
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate("/create/import")}
-                className="mt-4 w-full border border-dashed border-border rounded-lg p-5 text-left hover:border-foreground/40 transition-colors group"
-              >
-                <div className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-1">
-                  Already have a debate?
-                </div>
-                <div className="text-sm font-body text-foreground group-hover:text-foreground">
-                  Drop a link or transcript → get a threaded record.
-                </div>
-              </button>
             </motion.div>
           )}
 
