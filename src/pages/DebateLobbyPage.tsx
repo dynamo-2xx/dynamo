@@ -78,7 +78,7 @@ export default function DebateLobbyPage() {
     if (!ok) return;
     const { error } = await supabase
       .from("debates")
-      .update({ status: "cancelled", ended_at: new Date().toISOString() })
+      .update({ status: "archived", ended_at: new Date().toISOString() })
       .eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success("Debate cancelled");
