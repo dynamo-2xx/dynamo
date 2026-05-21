@@ -39,7 +39,7 @@ interface NotebookPanelProps {
   onClose: () => void;
   sessionId: string;
   /** Optional: when set, Dynamo Q&A targets a debate or CMM record instead of a live session. */
-  recordType?: "live_session" | "debate" | "change_my_mind";
+  recordType?: "live_session" | "debate" | "change_my_mind" | "imported_record";
   recordId?: string;
   thoughts: string;
   setThoughts: (v: string) => void;

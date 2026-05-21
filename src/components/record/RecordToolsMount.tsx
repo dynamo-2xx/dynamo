@@ -8,7 +8,7 @@ import { useSessionAnnotations, type SessionAnnotation } from "@/hooks/useSessio
 import type { LiveTranscriptEntry, LiveSummary } from "@/hooks/useLiveTranscription";
 
 interface RecordToolsMountProps {
-  recordType: "live_session" | "debate" | "change_my_mind";
+  recordType: "live_session" | "debate" | "change_my_mind" | "imported_record";
   recordId: string;
   /** CSS selector for the container that wraps highlightable transcript / argument elements. */
   containerSelector?: string;
@@ -33,7 +33,11 @@ const RecordToolsMount = ({
 }: RecordToolsMountProps) => {
   const [open, setOpen] = useState(false);
   const notebook = useSessionNotebook({ recordType, recordId });
-  const annotations = useSessionAnnotations({ recordType, recordId });
+  const supportsAnnotations = recordType !== "imported_record";
+  const annotations = useSessionAnnotations({
+    recordType: supportsAnnotations ? (recordType as any) : "live_session",
+    recordId: supportsAnnotations ? recordId : "00000000-0000-0000-0000-000000000000",
+  });
 
   const jumpToAnnotation = (a: SessionAnnotation) => {
     const sel =
@@ -52,13 +56,15 @@ const RecordToolsMount = ({
 
   return (
     <>
-      <HighlightAnnotateLayer
-        containerSelector={containerSelector}
-        onAnnotate={(input) => {
-          void annotations.add(input);
-          toast.success("Saved to notebook");
-        }}
-      />
+      {supportsAnnotations && (
+        <HighlightAnnotateLayer
+          containerSelector={containerSelector}
+          onAnnotate={(input) => {
+            void annotations.add(input);
+            toast.success("Saved to notebook");
+          }}
+        />
+      )}
 
       <button
         onClick={() => setOpen((v) => !v)}

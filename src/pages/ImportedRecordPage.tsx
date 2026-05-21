@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import ArgumentMapContent from "@/components/debate/ArgumentMapContent";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
+import RecordToolsMount from "@/components/record/RecordToolsMount";
 import { toast } from "sonner";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 
@@ -73,7 +74,7 @@ export default function ImportedRecordPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-3xl mx-auto px-4 py-6" data-record-root>
         <button
           onClick={() => navigate(-1)}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
@@ -130,6 +131,12 @@ export default function ImportedRecordPage() {
           />
         </div>
       </div>
+      <RecordToolsMount
+        recordType="imported_record"
+        recordId={rec.id}
+        transcriptEntries={rec.transcript_entries as any}
+        subtopics={subtopics.map((s) => s.title)}
+      />
     </AppLayout>
   );
 }
