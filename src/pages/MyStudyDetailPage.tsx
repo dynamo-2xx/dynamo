@@ -17,11 +17,14 @@ import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
 import ShareMenu from "@/components/study/ShareMenu";
 import RenameDialog from "@/components/study/RenameDialog";
-import ThoughtsTab from "@/components/live/record/notebook/ThoughtsTab";
+import ThoughtsEditor from "@/components/study/ThoughtsEditor";
 import AnnotationsTab from "@/components/live/record/notebook/AnnotationsTab";
 import MyTakeTab from "@/components/live/record/notebook/MyTakeTab";
 import DynamoChatPane from "@/components/live/record/DynamoChatPane";
 import NotebookSplitDivider from "@/components/live/record/NotebookSplitDivider";
+import NotebookToolbar from "@/components/study/NotebookToolbar";
+import PublishNotebookButton from "@/components/study/PublishNotebookButton";
+import type { Editor } from "@tiptap/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -156,6 +159,11 @@ const MyStudyDetailPage = () => {
   const [tab, setTab] = useState<Tab>("thoughts");
   const [renameOpen, setRenameOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
+  const handleEditorReady = (e: Editor | null) => {
+    if (e) setActiveEditor(e);
+    else setActiveEditor((cur) => (cur && cur.isDestroyed ? null : cur));
+  };
   const reader = useReaderNotes(notebookId ?? null);
 
   // §21 — "Discuss in Dynamo" deep link. IntelligencePage and other surfaces
@@ -227,9 +235,11 @@ const MyStudyDetailPage = () => {
   const renderTab = (t: Tab) => {
     if (t === "thoughts")
       return (
-        <ThoughtsTab
+        <ThoughtsEditor
           thoughts={nb.thoughts}
           setThoughts={nb.setThoughts}
+          onEditorReady={handleEditorReady}
+          onFocus={() => {}}
           readerNotes={reader.inThoughts}
           onDismissReaderNote={reader.dismiss}
           onJumpReaderNote={handleJumpReaderNote}
@@ -241,6 +251,7 @@ const MyStudyDetailPage = () => {
           annotations={annotations || []}
           onJump={(a) => navigate(`${recordHref}#annotation-${a.id}`)}
           onRemove={handleRemoveAnn}
+          onEditorReady={handleEditorReady}
         />
       );
     if (t === "my_take")
@@ -252,6 +263,9 @@ const MyStudyDetailPage = () => {
           onPublish={nb.publish}
           onUnpublish={nb.unpublish}
           isPublished={nb.isPublished}
+          onEditorReady={handleEditorReady}
+          recordType={recordType}
+          recordId={recordId}
         />
       );
     // dynamo
