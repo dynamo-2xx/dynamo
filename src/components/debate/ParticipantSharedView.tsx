@@ -264,6 +264,38 @@ const ParticipantSharedView = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Constant control trio — both sides have access to d., the argument
+              map, and their notebook regardless of whose turn it is. */}
+          {isSpeaker && (
+            <div className="flex items-center gap-1.5 mr-1">
+              {onToggleAiMessage && (
+                <DLogoButton
+                  onClick={onToggleAiMessage}
+                  active={!aiMessageCollapsed}
+                  pulse={aiMessagePulse}
+                  disabled={!aiMessage}
+                />
+              )}
+              <IconCircleButton
+                onClick={() => setArgumentMapOpen((v) => !v)}
+                active={argumentMapOpen}
+                title="Argument map"
+                ariaLabel="Toggle argument map overlay"
+              >
+                <MapIcon className="w-3.5 h-3.5" />
+              </IconCircleButton>
+              {onOpenNotebook && (
+                <IconCircleButton
+                  onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
+                  active={notebookOpen}
+                  title="My notebook"
+                  ariaLabel="Toggle notebook"
+                >
+                  <NotebookPen className="w-3.5 h-3.5" />
+                </IconCircleButton>
+              )}
+            </div>
+          )}
           <DebateTimer timeLeft={timeLeft} size="md" />
         </div>
       </div>
