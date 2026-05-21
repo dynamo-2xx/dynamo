@@ -966,14 +966,9 @@ const CreateDebatePage = () => {
         toast.success("Debate updated");
         navigate(`/debate/${editId}/preview`);
       } else if (publishMode) {
-        const hasTags = selectedTags.length > 0;
-        if (hasTags) {
-          toast.success("Debate published! Find it on Explore under your tags.");
-          navigate(`/explore/topic/${selectedTags[0].slug}`);
-        } else {
-          toast.success("Debate published! Find it under My Recent on your profile.");
-          navigate(`/my-recent`);
-        }
+        // Publisher must pass through mic-prep just like every other speaker.
+        toast.success("Debate published! Test your mic to start.");
+        navigate(`/debate/${dbDebate.id}/lobby`);
       } else {
         toast.success("Debate created!");
         navigate(`/debate/${dbDebate.id}`);
