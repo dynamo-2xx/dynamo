@@ -21,8 +21,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { gradientFromSeed } from "@/lib/gradient";
 import type { Database } from "@/integrations/supabase/types";
+import ProfileIdCard from "@/components/profile/ProfileIdCard";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -93,13 +93,6 @@ const EditProfilePage = () => {
       (k) => form[k] !== initial[k]
     );
   }, [form, initial]);
-
-  const bannerStyle = useMemo(() => {
-    if (form.banner_url) {
-      return { backgroundImage: `url(${form.banner_url})` };
-    }
-    return { backgroundImage: gradientFromSeed(form.display_name || user?.email || "d.") };
-  }, [form.banner_url, form.display_name, user?.email]);
 
   const handleUpload = async (kind: "avatar" | "banner", file: File) => {
     if (!user) return;
