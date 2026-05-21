@@ -10,9 +10,14 @@ import FeaturedRow from "@/components/explore/FeaturedRow";
 import TagShelf from "@/components/explore/TagShelf";
 import CompactRecordCard from "@/components/explore/CompactRecordCard";
 import CompactShelf from "@/components/explore/CompactShelf";
+import {
+  ExploreFiltersProvider,
+  useExploreFilters,
+} from "@/contexts/ExploreFiltersContext";
 
-const ExplorePage = () => {
+const ExplorePageInner = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const { matches } = useExploreFilters();
 
   useDocumentMeta({
     title: "Explore Debates — Dynamo",
@@ -23,9 +28,19 @@ const ExplorePage = () => {
       typeof window !== "undefined" ? `${window.location.origin}/explore` : undefined,
   });
 
-  const { items: trending } = useTrendingDebates(24);
-  const { items: latest } = useLatestDebates(24);
-  const { shelves } = useTagShelves(16);
+  const { items: trendingAll } = useTrendingDebates(24);
+  const { items: latestAll } = useLatestDebates(24);
+  const { shelves: shelvesAll } = useTagShelves(16);
+
+  const trending = useMemo(() => trendingAll.filter((d) => matches(d)), [trendingAll, matches]);
+  const latest = useMemo(() => latestAll.filter((d) => matches(d)), [latestAll, matches]);
+  const shelves = useMemo(
+    () =>
+      shelvesAll
+        .map((s) => ({ ...s, items: s.items.filter((d) => matches(d)) }))
+        .filter((s) => s.items.length > 0),
+    [shelvesAll, matches],
+  );
 
   const allMerged = useMemo(() => {
     const seen = new Set<string>();
@@ -104,5 +119,11 @@ const ExplorePage = () => {
     </AppLayout>
   );
 };
+
+const ExplorePage = () => (
+  <ExploreFiltersProvider>
+    <ExplorePageInner />
+  </ExploreFiltersProvider>
+);
 
 export default ExplorePage;

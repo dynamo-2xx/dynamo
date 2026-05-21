@@ -17,6 +17,7 @@ export interface ExploreDebate {
   publisher_name?: string | null;
   publisher_avatar?: string | null;
   kind?: "debate" | "imported_record";
+  format?: string | null;
 }
 
 export interface ExploreLiveSession {
@@ -30,7 +31,7 @@ export interface ExploreLiveSession {
 }
 
 const DEBATE_SELECT =
-  "id, topic, status, cover_image_url, created_at, is_public, created_by, community_tag, debate_participants(count)";
+  "id, topic, status, cover_image_url, created_at, is_public, created_by, community_tag, format, debate_participants(count)";
 
 const mapDebate = (d: any): ExploreDebate => ({
   id: d.id,
@@ -43,6 +44,7 @@ const mapDebate = (d: any): ExploreDebate => ({
   community_tag: d.community_tag,
   participant_count: d.debate_participants?.[0]?.count ?? 0,
   kind: "debate",
+  format: d.format ?? null,
 });
 
 const mapImported = (r: any): ExploreDebate => ({

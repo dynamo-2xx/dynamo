@@ -3,10 +3,14 @@ import { useFeaturedRow, type FeaturedScope } from "@/hooks/useFeaturedRow";
 import { useEdgeScroll } from "@/hooks/useEdgeScroll";
 import FeaturedCard from "./FeaturedCard";
 import EdgeArrow from "./EdgeArrow";
+import FormatFilter from "./FormatFilter";
+import { useExploreFilters } from "@/contexts/ExploreFiltersContext";
 
 const FeaturedRow = () => {
-  const { items, loading, scope, setScope, canUseLocal } = useFeaturedRow(12);
+  const { items: allItems, loading, scope, setScope, canUseLocal } = useFeaturedRow(12);
   const { ref, canLeft, canRight, scrollByCard } = useEdgeScroll<HTMLDivElement>();
+  const { matches } = useExploreFilters();
+  const items = allItems.filter((d) => matches(d));
 
   const Toggle = ({ value, label }: { value: FeaturedScope; label: string }) => {
     const active = scope === value;
@@ -30,15 +34,18 @@ const FeaturedRow = () => {
     );
   };
 
-  if (!loading && items.length === 0) return null;
+  if (!loading && allItems.length === 0) return null;
 
   return (
     <section className="min-w-0">
       <div className="flex items-center justify-between mb-3 px-0.5">
         <h2 className="font-display text-xl sm:text-2xl text-foreground">Featured</h2>
-        <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full border border-border/60 bg-foreground/5 backdrop-blur-xl">
-          <Toggle value="for_you" label="For You" />
-          <Toggle value="local" label="Local" />
+        <div className="flex items-center gap-2">
+          <FormatFilter />
+          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full border border-border/60 bg-foreground/5 backdrop-blur-xl">
+            <Toggle value="for_you" label="For You" />
+            <Toggle value="local" label="Local" />
+          </div>
         </div>
       </div>
 
@@ -47,14 +54,20 @@ const FeaturedRow = () => {
           ref={ref}
           className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {loading && items.length === 0
+          {loading && allItems.length === 0
             ? Array.from({ length: 3 }).map((_, i) => (
                 <div
                   key={i}
                   className="snap-start shrink-0 w-[78vw] sm:w-[44vw] md:w-[calc((100%-2rem)/3)] aspect-[16/10] rounded-xl bg-foreground/5 animate-pulse"
                 />
               ))
-            : items.map((d) => <FeaturedCard key={d.id} d={d} />)}
+            : items.length === 0
+              ? (
+                <div className="text-sm text-muted-foreground font-body py-6">
+                  No featured records match this filter.
+                </div>
+              )
+              : items.map((d) => <FeaturedCard key={d.id} d={d} />)}
         </div>
         <div
           className={`pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-background to-transparent transition-opacity ${canLeft ? "opacity-100" : "opacity-0"}`}

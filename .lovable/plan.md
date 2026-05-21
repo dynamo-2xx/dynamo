@@ -1,39 +1,56 @@
-# Polish the Explore shelves
+# Explore — Format filter (All / Debates / Live / CMM / Imported)
 
-Two small but visible issues on `/explore`:
+Add a multi-select format filter that sits to the left of the For You / Local toggle in the Featured row header but applies **globally** to every shelf on `/explore` (Featured, all TagShelves, Latest, and search results).
 
-1. **Page-level horizontal scrollbar appears** when the sidebar expands. Cards that no longer fit push the whole page wider instead of being absorbed into the shelf's own horizontal scroller + edge-arrow preview.
-2. **"See all"** sits at the far right of the row, visually disconnected from its `#Tag` title.
+## UI
 
-## What changes
+`src/components/explore/FormatFilter.tsx` (new)
 
-### 1. Kill the page-level horizontal scroll
+- shadcn `DropdownMenu` trigger styled to match the For You/Local pill: rounded-full border `border-border/60`, `bg-foreground/5 backdrop-blur-xl`, `px-3.5 py-1.5 text-[12px] font-body`.
+- Label logic:
+  - All selected (or none) → `All formats ▾`
+  - 1 selected → `Debates ▾`
+  - 2+ selected → `Debates +2 ▾`
+- Menu contains 5 `DropdownMenuCheckboxItem`s: **All**, **Debates**, **Live**, **Change My Mind**, **Imported**.
+  - **All** is a master toggle: clicking it selects everything / clears to All-state. Toggling any individual item off "All" deselects All and leaves only that item.
+  - Selecting all 4 individuals auto-flips back to All.
 
-Goal: only the **shelf scrollers** ever scroll horizontally. The page itself never does. Off-screen cards become the "preview peek" reached only via the translucent edge arrow.
+## Global state
 
-- `src/components/AppLayout.tsx` — add `min-w-0 overflow-x-hidden` to the `<main>` element. Flex children default to `min-width: auto`, which lets wide inner content (like the shelves' `flex` row of cards) inflate the main column and produce a page scrollbar. `min-w-0` lets `flex-1` actually constrain width; `overflow-x-hidden` is a belt-and-suspenders guarantee.
-- `src/pages/ExplorePage.tsx` — add `min-w-0` to the inner `max-w-7xl` wrapper for the same reason (it sits inside another flex/flow context).
-- Each shelf's outer `<section className="relative">` (TagShelf, CompactShelf, FeaturedRow) — add `min-w-0 overflow-hidden` on the `relative` wrapper that contains the scroller, fades, and edge arrows, so partial cards are clipped at the section edge and only become visible via the arrow.
-- Verify FeaturedCard's responsive width tokens still resolve correctly inside the now-strictly-bounded container; no change to card widths themselves.
+`src/contexts/ExploreFiltersContext.tsx` (new) — lightweight context exposing:
 
-Result: when the user expands the sidebar, cards that would extend past the new viewport simply disappear behind the right-edge fade, and the translucent right arrow becomes active to reveal them. No browser-level horizontal scrollbar ever appears.
-
-### 2. Move "See all" next to the tag name
-
-`src/components/explore/TagShelf.tsx` — collapse the split header into a single left-aligned cluster:
-
-```text
-#Politics  4   See all →
+```ts
+type Format = "debate" | "live" | "cmm" | "imported";
+{ formats: Set<Format> | "all"; setFormats; isAll: boolean; matches: (item) => boolean }
 ```
 
-- Remove the right-side `<Link>See all →</Link>`.
-- Inside the existing left-side `<Link>` group, append a small `See all →` affordance after the count, styled as muted body text that brightens on hover (matches current "See all" style).
-- Header container becomes `flex items-baseline gap-2` (drop `justify-between`).
+Persisted in `localStorage` (`explore.formats`). Default = `"all"`.
 
-`CompactShelf` ("Latest") has no "See all" target, so its header is unchanged.
+`matches(item)` classifies an `ExploreDebate`/`ExploreLiveSession`:
+
+- `kind === "imported_record"` → `imported`
+- live-session item (from `useLiveSessionsByTag`) → `live`
+- debate with `status === "live"` → `live`
+- debate where the row's record type is CMM → `cmm` (see Technical below)
+- otherwise → `debate`
+
+## Wiring
+
+- `ExplorePage.tsx`: wrap content in `<ExploreFiltersProvider>`. Apply `matches` as a `.filter()` over: `trending`, `latest`, `shelves[i].items`, and `searchResults`. Hide a shelf if it becomes empty post-filter (preserves the "nothing janky" feel rather than showing empty rows).
+- `FeaturedRow.tsx`: render `<FormatFilter />` to the left of the existing toggle pill (`flex items-center gap-2`). Apply filter to `items` from `useFeaturedRow` before render; if the filtered list is empty, show a single muted line "No featured records match this filter."
+
+## Technical
+
+- **CMM detection**: `useExplore.ts` currently selects from `debates` without a format column. Extend `DEBATE_SELECT` to include a discriminator. Two options, pick whichever already exists in schema (verify before coding):
+  1. If `debates.format` / `debates.kind` column exists → add it to select + `mapDebate`.
+  2. Otherwise, left-join `change_my_mind_sessions` (or whatever table backs CMM rooms) keyed on `debate_id`, set `kind: "cmm"` when present.
+  This is the only data-layer change; no migrations, no RLS changes.
+- `ExploreDebate.kind` union expands to `"debate" | "live" | "cmm" | "imported_record"`. The Live-session shelves keep their own type — filter handles both via `matches`.
+- No new RPC; filtering happens client-side over already-loaded items (Explore shelves cap at 16–24).
 
 ## Out of scope
 
-- No changes to card sizing, scroll snap behavior, or arrow visuals.
-- No changes to `FeaturedRow`'s toggle pill placement (it stays on the right of the Featured header, since it's a control, not a navigation link).
-- No data, RPC, or routing changes.
+- No change to card visuals, edge-arrow scroll, or shelf ordering.
+- No server-side filter / pagination changes.
+- No new routes.  
+  
