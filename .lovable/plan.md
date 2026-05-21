@@ -1,81 +1,114 @@
-Progress: [██████░░░░] (revised plan — Import as 4th creation format)
+## Goal
+Restructure `/my-study/:id` to feel like a Google Doc: `[title row] → [toolbar] → [tabs + doc rectangle]`. Migrate Thoughts, Annotations (editing), and My Take to TipTap rich-text. Add a notebook-level **Publish** button. Public viewer mirrors the owner layout (no toolbar/editing) and gets its **own private Dynamo chatbot**.
 
-# Import-to-Record v2 — Promote to a Standalone Format
-
-You're right. Folding import into the Debate flow has been forcing it through the wrong abstraction. Making it the **fourth creation format** (alongside Debate / Live / CMM) is cleaner: one entry point on the homepage wheel, one page, one record-structure picker, one pipeline.
-
-## The new model
+## Layout (owner/editor view)
 
 ```text
-Homepage wheel  →  Debate
-                →  Live
-                →  Change My Mind
-                →  Import            ← NEW (4th slide)
+← Back to My Study
+Test in EF class  ✎      [✉] [Publish] [Open record ↗] [⤴ Share]
+Recorded May 20, 2026
+
+[ B  I  U  S  H1 H2 • 1. 🔗  ↶ ↷ ]            ← toolbar: always visible, identical across tabs
+┌──────────────────────────────────────────┐
+│ Thoughts │ Annotations · 0 │ My Take │ ✨ Dynamo │
+├──────────────────────────────────────────┤
+│  tab content                              │
+└──────────────────────────────────────────┘
 ```
 
-**Import** = "I already have the raw material. Turn it into a record."
+- Doc chrome = subtle bordered card.
+- Tab strip docks to top edge of the rectangle; active tab connects into the card.
 
-Inside the Import page, the user picks:
+## Toolbar behavior (constant across tabs)
+- Toolbar is **always rendered with the same buttons in the same positions**, on every tab.
+- Buttons are interactive whenever the focused tab is a rich-text surface (**Thoughts, Annotations editor, My Take**). On Dynamo the buttons appear identical but no-op on click (no greyed/disabled state).
+- Active formatting indicators reflect the currently focused editor.
+- Hidden entirely on the public viewer.
 
-1. **Source** — URL · pasted text · file (.txt/.md/.srt/.vtt/.pdf/.mp3/.mp4/.m4a/.wav)
-2. **Record structure** — Debate · Live · CMM (default = Debate)
-3. **Title hint** (optional)
+## Rich-text surfaces (v1)
+- **Thoughts**: TipTap full doc.
+- **Annotations**: when a note is in edit mode, its `Textarea` becomes a TipTap editor bound to the toolbar. Excerpt stays plain.
+- **My Take**: TipTap editor — **fully user-editable, the user writes their own take**. 280-char limit still enforced against plain-text length.
 
-The output is always a **completed, private record** in the chosen structure. No live phase, no prep, no participants — just the final analyzed artifact.
+## My Take authorship (default vs optional AI assist)
+- **Default**: the user writes My Take themselves. No AI consolidation runs automatically.
+- **Optional**: a clearly-labeled secondary action (e.g. "Suggest from my Thoughts + Annotations") sits inside the My Take tab. Clicking it produces a **recommended** draft consolidated from the user's Thoughts and Annotations, which the user can accept, edit, or discard. Nothing is written to My Take without explicit user action.
 
-## What this fixes
+## Publish button (notebook-level)
+- Placed **left of "Open record"**.
+- Uses existing `notebooks.published` flag.
+- States:
+  - Unpublished → `Publish` (primary). Click sets `published = true`, ensures `share_token` exists, toasts "Published to your profile".
+  - Published → `Published` + globe icon (outline). Click opens popover with **Unpublish** + copyable public link.
 
-- **"Summaries pending"** — current import only writes `debate_transcripts.transcript_entries`. The threaded record reads from `round_summaries.key_arguments`. Import will now populate both, so the threaded record fills in immediately.
-- **Audio / video / PDF "coming soon"** — Deepgram (already in the project for live) handles audio/video transcription; `unpdf` (already imported) handles PDFs. Same pipeline, three new front doors.
-- **Confusing UX** — Right now Import is buried at the bottom of `/create` (Debate). Users don't realize Live and CMM imports aren't possible. Promoting it makes that capability obvious.
+## Public viewer (`SharedNotebookPage`)
+Mirrors the owner layout with these diffs:
+- **No toolbar.**
+- Tabs: **Thoughts, Annotations, My Take, ✨ Dynamo**.
+- Thoughts / Annotations / My Take render read-only TipTap (`editable: false`); no edit pencil, no delete, no Publish, no owner Share-menu. Only a "Copy link" button.
+- **Dynamo (visitor)** = the visitor's **own private chatbot** scoped to this notebook. Lets them ask questions about the notebook contents.
+  - Chat history is per-visitor and **never** shows the owner's Dynamo history. The owner's Dynamo chat is private to the owner always.
+  - Anonymous visitors: history persists in `localStorage` keyed by `notebookId`.
+  - Signed-in visitors: history persists in a per-user, per-notebook row (visitor_id + notebook_id).
+- If a visitor **spawns their own notebook** from this one, their new notebook's Dynamo tab is **seeded with a copy of their existing visitor Dynamo chat history** (if any) for that source notebook. Owner history is never copied.
 
-## Scope of this pass
+## Thoughts → TipTap migration
+- New `src/components/study/ThoughtsEditor.tsx` (`@tiptap/react` + `StarterKit` + `Underline` + `Link` + `Image`).
+- Persist HTML into existing `notebooks.thoughts`. On load, wrap plain text as `<p>` so existing notes load losslessly.
+- Paste-image preserved via `editorProps.handlePaste`.
+- Page owns the active editor instance per focused tab and passes it to `NotebookToolbar`.
 
-### 1. Homepage wheel: add 4th slide
-- `HeroActionShazam.tsx`: add `{ id: "import", label: "Import", description: "Turn a link, transcript, or recording into a record", icon: Download, route: "/create/import" }`.
-- Wheel logic already cycles by count, so 4 slides Just Work; bump dot count.
+## User stories
 
-### 2. New standalone page at `/create/import`
-- Move out from under `/create` tab.
-- Three source pickers (URL · text · file) — file picker accepts text, PDF, and media types.
-- Record-structure segmented control: **Debate** (default) · **Live** · **Change My Mind**.
-- Single "Generate record" button. Loader stages: `Transcribing → Structuring → Building threads → Summarizing`.
+**Constant toolbar**
+- *As an owner*, the formatting toolbar stays in the same place across all tabs so chrome never shifts.
+- *As an owner on Dynamo*, toolbar buttons no-op silently.
 
-### 3. Edge function: `import-to-record` rewrite
-- Accept `{ source, structure: "debate" | "live" | "cmm" }`.
-- Branch on source:
-  - text/url → existing path
-  - PDF (URL or upload) → `unpdf` extract
-  - audio/video (upload or direct media URL) → new `transcribe-media` helper using Deepgram prerecorded API
-- Branch on structure when writing:
-  - **debate** → subtopics + sides + transcript + **round_summaries** (this is the missing piece)
-  - **live** → write `live_sessions` row + `session_entries` + subtopic baskets (matches Live Session schema)
-  - **cmm** → write a CMM room shell + queue entries with the challenger texts
-- Always private, always completed, always counts toward import daily cap.
+**Rich-text everywhere (Thoughts / Annotations / My Take)**
+- *As an owner*, I can format Thoughts with bold, italic, underline, strike, H1/H2, lists, and links from the shared toolbar.
+- *As an owner editing an annotation note*, the same toolbar formats that annotation in place.
+- *As an owner writing My Take*, I write and format my own take with rich text; the 280-char limit checks plain-text length.
+- *As a returning user*, my pre-existing plain-text content loads losslessly.
+- *As an owner*, I can paste an image directly into Thoughts and it appears inline.
 
-### 4. Cost & limits
-- Pro: 20 imports/day, media capped 60 min/file.
-- Education/Civic: 50/day, 180 min/file.
-- Reuse `logAiUsage` + add Deepgram minute logging to `usage_logs` (§18).
+**Optional AI consolidation for My Take**
+- *As an owner*, by default no AI runs on My Take — what I type is what's there.
+- *As an owner who wants a starting point*, I can click "Suggest from my Thoughts + Annotations" inside the My Take tab to get a recommended draft I can accept, edit, or discard.
 
-## Out of scope (follow-ups)
+**Notebook Publish button**
+- *As an owner*, I see Publish to the left of "Open record" and publish the whole notebook in one click.
+- *As an owner already published*, the button reads "Published" and lets me copy the public link or unpublish.
+- *As a first-time publisher*, the public share link is generated automatically.
 
-- YouTube URL ingestion (needs yt-dlp-style service — paste a direct media link or upload for now).
-- Backfill button on already-imported debates to regenerate threaded summaries (easy one-shot if you want it after).
-- Speaker diarization beyond Deepgram defaults.
+**Public viewer parity**
+- *As a visitor*, I see the same title row and tabbed doc rectangle the owner sees.
+- *As a visitor*, I do not see the toolbar, edit pencils, owner Share menu, or the Publish button — content is read-only.
+- *As a visitor*, the tabs I see are Thoughts, Annotations, My Take, and Dynamo.
 
-## Files touched
+**Visitor Dynamo (private chatbot)**
+- *As a visitor*, I can open the Dynamo tab and chat with a bot about this notebook's contents.
+- *As a visitor*, my chat is private to me and never shows the owner's chat history. The owner's Dynamo chat stays private to the owner.
+- *As a returning visitor (same browser / same account)*, my chat history with this notebook persists.
+- *As a visitor who creates my own notebook spawned from this one*, my new notebook's Dynamo tab is pre-seeded with a copy of my existing visitor Dynamo chat history for that source notebook. The owner's history is never copied in.
 
-- `src/components/home/HeroActionShazam.tsx` — add 4th slide
-- `src/pages/ImportToRecordPage.tsx` — add structure picker, expand file types, restyle as standalone
-- `src/pages/CreateDebatePage.tsx` — remove the "Import" dropbox (it's now its own wheel slide)
-- `src/App.tsx` — route already exists at `/create/import`, keep it
-- `supabase/functions/import-to-record/index.ts` — branch by source + structure, write `round_summaries`
-- `supabase/functions/transcribe-media/index.ts` — new, Deepgram prerecorded wrapper
-- Memory: add `mem://features/import-as-format` describing the new contract
+## Out of scope (v1)
+- Alignment, font size, color, headings beyond H1/H2.
+- Comments-as-annotations spawn flow.
+- Per-tab independent publishing (notebook-level only; existing My-Take publish toggle inside the tab is unaffected).
+- Cross-device sync of anonymous visitor Dynamo history (localStorage is browser-local).
+- Automatic AI consolidation of My Take (only available as an explicit user-triggered suggestion).
 
-No DB migrations needed — `round_summaries`, `live_sessions`, `session_entries`, and CMM tables all exist.
+## Files
+- **Edit**: `src/pages/MyStudyDetailPage.tsx`, `src/pages/SharedNotebookPage.tsx`, `src/components/live/record/notebook/AnnotationsTab.tsx` (TipTap edit mode), `src/components/live/record/notebook/MyTakeTab.tsx` (TipTap + opt-in suggest button), notebook spawn handler (seed visitor Dynamo history into new notebook).
+- **New**: `src/components/study/NotebookToolbar.tsx`, `src/components/study/ThoughtsEditor.tsx`, `src/components/study/RichTextEditor.tsx` (shared TipTap wrapper for Thoughts/Annotations/My Take), `src/components/study/PublishNotebookButton.tsx`, `src/components/study/VisitorDynamoChat.tsx`, `src/hooks/useVisitorDynamoHistory.ts`.
+- **Untouched**: `src/components/live/record/notebook/ThoughtsTab.tsx` (still used by floating overlay).
+- **DB**: new table `visitor_dynamo_messages` (notebook_id, visitor_id nullable, anon_key nullable, role, content, created_at) with RLS so a visitor reads/writes only their own rows; owner Dynamo storage stays separate and untouched.
+- **Deps**: `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-underline`, `@tiptap/extension-link`, `@tiptap/extension-image`.
 
----
-
-Approve and I'll ship it as one pass. If you'd rather split, the safest seam is: **(A) wheel slide + standalone page + summaries fix + text/PDF**, then **(B) audio/video via Deepgram** in a second pass — but they share enough code that doing both together is cheaper.
+## Acceptance
+- Toolbar stays identical across tab switches; formats Thoughts, Annotation-in-edit, and My Take; no-ops on Dynamo.
+- My Take is user-authored by default; AI consolidation only runs when the user clicks the suggest action and is staged as a draft for accept/edit/discard.
+- Publish button sits left of Open record; toggles `notebooks.published` and exposes the public link.
+- Public viewer shows Thoughts / Annotations / My Take / Dynamo, all read-only except the visitor's own Dynamo chat.
+- Visitor Dynamo never displays owner messages; owner Dynamo never displays visitor messages.
+- Spawning a notebook from a public notebook copies the visitor's prior Dynamo history (if any) into the new notebook's Dynamo tab.
