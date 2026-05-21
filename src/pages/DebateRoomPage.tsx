@@ -434,9 +434,10 @@ const DebateRoomPage = () => {
          }
         // Sync prep phase from other participant
         if (updated.prep_phase_active) {
-          if (!prepPhaseRoleRef.current) {
-            enterPrepPhaseFromRealtimeRef.current(updated);
-          }
+          // Always re-enter prep when the server flips prep_phase_active true.
+          // Previously we skipped if a local role was already set, which left the
+          // other side stranded after a rapid end-turn-early/advance cycle.
+          enterPrepPhaseFromRealtimeRef.current(updated);
 
           setSelectedPrepDuration(updated.prep_duration_seconds ?? null);
           setPrepStartedAt(
