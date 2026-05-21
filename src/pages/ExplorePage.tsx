@@ -9,6 +9,7 @@ import FloatingSearch from "@/components/explore/FloatingSearch";
 import FeaturedRow from "@/components/explore/FeaturedRow";
 import TagShelf from "@/components/explore/TagShelf";
 import CompactRecordCard from "@/components/explore/CompactRecordCard";
+import CompactShelf from "@/components/explore/CompactShelf";
 
 const ExplorePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,20 +87,7 @@ const ExplorePage = () => {
                 ))}
 
                 {latest.length > 0 && (
-                  <section>
-                    <div className="flex items-end justify-between mb-2.5 px-0.5">
-                      <h3 className="font-display text-lg sm:text-xl text-foreground">
-                        Latest
-                      </h3>
-                    </div>
-                    <div className="flex gap-3 overflow-x-auto snap-x scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {latest.map((d) => (
-                        <div key={d.id} className="snap-start">
-                          <CompactRecordCard d={d} />
-                        </div>
-                      ))}
-                    </div>
-                  </section>
+                  <CompactShelf title="Latest" items={latest} />
                 )}
 
                 {shelves.length === 0 && latest.length === 0 && (

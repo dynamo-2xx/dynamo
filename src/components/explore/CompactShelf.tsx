@@ -1,40 +1,21 @@
-import { Link } from "react-router-dom";
 import CompactRecordCard from "./CompactRecordCard";
 import EdgeArrow from "./EdgeArrow";
 import { useEdgeScroll } from "@/hooks/useEdgeScroll";
 import type { ExploreDebate } from "@/hooks/useExplore";
-import type { Tag } from "@/hooks/useTags";
 
 interface Props {
-  tag: Tag;
+  title: string;
   items: ExploreDebate[];
 }
 
-const TagShelf = ({ tag, items }: Props) => {
+const CompactShelf = ({ title, items }: Props) => {
   const { ref, canLeft, canRight, scrollByCard } = useEdgeScroll<HTMLDivElement>();
-
   if (items.length === 0) return null;
 
   return (
     <section className="relative">
       <div className="flex items-end justify-between mb-2.5 px-0.5">
-        <Link
-          to={`/explore/topic/${tag.slug}`}
-          className="group flex items-baseline gap-2"
-        >
-          <h3 className="font-display text-lg sm:text-xl text-foreground group-hover:opacity-70 transition-opacity">
-            #{tag.name}
-          </h3>
-          <span className="text-[11px] text-muted-foreground font-body">
-            {items.length}
-          </span>
-        </Link>
-        <Link
-          to={`/explore/topic/${tag.slug}`}
-          className="text-[12px] font-body text-muted-foreground hover:text-foreground transition-colors"
-        >
-          See all →
-        </Link>
+        <h3 className="font-display text-lg sm:text-xl text-foreground">{title}</h3>
       </div>
       <div className="relative">
         <div
@@ -47,7 +28,6 @@ const TagShelf = ({ tag, items }: Props) => {
             </div>
           ))}
         </div>
-        {/* Edge fades so partial cards melt into background */}
         <div
           className={`pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background to-transparent transition-opacity ${canLeft ? "opacity-100" : "opacity-0"}`}
         />
@@ -61,4 +41,4 @@ const TagShelf = ({ tag, items }: Props) => {
   );
 };
 
-export default TagShelf;
+export default CompactShelf;
