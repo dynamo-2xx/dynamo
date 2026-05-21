@@ -33,7 +33,7 @@ const FeaturedRow = () => {
   if (!loading && items.length === 0) return null;
 
   return (
-    <section>
+    <section className="min-w-0">
       <div className="flex items-center justify-between mb-3 px-0.5">
         <h2 className="font-display text-xl sm:text-2xl text-foreground">Featured</h2>
         <div className="inline-flex items-center gap-0.5 p-0.5 rounded-full border border-border/60 bg-foreground/5 backdrop-blur-xl">
@@ -42,7 +42,7 @@ const FeaturedRow = () => {
         </div>
       </div>
 
-      <div className="relative">
+      <div className="relative min-w-0 overflow-hidden">
         <div
           ref={ref}
           className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

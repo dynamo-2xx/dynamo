@@ -16,8 +16,8 @@ const TagShelf = ({ tag, items }: Props) => {
   if (items.length === 0) return null;
 
   return (
-    <section className="relative">
-      <div className="flex items-end justify-between mb-2.5 px-0.5">
+    <section className="relative min-w-0">
+      <div className="flex items-baseline gap-3 mb-2.5 px-0.5">
         <Link
           to={`/explore/topic/${tag.slug}`}
           className="group flex items-baseline gap-2"
@@ -36,7 +36,7 @@ const TagShelf = ({ tag, items }: Props) => {
           See all →
         </Link>
       </div>
-      <div className="relative">
+      <div className="relative min-w-0 overflow-hidden">
         <div
           ref={ref}
           className="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

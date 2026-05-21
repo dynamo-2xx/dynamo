@@ -100,7 +100,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       )}
 
       {/* Main content */}
-      <main className={cn("flex-1 pb-20 md:pb-0 transition-all duration-300", sidebarOpen ? "md:ml-[16rem]" : "md:ml-0")}>
+      <main className={cn("flex-1 min-w-0 overflow-x-hidden pb-20 md:pb-0 transition-all duration-300", sidebarOpen ? "md:ml-[16rem]" : "md:ml-0")}>
         <VerifyEmailBanner />
         <MySanctionBanner />
         {children}

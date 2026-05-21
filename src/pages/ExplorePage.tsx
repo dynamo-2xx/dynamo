@@ -44,7 +44,7 @@ const ExplorePage = () => {
   return (
     <AppLayout>
       <FloatingSearch value={searchQuery} onChange={setSearchQuery} />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-10">
+      <div className="max-w-7xl mx-auto min-w-0 px-4 sm:px-6 py-6 sm:py-8 md:py-10">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
