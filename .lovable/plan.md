@@ -1,73 +1,80 @@
 ## Goal
+Replace the current YouTube-style chip-filter + uniform grid on `/explore` with a richer browse surface: one featured hero at the top, then a stack of horizontal "shelves" — one per tag/category — each scrolling a high-density row of record cards. A sticky search affordance follows the user as they scroll.
 
-Stop forcing imports through Debate / CMM / Live formats. Imports become their own record type with a dedicated viewer: **Transcript** + **Argument Map** as the two primary tabs, plus Q&A chat, sharing/comments, and the notebook stack — nothing else (no sides, prep, turns, queue, facilitator).
-
-## What changes
-
-### 1. New `imported_records` table
-
-Single home for imports. No legacy debate fields, no participants, no RLS coupling to `debates`.
-
-Columns: `id`, `user_id`, `title`, `description`, `cover_image_url`, `source_kind` (`url`/`text`/`pdf`/`media`/`article`), `source_url`, `subtopics jsonb`, `transcript_entries jsonb`, `argument_map jsonb` (claims/counters/evidence with `parent_index` chains), `is_public`, `share_token`, `created_at`, `updated_at`.
-
-RLS via new `can_view_imported_record(_id uuid)` SECURITY DEFINER (public / owner / `is_follower_of(user_id)` / `is_record_viewer('imported_record', id)`). Add `'imported_record'` to the `shareable_record_type` enum so existing share/comment/notebook plumbing applies for free.
-
-### 2. Rewrite the edge function
-
-`supabase/functions/import-to-record/index.ts`:
-
-- Drop the `structure: debate|live|cmm` switch and the debate/live/cmm insert branches.
-- One AI pass returns: `{ topic, subtopics[], transcript[], argument_map[] }` (no sides, no challengers, no key_arguments-by-side).
-- Insert a single row into `imported_records`. Return `{ imported_record_id }`.
-- Keep: tier gate, daily soft cap (now counted off `imported_records`), Deepgram for media, PDF extract, URL fetch, usage logging.
-
-### 3. New viewer page `/import/:id` → `ImportedRecordPage.tsx`
-
-Two-tab layout reusing the existing `ArgumentMapContent` component (already supports `threaded` / `transcript` tabs):
+## New layout
 
 ```text
-┌──────────────────────────────────────────────┐
-│  ← Back   Title           [Share] [⋯]        │
-│  Imported · source chip · date · privacy     │
-├──────────────────────────────────────────────┤
-│  [ Transcript ] [ Argument Map ]             │
-├──────────────────────────────────────────────┤
-│  <ArgumentMapContent tab={tab} ... />        │
-└──────────────────────────────────────────────┘
-   Floating: Dynamo Q&A · Notebook drawer
-   Bottom:   RecordCommentsSection
+┌──────────────────────────────────────────────────────────────┐
+│ [🔍 floating search pill — fixed top-left, always visible]   │
+│                                                              │
+│   Explore                                                    │
+│                                                              │
+│   ┌────────────────────────────────────────────────────┐    │
+│   │  FEATURED  ·  LIVE NOW                             │    │
+│   │  Big cover · topic · publisher · participants      │    │
+│   │  [Join / Open]                                     │    │
+│   └────────────────────────────────────────────────────┘    │
+│                                                              │
+│   #philosophy                                  See all →     │
+│   ◀ [card][card][card][card][card][card][card] ▶            │
+│                                                              │
+│   #politics                                    See all →     │
+│   ◀ [card][card][card][card][card][card][card] ▶            │
+│                                                              │
+│   #science                                     See all →     │
+│   ◀ [card][card][card][card][card][card][card] ▶            │
+│   …                                                          │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-Reused components: `ArgumentMapContent`, `ShareDialog`, `RecordCommentsSection`, `useSessionNotebook`, `useRecordQA`, `CitationModal`. All accept a `(record_type, record_id)` pair — we just pass `'imported_record'`.
+## Sections
 
-### 4. Strip the structure picker from `ImportToRecordPage.tsx`
+1. **Floating search pill** — fixed `top-4 left-4`, circular icon-only at rest, expands inline to an input on focus/click. Stays visible while scrolling. Replaces the inline search field.
+2. **Featured hero** — single record (live > trending > latest). Large cover, topic in Instrument Serif, publisher + participant count, status pill, primary CTA. Subtle gradient overlay, ~40vh on desktop, shorter on mobile.
+3. **Tag shelves** — one horizontal row per visible tag (official tags + any tag with ≥1 record). Each shelf:
+   - Header: `#tagname` + count + `See all →` (links to `/topic/:slug` or filtered view).
+   - Horizontal scroller of compact, high-density cards (smaller than current Explore cards, ~5-6 visible on desktop, snap-x, scrollbar hidden, chevron buttons on hover like `AutoCarousel`).
+   - Hidden if the shelf has 0 records.
+4. **"Uncategorized / Latest" shelf** at the bottom for records without tags.
+5. **Search results mode** — when the floating search has a query, replace shelves with a single dense grid of matching records across all tags (same compact card).
 
-- Remove the Debate / Live / CMM tri-toggle and `structure` state.
-- Single CTA: **Generate record**.
-- On success, navigate to `/import/:id`.
+## Card design (high-density)
 
-### 5. Migrate existing imports
+- Width ~160-180px on desktop, ~140px on mobile, 4:5 cover aspect.
+- Cover image with subtle inner shadow; status badge top-left (LIVE / IMPORTED / SCHEDULED).
+- Two lines: topic (DM Sans medium, 13px, clamp-2) + publisher name (12px muted).
+- No participant count on the compact card — moved to hover tooltip / hero only.
+- Imported records keep the "Imported" pill.
 
-Migration script inside the same SQL migration:
+## Data wiring
 
-- For every `debates` row where `imported_source_kind IS NOT NULL`: insert into `imported_records` copying topic→title, description, `imported_source_kind`→source_kind, `imported_source_url`→source_url, subtopics + transcript_entries reconstructed from `debate_subtopics` + `debate_transcripts.transcript_entries` + `round_summaries.key_arguments`.
-- For every `live_sessions` row that was imported (heuristic: `mode='single_device' AND status='ended' AND created via import` — flagged by adding `imported_from boolean` check; if no flag exists we'll mark candidates via the structuring metadata). Pragmatic fallback: only migrate `debates`-side imports cleanly; live imports will be small in number and the user can re-import if needed. (Flag in the plan to confirm.)
-- After copy, soft-redirect: add a route handler on the old detail pages that, if the record has `imported_source_kind`, `Navigate` to `/import/:newId` via a lookup table written during migration (`legacy_import_redirects(old_type, old_id, new_id)`).
+- Reuse `useFeaturedDebates(1)` for hero.
+- New hook `useTagShelves()`:
+  - Pulls visible tags from `useAllTags()` (official OR `debate_count > 0`).
+  - For each tag, fetches up to ~12 records (debates + imported_records) via existing `debate_tags` / `live_session_tags` joins, mapped through existing `mapDebate` / `mapImported` shape. Reuse the imported-record fetch already in `useExplore.ts`.
+  - Returns `{ tag, items }[]`, filtered to shelves with `items.length > 0`.
+- Search uses the existing merged-all pool (featured + trending + latest) like today.
 
-### 6. Cleanup
+No backend / RLS / schema changes — purely a frontend redesign of `ExplorePage.tsx` plus a new shelf component and a new compact card variant.
 
-- Remove `imported_source_kind` / `imported_source_url` reads from debate UI (or keep silent — they'll only exist on legacy rows that are now redirected).
-- Update `HeroActionShazam` link target stays `/create/import`.
-- Update memory file `.lovable/memory/features/import-to-record.md` to reflect new flow.
+## Files
+
+- `src/pages/ExplorePage.tsx` — rewrite layout (hero + shelves + floating search + search-results grid).
+- `src/components/explore/FloatingSearch.tsx` (new) — fixed pill, expand-on-click.
+- `src/components/explore/FeaturedHero.tsx` (new) — featured record block.
+- `src/components/explore/TagShelf.tsx` (new) — header + horizontal snap scroller with chevrons (pattern from `AutoCarousel`, manual nav only).
+- `src/components/explore/CompactRecordCard.tsx` (new) — high-density card variant (reuses routing logic from `DebateCoverCard`).
+- `src/hooks/useTagShelves.ts` (new) — fetches per-tag record lists.
 
 ## Out of scope
 
-- YouTube URL ingestion (still returns the existing 501 message).
-- Re-extracting argument maps for legacy imports — they get migrated with whatever shape they already had; new imports use the cleaner argument_map schema.
-- Editing the imported transcript or argument map post-creation.
+- No changes to the underlying chip taxonomy / tag CRUD.
+- No changes to `/topic/:slug` (the `See all` destination already exists).
+- No backend, RLS, or schema work.
+- No changes to Home page or other surfaces.
 
-## Open item to confirm
+## Notes
 
-Live-session imports: migrate best-effort, or skip and leave them at `/live/:id` until re-imported? I'll default to **skip + leave** unless you say otherwise — the debate-side imports are the bulk and worth the migration cost. My answer: remove all previous imported files. Delete them all. We're starting from scratch. Change nothing else.
-
-&nbsp;
+- All colors/spacing via existing semantic tokens (`bg-background`, `text-foreground`, `border-border`). No raw hex.
+- Mobile: floating search collapses to icon; shelves remain horizontal scrollers (touch-native), chevrons hidden < `sm`.
+- Respect `prefers-reduced-motion` on any shelf scroll animation.
