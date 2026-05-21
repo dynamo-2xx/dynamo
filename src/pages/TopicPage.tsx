@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Hash, Radio, MessageSquare } from "lucide-react";
+import { ArrowLeft, Hash } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
-import { useDebatesByTag, useLiveSessionsByTag } from "@/hooks/useExplore";
+import type { ExploreDebate } from "@/hooks/useExplore";
 import type { Tag } from "@/hooks/useTags";
-
-type Filter = "all" | "debates" | "live" | "live_now";
+import { fetchTagShelf } from "@/hooks/useTagShelves";
+import FloatingSearch from "@/components/explore/FloatingSearch";
+import CompactRecordCard from "@/components/explore/CompactRecordCard";
 
 const TopicPage = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -15,7 +16,8 @@ const TopicPage = () => {
   const [tag, setTag] = useState<Tag | null>(null);
   const [subtags, setSubtags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [items, setItems] = useState<ExploreDebate[]>([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!slug) return;
@@ -24,14 +26,17 @@ const TopicPage = () => {
       setLoading(true);
       const { data } = await (supabase as any).from("tags").select("*").eq("slug", slug).maybeSingle();
       if (cancelled) return;
-      setTag(data as Tag | null);
-      if (data?.id) {
+      const t = data as Tag | null;
+      setTag(t);
+      if (t?.id) {
         const { data: kids } = await (supabase as any)
           .from("tags")
           .select("*")
-          .eq("parent_tag_id", data.id)
+          .eq("parent_tag_id", t.id)
           .order("debate_count", { ascending: false });
         if (!cancelled) setSubtags((kids || []) as Tag[]);
+        const records = await fetchTagShelf(t, 200);
+        if (!cancelled) setItems(records);
       }
       setLoading(false);
     })();
@@ -40,21 +45,16 @@ const TopicPage = () => {
     };
   }, [slug]);
 
-  const { items: debates } = useDebatesByTag(tag?.id || null);
-  const { items: liveSessions } = useLiveSessionsByTag(tag?.id || null);
-
-  const liveNow = useMemo(() => debates.filter((d) => d.status === "live"), [debates]);
-
-  const counts = {
-    all: debates.length + liveSessions.length,
-    debates: debates.length,
-    live: liveSessions.length,
-    live_now: liveNow.length,
-  };
+  const q = search.trim().toLowerCase();
+  const filtered = useMemo(
+    () => (q ? items.filter((i) => i.topic.toLowerCase().includes(q)) : items),
+    [items, q],
+  );
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto px-4 py-6 sm:py-10">
+      <FloatingSearch value={search} onChange={setSearch} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <button
           onClick={() => navigate("/explore")}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
@@ -74,6 +74,9 @@ const TopicPage = () => {
               {tag.is_official && (
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Official</span>
               )}
+              <span className="text-[12px] text-muted-foreground font-body ml-1">
+                {items.length} record{items.length === 1 ? "" : "s"}
+              </span>
             </div>
             {tag.description && (
               <p className="text-sm text-muted-foreground font-body mb-6">{tag.description}</p>
@@ -98,87 +101,19 @@ const TopicPage = () => {
               </div>
             )}
 
-            {/* Filter chips */}
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-              {([
-                ["all", "All", counts.all],
-                ["debates", "Debates", counts.debates],
-                ["live", "Live records", counts.live],
-                ["live_now", "Live now", counts.live_now],
-              ] as [Filter, string, number][]).map(([k, label, n]) => (
-                <button
-                  key={k}
-                  onClick={() => setFilter(k)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-body transition-colors border ${
-                    filter === k
-                      ? "bg-foreground text-background border-foreground"
-                      : "bg-background text-muted-foreground border-border hover:border-foreground/20"
-                  }`}
-                >
-                  {label} <span className="opacity-70">{n}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Results */}
-            <div className="space-y-2">
-              {(filter === "all" || filter === "live_now") &&
-                liveNow.map((d) => (
-                  <Link
-                    key={`live-${d.id}`}
-                    to={`/debate/${d.id}`}
-                    className="flex items-center gap-3 border border-border rounded-xl px-5 py-4 hover:border-foreground/20 transition-colors bg-background"
-                  >
-                    <span className="flex items-center gap-1.5 text-[10px] font-body font-medium uppercase tracking-wider bg-[#dcfce7] text-[#166534] dark:bg-[#166534]/20 dark:text-[#4ade80] px-2 py-0.5 rounded-full shrink-0">
-                      <span className="w-1.5 h-1.5 bg-[#166534] dark:bg-[#4ade80] rounded-full animate-pulse" />
-                      Live
-                    </span>
-                    <span className="font-display text-sm truncate">{d.topic}</span>
-                  </Link>
+            {filtered.length === 0 ? (
+              <div className="border border-dashed border-border rounded-xl px-5 py-12 text-center text-sm text-muted-foreground font-body">
+                {q
+                  ? `No records match “${search}” in #${tag.name}.`
+                  : `Nothing here yet — start a debate and tag it #${tag.name} to seed this topic.`}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-5">
+                {filtered.map((d) => (
+                  <CompactRecordCard key={`${d.kind}-${d.id}`} d={d} />
                 ))}
-
-              {(filter === "all" || filter === "debates") &&
-                debates
-                  .filter((d) => filter !== "all" || d.status !== "live")
-                  .map((d) => (
-                    <Link
-                      key={d.id}
-                      to={`/debate/${d.id}`}
-                      className="flex items-center gap-3 border border-border rounded-xl px-5 py-4 hover:border-foreground/20 transition-colors bg-background"
-                    >
-                      <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-display text-sm truncate">{d.topic}</p>
-                        <p className="text-[11px] text-muted-foreground font-body">
-                          {new Date(d.created_at).toLocaleDateString()} · {d.participant_count} speakers
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-
-              {(filter === "all" || filter === "live") &&
-                liveSessions.map((s) => (
-                  <Link
-                    key={s.id}
-                    to={`/live/shared/${s.share_token}`}
-                    className="flex items-center gap-3 border border-border rounded-xl px-5 py-4 hover:border-foreground/20 transition-colors bg-background"
-                  >
-                    <Radio className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-display text-sm truncate">{s.title || "Untitled session"}</p>
-                      <p className="text-[11px] text-muted-foreground font-body">
-                        Live record · {new Date(s.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-
-              {counts.all === 0 && (
-                <div className="border border-dashed border-border rounded-xl px-5 py-12 text-center text-sm text-muted-foreground font-body">
-                  Nothing here yet — start a debate and tag it #{tag.name} to seed this topic.
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </motion.div>
         )}
       </div>
