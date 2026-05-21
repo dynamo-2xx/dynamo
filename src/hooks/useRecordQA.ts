@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 export type QAMsg = { role: "user" | "assistant"; content: string };
 
-export type RecordType = "live_session" | "debate" | "change_my_mind";
+export type RecordType = "live_session" | "debate" | "change_my_mind" | "imported_record";
 
 export interface QATarget {
   recordType: RecordType;

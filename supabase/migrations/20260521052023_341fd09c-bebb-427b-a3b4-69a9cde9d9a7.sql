@@ -1,0 +1,1 @@
+ALTER TYPE public.shareable_record_type ADD VALUE IF NOT EXISTS 'imported_record';

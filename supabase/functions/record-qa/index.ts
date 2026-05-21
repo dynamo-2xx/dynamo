@@ -88,6 +88,50 @@ serve(async (req) => {
       subtopicList = subtopics.length > 0
         ? `\nSubtopics discussed: ${subtopics.map((s, i) => `${i + 1}. ${s}`).join(", ")}`
         : "";
+    } else if (recordType === "imported_record") {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const token = authHeader.replace("Bearer ", "");
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authErr } = await userClient.auth.getUser(token);
+      if (authErr || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: visible } = await userClient.rpc("can_view_imported_record", { _id: recordId });
+      if (!visible) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: rec } = await supabase
+        .from("imported_records")
+        .select("title, subtopics, transcript_entries")
+        .eq("id", recordId)
+        .maybeSingle();
+      if (!rec) {
+        return new Response(JSON.stringify({ error: "Not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const entries = (rec.transcript_entries as any[]) || [];
+      const subs = (rec.subtopics as any[]) || [];
+      transcriptText = `Topic: ${rec.title || "Imported record"}\n\n`;
+      for (const e of entries) {
+        const topic = e.subtopic ? ` [Topic: "${e.subtopic}"]` : "";
+        transcriptText += `${e.speaker_side || "Speaker"}${topic}: ${e.text || ""}\n`;
+      }
+      subtopicList = subs.length > 0
+        ? `\nSubtopics: ${subs.map((s: any, i: number) => `${i + 1}. ${s.title || s}`).join(", ")}`
+        : "";
     } else if (recordType === "debate" || recordType === "change_my_mind") {
       // Auth via JWT — viewer must be able to see the debate.
       const authHeader = req.headers.get("Authorization");

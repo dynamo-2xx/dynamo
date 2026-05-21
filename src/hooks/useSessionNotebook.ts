@@ -7,7 +7,7 @@ export interface NotebookThoughtBlock {
   value: string;
 }
 
-export type RecordType = "live_session" | "debate" | "change_my_mind";
+export type RecordType = "live_session" | "debate" | "change_my_mind" | "imported_record";
 
 export interface SessionNotebook {
   id: string;
