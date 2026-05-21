@@ -384,6 +384,17 @@ const MyStudyDetailPage = () => {
                       <DropdownMenuItem onClick={() => setRenameOpen(true)}>Rename</DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={async () => {
+                          if (!notebook.share_token) {
+                            await study.generateShareToken(notebook.id);
+                          }
+                          if (nb.isPublished) await nb.unpublish();
+                          else await nb.publish();
+                        }}
+                      >
+                        {nb.isPublished ? "Unpublish notebook" : "Publish notebook"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={async () => {
                           const token = await study.generateShareToken(notebook.id);
                           if (token) {
                             await navigator.clipboard.writeText(
@@ -415,6 +426,14 @@ const MyStudyDetailPage = () => {
                       </span>
                     )}
                   </button>
+                  <PublishNotebookButton
+                    notebookId={notebook.id}
+                    shareToken={notebook.share_token}
+                    isPublished={nb.isPublished}
+                    onPublish={nb.publish}
+                    onUnpublish={nb.unpublish}
+                    onEnsureShareToken={study.generateShareToken}
+                  />
                   <Link
                     to={recordHref}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5"
@@ -442,6 +461,8 @@ const MyStudyDetailPage = () => {
 
               {/* Tab bar (single mode) */}
               {!split.enabled && (
+                <>
+                <NotebookToolbar editor={activeEditor} />
                 <div className="flex items-end px-1 border-b border-border overflow-x-auto">
                   <div className="flex items-end gap-1 flex-1 min-w-0">
                     {tabsArr.map((t) => (
@@ -465,7 +486,9 @@ const MyStudyDetailPage = () => {
                     <Columns2 className="w-4 h-4" />
                   </button>
                 </div>
+                </>
               )}
+              {split.enabled && <NotebookToolbar editor={activeEditor} />}
 
               {/* Body */}
               <div className="relative">
