@@ -2978,6 +2978,7 @@ export type Database = {
           my_take: string
           published: boolean
           published_at: string
+          record_type: string
           session_created_at: string
           session_id: string
           session_title: string
@@ -2995,6 +2996,7 @@ export type Database = {
           owner_id: string
           published: boolean
           published_at: string
+          record_type: string
           session_created_at: string
           session_id: string
           session_title: string

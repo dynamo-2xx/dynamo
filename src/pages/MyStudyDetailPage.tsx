@@ -17,11 +17,14 @@ import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
 import ShareMenu from "@/components/study/ShareMenu";
 import RenameDialog from "@/components/study/RenameDialog";
-import ThoughtsTab from "@/components/live/record/notebook/ThoughtsTab";
+import ThoughtsEditor from "@/components/study/ThoughtsEditor";
 import AnnotationsTab from "@/components/live/record/notebook/AnnotationsTab";
 import MyTakeTab from "@/components/live/record/notebook/MyTakeTab";
 import DynamoChatPane from "@/components/live/record/DynamoChatPane";
 import NotebookSplitDivider from "@/components/live/record/NotebookSplitDivider";
+import NotebookToolbar from "@/components/study/NotebookToolbar";
+import PublishNotebookButton from "@/components/study/PublishNotebookButton";
+import type { Editor } from "@tiptap/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -156,6 +159,11 @@ const MyStudyDetailPage = () => {
   const [tab, setTab] = useState<Tab>("thoughts");
   const [renameOpen, setRenameOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
+  const handleEditorReady = (e: Editor | null) => {
+    if (e) setActiveEditor(e);
+    else setActiveEditor((cur) => (cur && cur.isDestroyed ? null : cur));
+  };
   const reader = useReaderNotes(notebookId ?? null);
 
   // §21 — "Discuss in Dynamo" deep link. IntelligencePage and other surfaces
@@ -227,9 +235,11 @@ const MyStudyDetailPage = () => {
   const renderTab = (t: Tab) => {
     if (t === "thoughts")
       return (
-        <ThoughtsTab
+        <ThoughtsEditor
           thoughts={nb.thoughts}
           setThoughts={nb.setThoughts}
+          onEditorReady={handleEditorReady}
+          onFocus={() => {}}
           readerNotes={reader.inThoughts}
           onDismissReaderNote={reader.dismiss}
           onJumpReaderNote={handleJumpReaderNote}
@@ -241,6 +251,7 @@ const MyStudyDetailPage = () => {
           annotations={annotations || []}
           onJump={(a) => navigate(`${recordHref}#annotation-${a.id}`)}
           onRemove={handleRemoveAnn}
+          onEditorReady={handleEditorReady}
         />
       );
     if (t === "my_take")
@@ -252,6 +263,9 @@ const MyStudyDetailPage = () => {
           onPublish={nb.publish}
           onUnpublish={nb.unpublish}
           isPublished={nb.isPublished}
+          onEditorReady={handleEditorReady}
+          recordType={recordType}
+          recordId={recordId}
         />
       );
     // dynamo
@@ -370,6 +384,17 @@ const MyStudyDetailPage = () => {
                       <DropdownMenuItem onClick={() => setRenameOpen(true)}>Rename</DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={async () => {
+                          if (!notebook.share_token) {
+                            await study.generateShareToken(notebook.id);
+                          }
+                          if (nb.isPublished) await nb.unpublish();
+                          else await nb.publish();
+                        }}
+                      >
+                        {nb.isPublished ? "Unpublish notebook" : "Publish notebook"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={async () => {
                           const token = await study.generateShareToken(notebook.id);
                           if (token) {
                             await navigator.clipboard.writeText(
@@ -401,6 +426,14 @@ const MyStudyDetailPage = () => {
                       </span>
                     )}
                   </button>
+                  <PublishNotebookButton
+                    notebookId={notebook.id}
+                    shareToken={notebook.share_token}
+                    isPublished={nb.isPublished}
+                    onPublish={nb.publish}
+                    onUnpublish={nb.unpublish}
+                    onEnsureShareToken={study.generateShareToken}
+                  />
                   <Link
                     to={recordHref}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5"
@@ -428,6 +461,8 @@ const MyStudyDetailPage = () => {
 
               {/* Tab bar (single mode) */}
               {!split.enabled && (
+                <>
+                <NotebookToolbar editor={activeEditor} />
                 <div className="flex items-end px-1 border-b border-border overflow-x-auto">
                   <div className="flex items-end gap-1 flex-1 min-w-0">
                     {tabsArr.map((t) => (
@@ -451,7 +486,9 @@ const MyStudyDetailPage = () => {
                     <Columns2 className="w-4 h-4" />
                   </button>
                 </div>
+                </>
               )}
+              {split.enabled && <NotebookToolbar editor={activeEditor} />}
 
               {/* Body */}
               <div className="relative">

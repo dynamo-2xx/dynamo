@@ -7,6 +7,7 @@ export interface SharedNotebookForReader {
   id: string;
   session_id: string;
   owner_id: string;
+  record_type: "live_session" | "debate" | "change_my_mind";
   display_title: string | null;
   thoughts: any;
   my_take: string | null;

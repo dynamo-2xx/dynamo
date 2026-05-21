@@ -1,61 +1,110 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BookOpen, ArrowLeft, X, Pencil, Check } from "lucide-react";
+import { ArrowLeft, Copy, Check, Sparkles, BookOpen } from "lucide-react";
+import { toast } from "sonner";
+
 import { useMyReaderNotes } from "@/hooks/useMyReaderNotes";
-import LeaveReaderNoteComposer, {
-  type PinAnchor,
-} from "@/components/study/LeaveReaderNoteComposer";
-import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/study/RichTextEditor";
+import VisitorDynamoChat from "@/components/study/VisitorDynamoChat";
+import { cn } from "@/lib/utils";
+
+type Tab = "thoughts" | "annotations" | "my_take" | "dynamo";
+
+const TAB_LABEL: Record<Tab, string> = {
+  thoughts: "Thoughts",
+  annotations: "Annotations",
+  my_take: "My Take",
+  dynamo: "Dynamo",
+};
+
+const TabBtn = ({
+  active,
+  onClick,
+  children,
+  hasIcon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  hasIcon?: boolean;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      "relative shrink-0 px-3 sm:px-4 pt-2 pb-2.5 text-[13px] sm:text-sm font-body rounded-t-md border border-b-0 transition-colors min-h-[44px] sm:min-h-0 whitespace-nowrap",
+      active
+        ? "bg-background border-border text-foreground -mb-px z-10"
+        : "bg-accent/50 border-transparent text-muted-foreground hover:text-foreground",
+    )}
+  >
+    {hasIcon && <Sparkles className="w-3 h-3 inline -mt-0.5 mr-1" />}
+    {children}
+  </button>
+);
 
 const SharedNotebookPage = () => {
   const { token } = useParams<{ token: string }>();
-  const { notebook: nb, loading, submit, update, remove } = useMyReaderNotes(token);
-  const [pendingAnchor, setPendingAnchor] = useState<PinAnchor | null>(null);
-  const thoughtsRef = useRef<HTMLParagraphElement>(null);
-  const myTakeRef = useRef<HTMLParagraphElement>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editBody, setEditBody] = useState("");
+  const { notebook: nb, loading } = useMyReaderNotes(token);
+  const [tab, setTab] = useState<Tab>("thoughts");
+  const [copied, setCopied] = useState(false);
 
-  // Capture text selection inside Thoughts/My Take and convert to a pin anchor
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    toast.success("Link copied");
+    setTimeout(() => setCopied(false), 1500);
+  };
+
   useEffect(() => {
-    const handler = () => {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
-      const range = sel.getRangeAt(0);
-      const text = sel.toString().trim();
-      if (!text) return;
-      const tEl = thoughtsRef.current;
-      const mEl = myTakeRef.current;
-      const inThoughts = tEl && tEl.contains(range.commonAncestorContainer);
-      const inMyTake = mEl && mEl.contains(range.commonAncestorContainer);
-      if (!inThoughts && !inMyTake) return;
-      const sourceText = (inThoughts ? tEl?.textContent : mEl?.textContent) || "";
-      const start = sourceText.indexOf(text);
-      setPendingAnchor({
-        kind: inThoughts ? "thought" : "my_take",
-        excerpt: text.length > 240 ? text.slice(0, 240) + "…" : text,
-        char_start: start >= 0 ? start : 0,
-        char_end: start >= 0 ? start + text.length : text.length,
-      });
-    };
-    document.addEventListener("mouseup", handler);
-    document.addEventListener("touchend", handler);
-    return () => {
-      document.removeEventListener("mouseup", handler);
-      document.removeEventListener("touchend", handler);
-    };
-  }, []);
+    if (nb) document.title = `${nb.display_title || nb.session_title || "Notebook"} · Dynamo`;
+  }, [nb]);
 
-  const title = nb?.display_title || nb?.session_title || "Untitled session";
-  const thoughts = ((nb?.thoughts as any)?.blocks?.[0]?.value || "").trim();
+  const title = nb?.display_title || nb?.session_title || "Untitled notebook";
+  const thoughtsHtml = (nb?.thoughts as any)?.blocks?.[0]?.value || "";
+  const myTakeHtml = nb?.my_take || "";
+
+  const tabs: Tab[] = ["thoughts", "annotations", "my_take", "dynamo"];
+
+  const renderTab = (t: Tab) => {
+    if (t === "thoughts") {
+      if (!thoughtsHtml.trim())
+        return (
+          <p className="text-sm italic text-muted-foreground">No thoughts shared.</p>
+        );
+      return <RichTextEditor value={thoughtsHtml} editable={false} minHeight="auto" />;
+    }
+    if (t === "annotations") {
+      return (
+        <p className="text-sm italic text-muted-foreground">
+          The author hasn't shared annotations for this notebook.
+        </p>
+      );
+    }
+    if (t === "my_take") {
+      if (!myTakeHtml.trim())
+        return <p className="text-sm italic text-muted-foreground">No take shared.</p>;
+      return <RichTextEditor value={myTakeHtml} editable={false} minHeight="auto" />;
+    }
+    // dynamo
+    if (!nb || !token) return null;
+    return (
+      <VisitorDynamoChat
+        notebookId={nb.id}
+        shareToken={token}
+        recordType={nb.record_type || "live_session"}
+        recordId={nb.session_id}
+      />
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-2xl lg:max-w-3xl mx-auto px-4 lg:px-8 py-6 sm:py-8 lg:py-12">
+      <div className="max-w-3xl lg:max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 md:py-8 lg:py-12">
         <Link
           to="/"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-6"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3 sm:mb-4"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Dynamo
         </Link>
@@ -73,148 +122,62 @@ const SharedNotebookPage = () => {
             </p>
           </div>
         ) : (
-          <motion.article
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            <header>
-              <div className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
-                <BookOpen className="w-3 h-3" /> Shared notebook
-              </div>
-              <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl mb-2">{title}</h1>
-              {nb.session_created_at && (
-                <p className="text-xs text-muted-foreground font-body">
-                  Recorded{" "}
-                  {new Date(nb.session_created_at).toLocaleDateString(undefined, {
-                    month: "long",
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+              <BookOpen className="w-3 h-3" /> Shared notebook
+            </div>
+
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-display truncate flex-1 min-w-0">
+                {title}
+              </h1>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="shrink-0 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border rounded-md px-2 py-1.5"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" /> Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" /> Copy link
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] sm:text-xs text-muted-foreground font-body mb-4 sm:mb-6">
+              {nb.session_created_at
+                ? `Recorded ${new Date(nb.session_created_at).toLocaleDateString(undefined, {
+                    month: "short",
                     day: "numeric",
                     year: "numeric",
-                  })}
-                </p>
-              )}
-            </header>
+                  })}`
+                : ""}
+            </p>
 
-            {nb.my_take && (
-              <section>
-                <h2 className="font-display text-lg mb-2">My Take</h2>
-                <p
-                  ref={myTakeRef}
-                  className="text-sm text-foreground/90 font-body whitespace-pre-wrap leading-relaxed"
-                >
-                  {nb.my_take}
-                </p>
-              </section>
-            )}
+            {/* Tab bar — no toolbar above; visitors can't edit */}
+            <div className="flex items-end px-1 border-b border-border overflow-x-auto">
+              <div className="flex items-end gap-1 flex-1 min-w-0">
+                {tabs.map((t) => (
+                  <TabBtn
+                    key={t}
+                    active={tab === t}
+                    onClick={() => setTab(t)}
+                    hasIcon={t === "dynamo"}
+                  >
+                    {TAB_LABEL[t]}
+                  </TabBtn>
+                ))}
+              </div>
+            </div>
 
-            {thoughts && (
-              <section>
-                <h2 className="font-display text-lg mb-2">Thoughts</h2>
-                <p
-                  ref={thoughtsRef}
-                  className="text-sm text-foreground/85 font-body whitespace-pre-wrap leading-relaxed"
-                >
-                  {thoughts}
-                </p>
-              </section>
-            )}
-
-            {!nb.my_take && !thoughts && (
-              <p className="text-sm italic text-muted-foreground">This notebook is empty.</p>
-            )}
-
-            {/* Recipient's previously-sent notes */}
-            {nb.my_notes && nb.my_notes.length > 0 && (
-              <section className="pt-4 border-t border-border">
-                <h2 className="font-display text-base mb-2">Your notes</h2>
-                <div className="space-y-2">
-                  {nb.my_notes.map((n) => (
-                    <div
-                      key={n.id}
-                      className="rounded-md border border-foreground/10 bg-background p-3"
-                      style={{ borderWidth: "0.5px" }}
-                    >
-                      {n.anchor_excerpt && (
-                        <div className="mb-1.5 pl-2 border-l-2 border-foreground/20 text-[11px] italic text-muted-foreground line-clamp-2">
-                          “{n.anchor_excerpt}”
-                          <span className="ml-1 not-italic text-[10px] uppercase tracking-wider">
-                            · {n.anchor_kind === "my_take" ? "My Take" : "Thought"}
-                          </span>
-                        </div>
-                      )}
-                      {editingId === n.id ? (
-                        <div className="space-y-2">
-                          <Textarea
-                            value={editBody}
-                            onChange={(e) => setEditBody(e.target.value)}
-                            rows={3}
-                            className="text-sm font-body"
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(null)}
-                              className="text-xs text-muted-foreground hover:text-foreground"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                await update(n.id, editBody);
-                                setEditingId(null);
-                              }}
-                              className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-foreground text-background rounded"
-                            >
-                              <Check className="w-3 h-3" /> Save
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-sm text-foreground/90 font-body whitespace-pre-wrap break-words leading-relaxed">
-                            {n.body}
-                          </p>
-                          <div className="flex justify-end gap-1 mt-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(n.id);
-                                setEditBody(n.body);
-                              }}
-                              className="p-1 text-muted-foreground hover:text-foreground"
-                              aria-label="Edit"
-                              title="Edit"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => remove(n.id)}
-                              className="p-1 text-muted-foreground hover:text-foreground"
-                              aria-label="Delete"
-                              title="Delete"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Composer */}
-            <section className="pt-4 border-t border-border">
-              <LeaveReaderNoteComposer
-                onSubmit={submit}
-                pendingAnchor={pendingAnchor}
-                clearAnchor={() => setPendingAnchor(null)}
-              />
-            </section>
-          </motion.article>
+            {/* Doc rectangle */}
+            <div className="bg-background border border-border border-t-0 rounded-b-md p-3 sm:p-4 md:p-6 min-h-[60vh] sm:min-h-[400px]">
+              {renderTab(tab)}
+            </div>
+          </motion.div>
         )}
       </div>
     </div>
