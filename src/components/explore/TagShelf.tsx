@@ -25,7 +25,7 @@ const TagShelf = ({ tag, items }: Props) => {
     <section className="relative">
       <div className="flex items-end justify-between mb-2.5 px-0.5">
         <Link
-          to={`/topic/${tag.slug}`}
+          to={`/explore/topic/${tag.slug}`}
           className="group flex items-baseline gap-2"
         >
           <h3 className="font-display text-lg sm:text-xl text-foreground group-hover:opacity-70 transition-opacity">
@@ -36,7 +36,7 @@ const TagShelf = ({ tag, items }: Props) => {
           </span>
         </Link>
         <Link
-          to={`/topic/${tag.slug}`}
+          to={`/explore/topic/${tag.slug}`}
           className="text-[12px] font-body text-muted-foreground hover:text-foreground transition-colors"
         >
           See all →

@@ -54,7 +54,7 @@ async function attachPublishers(items: ExploreDebate[]): Promise<ExploreDebate[]
   }));
 }
 
-async function fetchTagShelf(tag: Tag, perTag = 12): Promise<ExploreDebate[]> {
+export async function fetchTagShelf(tag: Tag, perTag = 12): Promise<ExploreDebate[]> {
   // debate ids tagged with this tag
   const { data: dLinks } = await (supabase as any)
     .from("debate_tags")

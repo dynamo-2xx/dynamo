@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { NavLink as RouterNavLink, useLocation } from "react-router-dom";
-import { Home, Compass, PlusCircle, User, MessageCircle, PanelLeftClose, PanelLeft, Users } from "lucide-react";
+import { Home, Compass, PlusCircle, User, MessageCircle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ThemeToggle from "@/components/ThemeToggle";
 import logoSmiley from "@/assets/logo-smiley.png";
@@ -28,19 +28,26 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
   return (
     <FloatingDMProvider>
     <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Desktop sidebar */}
+      {/* Desktop translucent nav bubble */}
       <aside
         className={cn(
-          "hidden md:flex flex-col border-r border-border bg-background p-6 gap-2 fixed h-full transition-all duration-300 z-30",
-          sidebarOpen ? "w-64" : "w-0 p-0 overflow-hidden border-r-0"
+          "hidden md:flex flex-col fixed top-3 left-3 bottom-3 z-30 transition-all duration-300",
+          "bg-background/70 backdrop-blur-xl border border-border/60 shadow-lg rounded-2xl",
+          "p-5 gap-2 overflow-hidden",
+          sidebarOpen ? "w-60 opacity-100" : "w-0 p-0 border-0 opacity-0 pointer-events-none",
         )}
       >
-        <div className="mb-8 flex items-center gap-3">
-          <img src={logoSmiley} alt="d. logo" className="w-10 h-10 dark:invert" />
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(false)}
+          className="mb-6 flex items-center gap-3 group text-left"
+          title="Minimize navigation"
+        >
+          <img src={logoSmiley} alt="d. logo" className="w-9 h-9 dark:invert transition-transform group-hover:scale-105" />
           <span className="font-body text-foreground text-sm font-medium tracking-[0.16em] uppercase">
             DYNAMO
           </span>
-        </div>
+        </button>
         <nav className="flex flex-col gap-0.5 flex-1">
           {navItems.map((item) => {
             const active = location.pathname === item.to || (item.to === "/messages" && location.pathname.startsWith("/messages"));
@@ -50,10 +57,10 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg text-[13px] transition-colors whitespace-nowrap font-body",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-colors whitespace-nowrap font-body",
                   active
-                    ? "text-foreground font-medium bg-accent border-l-2 border-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? "text-foreground font-medium bg-foreground/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
                 )}
               >
                 <item.icon className="w-5 h-5" />
@@ -68,20 +75,12 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           })}
         </nav>
         <div className="mt-auto space-y-3">
-          <p className="text-[11px] text-muted-foreground font-body"></p>
           <div className="flex items-center justify-between">
             <ThemeToggle />
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="Close sidebar"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </button>
           </div>
           <RouterNavLink
             to={user ? "/?highlight=actions" : "/auth"}
-            className="flex items-center justify-center gap-2 border border-border text-foreground rounded-lg py-3 font-body text-xs font-medium hover:bg-accent transition-colors whitespace-nowrap"
+            className="flex items-center justify-center gap-2 border border-border/60 text-foreground rounded-xl py-2.5 font-body text-xs font-medium hover:bg-foreground/5 transition-colors whitespace-nowrap"
           >
             <PlusCircle className="w-4 h-4" />
             Get Started
@@ -89,19 +88,19 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         </div>
       </aside>
 
-      {/* Reopen button when sidebar is closed */}
+      {/* Floating logo button when sidebar is collapsed */}
       {!sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
-          className="hidden md:flex fixed top-4 left-4 z-40 min-w-[44px] min-h-[44px] items-center justify-center rounded-lg bg-background border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          title="Open sidebar"
+          className="hidden md:flex fixed top-3 left-3 sm:top-4 sm:left-4 z-40 w-11 h-11 items-center justify-center rounded-full bg-background/70 backdrop-blur-xl border border-border/60 shadow-sm hover:bg-background/90 transition-colors"
+          title="Open navigation"
         >
-          <PanelLeft className="w-5 h-5" />
+          <img src={logoSmiley} alt="d. logo" className="w-6 h-6 dark:invert" />
         </button>
       )}
 
       {/* Main content */}
-      <main className={cn("flex-1 pb-20 md:pb-0 transition-all duration-300", sidebarOpen ? "md:ml-64" : "md:ml-0")}>
+      <main className={cn("flex-1 pb-20 md:pb-0 transition-all duration-300", sidebarOpen ? "md:ml-[16rem]" : "md:ml-0")}>
         <VerifyEmailBanner />
         <MySanctionBanner />
         {children}
