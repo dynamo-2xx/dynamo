@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Link2, FileText, Sparkles, Upload, Download, Radio, Swords, PlusCircle } from "lucide-react";
+import { ArrowLeft, Link2, FileText, Sparkles, Upload, Download } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import DynamoLoader from "@/components/DynamoLoader";
 import { Button } from "@/components/ui/button";
@@ -10,18 +10,14 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 /**
- * §25 Import — standalone 4th creation format on /create/import.
- * Source: URL · text · file (.txt/.md/.srt/.vtt/.pdf/.mp3/.mp4/.m4a/.wav).
- * Structure: Debate (default) · Live · Change My Mind.
- * Output: a completed, private record in the chosen structure.
+ * Import — standalone creation surface. One source → one imported_record.
+ * No debate/live/cmm structure picker. Output is a transcript + argument map.
  */
 
 type SourceMode = "url" | "text" | "file";
-type Structure = "debate" | "live" | "cmm";
 
 const TEXT_EXTS = /\.(txt|md|markdown|srt|vtt)$/i;
 const PDF_EXTS = /\.pdf$/i;
@@ -31,7 +27,6 @@ export default function ImportToRecordPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [mode, setMode] = useState<SourceMode>("url");
-  const [structure, setStructure] = useState<Structure>("debate");
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
   const [title, setTitle] = useState("");
@@ -45,7 +40,7 @@ export default function ImportToRecordPage() {
 
   useDocumentMeta({
     title: "Import · Dynamo",
-    description: "Turn a link, transcript, PDF, or recording into a fully analyzed record.",
+    description: "Turn a link, transcript, PDF, or recording into a transcript + argument map.",
   });
 
   async function run() {
@@ -61,8 +56,8 @@ export default function ImportToRecordPage() {
       : "Structuring",
     );
     setTimeout(() => setStage("Structuring"), 4000);
-    setTimeout(() => setStage("Building threads"), 9000);
-    setTimeout(() => setStage("Summarizing"), 14000);
+    setTimeout(() => setStage("Building argument map"), 9000);
+    setTimeout(() => setStage("Finalizing"), 14000);
     try {
       const payloadKind: "url" | "text" | "pdf_upload" | "media_upload" =
         mode === "url" ? "url"
@@ -72,7 +67,6 @@ export default function ImportToRecordPage() {
       const { data, error } = await supabase.functions.invoke("import-to-record", {
         body: {
           kind: payloadKind,
-          structure,
           source_url: mode === "url" ? url.trim() : undefined,
           raw_text: mode === "text" || (mode === "file" && !uploadedPath) ? text : undefined,
           storage_path: uploadedPath ?? undefined,
@@ -95,13 +89,10 @@ export default function ImportToRecordPage() {
         return;
       }
       if (error) throw new Error(payload?.message ?? (error as any)?.message ?? "Import failed");
-      const debateId = payload?.debate_id;
-      const liveId = payload?.live_session_id;
-      if (!debateId && !liveId) throw new Error(payload?.message ?? "No record returned");
+      const importId = payload?.imported_record_id;
+      if (!importId) throw new Error(payload?.message ?? "No record returned");
       toast.success("Record ready");
-      // Skip the live/debate "room" UI and go straight to the final analyzed record.
-      if (liveId) navigate(`/live/${liveId}`);
-      else navigate(`/explore/${debateId}`);
+      navigate(`/import/${importId}`);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Import failed. Try a different source.");
@@ -131,9 +122,7 @@ export default function ImportToRecordPage() {
       setUploadedKind("text");
       return;
     }
-    if (!user) {
-      return toast.error("Sign in to upload PDFs or media.");
-    }
+    if (!user) return toast.error("Sign in to upload PDFs or media.");
     try {
       setUploading(true);
       const ext = name.split(".").pop() || "bin";
@@ -166,12 +155,6 @@ export default function ImportToRecordPage() {
     );
   }
 
-  const STRUCTURES: { id: Structure; label: string; description: string; icon: typeof PlusCircle }[] = [
-    { id: "debate", label: "Debate", description: "Threaded by side & subtopic", icon: PlusCircle },
-    { id: "live", label: "Live", description: "Chronological session", icon: Radio },
-    { id: "cmm", label: "Change My Mind", description: "Position + challenger queue", icon: Swords },
-  ];
-
   return (
     <AppLayout>
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -186,33 +169,8 @@ export default function ImportToRecordPage() {
           <h1 className="text-3xl font-serif">Import to record</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-6">
-          Drop a link, transcript, PDF, or recording. Pick how you want it structured. Dynamo returns a fully analyzed record — private by default.
+          Drop a link, transcript, PDF, or recording. Dynamo returns a clean transcript and argument map — private by default.
         </p>
-
-        <div className="mb-5">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-body mb-2">Record structure</div>
-          <div className="grid grid-cols-3 gap-2">
-            {STRUCTURES.map((s) => {
-              const Icon = s.icon;
-              const active = structure === s.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setStructure(s.id)}
-                  className={cn(
-                    "rounded-lg border p-3 text-left transition-colors",
-                    active ? "border-foreground bg-foreground/[0.04]" : "border-border hover:border-foreground/30",
-                  )}
-                >
-                  <Icon className="w-4 h-4 mb-1.5" strokeWidth={1.5} />
-                  <div className="text-sm font-display">{s.label}</div>
-                  <div className="text-[10px] text-muted-foreground font-body leading-tight mt-0.5">{s.description}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         <div className="flex gap-2 mb-4">
           <button
@@ -304,7 +262,7 @@ export default function ImportToRecordPage() {
           </div>
           <Button onClick={run} className="w-full" disabled={uploading}>
             <Sparkles className="w-4 h-4 mr-1.5" />
-            Generate {structure === "debate" ? "debate" : structure === "live" ? "live" : "CMM"} record
+            Generate record
           </Button>
         </Card>
       </div>
