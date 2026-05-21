@@ -2920,6 +2920,21 @@ export type Database = {
         Args: { _device_id: string; _session_id: string }
         Returns: boolean
       }
+      featured_records: {
+        Args: { p_limit?: number; p_scope?: string; p_viewer?: string }
+        Returns: {
+          comment_count: number
+          cover_image_url: string
+          created_at: string
+          created_by: string
+          id: string
+          kind: string
+          participant_count: number
+          score: number
+          status: string
+          topic: string
+        }[]
+      }
       fork_record_for_user: {
         Args: {
           _id: string
