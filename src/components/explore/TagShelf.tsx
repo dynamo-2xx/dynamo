@@ -1,7 +1,7 @@
-import { useRef } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import CompactRecordCard from "./CompactRecordCard";
+import EdgeArrow from "./EdgeArrow";
+import { useEdgeScroll } from "@/hooks/useEdgeScroll";
 import type { ExploreDebate } from "@/hooks/useExplore";
 import type { Tag } from "@/hooks/useTags";
 
@@ -11,13 +11,7 @@ interface Props {
 }
 
 const TagShelf = ({ tag, items }: Props) => {
-  const scrollerRef = useRef<HTMLDivElement>(null);
-
-  const scroll = (dir: 1 | -1) => {
-    const sc = scrollerRef.current;
-    if (!sc) return;
-    sc.scrollBy({ left: dir * sc.clientWidth * 0.8, behavior: "smooth" });
-  };
+  const { ref, canLeft, canRight, scrollByCard } = useEdgeScroll<HTMLDivElement>();
 
   if (items.length === 0) return null;
 
@@ -42,10 +36,10 @@ const TagShelf = ({ tag, items }: Props) => {
           See all →
         </Link>
       </div>
-      <div className="relative group">
+      <div className="relative">
         <div
-          ref={scrollerRef}
-          className="flex gap-3 overflow-x-auto snap-x scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          ref={ref}
+          className="flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {items.map((d) => (
             <div key={d.id} className="snap-start">
@@ -53,26 +47,15 @@ const TagShelf = ({ tag, items }: Props) => {
             </div>
           ))}
         </div>
-        {items.length > 4 && (
-          <>
-            <button
-              type="button"
-              onClick={() => scroll(-1)}
-              aria-label="Scroll left"
-              className="hidden sm:flex absolute left-1 top-[40%] -translate-y-1/2 w-8 h-8 rounded-full bg-background/90 border border-border items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => scroll(1)}
-              aria-label="Scroll right"
-              className="hidden sm:flex absolute right-1 top-[40%] -translate-y-1/2 w-8 h-8 rounded-full bg-background/90 border border-border items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </>
-        )}
+        {/* Edge fades so partial cards melt into background */}
+        <div
+          className={`pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-background to-transparent transition-opacity ${canLeft ? "opacity-100" : "opacity-0"}`}
+        />
+        <div
+          className={`pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-background to-transparent transition-opacity ${canRight ? "opacity-100" : "opacity-0"}`}
+        />
+        <EdgeArrow side="left" visible={canLeft} onClick={() => scrollByCard(-1)} />
+        <EdgeArrow side="right" visible={canRight} onClick={() => scrollByCard(1)} />
       </div>
     </section>
   );
