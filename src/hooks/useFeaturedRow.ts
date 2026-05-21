@@ -38,6 +38,15 @@ async function attachPublishers(items: ExploreDebate[]): Promise<ExploreDebate[]
   }));
 }
 
+async function backfillFormats(items: ExploreDebate[]): Promise<ExploreDebate[]> {
+  const ids = items.filter((i) => i.kind === "debate").map((i) => i.id);
+  if (!ids.length) return items;
+  const { data } = await supabase.from("debates").select("id, format").in("id", ids);
+  const map = new Map<string, string | null>();
+  (data || []).forEach((d: any) => map.set(d.id, d.format ?? null));
+  return items.map((i) => (i.kind === "debate" ? { ...i, format: map.get(i.id) ?? null } : i));
+}
+
 async function fetchScope(
   scope: FeaturedScope,
   viewer: string | null,
@@ -60,7 +69,8 @@ async function fetchScope(
     participant_count: r.participant_count ?? 0,
     kind: r.kind,
   }));
-  return attachPublishers(mapped);
+  const enriched = await attachPublishers(mapped);
+  return backfillFormats(enriched);
 }
 
 export function useFeaturedRow(limit = 12) {
