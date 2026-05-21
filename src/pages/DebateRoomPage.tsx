@@ -285,6 +285,7 @@ const DebateRoomPage = () => {
   const currentSideForTranscript = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const {
     transcriptEntries,
+    argumentMap,
     interimText,
     isConnected: deepgramConnected,
     micError,
@@ -295,7 +296,7 @@ const DebateRoomPage = () => {
     currentSpeakerSide: currentSideForTranscript?.label || "",
     currentSubtopic: currentSubtopicForTranscript?.title || "",
     sides: sides.map((s) => s.label),
-    isActive: debate?.status === "live" && userRole !== "spectator" && deepgramActive,
+    isActive: debate?.status === "live" && userRole !== "spectator",
   });
 
   // Request media permissions at session start for non-spectators
@@ -434,9 +435,10 @@ const DebateRoomPage = () => {
          }
         // Sync prep phase from other participant
         if (updated.prep_phase_active) {
-          if (!prepPhaseRoleRef.current) {
-            enterPrepPhaseFromRealtimeRef.current(updated);
-          }
+          // Always re-enter prep when the server flips prep_phase_active true.
+          // Previously we skipped if a local role was already set, which left the
+          // other side stranded after a rapid end-turn-early/advance cycle.
+          enterPrepPhaseFromRealtimeRef.current(updated);
 
           setSelectedPrepDuration(updated.prep_duration_seconds ?? null);
           setPrepStartedAt(
@@ -554,16 +556,30 @@ const DebateRoomPage = () => {
     setTimerRunning(false);
     setTimeLeft(0);
 
-      // Write prep phase to DB — use idempotent guard so only the first writer wins
+      // Write prep phase to DB. We previously guarded on prep_phase_active=false
+      // which silently dropped writes when the local cache was stale, leaving the
+      // OTHER side stuck in the live view (the "end-turn-early misalignment" bug).
+      // Now always write; the realtime UPDATE that follows is idempotent on both sides.
       supabase.from("debates").update({
-      prep_phase_active: true,
-       prep_phase_started_at: startedAt,
-       prep_duration_seconds: prepSeconds,
-      prep_side1_ready: false,
-      prep_side2_ready: false,
-      } as any).eq("id", debate.id).eq("prep_phase_active", false).then(({ error }) => {
-       if (error) console.error("Failed to write prep phase to DB:", error);
-     });
+        prep_phase_active: true,
+        prep_phase_started_at: startedAt,
+        prep_duration_seconds: prepSeconds,
+        prep_side1_ready: false,
+        prep_side2_ready: false,
+      } as any).eq("id", debate.id).then(({ error }) => {
+        if (error) console.error("Failed to write prep phase to DB:", error);
+      });
+
+      // Watchdog: if realtime fails to propagate within 2s, force a refetch so
+      // the other side is pulled into prep regardless of channel hiccups.
+      const debateId = debate.id;
+      setTimeout(async () => {
+        const { data } = await supabase
+          .from("debates").select("*").eq("id", debateId).maybeSingle();
+        if (data?.prep_phase_active) {
+          setDebate((prev) => prev ? { ...prev, ...(data as any) } : (data as any));
+        }
+      }, 2000);
   }, [debate, myParticipant, transcriptEntries, currentSubtopic, currentSide]);
 
    // Reset turn-end guard whenever a new turn starts (turn_started_at changes)
@@ -1445,6 +1461,7 @@ const DebateRoomPage = () => {
               onNotebookContentChange={setNotebookContent}
               onCloseNotebook={() => setNotebookOpen(false)}
               roundSummaries={roundSummaries}
+              argumentMapEntries={argumentMap}
             />
             {/* Prep phase overlay */}
             {prepPhaseRole && (
@@ -1466,8 +1483,9 @@ const DebateRoomPage = () => {
                   debate.prep_phase_active && prepPhaseRole === "incoming" &&
                   !(getMySideIndex() === 0 ? debate.prep_side2_ready : debate.prep_side1_ready)
                 }
-                notebookValue={notebookContent}
-                onNotebookChange={setNotebookContent}
+                argumentMap={argumentMap}
+                recordType="debate"
+                recordId={debate.id}
               />
             )}
             {/* Notebook button now lives inside ParticipantSharedView's metadata-row stack */}

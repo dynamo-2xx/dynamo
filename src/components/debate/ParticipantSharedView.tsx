@@ -80,6 +80,8 @@ interface ParticipantSharedViewProps {
   onNotebookContentChange?: (val: string) => void;
   onCloseNotebook?: () => void;
   roundSummaries?: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>;
+  /** Full argument-map entries (typed/threaded) for the entire debate. */
+  argumentMapEntries?: Array<{ id: string; type: string; speaker_side: string; content: string; quote?: string; parent_index?: number; subtopic: string; created_at: number }>;
 }
 
 const ParticipantSharedView = ({
@@ -97,6 +99,7 @@ const ParticipantSharedView = ({
   onNotebookContentChange,
   onCloseNotebook,
   roundSummaries = {},
+  argumentMapEntries = [],
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [argumentMapOpen, setArgumentMapOpen] = useState(false);
@@ -264,6 +267,38 @@ const ParticipantSharedView = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Constant control trio — both sides have access to d., the argument
+              map, and their notebook regardless of whose turn it is. */}
+          {isSpeaker && (
+            <div className="flex items-center gap-1.5 mr-1">
+              {onToggleAiMessage && (
+                <DLogoButton
+                  onClick={onToggleAiMessage}
+                  active={!aiMessageCollapsed}
+                  pulse={aiMessagePulse}
+                  disabled={!aiMessage}
+                />
+              )}
+              <IconCircleButton
+                onClick={() => setArgumentMapOpen((v) => !v)}
+                active={argumentMapOpen}
+                title="Argument map"
+                ariaLabel="Toggle argument map overlay"
+              >
+                <MapIcon className="w-3.5 h-3.5" />
+              </IconCircleButton>
+              {onOpenNotebook && (
+                <IconCircleButton
+                  onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
+                  active={notebookOpen}
+                  title="My notebook"
+                  ariaLabel="Toggle notebook"
+                >
+                  <NotebookPen className="w-3.5 h-3.5" />
+                </IconCircleButton>
+              )}
+            </div>
+          )}
           <DebateTimer timeLeft={timeLeft} size="md" />
         </div>
       </div>
@@ -285,8 +320,9 @@ const ParticipantSharedView = ({
             <ChevronRight className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Next Subtopic</span>
           </button>
 
-          {/* Mobile-only: d. / map / notebook docked to the right of publisher controls */}
-          {canSpeak && (
+          {/* Mobile-only: d. / map / notebook docked to the right of publisher controls.
+              Always visible to any speaker — both sides need constant access to map + notebook. */}
+          {isSpeaker && (
             <div className="sm:hidden ml-auto flex items-center gap-1.5 shrink-0">
               {onToggleAiMessage && (
                 <DLogoButton
@@ -299,7 +335,6 @@ const ParticipantSharedView = ({
               <IconCircleButton
                 onClick={() => setArgumentMapOpen((v) => !v)}
                 active={argumentMapOpen}
-                disabled={overlayArgs.length === 0}
                 title="Argument map"
                 ariaLabel="Toggle argument map overlay"
               >
@@ -321,7 +356,7 @@ const ParticipantSharedView = ({
       )}
 
       {/* Mobile-only thin row for non-publishers — sits directly above the input */}
-      {canSpeak && !isPublisher && (
+      {isSpeaker && !isPublisher && (
         <div className="sm:hidden border-b border-border bg-card/50 px-4 py-2 flex items-center justify-end gap-1.5 shrink-0">
           {onToggleAiMessage && (
             <DLogoButton
@@ -334,7 +369,6 @@ const ParticipantSharedView = ({
           <IconCircleButton
             onClick={() => setArgumentMapOpen((v) => !v)}
             active={argumentMapOpen}
-            disabled={overlayArgs.length === 0}
             title="Argument map"
             ariaLabel="Toggle argument map overlay"
           >
@@ -429,8 +463,26 @@ const ParticipantSharedView = ({
           <ArgumentMapOverlay
             open={argumentMapOpen}
             onClose={() => setArgumentMapOpen(false)}
-            arguments={overlayArgs}
             subtopicTitle={currentSubtopic?.title}
+            subtopics={subtopics.map((s) => ({ id: s.id, title: s.title }))}
+            transcriptEntries={transcriptEntries.map((e) => ({
+              id: e.id,
+              speaker_side: e.speaker_side,
+              text: e.text,
+              subtopic: e.subtopic,
+              timestamp: e.timestamp,
+              ai_summary: e.ai_summary,
+            }))}
+            argumentMap={argumentMapEntries}
+            analysis={Object.entries(roundSummaries).map(([sid, v]) => {
+              const st = subtopics.find((s) => s.id === sid);
+              return {
+                subtopicId: sid,
+                subtopicTitle: st?.title ?? "",
+                summary: v.summary,
+                keyArguments: v.key_arguments,
+              };
+            })}
           />
 
           {/* Translucent notebook overlay */}
@@ -514,7 +566,6 @@ const ParticipantSharedView = ({
                 <IconCircleButton
                   onClick={() => setArgumentMapOpen((v) => !v)}
                   active={argumentMapOpen}
-                  disabled={overlayArgs.length === 0}
                   title="Argument map"
                   ariaLabel="Toggle argument map overlay"
                 >

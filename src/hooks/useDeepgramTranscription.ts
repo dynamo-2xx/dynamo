@@ -165,9 +165,16 @@ export function useDeepgramTranscription({
     const text = statementBufferRef.current.trim();
     if (!text) return;
 
+    // Guard: never write an entry with an empty speaker_side — that breaks the
+    // threaded record + transcript views downstream. Fall back to current side ref.
+    const side =
+      (statementSideRef.current && statementSideRef.current.trim()) ||
+      (currentSideRef.current && currentSideRef.current.trim()) ||
+      "Speaker";
+
     const entry: TranscriptEntry = {
       id: `stmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      speaker_side: statementSideRef.current,
+      speaker_side: side,
       text,
       subtopic: statementSubtopicRef.current,
       timestamp: Date.now(),
