@@ -39,7 +39,7 @@ const RichTextEditor = ({
 }: Props) => {
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2] } }),
+      StarterKit.configure({ heading: { levels: [1, 2] }, underline: false, link: false } as any),
       Underline,
       Link.configure({ openOnClick: false, autolink: true }),
       Image.configure({ inline: false, allowBase64: true }),

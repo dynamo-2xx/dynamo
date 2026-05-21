@@ -137,10 +137,10 @@ const NotebookToolbar = ({ editor, className }: Props) => {
         <LinkIcon className="w-3.5 h-3.5" />
       </Btn>
       <Divider />
-      <Btn label="Undo" onClick={run((c) => c.undo())} disabled={!editor?.can().undo()}>
+      <Btn label="Undo" onClick={run((c) => c.undo())} disabled={!editor || editor.isDestroyed || !editor.can().undo()}>
         <Undo2 className="w-3.5 h-3.5" />
       </Btn>
-      <Btn label="Redo" onClick={run((c) => c.redo())} disabled={!editor?.can().redo()}>
+      <Btn label="Redo" onClick={run((c) => c.redo())} disabled={!editor || editor.isDestroyed || !editor.can().redo()}>
         <Redo2 className="w-3.5 h-3.5" />
       </Btn>
     </div>
