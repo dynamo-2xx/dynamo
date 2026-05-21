@@ -80,6 +80,8 @@ interface ParticipantSharedViewProps {
   onNotebookContentChange?: (val: string) => void;
   onCloseNotebook?: () => void;
   roundSummaries?: Record<string, { summary: string; key_arguments: Array<{ side: string; content: string; type: string; significance: string }> }>;
+  /** Full argument-map entries (typed/threaded) for the entire debate. */
+  argumentMapEntries?: Array<{ id: string; type: string; speaker_side: string; content: string; quote?: string; parent_index?: number; subtopic: string; created_at: number }>;
 }
 
 const ParticipantSharedView = ({
@@ -97,6 +99,7 @@ const ParticipantSharedView = ({
   onNotebookContentChange,
   onCloseNotebook,
   roundSummaries = {},
+  argumentMapEntries = [],
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [argumentMapOpen, setArgumentMapOpen] = useState(false);
@@ -462,8 +465,26 @@ const ParticipantSharedView = ({
           <ArgumentMapOverlay
             open={argumentMapOpen}
             onClose={() => setArgumentMapOpen(false)}
-            arguments={overlayArgs}
             subtopicTitle={currentSubtopic?.title}
+            subtopics={subtopics.map((s) => ({ id: s.id, title: s.title }))}
+            transcriptEntries={transcriptEntries.map((e) => ({
+              id: e.id,
+              speaker_side: e.speaker_side,
+              text: e.text,
+              subtopic: e.subtopic,
+              timestamp: e.timestamp,
+              ai_summary: e.ai_summary,
+            }))}
+            argumentMap={argumentMapEntries}
+            analysis={Object.entries(roundSummaries).map(([sid, v]) => {
+              const st = subtopics.find((s) => s.id === sid);
+              return {
+                subtopicId: sid,
+                subtopicTitle: st?.title ?? "",
+                summary: v.summary,
+                keyArguments: v.key_arguments,
+              };
+            })}
           />
 
           {/* Translucent notebook overlay */}
