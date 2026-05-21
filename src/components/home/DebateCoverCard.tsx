@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check, HandHeart, Calendar } from "lucide-react";
+import { Users, MoreHorizontal, Globe, Lock, Archive, Trash2, Check, HandHeart, Calendar, FileText } from "lucide-react";
 import { gradientFromSeed } from "@/lib/gradient";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,7 +34,7 @@ export interface DebateCoverItem {
   scheduled_at?: string | null;
   created_by?: string;
   is_public?: boolean;
-  kind?: "debate" | "live_session";
+  kind?: "debate" | "live_session" | "imported_record";
 }
 
 interface Props {
@@ -54,20 +54,21 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   const [busy, setBusy] = useState(false);
 
   const isLiveSession = d.kind === "live_session";
+  const isImported = d.kind === "imported_record";
   const isLive = d.status === "live";
   const isScheduled = d.status === "scheduled" || d.status === "draft";
   const isArchived = d.status === "archived";
   const isOwner = !!user && !!d.created_by && user.id === d.created_by;
-  const showOwnerControls = isOwner && !isLive && !selectionMode && !isLiveSession;
+  const showOwnerControls = isOwner && !isLive && !selectionMode && !isLiveSession && !isImported;
   const selectable = !!selectionMode && isOwner;
   const happeningLabel = isScheduled && !isLiveSession ? formatUpcomingShort(d.scheduled_at) : null;
-  // Scheduled/draft debates always route to preview (owner sees coordination panel,
-  // non-owners see the Interested CTA). Live/completed go straight into the room.
-  const linkTo = isLiveSession
-    ? `/live/${d.id}`
-    : isScheduled
-      ? `/debate/${d.id}/preview`
-      : `/debate/${d.id}`;
+  const linkTo = isImported
+    ? `/import/${d.id}`
+    : isLiveSession
+      ? `/live/${d.id}`
+      : isScheduled
+        ? `/debate/${d.id}/preview`
+        : `/debate/${d.id}`;
 
   const bg = d.cover_image_url
     ? { backgroundImage: `url(${d.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -115,6 +116,14 @@ const DebateCoverCard = ({ d, onChanged, selectionMode, selected, onToggleSelect
   };
 
   const renderStatusPill = () => {
+    if (isImported) {
+      return (
+        <span className={cn(PILL_BASE, "bg-background/95 text-foreground")}>
+          <FileText className="w-2.5 h-2.5" />
+          Imported
+        </span>
+      );
+    }
     if (isLiveSession) {
       const isRec = d.status === "live";
       return (
