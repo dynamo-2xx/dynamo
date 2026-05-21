@@ -1526,13 +1526,22 @@ const CreateDebatePage = () => {
                                     : "bg-background border border-border text-foreground"
                                 } ${draggingId === k || pointerDragId === k ? "opacity-50" : ""}`}
                               >
-                                {e.avatarUrl ? (
-                                  <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                ) : (
-                                  <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
-                                    {e.username.slice(0, 2).toUpperCase()}
-                                  </span>
-                                )}
+                                <span className="relative inline-flex">
+                                  {e.avatarUrl ? (
+                                    <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                  ) : (
+                                    <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                      {e.username.slice(0, 2).toUpperCase()}
+                                    </span>
+                                  )}
+                                  {e.userId && readyUserIds.has(e.userId) && (
+                                    <span
+                                      title="Mic ready"
+                                      aria-label="Mic ready"
+                                      className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-background animate-pulse"
+                                    />
+                                  )}
+                                </span>
                                 {e.username}
                                 {/* Mobile-friendly side picker */}
                                 <select
