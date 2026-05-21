@@ -1904,8 +1904,26 @@ const CreateDebatePage = () => {
                       setSaving(false);
                     }
                   };
+                  const canSendInvitesNow =
+                    !isPublished && invitedEntries.length > 0 && !saving;
                   return (
-                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <div className="flex flex-col gap-3 pt-2">
+                      {canSendInvitesNow && (
+                        <button
+                          type="button"
+                          onClick={() => handleCreateDebate(false)}
+                          disabled={saving}
+                          className="w-full flex items-center justify-center gap-2 border border-dashed border-foreground/30 rounded-full py-2.5 font-body text-xs font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                          title="Save draft and email invitees now so they can test their mic before you publish"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          Send invites now ({invitedEntries.length})
+                          <span className="text-[10px] text-muted-foreground font-normal">
+                            — they'll see a green chime when ready
+                          </span>
+                        </button>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-3">
                       <button
                         onClick={() => handleCreateDebate(false)}
                         disabled={saving}
@@ -1922,6 +1940,7 @@ const CreateDebatePage = () => {
                         {rightLabel}
                         {isPublished ? <Play className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                       </button>
+                      </div>
                     </div>
                   );
                 })()}
