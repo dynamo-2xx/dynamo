@@ -57,7 +57,7 @@ const ExplorePage = () => {
           transition={{ duration: 0.4 }}
           className="space-y-10"
         >
-          <header className="pl-12 sm:pl-14">
+          <header className="pr-12 sm:pr-14">
             <h1 className="font-display text-3xl sm:text-4xl text-foreground">
               Explore
             </h1>
