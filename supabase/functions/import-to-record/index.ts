@@ -101,7 +101,36 @@ async function structure(text: string, titleHint?: string) {
   const json = await res.json();
   const content: string = json.choices?.[0]?.message?.content ?? "";
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-  return { parsed: JSON.parse(cleaned), usage: json.usage };
+  return { parsed: repairAndParse(cleaned), usage: json.usage };
+}
+
+function repairAndParse(raw: string): any {
+  try { return JSON.parse(raw); } catch (_) {}
+  // Extract JSON object substring
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  let s = start >= 0 && end > start ? raw.slice(start, end + 1) : raw;
+  // Strip control characters
+  s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  // Remove trailing commas
+  s = s.replace(/,(\s*[}\]])/g, "$1");
+  try { return JSON.parse(s); } catch (_) {}
+  // Balance brackets/braces inside strings-awareness
+  let braces = 0, brackets = 0, inStr = false, esc = false;
+  for (const ch of s) {
+    if (esc) { esc = false; continue; }
+    if (ch === "\\") { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === "{") braces++;
+    else if (ch === "}") braces--;
+    else if (ch === "[") brackets++;
+    else if (ch === "]") brackets--;
+  }
+  if (inStr) s += '"';
+  while (brackets-- > 0) s += "]";
+  while (braces-- > 0) s += "}";
+  return JSON.parse(s);
 }
 
 serve(async (req) => {
