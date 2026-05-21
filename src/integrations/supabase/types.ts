@@ -3259,6 +3259,7 @@ export type Database = {
         | "change_my_mind"
         | "live_session"
         | "notebook"
+        | "imported_record"
       subscription_status:
         | "active"
         | "past_due"
@@ -3452,6 +3453,7 @@ export const Constants = {
         "change_my_mind",
         "live_session",
         "notebook",
+        "imported_record",
       ],
       subscription_status: [
         "active",
