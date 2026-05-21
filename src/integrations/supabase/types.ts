@@ -1514,6 +1514,57 @@ export type Database = {
         }
         Relationships: []
       }
+      imported_records: {
+        Row: {
+          argument_map: Json
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean
+          share_token: string | null
+          source_kind: string
+          source_url: string | null
+          subtopics: Json
+          title: string
+          transcript_entries: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          argument_map?: Json
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          share_token?: string | null
+          source_kind: string
+          source_url?: string | null
+          subtopics?: Json
+          title: string
+          transcript_entries?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          argument_map?: Json
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          share_token?: string | null
+          source_kind?: string
+          source_url?: string | null
+          subtopics?: Json
+          title?: string
+          transcript_entries?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       live_session_entries: {
         Row: {
           client_ts: string
@@ -2735,6 +2786,7 @@ export type Database = {
       can_preview_debate: { Args: { _debate_id: string }; Returns: boolean }
       can_view_club: { Args: { _club_id: string }; Returns: boolean }
       can_view_debate: { Args: { _debate_id: string }; Returns: boolean }
+      can_view_imported_record: { Args: { _id: string }; Returns: boolean }
       can_view_live_session: { Args: { _session_id: string }; Returns: boolean }
       can_view_lobby: { Args: { _id: string; _kind: string }; Returns: boolean }
       can_view_record: {
