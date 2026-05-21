@@ -285,8 +285,9 @@ const ParticipantSharedView = ({
             <ChevronRight className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Next Subtopic</span>
           </button>
 
-          {/* Mobile-only: d. / map / notebook docked to the right of publisher controls */}
-          {canSpeak && (
+          {/* Mobile-only: d. / map / notebook docked to the right of publisher controls.
+              Always visible to any speaker — both sides need constant access to map + notebook. */}
+          {isSpeaker && (
             <div className="sm:hidden ml-auto flex items-center gap-1.5 shrink-0">
               {onToggleAiMessage && (
                 <DLogoButton
@@ -321,7 +322,7 @@ const ParticipantSharedView = ({
       )}
 
       {/* Mobile-only thin row for non-publishers — sits directly above the input */}
-      {canSpeak && !isPublisher && (
+      {isSpeaker && !isPublisher && (
         <div className="sm:hidden border-b border-border bg-card/50 px-4 py-2 flex items-center justify-end gap-1.5 shrink-0">
           {onToggleAiMessage && (
             <DLogoButton
