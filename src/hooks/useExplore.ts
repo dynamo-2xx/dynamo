@@ -16,6 +16,7 @@ export interface ExploreDebate {
   tags?: Tag[];
   publisher_name?: string | null;
   publisher_avatar?: string | null;
+  kind?: "debate" | "imported_record";
 }
 
 export interface ExploreLiveSession {
@@ -41,7 +42,30 @@ const mapDebate = (d: any): ExploreDebate => ({
   created_by: d.created_by,
   community_tag: d.community_tag,
   participant_count: d.debate_participants?.[0]?.count ?? 0,
+  kind: "debate",
 });
+
+const mapImported = (r: any): ExploreDebate => ({
+  id: r.id,
+  topic: r.title || "Imported record",
+  status: "completed",
+  cover_image_url: r.cover_image_url,
+  created_at: r.created_at,
+  is_public: !!r.is_public,
+  created_by: r.user_id,
+  participant_count: 0,
+  kind: "imported_record",
+});
+
+async function fetchPublicImported(limit = 24): Promise<ExploreDebate[]> {
+  const { data } = await (supabase as any)
+    .from("imported_records")
+    .select("id, title, cover_image_url, created_at, user_id, is_public")
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return ((data as any[]) || []).map(mapImported);
+}
 
 async function attachPublishers(items: ExploreDebate[]): Promise<ExploreDebate[]> {
   const ids = Array.from(new Set(items.map((i) => i.created_by).filter(Boolean)));
