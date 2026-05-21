@@ -142,7 +142,10 @@ export function useTrendingDebates(limit = 6) {
         .neq("status", "archived")
         .gte("created_at", since)
         .limit(50);
-      const mapped = (data || []).map(mapDebate).sort((a, b) => b.participant_count - a.participant_count);
+      const imported = await fetchPublicImported(20);
+      const mapped = [...(data || []).map(mapDebate), ...imported].sort(
+        (a, b) => b.participant_count - a.participant_count,
+      );
       if (!cancelled) {
         const enriched = await attachPublishers(mapped.slice(0, limit));
         if (!cancelled) {
@@ -171,8 +174,12 @@ export function useLatestDebates(limit = 8) {
         .neq("status", "archived")
         .order("created_at", { ascending: false })
         .limit(limit);
+      const imported = await fetchPublicImported(limit);
+      const merged = [...(data || []).map(mapDebate), ...imported].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
       if (!cancelled) {
-        const enriched = await attachPublishers((data || []).map(mapDebate));
+        const enriched = await attachPublishers(merged.slice(0, limit));
         if (!cancelled) {
           setItems(enriched);
           setLoading(false);
