@@ -1,16 +1,12 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import AppLayout from "@/components/AppLayout";
-import {
-  useFeaturedDebates,
-  useTrendingDebates,
-  useLatestDebates,
-} from "@/hooks/useExplore";
+import { useTrendingDebates, useLatestDebates } from "@/hooks/useExplore";
 import { useTagShelves } from "@/hooks/useTagShelves";
 import LegalFooter from "@/components/legal/LegalFooter";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import FloatingSearch from "@/components/explore/FloatingSearch";
-import FeaturedHero from "@/components/explore/FeaturedHero";
+import FeaturedRow from "@/components/explore/FeaturedRow";
 import TagShelf from "@/components/explore/TagShelf";
 import CompactRecordCard from "@/components/explore/CompactRecordCard";
 
@@ -26,12 +22,9 @@ const ExplorePage = () => {
       typeof window !== "undefined" ? `${window.location.origin}/explore` : undefined,
   });
 
-  const { items: featured } = useFeaturedDebates(1);
   const { items: trending } = useTrendingDebates(24);
   const { items: latest } = useLatestDebates(24);
   const { shelves } = useTagShelves(16);
-
-  const hero = featured[0] || trending[0] || latest[0];
 
   const allMerged = useMemo(() => {
     const seen = new Set<string>();
@@ -85,7 +78,7 @@ const ExplorePage = () => {
             </section>
           ) : (
             <>
-              {hero && <FeaturedHero d={hero} />}
+              <FeaturedRow />
 
               <div className="space-y-9">
                 {shelves.map(({ tag, items }) => (
