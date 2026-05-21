@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import TagPicker from "@/components/tags/TagPicker";
 import CoverImageUploader from "@/components/upload/CoverImageUploader";
 import type { Tag } from "@/hooks/useTags";
@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
+import { useMicLobby } from "@/hooks/useMicLobby";
 
 interface GeneratedDebate {
   topic: string;
@@ -104,6 +105,20 @@ const CreateDebatePage = () => {
   const [maxSpeakersPerSide, setMaxSpeakersPerSide] = useState<number>(2);
   // Live counts of joined speakers per side, populated when a draft exists.
   const [sideSpeakerCounts, setSideSpeakerCounts] = useState<Record<string, number>>({});
+
+  // Live mic-prep readiness: any invitee/participant who has connected their
+  // mic via /join/:code (or the host's lobby) shows up here. Drives the green
+  // chime indicator on invitee avatars.
+  const { rows: liveMicRows } = useMicLobby("debate", draftDebateId);
+  const readyUserIds = useMemo(
+    () =>
+      new Set(
+        liveMicRows
+          .filter((r) => r.status === "connected" && r.user_id)
+          .map((r) => r.user_id as string),
+      ),
+    [liveMicRows],
+  );
 
   // Sync editor items whenever the underlying debate.subtopics changes from outside
   // (initial generation, collaborative-mode add/remove). We preserve existing IDs by title match
@@ -951,14 +966,9 @@ const CreateDebatePage = () => {
         toast.success("Debate updated");
         navigate(`/debate/${editId}/preview`);
       } else if (publishMode) {
-        const hasTags = selectedTags.length > 0;
-        if (hasTags) {
-          toast.success("Debate published! Find it on Explore under your tags.");
-          navigate(`/explore/topic/${selectedTags[0].slug}`);
-        } else {
-          toast.success("Debate published! Find it under My Recent on your profile.");
-          navigate(`/my-recent`);
-        }
+        // Publisher must pass through mic-prep just like every other speaker.
+        toast.success("Debate published! Test your mic to start.");
+        navigate(`/debate/${dbDebate.id}/lobby`);
       } else {
         toast.success("Debate created!");
         navigate(`/debate/${dbDebate.id}`);
@@ -1511,13 +1521,22 @@ const CreateDebatePage = () => {
                                     : "bg-background border border-border text-foreground"
                                 } ${draggingId === k || pointerDragId === k ? "opacity-50" : ""}`}
                               >
-                                {e.avatarUrl ? (
-                                  <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                ) : (
-                                  <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
-                                    {e.username.slice(0, 2).toUpperCase()}
-                                  </span>
-                                )}
+                                <span className="relative inline-flex">
+                                  {e.avatarUrl ? (
+                                    <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                  ) : (
+                                    <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                      {e.username.slice(0, 2).toUpperCase()}
+                                    </span>
+                                  )}
+                                  {e.userId && readyUserIds.has(e.userId) && (
+                                    <span
+                                      title="Mic ready"
+                                      aria-label="Mic ready"
+                                      className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-background animate-pulse"
+                                    />
+                                  )}
+                                </span>
                                 {e.username}
                                 {/* Mobile-friendly side picker */}
                                 <select
@@ -1634,13 +1653,22 @@ const CreateDebatePage = () => {
                                             : "bg-accent text-foreground"
                                         } ${draggingId === k || pointerDragId === k ? "opacity-50" : ""}`}
                                       >
-                                        {e.avatarUrl ? (
-                                          <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-                                        ) : (
-                                          <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
-                                            {e.username.slice(0, 2).toUpperCase()}
-                                          </span>
-                                        )}
+                                        <span className="relative inline-flex">
+                                          {e.avatarUrl ? (
+                                            <img src={e.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                          ) : (
+                                            <span className="w-5 h-5 rounded-full bg-foreground/10 inline-flex items-center justify-center text-[9px]">
+                                              {e.username.slice(0, 2).toUpperCase()}
+                                            </span>
+                                          )}
+                                          {e.userId && readyUserIds.has(e.userId) && (
+                                            <span
+                                              title="Mic ready"
+                                              aria-label="Mic ready"
+                                              className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-background animate-pulse"
+                                            />
+                                          )}
+                                        </span>
                                         {e.username}
                                         {/* Mobile-friendly side picker (move or unassign) */}
                                         <select
@@ -1876,8 +1904,26 @@ const CreateDebatePage = () => {
                       setSaving(false);
                     }
                   };
+                  const canSendInvitesNow =
+                    !isPublished && invitedEntries.length > 0 && !saving;
                   return (
-                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <div className="flex flex-col gap-3 pt-2">
+                      {canSendInvitesNow && (
+                        <button
+                          type="button"
+                          onClick={() => handleCreateDebate(false)}
+                          disabled={saving}
+                          className="w-full flex items-center justify-center gap-2 border border-dashed border-foreground/30 rounded-full py-2.5 font-body text-xs font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                          title="Save draft and email invitees now so they can test their mic before you publish"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          Send invites now ({invitedEntries.length})
+                          <span className="text-[10px] text-muted-foreground font-normal">
+                            — they'll see a green chime when ready
+                          </span>
+                        </button>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-3">
                       <button
                         onClick={() => handleCreateDebate(false)}
                         disabled={saving}
@@ -1894,6 +1940,7 @@ const CreateDebatePage = () => {
                         {rightLabel}
                         {isPublished ? <Play className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                       </button>
+                      </div>
                     </div>
                   );
                 })()}
