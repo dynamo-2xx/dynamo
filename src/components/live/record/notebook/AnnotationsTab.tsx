@@ -1,16 +1,27 @@
 import { useState } from "react";
 import { ArrowUpRight, Trash2, Pencil, Check, X as XIcon } from "lucide-react";
 import type { SessionAnnotation } from "@/hooks/useSessionAnnotations";
-import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor, { type Editor } from "@/components/study/RichTextEditor";
 
 interface Props {
   annotations: SessionAnnotation[];
   onJump: (a: SessionAnnotation) => void;
   onRemove: (id: string) => void;
   onUpdate?: (id: string, patch: { note?: string; excerpt?: string }) => void;
+  onEditorReady?: (e: Editor | null) => void;
+  onEditorFocus?: () => void;
+  readOnly?: boolean;
 }
 
-const AnnotationsTab = ({ annotations, onJump, onRemove, onUpdate }: Props) => {
+const AnnotationsTab = ({
+  annotations,
+  onJump,
+  onRemove,
+  onUpdate,
+  onEditorReady,
+  onEditorFocus,
+  readOnly,
+}: Props) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -29,11 +40,13 @@ const AnnotationsTab = ({ annotations, onJump, onRemove, onUpdate }: Props) => {
   const cancelEdit = () => {
     setEditingId(null);
     setDraft("");
+    onEditorReady?.(null);
   };
   const saveEdit = (id: string) => {
     onUpdate?.(id, { note: draft });
     setEditingId(null);
     setDraft("");
+    onEditorReady?.(null);
   };
 
   return (
@@ -44,15 +57,21 @@ const AnnotationsTab = ({ annotations, onJump, onRemove, onUpdate }: Props) => {
           <div key={a.id} className="border border-foreground/10 rounded-md p-2">
             <p className="text-xs italic text-foreground/80 line-clamp-3 mb-1">"{a.excerpt}"</p>
             {isEditing ? (
-              <Textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Add a note…"
-                className="w-full min-h-[60px] text-xs font-body mb-2 border-foreground/10"
-                autoFocus
-              />
+              <div className="border border-border rounded-md p-2 mb-2">
+                <RichTextEditor
+                  value={draft}
+                  onChange={setDraft}
+                  onEditorReady={onEditorReady}
+                  onFocus={onEditorFocus}
+                  placeholder="Add a note…"
+                  minHeight="80px"
+                />
+              </div>
             ) : a.note ? (
-              <p className="text-xs text-foreground/90 font-body mb-1 whitespace-pre-wrap">{a.note}</p>
+              <div
+                className="text-xs text-foreground/90 font-body mb-1 prose prose-sm max-w-none [&_p]:my-1"
+                dangerouslySetInnerHTML={{ __html: a.note }}
+              />
             ) : (
               <p className="text-[11px] italic text-muted-foreground/70 mb-1">No note yet.</p>
             )}
@@ -65,6 +84,7 @@ const AnnotationsTab = ({ annotations, onJump, onRemove, onUpdate }: Props) => {
                 Jump to source
                 <ArrowUpRight className="w-3 h-3" />
               </button>
+              {!readOnly && (
               <div className="flex items-center gap-1">
                 {isEditing ? (
                   <>
@@ -111,6 +131,7 @@ const AnnotationsTab = ({ annotations, onJump, onRemove, onUpdate }: Props) => {
                   </>
                 )}
               </div>
+              )}
             </div>
           </div>
         );
