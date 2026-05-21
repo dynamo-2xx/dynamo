@@ -1,56 +1,106 @@
-# Explore — Format filter (All / Debates / Live / CMM / Imported)
+## Goal
 
-Add a multi-select format filter that sits to the left of the For You / Local toggle in the Featured row header but applies **globally** to every shelf on `/explore` (Featured, all TagShelves, Latest, and search results).
+Replace the top profile display on three surfaces — Home (`/`), Profile (`/profile`), and Edit Profile (`/profile/edit`) — with a single, shared "ID card" component styled in the minimal DYNAMO aesthetic. The Home card keeps its fade-in transition. The Edit card is the only one with inline editing.
 
-## UI
+## Data model
 
-`src/components/explore/FormatFilter.tsx` (new)
+No schema changes. All fields already exist on `profiles`:
 
-- shadcn `DropdownMenu` trigger styled to match the For You/Local pill: rounded-full border `border-border/60`, `bg-foreground/5 backdrop-blur-xl`, `px-3.5 py-1.5 text-[12px] font-body`.
-- Label logic:
-  - All selected (or none) → `All formats ▾`
-  - 1 selected → `Debates ▾`
-  - 2+ selected → `Debates +2 ▾`
-- Menu contains 5 `DropdownMenuCheckboxItem`s: **All**, **Debates**, **Live**, **Change My Mind**, **Imported**.
-  - **All** is a master toggle: clicking it selects everything / clears to All-state. Toggling any individual item off "All" deselects All and leaves only that item.
-  - Selecting all 4 individuals auto-flips back to All.
+- `display_name` → Name
+- `friend_code` (unique) → Friend code + QR target
+- `created_at` → Join date
+- `avatar_url` → Portrait field
+- `banner_url` → Background
 
-## Global state
+QR encodes a stable share URL: `${window.location.origin}/u/${friend_code}` (or `/profile/${friend_code}` — using whichever route already resolves; if no such route exists yet we encode the friend code string as plain text — to be confirmed in implementation).
 
-`src/contexts/ExploreFiltersContext.tsx` (new) — lightweight context exposing:
+## New component
+
+`src/components/profile/ProfileIdCard.tsx`
+
+Single component with one prop surface:
 
 ```ts
-type Format = "debate" | "live" | "cmm" | "imported";
-{ formats: Set<Format> | "all"; setFormats; isAll: boolean; matches: (item) => boolean }
+interface ProfileIdCardProps {
+  variant: "display" | "edit";
+  // Edit-only callbacks (ignored when variant="display")
+  onAvatarClick?: () => void;
+  onBannerClick?: () => void;
+  onNameChange?: (v: string) => void;
+  uploading?: "avatar" | "banner" | null;
+  // Overrides for live-editing preview (Edit page passes form state)
+  overrides?: { display_name?: string; avatar_url?: string | null; banner_url?: string | null };
+}
 ```
 
-Persisted in `localStorage` (`explore.formats`). Default = `"all"`.
+It reads `user` + `profile` from `useAuth()` and renders the ID card. The display version is read-only; the edit version shows a Camera button on banner, a Camera button on avatar, and an inline `<Input>` for the display name. All other ID-card fields (username/handle, join date, friend code, QR) are always read-only — friend code is system-issued and join date is immutable.
 
-`matches(item)` classifies an `ExploreDebate`/`ExploreLiveSession`:
+### Visual structure (DYNAMO minimal, ID-card metaphor)
 
-- `kind === "imported_record"` → `imported`
-- live-session item (from `useLiveSessionsByTag`) → `live`
-- debate with `status === "live"` → `live`
-- debate where the row's record type is CMM → `cmm` (see Technical below)
-- otherwise → `debate`
+```text
+┌──────────────────────────────────────────────────────────┐
+│  [banner image — full bleed, ~aspect-[5/2]]              │
+│                                          [Banner ⌃]      │  ← edit only
+│  ┌──────────┐                                            │
+│  │ avatar   │   Display Name (Instrument Serif)          │
+│  │ (round)  │   @handle                  · Joined May 26 │
+│  └──────────┘                                            │
+│ ─────────────────────────────────────────────────────── │
+│  FRIEND CODE                                  ┌────────┐ │
+│  D-A4F7-9K2Q  (mono, tracked)                 │  QR    │ │
+│  Tap to copy                                  │ 72×72  │ │
+│                                               └────────┘ │
+└──────────────────────────────────────────────────────────┘
+```
+
+Tokens: `bg-card border border-border rounded-2xl overflow-hidden`. Friend code uses `font-mono tracking-[0.2em] tabular-nums`. Section divider is `border-t border-border/60`. Joined date format: `Joined {Mon YYYY}`. Tap-to-copy on the friend code triggers a `toast.success("Friend code copied")`.
+
+QR rendering uses the existing `qrcode` package via `src/lib/qr.ts → makeQrDataUrl`. Generated once per friend-code value with `useEffect`.
 
 ## Wiring
 
-- `ExplorePage.tsx`: wrap content in `<ExploreFiltersProvider>`. Apply `matches` as a `.filter()` over: `trending`, `latest`, `shelves[i].items`, and `searchResults`. Hide a shelf if it becomes empty post-filter (preserves the "nothing janky" feel rather than showing empty rows).
-- `FeaturedRow.tsx`: render `<FormatFilter />` to the left of the existing toggle pill (`flex items-center gap-2`). Apply filter to `items` from `useFeaturedRow` before render; if the filtered list is empty, show a single muted line "No featured records match this filter."
+### 1. `src/components/home/GreetingHeader.tsx`
 
-## Technical
+Inside the `AnimatePresence` "header" branch, **replace** the banner + avatar + name block with `<ProfileIdCard variant="display" />`. Keep:
 
-- **CMM detection**: `useExplore.ts` currently selects from `debates` without a format column. Extend `DEBATE_SELECT` to include a discriminator. Two options, pick whichever already exists in schema (verify before coding):
-  1. If `debates.format` / `debates.kind` column exists → add it to select + `mapDebate`.
-  2. Otherwise, left-join `change_my_mind_sessions` (or whatever table backs CMM rooms) keyed on `debate_id`, set `kind: "cmm"` when present.
-  This is the only data-layer change; no migrations, no RLS changes.
-- `ExploreDebate.kind` union expands to `"debate" | "live" | "cmm" | "imported_record"`. The Live-session shelves keep their own type — filter handles both via `matches`.
-- No new RPC; filtering happens client-side over already-loaded items (Explore shelves cap at 16–24).
+- The greeting → header fade (`AnimatePresence`, 1000ms delay, existing transition props).
+- The logged-out welcome banner (unchanged).
+- The Avg score badge stays in its current position **outside** the ID card, floating top-right of the card region (preserves the current layout intent). If it would crowd the QR, we relocate it just below the card — to be decided visually during implementation.
+
+### 2. `src/pages/ProfilePage.tsx`
+
+Replace the existing avatar/name/email block (lines ~76–92, the `<div className="bg-background border border-border rounded-lg p-4 sm:p-6 mb-6 flex items-center gap-4 sm:gap-5">…`) with `<ProfileIdCard variant="display" />`. Everything below (Activity list, Account list, Admin, Sign Out, Published Takes) is unchanged.
+
+### 3. `src/pages/EditProfilePage.tsx`
+
+Replace the current "Banner + Avatar" section (lines ~286–362) with:
+
+```tsx
+<ProfileIdCard
+  variant="edit"
+  overrides={{ display_name: form.display_name, avatar_url: form.avatar_url, banner_url: form.banner_url }}
+  uploading={uploading}
+  onBannerClick={() => bannerInputRef.current?.click()}
+  onAvatarClick={() => avatarInputRef.current?.click()}
+  onNameChange={(v) => setForm((f) => ({ ...f, display_name: v }))}
+/>
+```
+
+The hidden `<input type="file">` elements and `handleUpload` stay in the page (they own the form state). The "Display name" field is **removed** from the Basic info section because it now lives inside the card. Affiliation, Location, Role, Public toggle, Save/Cancel, Delete/Export — all unchanged.  
+  
+My extra input: Make everything suitable for mobile. no missing or overlapping buttons. no horizontal scroll wheel EVER for desktop or mobile. 
 
 ## Out of scope
 
-- No change to card visuals, edge-arrow scroll, or shelf ordering.
-- No server-side filter / pagination changes.
-- No new routes.  
-  
+- No new routes, no friend-code regeneration UI, no friend-code redemption flow.
+- No changes to the Avg badge logic.
+- No changes to logged-out home banner.
+- No backend/RLS changes.  
+
+
+## Files touched
+
+- **add** `src/components/profile/ProfileIdCard.tsx`
+- **edit** `src/components/home/GreetingHeader.tsx`
+- **edit** `src/pages/ProfilePage.tsx`
+- **edit** `src/pages/EditProfilePage.tsx`  

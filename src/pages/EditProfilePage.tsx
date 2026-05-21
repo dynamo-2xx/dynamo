@@ -21,8 +21,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { gradientFromSeed } from "@/lib/gradient";
 import type { Database } from "@/integrations/supabase/types";
+import ProfileIdCard from "@/components/profile/ProfileIdCard";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -93,13 +93,6 @@ const EditProfilePage = () => {
       (k) => form[k] !== initial[k]
     );
   }, [form, initial]);
-
-  const bannerStyle = useMemo(() => {
-    if (form.banner_url) {
-      return { backgroundImage: `url(${form.banner_url})` };
-    }
-    return { backgroundImage: gradientFromSeed(form.display_name || user?.email || "d.") };
-  }, [form.banner_url, form.display_name, user?.email]);
 
   const handleUpload = async (kind: "avatar" | "banner", file: File) => {
     if (!user) return;
@@ -282,98 +275,49 @@ const EditProfilePage = () => {
             <h2 className="text-xl sm:text-2xl font-display">Edit profile</h2>
           </div>
 
-          {/* Banner + Avatar */}
-          <section className="bg-background border border-border rounded-lg overflow-hidden mb-6">
-            <div className="relative">
-              <div
-                className="w-full aspect-[5/2] sm:aspect-[3/1] bg-cover bg-center"
-                style={bannerStyle}
-              />
-              <button
-                type="button"
-                onClick={() => bannerInputRef.current?.click()}
-                className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-background/90 backdrop-blur px-3 py-1.5 text-xs font-body font-medium border border-border hover:bg-background transition-colors min-h-[36px]"
-                disabled={uploading === "banner"}
-              >
-                {uploading === "banner" ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Camera className="w-3.5 h-3.5" />
-                )}
-                Banner
-              </button>
-              <input
-                ref={bannerInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleUpload("banner", f);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-
-            <div className="px-4 sm:px-5 pb-5">
-              <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 -mt-12">
-                <div className="relative shrink-0">
-                  <div className="w-24 h-24 rounded-full bg-accent border-4 border-background overflow-hidden flex items-center justify-center">
-                    {form.avatar_url ? (
-                      <img
-                        src={form.avatar_url}
-                        alt="Avatar"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <UserIcon className="w-8 h-8 text-muted-foreground" />
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => avatarInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-foreground text-background flex items-center justify-center shadow-md hover:opacity-90 transition-opacity"
-                    aria-label="Change avatar"
-                    disabled={uploading === "avatar"}
-                  >
-                    {uploading === "avatar" ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Camera className="w-4 h-4" />
-                    )}
-                  </button>
-                  <input
-                    ref={avatarInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handleUpload("avatar", f);
-                      e.target.value = "";
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground font-body sm:pb-2">
-                  Square image works best for the avatar; a wide image works best for the banner.
-                </p>
-              </div>
-            </div>
-          </section>
+          {/* ID card (banner + avatar + name + friend code) */}
+          <div className="mb-6">
+            <ProfileIdCard
+              variant="edit"
+              uploading={uploading}
+              overrides={{
+                display_name: form.display_name,
+                avatar_url: form.avatar_url,
+                banner_url: form.banner_url,
+              }}
+              onBannerClick={() => bannerInputRef.current?.click()}
+              onAvatarClick={() => avatarInputRef.current?.click()}
+              onNameChange={(v) => setForm((f) => ({ ...f, display_name: v }))}
+            />
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload("banner", f);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload("avatar", f);
+                e.target.value = "";
+              }}
+            />
+            <p className="text-xs text-muted-foreground font-body mt-2 px-1">
+              Square image works best for the avatar; a wide image works best for the banner.
+            </p>
+          </div>
 
           {/* Basic info */}
           <section className="bg-background border border-border rounded-lg p-5 mb-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="display_name" className="font-body">Display name</Label>
-              <Input
-                id="display_name"
-                value={form.display_name}
-                onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-                placeholder="Your name"
-                className="font-body"
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="affiliation" className="font-body">Affiliation</Label>
               <Input
