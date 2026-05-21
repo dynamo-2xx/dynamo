@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import ProfileIdCard from "@/components/profile/ProfileIdCard";
 
 const roleLabels = { personal: "Personal", education: "Education", community: "Community" } as const;
 
@@ -61,21 +62,8 @@ const ProfilePage = () => {
             </Link>
           </div>
 
-          <div className="bg-background border border-border rounded-lg p-4 sm:p-6 mb-6 flex items-center gap-4 sm:gap-5">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-accent flex items-center justify-center overflow-hidden shrink-0">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-7 h-7 text-muted-foreground" />
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="font-body text-base sm:text-lg font-medium truncate">{profile?.display_name || user?.email}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground font-body truncate">{user?.email}</p>
-              {profile?.affiliation && (
-                <p className="text-[11px] text-muted-foreground mt-0.5 font-body truncate">{profile.affiliation}</p>
-              )}
-            </div>
+          <div className="mb-6">
+            <ProfileIdCard variant="display" />
           </div>
 
           {/* Activity */}
