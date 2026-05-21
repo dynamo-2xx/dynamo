@@ -72,6 +72,7 @@ import SettingsEmailPage from "./pages/SettingsEmailPage";
 import SettingsBillingPage from "./pages/SettingsBillingPage";
 import IntelligencePage from "./pages/IntelligencePage";
 import ImportToRecordPage from "./pages/ImportToRecordPage";
+import ImportedRecordPage from "./pages/ImportedRecordPage";
 import { PaywallGate } from "@/components/paywall/PaywallGate";
 
 const queryClient = new QueryClient();
@@ -152,6 +153,7 @@ const App = () => (
               <Route path="/settings/billing" element={<ProtectedRoute><SettingsBillingPage /></ProtectedRoute>} />
               <Route path="/intelligence/:kind/:id" element={<ProtectedRoute><IntelligencePage /></ProtectedRoute>} />
               <Route path="/create/import" element={<ProtectedRoute><PaywallGate metric="sessions_created"><ImportToRecordPage /></PaywallGate></ProtectedRoute>} />
+              <Route path="/import/:id" element={<ImportedRecordPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             </ErrorBoundary>
