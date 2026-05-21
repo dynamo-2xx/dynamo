@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import TagPicker from "@/components/tags/TagPicker";
 import CoverImageUploader from "@/components/upload/CoverImageUploader";
 import type { Tag } from "@/hooks/useTags";
@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
+import { useMicLobby } from "@/hooks/useMicLobby";
 
 interface GeneratedDebate {
   topic: string;
@@ -104,6 +105,20 @@ const CreateDebatePage = () => {
   const [maxSpeakersPerSide, setMaxSpeakersPerSide] = useState<number>(2);
   // Live counts of joined speakers per side, populated when a draft exists.
   const [sideSpeakerCounts, setSideSpeakerCounts] = useState<Record<string, number>>({});
+
+  // Live mic-prep readiness: any invitee/participant who has connected their
+  // mic via /join/:code (or the host's lobby) shows up here. Drives the green
+  // chime indicator on invitee avatars.
+  const { rows: liveMicRows } = useMicLobby("debate", draftDebateId);
+  const readyUserIds = useMemo(
+    () =>
+      new Set(
+        liveMicRows
+          .filter((r) => r.status === "connected" && r.user_id)
+          .map((r) => r.user_id as string),
+      ),
+    [liveMicRows],
+  );
 
   // Sync editor items whenever the underlying debate.subtopics changes from outside
   // (initial generation, collaborative-mode add/remove). We preserve existing IDs by title match
