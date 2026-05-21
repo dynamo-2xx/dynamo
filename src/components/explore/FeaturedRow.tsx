@@ -71,11 +71,7 @@ const FeaturedRow = () => {
                 className="snap-start shrink-0 w-[78vw] sm:w-[44vw] md:w-[calc((100%-2rem)/3)] aspect-[16/10] rounded-xl bg-foreground/5 animate-pulse"
               />
             ))
-          : items.map((d) => (
-              <div key={d.id} data-featured-card className="contents">
-                <FeaturedCard d={d} />
-              </div>
-            ))}
+          : items.map((d) => <FeaturedCard key={d.id} d={d} />)}
       </div>
     </section>
   );
