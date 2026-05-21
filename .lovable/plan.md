@@ -1,114 +1,140 @@
-## Goal
-Restructure `/my-study/:id` to feel like a Google Doc: `[title row] → [toolbar] → [tabs + doc rectangle]`. Migrate Thoughts, Annotations (editing), and My Take to TipTap rich-text. Add a notebook-level **Publish** button. Public viewer mirrors the owner layout (no toolbar/editing) and gets its **own private Dynamo chatbot**.
+## Goals
 
-## Layout (owner/editor view)
+Fix seven debate-flow defects so audio reliably becomes transcript, the Argument Map is a real threaded record, every side has constant access to their tools, the Preparation Window uses the current Notebook + Argument Map, turn-end always syncs both sides, joiners route through mic-prep, and the debate generator can send invites before publish.
 
-```text
-← Back to My Study
-Test in EF class  ✎      [✉] [Publish] [Open record ↗] [⤴ Share]
-Recorded May 20, 2026
+---
 
-[ B  I  U  S  H1 H2 • 1. 🔗  ↶ ↷ ]            ← toolbar: always visible, identical across tabs
-┌──────────────────────────────────────────┐
-│ Thoughts │ Annotations · 0 │ My Take │ ✨ Dynamo │
-├──────────────────────────────────────────┤
-│  tab content                              │
-└──────────────────────────────────────────┘
-```
+## 1. Audio → Transcript (Debate Room)
 
-- Doc chrome = subtle bordered card.
-- Tab strip docks to top edge of the rectangle; active tab connects into the card.
+**Bug**: Deepgram connects and shows interim text but final statements never persist. Root cause: `useDeepgramTranscription` only activates when `deepgramActive` toggle is true (`DebateRoomPage` line 298). The user expects audio capture as soon as the debate is live for the active speaker.
 
-## Toolbar behavior (constant across tabs)
-- Toolbar is **always rendered with the same buttons in the same positions**, on every tab.
-- Buttons are interactive whenever the focused tab is a rich-text surface (**Thoughts, Annotations editor, My Take**). On Dynamo the buttons appear identical but no-op on click (no greyed/disabled state).
-- Active formatting indicators reflect the currently focused editor.
-- Hidden entirely on the public viewer.
+**Fix**:
 
-## Rich-text surfaces (v1)
-- **Thoughts**: TipTap full doc.
-- **Annotations**: when a note is in edit mode, its `Textarea` becomes a TipTap editor bound to the toolbar. Excerpt stays plain.
-- **My Take**: TipTap editor — **fully user-editable, the user writes their own take**. 280-char limit still enforced against plain-text length.
+- Drop the manual `deepgramActive` toggle gate. Activate transcription automatically whenever `debate.status === "live"` AND `canSpeak` is true (the user is the active speaker on their turn). Keep a small mic on/off control on the toolbar for explicit mute.
+- Add a guard log when `flushStatement` fires with empty buffer; verify `statementSideRef.current` is populated (it was previously set to empty string when `currentSpeakerSide` was `""`). Default to `currentSide?.label || sides[0]?.label`.
+- Confirm `persistTranscriptEntries` upsert succeeds; surface errors via toast in dev only.
 
-## My Take authorship (default vs optional AI assist)
-- **Default**: the user writes My Take themselves. No AI consolidation runs automatically.
-- **Optional**: a clearly-labeled secondary action (e.g. "Suggest from my Thoughts + Annotations") sits inside the My Take tab. Clicking it produces a **recommended** draft consolidated from the user's Thoughts and Annotations, which the user can accept, edit, or discard. Nothing is written to My Take without explicit user action.
+---
 
-## Publish button (notebook-level)
-- Placed **left of "Open record"**.
-- Uses existing `notebooks.published` flag.
-- States:
-  - Unpublished → `Publish` (primary). Click sets `published = true`, ensures `share_token` exists, toasts "Published to your profile".
-  - Published → `Published` + globe icon (outline). Click opens popover with **Unpublish** + copyable public link.
+## 2. Argument Map — true Threaded Record
 
-## Public viewer (`SharedNotebookPage`)
-Mirrors the owner layout with these diffs:
-- **No toolbar.**
-- Tabs: **Thoughts, Annotations, My Take, ✨ Dynamo**.
-- Thoughts / Annotations / My Take render read-only TipTap (`editable: false`); no edit pencil, no delete, no Publish, no owner Share-menu. Only a "Copy link" button.
-- **Dynamo (visitor)** = the visitor's **own private chatbot** scoped to this notebook. Lets them ask questions about the notebook contents.
-  - Chat history is per-visitor and **never** shows the owner's Dynamo history. The owner's Dynamo chat is private to the owner always.
-  - Anonymous visitors: history persists in `localStorage` keyed by `notebookId`.
-  - Signed-in visitors: history persists in a per-user, per-notebook row (visitor_id + notebook_id).
-- If a visitor **spawns their own notebook** from this one, their new notebook's Dynamo tab is **seeded with a copy of their existing visitor Dynamo chat history** (if any) for that source notebook. Owner history is never copied.
+**Bug**: `ArgumentMapOverlay`'s "Threaded Record" tab is a flat transcript with no subtopic structure or argument-analysis grouping.
 
-## Thoughts → TipTap migration
-- New `src/components/study/ThoughtsEditor.tsx` (`@tiptap/react` + `StarterKit` + `Underline` + `Link` + `Image`).
-- Persist HTML into existing `notebooks.thoughts`. On load, wrap plain text as `<p>` so existing notes load losslessly.
-- Paste-image preserved via `editorProps.handlePaste`.
-- Page owns the active editor instance per focused tab and passes it to `NotebookToolbar`.
+**Fix** — rebuild `ArgumentMapOverlay` with two tabs:
+
+1. **Threaded Record**: collapsible per **subtopic** → collapsible per **thread** → cards built from `argumentMap` entries (which already carry `type: claim | counter | stake | quote | evidence` and `parent_index`). Use the same hierarchical pattern as `ThreadedRecordPane`. Each card shows the AI-derived summary plus its `type` flag (rebuttal/concession/etc.) as a chip. Threads are derived by walking `parent_index` chains within a subtopic.
+2. **Transcript**: collapsible per subtopic, listing every `TranscriptEntry` ordered by timestamp with side label.
+
+Pass `transcriptEntries` and `argumentMap` (from `useDeepgramTranscription`) plus `subtopics` to the overlay. `analysis` prop becomes derived metadata for chip labels, not the primary content.
+
+---
+
+## 3. Annotations on user content
+
+**Need**: User can highlight any user-generated text — in the main display, in the Argument Map overlay, in the Transcript tab — and create an annotation.
+
+**Fix**:
+
+- `DebateHighlightLayer` is already mounted at the root. Add `data-annotatable` to every text-bearing block inside the rebuilt `ArgumentMapOverlay` (both tabs) and in `MessengerChat` bubbles so the existing selection layer picks them up.
+- Confirm the highlight layer's selection capture works inside `FloatingOverlay` (z-index and pointer-event check); if not, raise the overlay's selection capture surface.
+
+---
+
+## 4. Control Panel always available to both sides
+
+**Bug**: In `ParticipantSharedView`, the d./Argument Map/Notebook buttons live inside `{canSpeak && ...}` blocks (lines 289, 324, 456) so only the actively-speaking side sees them.
+
+**Fix**:
+
+- Move the control trio (d. / Argument Map / Notebook) out of `canSpeak` gates. Render for any user where `isSpeaker === true` (i.e., either side), on every screen size. They open overlays that are read-only/editable regardless of turn.
+- The d. moderation button stays interactive for both sides (it's already content-agnostic).
+- Mic button stays gated by `canSpeak` (only the active speaker can broadcast).
+
+---
+
+## 5. Preparation Window — new Notebook + Argument Map
+
+**Bug**: `PrepPhaseOverlay` has a left "Prior turn transcript" box and a right single `<textarea>` "My Notes" — both outdated.
+
+**Fix**:
+
+- **Left column** → embed the new `ArgumentMapOverlay`'s content inline (without the floating frame): same two tabs (Threaded Record + Transcript), filtered to the full debate so prep users can review everything.
+- **Right column** → embed the current Notebook UI used in the main room: tabs for **My Thoughts**, **Annotations**, **My Take**, **Dynamo**, backed by `useSessionNotebook` and `useSessionAnnotations` (same hooks `NotebookOverlay` uses). Same rich-text surfaces.
+- Drop `lastTranscript` / `lastAiSummary` props; the embedded Argument Map covers prior-turn review.
+- Outgoing-role "edit AI summary" step keeps its existing two-column layout but the right column also becomes the Notebook (summary editor moves into a small banner above the workspace).
+
+---
+
+## 6. End-My-Turn-Early sync
+
+**Bug**: Visitor side clicking "End turn early" sometimes doesn't push the host side into the prep window — they stay in the live view.
+
+**Root cause**: `endTurnEarly` → `enterPrepPhase` writes `prep_phase_active = true` with the guard `.eq("prep_phase_active", false)`. When the previous prep cycle's realtime update hasn't reset the local DB row, the write silently drops. Plus the realtime handler's `enterPrepPhaseFromRealtime` only fires once `prepPhaseRoleRef.current` is null — if a prior state lingered, the other side never enters prep.
+
+**Fix**:
+
+- In `enterPrepPhase`, on update conflict, retry without the guard after a short delay; log the conflict.
+- In the realtime handler for `debates` updates: always re-evaluate `updated.prep_phase_active` and call `enterPrepPhaseFromRealtimeRef.current(updated)` whenever it flips true, even if a stale local `prepPhaseRoleRef` is set — clear and re-enter so both sides land in the same prep room.
+- Add a watchdog: when a side that just ended their turn writes prep, after 2s if the other side's `debate.prep_phase_active` hasn't propagated, force a `debates` SELECT refresh to recover from a missed realtime tick.
+
+---
+
+## 7. Mic-Preparation phase on join
+
+**Bug**: After queueing into a debate, users aren't sent through the mic-prep step.
+
+**Audit**:
+
+- `JoinDebatePage` already renders `MicTestStep` before navigating into the room — good.
+- `DebateLobbyPage` (owner pre-live) renders `MicLobby` — good.
+- The gap: in `JoinDebatePage` line ~191 (`if status === "live", hand off and navigate`), users who land mid-live skip the mic-test. Also the "publish → join" path can jump straight into the room.
+
+**Fix**:
+
+- In `JoinDebatePage`, always require `MicTestStep` completion before allowing handoff/navigation, regardless of debate status. Show a single-step modal "Test your mic" if status is already `live`.
+- After the publisher publishes (`CreateDebatePage` `handleCreateDebate(true)` → `navigate(/explore/...)`), if the publisher is also a speaker, route them to `/debate/:id/lobby` first so they go through `MicLobby` instead of jumping to Explore.
+
+---
+
+## 8. Pre-publish "Send Invites" button in debate generator
+
+**Need**: In `CreateDebatePage`, when the user has added invitees but hasn't published yet, give them a button that sends invitations immediately (debate stays as a draft / scheduled record).
+
+**Fix**:
+
+- Add a secondary action **"Send invites now"** next to the publish action. Disabled when `invitedEntries.length === 0`.
+- On click: run the same invitations block that currently lives inside `handleCreateDebate` (lines ~863–940) — create draft debate if not yet saved, write `debate_invitations` rows, invoke `send-invite-email` for email entries — but **do not** flip status to `scheduled`/`live`. Toast "Invitations sent. Publish when ready."
+- After sending, keep the user on the generator so they can keep editing before publish.
+
+---
+
+## Files
+
+**Edit**
+
+- `src/hooks/useDeepgramTranscription.ts` — fix speaker-side default; tighten persist logging.
+- `src/pages/DebateRoomPage.tsx` — drop `deepgramActive` gate; sync logic for prep-phase realtime; mic-prep routing post-publish.
+- `src/components/debate/ArgumentMapOverlay.tsx` — rebuild with subtopic-grouped Threaded Record + Transcript tabs; `data-annotatable` everywhere.
+- `src/components/debate/ParticipantSharedView.tsx` — ungate control panel from `canSpeak`.
+- `src/components/debate/PrepPhaseOverlay.tsx` — embed new Argument Map + Notebook instead of single-textarea.
+- `src/pages/JoinDebatePage.tsx` — mandate `MicTestStep` even when status is `live`.
+- `src/pages/CreateDebatePage.tsx` — extract invitations block; add "Send invites now" button.
+
+**New**
+
+- `src/components/debate/PrepArgumentMapPanel.tsx` — inline (non-floating) wrapper that reuses the Argument Map tabs for prep window.
+- `src/components/debate/PrepNotebookPanel.tsx` — inline wrapper around the same hooks as `NotebookOverlay` (My Thoughts / Annotations / My Take / Dynamo) for prep window.
+
+No DB migrations required.
+
+---
 
 ## User stories
 
-**Constant toolbar**
-- *As an owner*, the formatting toolbar stays in the same place across all tabs so chrome never shifts.
-- *As an owner on Dynamo*, toolbar buttons no-op silently.
-
-**Rich-text everywhere (Thoughts / Annotations / My Take)**
-- *As an owner*, I can format Thoughts with bold, italic, underline, strike, H1/H2, lists, and links from the shared toolbar.
-- *As an owner editing an annotation note*, the same toolbar formats that annotation in place.
-- *As an owner writing My Take*, I write and format my own take with rich text; the 280-char limit checks plain-text length.
-- *As a returning user*, my pre-existing plain-text content loads losslessly.
-- *As an owner*, I can paste an image directly into Thoughts and it appears inline.
-
-**Optional AI consolidation for My Take**
-- *As an owner*, by default no AI runs on My Take — what I type is what's there.
-- *As an owner who wants a starting point*, I can click "Suggest from my Thoughts + Annotations" inside the My Take tab to get a recommended draft I can accept, edit, or discard.
-
-**Notebook Publish button**
-- *As an owner*, I see Publish to the left of "Open record" and publish the whole notebook in one click.
-- *As an owner already published*, the button reads "Published" and lets me copy the public link or unpublish.
-- *As a first-time publisher*, the public share link is generated automatically.
-
-**Public viewer parity**
-- *As a visitor*, I see the same title row and tabbed doc rectangle the owner sees.
-- *As a visitor*, I do not see the toolbar, edit pencils, owner Share menu, or the Publish button — content is read-only.
-- *As a visitor*, the tabs I see are Thoughts, Annotations, My Take, and Dynamo.
-
-**Visitor Dynamo (private chatbot)**
-- *As a visitor*, I can open the Dynamo tab and chat with a bot about this notebook's contents.
-- *As a visitor*, my chat is private to me and never shows the owner's chat history. The owner's Dynamo chat stays private to the owner.
-- *As a returning visitor (same browser / same account)*, my chat history with this notebook persists.
-- *As a visitor who creates my own notebook spawned from this one*, my new notebook's Dynamo tab is pre-seeded with a copy of my existing visitor Dynamo chat history for that source notebook. The owner's history is never copied in.
-
-## Out of scope (v1)
-- Alignment, font size, color, headings beyond H1/H2.
-- Comments-as-annotations spawn flow.
-- Per-tab independent publishing (notebook-level only; existing My-Take publish toggle inside the tab is unaffected).
-- Cross-device sync of anonymous visitor Dynamo history (localStorage is browser-local).
-- Automatic AI consolidation of My Take (only available as an explicit user-triggered suggestion).
-
-## Files
-- **Edit**: `src/pages/MyStudyDetailPage.tsx`, `src/pages/SharedNotebookPage.tsx`, `src/components/live/record/notebook/AnnotationsTab.tsx` (TipTap edit mode), `src/components/live/record/notebook/MyTakeTab.tsx` (TipTap + opt-in suggest button), notebook spawn handler (seed visitor Dynamo history into new notebook).
-- **New**: `src/components/study/NotebookToolbar.tsx`, `src/components/study/ThoughtsEditor.tsx`, `src/components/study/RichTextEditor.tsx` (shared TipTap wrapper for Thoughts/Annotations/My Take), `src/components/study/PublishNotebookButton.tsx`, `src/components/study/VisitorDynamoChat.tsx`, `src/hooks/useVisitorDynamoHistory.ts`.
-- **Untouched**: `src/components/live/record/notebook/ThoughtsTab.tsx` (still used by floating overlay).
-- **DB**: new table `visitor_dynamo_messages` (notebook_id, visitor_id nullable, anon_key nullable, role, content, created_at) with RLS so a visitor reads/writes only their own rows; owner Dynamo storage stays separate and untouched.
-- **Deps**: `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extension-underline`, `@tiptap/extension-link`, `@tiptap/extension-image`.
-
-## Acceptance
-- Toolbar stays identical across tab switches; formats Thoughts, Annotation-in-edit, and My Take; no-ops on Dynamo.
-- My Take is user-authored by default; AI consolidation only runs when the user clicks the suggest action and is staged as a draft for accept/edit/discard.
-- Publish button sits left of Open record; toggles `notebooks.published` and exposes the public link.
-- Public viewer shows Thoughts / Annotations / My Take / Dynamo, all read-only except the visitor's own Dynamo chat.
-- Visitor Dynamo never displays owner messages; owner Dynamo never displays visitor messages.
-- Spawning a notebook from a public notebook copies the visitor's prior Dynamo history (if any) into the new notebook's Dynamo tab.
+- **As a speaker**, my spoken words appear in the transcript automatically as soon as my turn starts and I enable my microphone.
+- **As either side**, I can open the Argument Map at any time — including while the other side is speaking — and see a real threaded record grouped by subtopic with rebuttal/concession flags, plus a clean transcript tab. Exactly as demonstrated in the preview of a published debate and the completed record.
+- **As a debater**, I can highlight any text in the room (main view, argument map, transcript) and annotate it.
+- **As a debater preparing my turn**, the prep window gives me the full Argument Map on the left and my full Notebook (Thoughts / Annotations / My Take / Dynamo) on the right.
+- **As the visiting side**, when I end my turn early the host side is instantly pulled into the same prep window, keeping us on one timer.
+- **As a joiner**, I always go through mic-prep before entering the room, even if I joined mid-live.
+- **As a publisher**, I can send invitations to my picked invitees before I publish the debate.
