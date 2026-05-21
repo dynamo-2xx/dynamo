@@ -1483,8 +1483,9 @@ const DebateRoomPage = () => {
                   debate.prep_phase_active && prepPhaseRole === "incoming" &&
                   !(getMySideIndex() === 0 ? debate.prep_side2_ready : debate.prep_side1_ready)
                 }
-                notebookValue={notebookContent}
-                onNotebookChange={setNotebookContent}
+                argumentMap={argumentMap}
+                recordType="debate"
+                recordId={debate.id}
               />
             )}
             {/* Notebook button now lives inside ParticipantSharedView's metadata-row stack */}
