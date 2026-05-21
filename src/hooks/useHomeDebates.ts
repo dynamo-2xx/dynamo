@@ -72,7 +72,27 @@ export function useForYouDebates(mode: Mode, limit = 12) {
         participant_count: 0,
       }));
 
-      const merged = [...debateItems, ...liveItems];
+      const { data: importedData } = await supabase
+        .from("imported_records" as any)
+        .select("id, title, cover_image_url, created_at, user_id, is_public")
+        .eq("is_public", true)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (cancelled) return;
+
+      const importedItems: DebateCoverItem[] = ((importedData as any[]) || []).map((r: any) => ({
+        kind: "imported_record",
+        id: r.id,
+        topic: r.title || "Imported record",
+        status: "completed",
+        cover_image_url: r.cover_image_url,
+        created_at: r.created_at,
+        is_public: !!r.is_public,
+        created_by: r.user_id,
+        participant_count: 0,
+      }));
+
+      const merged = [...debateItems, ...liveItems, ...importedItems];
       merged.sort((a, b) => {
         if (a.status === "live" && b.status !== "live") return -1;
         if (b.status === "live" && a.status !== "live") return 1;
@@ -146,6 +166,13 @@ export function useMyRecentDebates(limit = 12) {
         .order("created_at", { ascending: false })
         .limit(limit);
 
+      const { data: importedData } = await supabase
+        .from("imported_records" as any)
+        .select("id, title, cover_image_url, created_at, user_id, is_public")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
       if (cancelled) return;
 
       const map = new Map<string, DebateCoverItem>();
@@ -190,6 +217,19 @@ export function useMyRecentDebates(limit = 12) {
           created_at: s.created_at,
           is_public: true,
           created_by: s.created_by,
+          participant_count: 0,
+        });
+      }
+      for (const r of (importedData as any[]) || []) {
+        map.set(`import:${r.id}`, {
+          kind: "imported_record",
+          id: r.id,
+          topic: r.title || "Imported record",
+          status: "completed",
+          cover_image_url: r.cover_image_url,
+          created_at: r.created_at,
+          is_public: !!r.is_public,
+          created_by: r.user_id,
           participant_count: 0,
         });
       }
