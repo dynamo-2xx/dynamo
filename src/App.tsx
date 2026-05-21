@@ -84,8 +84,8 @@ const App = () => (
           <LiveRegionProvider>
             <Toaster />
             <Sonner />
-            <ErrorBoundary>
           <BrowserRouter>
+            <ErrorBoundary>
             <IncidentBanner />
             <PastDueBanner />
             <OfflineBanner />
@@ -154,8 +154,8 @@ const App = () => (
               <Route path="/create/import" element={<ProtectedRoute><PaywallGate metric="sessions_created"><ImportToRecordPage /></PaywallGate></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
             </ErrorBoundary>
+          </BrowserRouter>
           </LiveRegionProvider>
         </TooltipProvider>
       </AuthProvider>
