@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { handleSilencedError } from "@/lib/silencedError";
 
-export type RecordType = "debate" | "live_session" | "change_my_mind";
+export type RecordType = "debate" | "live_session" | "change_my_mind" | "imported_record";
 
 export interface RecordComment {
   id: string;
