@@ -37,6 +37,7 @@ const FeaturedCard = ({ d }: Props) => {
   return (
     <Link
       to={to}
+      data-featured-card
       className="snap-start shrink-0 w-[78vw] sm:w-[44vw] md:w-[calc((100%-1.5rem)/3)] group"
     >
       <div
