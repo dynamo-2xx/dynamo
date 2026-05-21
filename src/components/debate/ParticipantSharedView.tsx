@@ -335,7 +335,6 @@ const ParticipantSharedView = ({
               <IconCircleButton
                 onClick={() => setArgumentMapOpen((v) => !v)}
                 active={argumentMapOpen}
-                disabled={overlayArgs.length === 0}
                 title="Argument map"
                 ariaLabel="Toggle argument map overlay"
               >
@@ -370,7 +369,6 @@ const ParticipantSharedView = ({
           <IconCircleButton
             onClick={() => setArgumentMapOpen((v) => !v)}
             active={argumentMapOpen}
-            disabled={overlayArgs.length === 0}
             title="Argument map"
             ariaLabel="Toggle argument map overlay"
           >
@@ -568,7 +566,6 @@ const ParticipantSharedView = ({
                 <IconCircleButton
                   onClick={() => setArgumentMapOpen((v) => !v)}
                   active={argumentMapOpen}
-                  disabled={overlayArgs.length === 0}
                   title="Argument map"
                   ariaLabel="Toggle argument map overlay"
                 >

@@ -285,6 +285,7 @@ const DebateRoomPage = () => {
   const currentSideForTranscript = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
   const {
     transcriptEntries,
+    argumentMap,
     interimText,
     isConnected: deepgramConnected,
     micError,
@@ -1460,6 +1461,7 @@ const DebateRoomPage = () => {
               onNotebookContentChange={setNotebookContent}
               onCloseNotebook={() => setNotebookOpen(false)}
               roundSummaries={roundSummaries}
+              argumentMapEntries={argumentMap}
             />
             {/* Prep phase overlay */}
             {prepPhaseRole && (
