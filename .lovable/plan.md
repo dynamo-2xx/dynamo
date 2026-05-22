@@ -1,74 +1,107 @@
 
-## Scope
+## Goal
 
-Three coordinated UI changes. No backend/schema/data changes.
+Fix `/my-debates` so:
+1. Imported records appear (and the "Imported" format filter works).
+2. The Change My Mind format filter works.
+3. The **Active** chip means "happening right now or open to join", not "everything that isn't archived/scheduled".
 
----
-
-### 1. `/my-study` — vertical hero-cards instead of horizontal row cards
-
-Replace the current `NotebookCard` (horizontal row with title/preview/menu) with a vertical **book-cover hero card** matching the home `HomeMyStudyRow` style:
-
-- New component `src/components/study/NotebookHeroCard.tsx`:
-  - `w-full aspect-[3/4]` rounded book cover, `monoGradientFromSeed(n.id || title)` background.
-  - Top-right: Published/Draft pill + format chip (Debate/CMM/Live) + share-link icon if shared.
-  - Bottom of cover: title in Instrument Serif white over gradient scrim, 3-line clamp.
-  - Below cover: "MY THOUGHTS" tracked label + 2-line preview, date · annotations meta line.
-  - Long-press / checkbox in select mode (port from existing `NotebookCard`).
-  - `MoreVertical` dropdown overlaid top-right corner with the same actions (Open / Open record / Rename / Move to folder / Share / Delete; Restore / Delete forever when trashed).
-  - dnd-kit `useSortable` wiring preserved (drag the card itself; no separate grip handle).
-- `MyStudyPage.tsx`: render `NotebookHeroCard` inside `FolderRow` using a responsive grid:
-  `grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3`.
-- `FolderRow` continues to wrap groups; folder header/dnd targets unchanged.
-- Keep filter chips, sort dropdown, empty-state, multi-select bar, rename dialogs — **change nothing else**.
+No schema, RLS, or backend changes — UI/data-loading only.
 
 ---
 
-### 2. `/my-debates` (My Agenda) — pattern after My Study
+## 1. Load imported records into My Agenda
 
-Rebuild the page around the same shell:
+In `src/pages/MyDebatesPage.tsx`, extend the loader (the `useEffect` around lines 125–196) to also fetch the current user's imported records, mirroring the pattern already used in `src/hooks/useHomeDebates.ts` (lines 75–93):
 
-- **Remove** the three-segment tab bar (Debates / Archive / Live) and the swipe-card list.
-- **Add** filter chips (mirrors `StudyFilterBar`):
-  - `All · n` · `Active · n` · `Scheduled · n` · `Archive · n` (drafts roll into Archive, matching current behavior).
-- **Add** the Explore format filter — extract today's `FormatFilter` + `ExploreFiltersContext` pattern into a reusable inline pill row of `Debate / Live / CMM / Imported` (multi-toggle, all-on by default). Filters the merged list of debates + live sessions + imported records.
-  - New component `src/components/home/MyAgendaFormatFilter.tsx` (own provider/context scoped to My Agenda; same UX as Explore's `FormatFilter`).
-- **Add** Folders: introduce `agenda_folders` UX using **localStorage only** (per-user, keyed by user id). No DB change. Folder row component reuses `FolderRow` styling.
-  - Each item stores `folder_id` in a localStorage map `agenda.folders.v1` → `{ folders: [{id,name}], assignments: {[itemId]: folderId} }`.
-  - "New folder", rename, delete, drag-to-folder — all client-side.
-- **Hero-cards**: keep existing `DebateCoverCard` (already a hero card), but render in a responsive grid `grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3` grouped by folder via `FolderRow`. Drop the swipeable mobile variant.
-- Keep existing selection-mode bulk actions (privacy/archive/delete) — wire into the new layout's header buttons (Select / Cancel) identical to My Study.
-- Empty states per filter preserved.
+```ts
+const { data: imported } = await supabase
+  .from("imported_records" as any)
+  .select("id, title, cover_image_url, created_at, user_id, is_public")
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false });
+
+const importedItems: DebateCoverItem[] = ((imported as any[]) || []).map((r) => ({
+  kind: "imported_record",
+  id: r.id,
+  topic: r.title || "Imported record",
+  status: "completed",
+  cover_image_url: r.cover_image_url,
+  created_at: r.created_at,
+  is_public: !!r.is_public,
+  created_by: r.user_id,
+  participant_count: 0,
+}));
+```
+
+Merge `importedItems` into the existing `all` array before sorting.
+
+Bulk actions (`bulkPrivacy`, `bulkArchive`, `bulkDelete`) already split by `kind === "live_session"` only — extend them to also branch on `kind === "imported_record"` and run against `imported_records` (privacy + delete only; skip "archive" for imported since the table has no `archived` status — gray-out / no-op those rows).
+
+`DebateCoverCard` already renders an **Imported** pill and links to `/import/:id`, so no card-level work is needed.
 
 ---
 
-### 3. Shared expandable top-right search
+## 2. Fix the format filter (CMM + Imported)
 
-Promote `FloatingSearch` to a generic component:
+Two small changes:
 
-- Rename usage: keep `src/components/explore/FloatingSearch.tsx` but expose a `placeholder` prop (default keeps existing copy).
-- Mount `<FloatingSearch placeholder="Search notebooks…" value={query} onChange={setQuery} />` in `MyStudyPage` — remove the inline search input from `StudyFilterBar`.
-- Mount `<FloatingSearch placeholder="Search my agenda…" value={query} onChange={setQuery} />` in `MyDebatesPage` — searches topic + format label.
+- **Select `format`** in both `debates` queries so each item carries it.
+- In the loader, set `format: d.format` on debate items, then in `visible` pass it through:
+
+```ts
+if (!matches({ kind: i.kind, format: (i as any).format ?? null })) return false;
+```
+
+Add `format?: string | null` to `DebateCoverItem` in `src/components/home/DebateCoverCard.tsx`. With this, the existing `classify()` in `MyAgendaFiltersContext` correctly routes `change_my_mind` → `cmm` and `imported_record` → `imported`.
 
 ---
 
-## Files
+## 3. Redefine the **Active** chip
 
-**New**
-- `src/components/study/NotebookHeroCard.tsx`
-- `src/components/home/MyAgendaFormatFilter.tsx`
-- `src/contexts/MyAgendaFiltersContext.tsx`
-- `src/hooks/useAgendaFolders.ts` (localStorage CRUD + assignments)
+Update `classifyAgenda` so "Active" only matches things a user can join or watch live right now. Everything finished moves to **Archive**.
 
-**Edited**
-- `src/components/explore/FloatingSearch.tsx` — add `placeholder` prop.
-- `src/components/study/StudyFilterBar.tsx` — remove search input (search moves to floating).
-- `src/pages/MyStudyPage.tsx` — grid layout + hero card + FloatingSearch.
-- `src/pages/MyDebatesPage.tsx` — full rewrite of layout: floating search, chip filters, format filter, folders, grid of `DebateCoverCard`.
+```ts
+function classifyAgenda(item: DebateCoverItem): AgendaFilter {
+  // Finished / draft / explicitly archived → Archive
+  if (item.status === "archived" || item.status === "draft" || item.status === "completed")
+    return "archive";
 
-**Out of scope**
-- Backend tables, RLS, migration of agenda folders to DB (localStorage only for v1).
-- Changes to `HomeMyStudyRow`, Explore page, individual record pages.
-- Changes to `DebateCoverCard` internals.
+  // Live right now OR a published debate awaiting participants → Active
+  if (item.status === "live") return "active";
 
-Ready to implement on approval.
+  const sched = item.scheduled_at ? new Date(item.scheduled_at).getTime() : 0;
+  if (item.status === "scheduled") {
+    // Scheduled with a future time = Scheduled; without a time but published = Active (open to join)
+    if (sched && sched > Date.now()) return "scheduled";
+    if (item.is_public) return "active";
+    return "scheduled";
+  }
+
+  return "archive";
+}
+```
+
+Result of the **Active** chip after this change:
+- Debates currently live (`status = 'live'`)
+- Published debates with `status = 'scheduled'` and no future `scheduled_at` (open lobby, waiting for people to queue/join)
+- Live sessions currently recording (`status = 'live'`)
+
+Excluded from Active (moved to Archive/Scheduled):
+- Completed debates and completed live recordings
+- Imported records (always `completed` → land in Archive)
+- Scheduled debates with a future `scheduled_at` → **Scheduled**
+- Drafts and archived items → **Archive**
+
+---
+
+## Files touched
+
+- `src/pages/MyDebatesPage.tsx` — loader (add imported_records + select format), bulk action branches, `classifyAgenda` rewrite.
+- `src/components/home/DebateCoverCard.tsx` — add `format?: string | null` to `DebateCoverItem`.
+
+## Out of scope
+
+- Backend, RLS, schema changes.
+- Card visual changes (Imported pill + link already exist).
+- Explore / Home / My Study.

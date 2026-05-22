@@ -35,6 +35,7 @@ export interface DebateCoverItem {
   created_by?: string;
   is_public?: boolean;
   kind?: "debate" | "live_session" | "imported_record";
+  format?: string | null;
 }
 
 interface Props {
