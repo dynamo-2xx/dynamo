@@ -314,17 +314,34 @@ export function useMyStudy(opts: { includeTrashed?: boolean } = {}) {
   };
 }
 
+function stripHtml(s: string): string {
+  if (!s) return "";
+  return s
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
 /** A notebook is "non-empty" if it has Thoughts text, a Take, or annotations. */
 export function isNotebookNonEmpty(n: StudyNotebook) {
-  const thoughtsText = (n.thoughts as any)?.blocks?.[0]?.value || "";
-  return Boolean((thoughtsText && thoughtsText.trim()) || (n.my_take && n.my_take.trim()) || n.annotation_count > 0);
+  const thoughtsText = stripHtml((n.thoughts as any)?.blocks?.[0]?.value || "");
+  const take = stripHtml(n.my_take || "");
+  return Boolean(thoughtsText || take || n.annotation_count > 0);
 }
 
 export function notebookPreview(n: StudyNotebook): string {
-  const take = (n.my_take || "").trim();
+  const take = stripHtml(n.my_take || "");
   if (take) return take;
-  const t = ((n.thoughts as any)?.blocks?.[0]?.value || "").trim();
-  return t;
+  return stripHtml((n.thoughts as any)?.blocks?.[0]?.value || "");
 }
 
 export function notebookTitle(n: StudyNotebook): string {
