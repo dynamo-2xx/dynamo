@@ -10,6 +10,8 @@ import {
 } from "@/hooks/useConnections";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { useEdgeScroll } from "@/hooks/useEdgeScroll";
+import EdgeArrow from "@/components/explore/EdgeArrow";
 
 const FindPeopleRow = () => {
   const { user } = useAuth();
@@ -20,6 +22,7 @@ const FindPeopleRow = () => {
   const { online, totalFollowing } = useFriendsOnline();
 
   const followingIds = useMemo(() => new Set(following.map((u) => u.user_id)), [following]);
+  const { ref, canLeft, canRight, scrollByCard } = useEdgeScroll<HTMLDivElement>();
 
   if (!user) return null;
   if (loading) return null;
@@ -72,7 +75,11 @@ const FindPeopleRow = () => {
         </Link>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto snap-x pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="relative">
+        <div
+          ref={ref}
+          className="flex gap-3 overflow-x-auto snap-x pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
         {users.map((u) => {
           const isRequested = pendingIds.has(u.user_id) || u.follow_status === "pending";
           const isFollowing = followingIds.has(u.user_id) || u.follow_status === "following";
@@ -128,6 +135,9 @@ const FindPeopleRow = () => {
             </div>
           );
         })}
+        </div>
+        <EdgeArrow side="left" visible={canLeft} onClick={() => scrollByCard(-1)} />
+        <EdgeArrow side="right" visible={canRight} onClick={() => scrollByCard(1)} />
       </div>
     </section>
   );
