@@ -241,7 +241,7 @@ const MyDebatesPageInner = () => {
     const q = query.trim().toLowerCase();
     return items.filter((i) => {
       if (filter !== "all" && classifyAgenda(i) !== filter) return false;
-      if (!matches({ kind: i.kind, format: null })) return false;
+      if (!matches({ kind: i.kind, format: i.format ?? null })) return false;
       if (q && !i.topic.toLowerCase().includes(q)) return false;
       return true;
     });
