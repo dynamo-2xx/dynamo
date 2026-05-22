@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Plus, CheckSquare, X, FolderOpen, MoreVertical } from "lucide-react";
+import { ArrowLeft, Plus, CheckSquare, X, FolderOpen } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
