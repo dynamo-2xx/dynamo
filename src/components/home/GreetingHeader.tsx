@@ -39,28 +39,25 @@ const GreetingHeader = () => {
   // Logged-out: show a welcome banner where the avatar/banner would be.
   if (!user) {
     return (
-      <div className="relative min-h-[160px] sm:min-h-[150px] mb-0">
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="absolute inset-0"
+      <motion.div
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div
+          className="h-[100px] sm:h-[110px] w-full rounded-2xl border border-border overflow-hidden flex items-center justify-center"
+          style={{ backgroundImage: monoGradientFromSeed("dynamo-welcome") }}
         >
-          <div
-            className="h-[100px] sm:h-[110px] w-full rounded-2xl border border-border overflow-hidden flex items-center justify-center"
-            style={{ backgroundImage: monoGradientFromSeed("dynamo-welcome") }}
-          >
-            <h2 className="font-display text-2xl sm:text-3xl text-background tracking-tight">
-              Welcome to DYNAMO!
-            </h2>
-          </div>
-        </motion.div>
-      </div>
+          <h2 className="font-display text-2xl sm:text-3xl text-background tracking-tight">
+            Welcome to DYNAMO!
+          </h2>
+        </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="relative min-h-[220px] sm:min-h-[240px] mb-0">
+    <div>
       <AnimatePresence mode="wait">
         {showGreeting ? (
           <motion.div
@@ -69,7 +66,7 @@ const GreetingHeader = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.45 }}
-            className="absolute inset-0 flex items-start"
+            className="flex items-start min-h-[40px]"
           >
             <h2 className="text-2xl sm:text-[28px] font-display leading-tight">
               {getGreeting()}, {displayName}.
@@ -81,7 +78,6 @@ const GreetingHeader = () => {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="absolute inset-0"
           >
             <div className="relative">
               <ProfileIdCard variant="display" />
