@@ -89,7 +89,7 @@ const HomePage = () => {
         <GreetingHeader />
 
         {/* Persistent tagline — vertically centered, left-aligned */}
-        <div className="flex items-center justify-start py-6">
+        <div className="flex items-center justify-start py-3 md:py-4">
           <RotatingTagline />
         </div>
 
