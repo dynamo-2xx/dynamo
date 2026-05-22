@@ -502,10 +502,11 @@ const MyDebatesPageInner = () => {
               <p className="text-sm font-body text-foreground mb-3">{emptyMessage}</p>
               <div className="flex justify-center gap-2 flex-wrap">
                 <Link
-                  to="/create"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body hover:opacity-90 transition-opacity"
+                  to={user ? "/?highlight=actions" : "/auth"}
+                  className="inline-flex items-center justify-center gap-2 border border-border/60 text-foreground rounded-xl px-4 py-2 font-body text-xs font-medium hover:bg-foreground/5 transition-colors whitespace-nowrap"
                 >
-                  Create a debate
+                  <Plus className="w-4 h-4" />
+                  Get Started
                 </Link>
                 <Link
                   to="/explore"
