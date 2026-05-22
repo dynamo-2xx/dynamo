@@ -1,12 +1,16 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight, BookOpen } from "lucide-react";
 import { useMyStudy, isNotebookNonEmpty, notebookTitle, notebookPreview } from "@/hooks/useMyStudy";
+import { useEdgeScroll } from "@/hooks/useEdgeScroll";
+import EdgeArrow from "@/components/explore/EdgeArrow";
+import { monoGradientFromSeed } from "@/lib/gradient";
 
 const HomeMyStudyRow = () => {
   const { notebooks, loading } = useMyStudy();
   const items = notebooks
     .filter((n) => !n.deleted_at && isNotebookNonEmpty(n))
     .slice(0, 6);
+  const { ref, canLeft, canRight, scrollByCard } = useEdgeScroll<HTMLDivElement>();
 
   if (loading) return null;
 
@@ -42,46 +46,70 @@ const HomeMyStudyRow = () => {
           </Link>
         </div>
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 sm:-mx-1 px-3 sm:px-1 snap-x">
-          {items.map((n) => {
-            const preview = notebookPreview(n);
-            return (
-              <Link
-                key={n.id}
-                to={`/my-study/${n.id}`}
-                className="snap-start shrink-0 w-[78vw] sm:w-64 border border-border rounded-lg p-3 sm:p-3.5 hover:border-foreground/20 transition-colors active:bg-accent/30"
-              >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <h4 className="font-display text-sm truncate">{notebookTitle(n)}</h4>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-body ${
-                      n.published
-                        ? "bg-foreground text-background"
-                        : "border border-border text-muted-foreground"
-                    }`}
-                  >
-                    {n.published ? "Published" : "Draft"}
-                  </span>
-                </div>
-                <p className="text-[11px] text-muted-foreground font-body mb-1">
-                  {n.session_created_at
-                    ? new Date(n.session_created_at).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : ""}
-                  {n.annotation_count > 0 && <> · {n.annotation_count} annotations</>}
-                </p>
-                <p
-                  className={`text-xs font-body line-clamp-3 ${
-                    preview ? "text-foreground/80" : "italic text-muted-foreground"
-                  }`}
+        <div className="relative">
+          <div
+            ref={ref}
+            className="flex gap-3 overflow-x-auto pb-2 -mx-3 sm:-mx-1 px-3 sm:px-1 snap-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {items.map((n) => {
+              const preview = notebookPreview(n);
+              const title = notebookTitle(n);
+              return (
+                <Link
+                  key={n.id}
+                  to={`/my-study/${n.id}`}
+                  className="snap-start shrink-0 w-[170px] sm:w-[180px] group"
                 >
-                  {preview || "No content yet"}
-                </p>
-              </Link>
-            );
-          })}
+                  {/* Book cover */}
+                  <div
+                    className="relative aspect-[3/4] rounded-lg border border-border overflow-hidden shadow-sm group-hover:shadow-md transition-shadow"
+                    style={{ backgroundImage: monoGradientFromSeed(n.id || title) }}
+                  >
+                    <span
+                      className={`absolute top-2 right-2 z-10 text-[10px] px-1.5 py-0.5 rounded-full font-body ${
+                        n.published
+                          ? "bg-foreground text-background"
+                          : "bg-background/80 backdrop-blur border border-border text-muted-foreground"
+                      }`}
+                    >
+                      {n.published ? "Published" : "Draft"}
+                    </span>
+                    <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/55 via-black/20 to-transparent">
+                      <h4 className="font-display text-[15px] leading-tight text-white line-clamp-3">
+                        {title}
+                      </h4>
+                    </div>
+                  </div>
+                  {/* Below cover: My Thoughts preview */}
+                  <div className="mt-2 px-0.5">
+                    <p className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-body mb-0.5">
+                      My Thoughts
+                    </p>
+                    <p
+                      className={`text-[11px] font-body line-clamp-2 ${
+                        preview ? "text-foreground/80" : "italic text-muted-foreground"
+                      }`}
+                    >
+                      {preview || "No content yet"}
+                    </p>
+                    {(n.session_created_at || n.annotation_count > 0) && (
+                      <p className="text-[10px] text-muted-foreground font-body mt-1 truncate">
+                        {n.session_created_at
+                          ? new Date(n.session_created_at).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : ""}
+                        {n.annotation_count > 0 && <> · {n.annotation_count} annotations</>}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+          <EdgeArrow side="left" visible={canLeft} onClick={() => scrollByCard(-1)} />
+          <EdgeArrow side="right" visible={canRight} onClick={() => scrollByCard(1)} />
         </div>
       )}
     </section>
