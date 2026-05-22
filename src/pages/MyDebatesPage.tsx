@@ -1,14 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, Plus, CheckSquare, X, FolderOpen, MoreVertical } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  useDraggable,
+} from "@dnd-kit/core";
 import AppLayout from "@/components/AppLayout";
 import DebateCoverCard, { type DebateCoverItem } from "@/components/home/DebateCoverCard";
-import SwipeableDebateCard from "@/components/home/SwipeableDebateCard";
 import BulkActionBar from "@/components/home/BulkActionBar";
+import FloatingSearch from "@/components/explore/FloatingSearch";
+import FolderRow from "@/components/study/FolderRow";
+import RenameDialog from "@/components/study/RenameDialog";
+import MyAgendaFormatFilter from "@/components/home/MyAgendaFormatFilter";
+import {
+  MyAgendaFiltersProvider,
+  useMyAgendaFilters,
+} from "@/contexts/MyAgendaFiltersContext";
+import { useAgendaFolders, type AgendaFolder } from "@/hooks/useAgendaFolders";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useDeleteAnimation } from "@/hooks/useDeleteAnimation";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -22,42 +38,100 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-const MyDebatesPage = () => {
+type AgendaFilter = "all" | "active" | "scheduled" | "archive";
+
+const Chip = ({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      "px-3 py-1 rounded-full text-xs font-body whitespace-nowrap transition-colors border",
+      active
+        ? "bg-foreground text-background border-foreground"
+        : "bg-background text-muted-foreground border-border hover:text-foreground hover:border-foreground/30",
+    )}
+  >
+    {children}
+  </button>
+);
+
+function classifyAgenda(item: DebateCoverItem): AgendaFilter {
+  if (item.status === "archived" || item.status === "draft") return "archive";
+  const sched = item.scheduled_at ? new Date(item.scheduled_at).getTime() : 0;
+  if (item.status === "scheduled" || (sched > Date.now() && item.kind !== "live_session"))
+    return "scheduled";
+  return "active";
+}
+
+const DraggableCardWrapper = ({
+  id,
+  enabled,
+  children,
+}: {
+  id: string;
+  enabled: boolean;
+  children: React.ReactNode;
+}) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id, disabled: !enabled });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(isDragging && "opacity-50")}
+      {...(enabled ? attributes : {})}
+      {...(enabled ? listeners : {})}
+    >
+      {children}
+    </div>
+  );
+};
+
+const MyDebatesPageInner = () => {
   const { user } = useAuth();
-  const isMobile = useIsMobile();
   const { isRemoving, animateRemove } = useDeleteAnimation();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const activeTab =
-    tabParam === "archive" || tabParam === "drafts"
-      ? "archive"
-      : tabParam === "live"
-      ? "live"
-      : "debates";
+  const { matches } = useMyAgendaFilters();
+  const agendaFolders = useAgendaFolders();
 
-  const [debates, setDebates] = useState<DebateCoverItem[]>([]);
-  const [archive, setArchive] = useState<DebateCoverItem[]>([]);
-  const [archivedLive, setArchivedLive] = useState<DebateCoverItem[]>([]);
-  const [liveSessions, setLiveSessions] = useState<DebateCoverItem[]>([]);
+  const [items, setItems] = useState<DebateCoverItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [confirmDelete, setConfirmDelete] = useState<DebateCoverItem | null>(null);
-  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
-  const [closeSignal, setCloseSignal] = useState(0);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<AgendaFilter>("all");
+
+  // Selection / bulk
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<DebateCoverItem | null>(null);
   const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
+
+  // Folder dialogs
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [renameFolderState, setRenameFolderState] = useState<AgendaFolder | null>(null);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      // Active debates I created (not draft, not archived)
+      setLoading(true);
+
+      // Debates (created or participated)
       const { data: created } = await supabase
         .from("debates")
         .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
         .eq("created_by", user.id)
-        .not("status", "in", "(draft,archived)")
         .order("created_at", { ascending: false });
 
       const { data: participated } = await supabase
@@ -75,50 +149,22 @@ const MyDebatesPage = () => {
           .from("debates")
           .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
           .in("id", extraIds)
-          .not("status", "in", "(draft,archived)")
           .order("created_at", { ascending: false });
         extraDebates = data || [];
       }
 
-      const all = [...(created || []), ...extraDebates];
-      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setDebates(
-        all.map((d: any) => ({
-          kind: "debate",
-          id: d.id,
-          topic: d.topic,
-          status: d.status,
-          cover_image_url: d.cover_image_url,
-          created_at: d.created_at,
-          scheduled_at: d.scheduled_at,
-          is_public: d.is_public,
-          created_by: d.created_by,
-          participant_count: d.debate_participants?.[0]?.count ?? 0,
-        })),
-      );
-
-      // Archive (drafts + archived) I created
-      const { data: myArchive } = await supabase
-        .from("debates")
-        .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
-        .eq("created_by", user.id)
-        .in("status", ["draft", "archived"])
-        .order("created_at", { ascending: false });
-
-      setArchive(
-        ((myArchive || []) as any[]).map((d) => ({
-          kind: "debate",
-          id: d.id,
-          topic: d.topic,
-          status: d.status,
-          cover_image_url: d.cover_image_url,
-          created_at: d.created_at,
-          scheduled_at: d.scheduled_at,
-          is_public: d.is_public,
-          created_by: d.created_by,
-          participant_count: d.debate_participants?.[0]?.count ?? 0,
-        })),
-      );
+      const debates: DebateCoverItem[] = [...(created || []), ...extraDebates].map((d: any) => ({
+        kind: "debate",
+        id: d.id,
+        topic: d.topic,
+        status: d.status,
+        cover_image_url: d.cover_image_url,
+        created_at: d.created_at,
+        scheduled_at: d.scheduled_at,
+        is_public: d.is_public,
+        created_by: d.created_by,
+        participant_count: d.debate_participants?.[0]?.count ?? 0,
+      }));
 
       // Live sessions
       const { data: sessions } = await supabase
@@ -127,12 +173,12 @@ const MyDebatesPage = () => {
         .eq("created_by", user.id)
         .order("created_at", { ascending: false });
 
-      const allLive = (((sessions as any) || []) as any[]).map((s) => ({
-        kind: "live_session" as const,
+      const liveItems: DebateCoverItem[] = (((sessions as any) || []) as any[]).map((s) => ({
+        kind: "live_session",
         id: s.id,
         topic: s.title || "Untitled Live Session",
-        rawStatus: s.status as string,
-        status: s.status === "recording" ? "live" : s.status === "archived" ? "archived" : "completed",
+        status:
+          s.status === "recording" ? "live" : s.status === "archived" ? "archived" : "completed",
         cover_image_url: null,
         created_at: s.created_at,
         is_public: !!s.is_public,
@@ -140,111 +186,79 @@ const MyDebatesPage = () => {
         participant_count: 0,
       }));
 
-      setLiveSessions(allLive.filter((s) => s.rawStatus !== "archived").map(({ rawStatus, ...rest }) => rest));
-      setArchivedLive(allLive.filter((s) => s.rawStatus === "archived").map(({ rawStatus, ...rest }) => rest));
-
+      const all = [...debates, ...liveItems].sort(
+        (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+      );
+      setItems(all);
       setLoading(false);
     };
     load();
   }, [user]);
 
-  const removeFromList = (id: string) => {
-    setDebates((prev) => prev.filter((d) => d.id !== id));
-    setArchive((prev) => prev.filter((d) => d.id !== id));
-    setArchivedLive((prev) => prev.filter((d) => d.id !== id));
-    setLiveSessions((prev) => prev.filter((d) => d.id !== id));
-  };
+  const removeFromList = (id: string) =>
+    setItems((prev) => prev.filter((d) => d.id !== id));
 
-  const patchInList = (id: string, patch: Partial<DebateCoverItem>) => {
-    const upd = (arr: DebateCoverItem[]) =>
-      arr.map((d) => (d.id === id ? { ...d, ...patch } : d));
-    setDebates(upd);
-    setArchive(upd);
-    setArchivedLive(upd);
-    setLiveSessions(upd);
-  };
+  const patchInList = (id: string, patch: Partial<DebateCoverItem>) =>
+    setItems((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
 
-  const swipeTogglePrivacy = async (item: DebateCoverItem) => {
-    if (item.kind === "live_session") return;
-    const next = !item.is_public;
-    const { error } = await supabase.from("debates").update({ is_public: next }).eq("id", item.id);
-    if (error) {
-      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
-      return;
+  // Filtering
+  const counts = useMemo(() => {
+    const acc = { all: items.length, active: 0, scheduled: 0, archive: 0 };
+    for (const i of items) {
+      const c = classifyAgenda(i);
+      if (c === "active") acc.active++;
+      else if (c === "scheduled") acc.scheduled++;
+      else acc.archive++;
     }
-    patchInList(item.id, { is_public: next });
-    toast({ title: next ? "Now public" : "Now private" });
-  };
+    return acc;
+  }, [items]);
 
-  const swipeArchive = async (item: DebateCoverItem) => {
-    if (item.kind === "live_session") return;
-    const { error } = await supabase.from("debates").update({ status: "archived" }).eq("id", item.id);
-    if (error) {
-      toast({ title: "Couldn't archive", description: error.message, variant: "destructive" });
-      return;
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((i) => {
+      if (filter !== "all" && classifyAgenda(i) !== filter) return false;
+      if (!matches({ kind: i.kind, format: null })) return false;
+      if (q && !i.topic.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [items, filter, matches, query]);
+
+  // Group by folder
+  const grouped = useMemo(() => {
+    const map = new Map<string | "root", DebateCoverItem[]>();
+    map.set("root", []);
+    for (const f of agendaFolders.folders) map.set(f.id, []);
+    for (const i of visible) {
+      const fid = agendaFolders.folderOf(i.id);
+      const key = fid && map.has(fid) ? fid : "root";
+      const arr = map.get(key) || [];
+      arr.push(i);
+      map.set(key, arr);
     }
-    // Move from active to archive list
-    setDebates((prev) => prev.filter((d) => d.id !== item.id));
-    setArchive((prev) => [{ ...item, status: "archived" }, ...prev]);
-    toast({ title: "Archived" });
-  };
+    return map;
+  }, [visible, agendaFolders]);
 
-  const swipeDelete = async () => {
-    const item = confirmDelete;
-    if (!item) return;
-    const table = item.kind === "live_session" ? ("live_sessions" as any) : "debates";
-    const { error } = await supabase.from(table).delete().eq("id", item.id);
-    setConfirmDelete(null);
-    if (error) {
-      toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
-      return;
-    }
-    animateRemove(item.id, removeFromList);
-    toast({ title: "Deleted" });
-  };
-
-  const closeAllSwipes = () => {
-    setOpenSwipeId(null);
-    setCloseSignal((n) => n + 1);
-  };
-
-  const currentList =
-    activeTab === "archive"
-      ? [...archive, ...archivedLive]
-      : activeTab === "live"
-      ? liveSessions
-      : debates;
-  const emptyMessage =
-    activeTab === "archive"
-      ? "Nothing in your archive yet. Drafts and archived debates appear here."
-      : activeTab === "live"
-      ? "You have no live session records yet."
-      : "You haven't participated in any debates yet.";
-
-  const ownedSelectedItems = () =>
-    Array.from(selected)
-      .map((id) => currentList.find((x) => x.id === id))
-      .filter((x): x is DebateCoverItem => !!x && !!user && x.created_by === user.id);
-
+  // Selection
   const exitSelection = () => {
     setSelectionMode(false);
     setSelected(new Set());
   };
-
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-
   const selectableIdsInView = () =>
-    currentList.filter((d) => user && d.created_by === user.id).map((d) => d.id);
-
+    visible.filter((d) => user && d.created_by === user.id).map((d) => d.id);
   const allSelected = (() => {
     const ids = selectableIdsInView();
     return ids.length > 0 && ids.every((id) => selected.has(id));
   })();
+  const ownedSelectedItems = () =>
+    Array.from(selected)
+      .map((id) => items.find((x) => x.id === id))
+      .filter((x): x is DebateCoverItem => !!x && !!user && x.created_by === user.id);
 
   const bulkPrivacy = async (next: boolean) => {
     const all = ownedSelectedItems();
@@ -252,23 +266,11 @@ const MyDebatesPage = () => {
     setBusy(true);
     const debateIds = all.filter((i) => i.kind !== "live_session").map((i) => i.id);
     const liveIds = all.filter((i) => i.kind === "live_session").map((i) => i.id);
-    const errors: string[] = [];
-    if (debateIds.length > 0) {
-      const { error } = await supabase.from("debates").update({ is_public: next }).in("id", debateIds);
-      if (error) errors.push(error.message);
-    }
-    if (liveIds.length > 0) {
-      const { error } = await supabase
-        .from("live_sessions" as any)
-        .update({ is_public: next } as any)
-        .in("id", liveIds);
-      if (error) errors.push(error.message);
-    }
+    if (debateIds.length)
+      await supabase.from("debates").update({ is_public: next }).in("id", debateIds);
+    if (liveIds.length)
+      await supabase.from("live_sessions" as any).update({ is_public: next } as any).in("id", liveIds);
     setBusy(false);
-    if (errors.length > 0) {
-      toast({ title: "Couldn't update", description: errors.join("; "), variant: "destructive" });
-      return;
-    }
     all.forEach((i) => patchInList(i.id, { is_public: next }));
     toast({ title: `${all.length} updated`, description: next ? "Now public" : "Now private" });
     exitSelection();
@@ -280,76 +282,114 @@ const MyDebatesPage = () => {
     setBusy(true);
     const debateIds = all.filter((i) => i.kind !== "live_session").map((i) => i.id);
     const liveIds = all.filter((i) => i.kind === "live_session").map((i) => i.id);
-    const errors: string[] = [];
-    if (debateIds.length > 0) {
-      const { error } = await supabase.from("debates").update({ status: "archived" }).in("id", debateIds);
-      if (error) errors.push(error.message);
-    }
-    if (liveIds.length > 0) {
-      const { error } = await supabase
-        .from("live_sessions" as any)
-        .update({ status: "archived" } as any)
-        .in("id", liveIds);
-      if (error) errors.push(error.message);
-    }
+    if (debateIds.length)
+      await supabase.from("debates").update({ status: "archived" }).in("id", debateIds);
+    if (liveIds.length)
+      await supabase.from("live_sessions" as any).update({ status: "archived" } as any).in("id", liveIds);
     setBusy(false);
-    if (errors.length > 0) {
-      toast({ title: "Couldn't archive", description: errors.join("; "), variant: "destructive" });
-      return;
-    }
-    all.forEach((i) => {
-      setDebates((prev) => prev.filter((d) => d.id !== i.id));
-      setLiveSessions((prev) => prev.filter((d) => d.id !== i.id));
-      const archived = { ...i, status: "archived" };
-      if (i.kind === "live_session") {
-        setArchivedLive((prev) => [archived, ...prev.filter((d) => d.id !== i.id)]);
-      } else {
-        setArchive((prev) => [archived, ...prev.filter((d) => d.id !== i.id)]);
-      }
-    });
+    all.forEach((i) => patchInList(i.id, { status: "archived" }));
     toast({ title: `${all.length} archived` });
     exitSelection();
   };
 
   const bulkDelete = async () => {
-    const items = ownedSelectedItems();
-    if (items.length === 0) {
+    const list = ownedSelectedItems();
+    if (list.length === 0) {
       setConfirmBulkDeleteOpen(false);
       return;
     }
     setBusy(true);
-    const debateIds = items.filter((i) => i.kind !== "live_session").map((i) => i.id);
-    const liveIds = items.filter((i) => i.kind === "live_session").map((i) => i.id);
-    const errors: string[] = [];
-    if (debateIds.length > 0) {
-      const { error } = await supabase.from("debates").delete().in("id", debateIds);
-      if (error) errors.push(error.message);
-    }
-    if (liveIds.length > 0) {
-      const { error } = await supabase.from("live_sessions" as any).delete().in("id", liveIds);
-      if (error) errors.push(error.message);
-    }
+    const debateIds = list.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const liveIds = list.filter((i) => i.kind === "live_session").map((i) => i.id);
+    if (debateIds.length) await supabase.from("debates").delete().in("id", debateIds);
+    if (liveIds.length) await supabase.from("live_sessions" as any).delete().in("id", liveIds);
     setBusy(false);
     setConfirmBulkDeleteOpen(false);
-    if (errors.length > 0) {
-      toast({ title: "Some deletions failed", description: errors.join("; "), variant: "destructive" });
-    }
-    animateRemove(items.map((i) => i.id), removeFromList);
-    toast({ title: `${items.length} deleted` });
+    animateRemove(list.map((i) => i.id), removeFromList);
+    toast({ title: `${list.length} deleted` });
     exitSelection();
   };
 
+  // DnD - drop card onto folder
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over) return;
+    const overId = String(over.id);
+    if (!overId.startsWith("folder-")) return;
+    const folderKey = overId.replace("folder-", "");
+    const folderId = folderKey === "root" ? null : folderKey;
+    agendaFolders.assign(String(active.id), folderId);
+    toast({ title: folderId ? "Moved to folder" : "Moved to Uncategorized" });
+  };
+
+  const emptyMessage =
+    filter === "archive"
+      ? "Nothing in your archive yet. Drafts and archived items appear here."
+      : filter === "scheduled"
+      ? "Nothing scheduled."
+      : "You haven't participated in any sessions yet.";
+
+  const renderCard = (d: DebateCoverItem) => {
+    const removing = isRemoving(d.id);
+    const isOwner = !!user && d.created_by === user.id;
+    return (
+      <DraggableCardWrapper
+        key={`${d.kind || "debate"}-${d.id}`}
+        id={d.id}
+        enabled={isOwner && !selectionMode}
+      >
+        <div className={cn("relative", removing && "deleting-item")}>
+          <DebateCoverCard
+            d={d}
+            selectionMode={selectionMode}
+            selected={selected.has(d.id)}
+            onToggleSelected={toggle}
+            onChanged={(action, id, patch) => {
+              if (action === "removed") animateRemove(id, removeFromList);
+              else if (action === "updated" && patch) patchInList(id, patch);
+            }}
+          />
+          {!selectionMode && isOwner && (
+            <div className="absolute bottom-2 right-2 z-30" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Move to folder"
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 rounded-full bg-background/95 border border-border text-foreground flex items-center justify-center"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44 z-50">
+                  <DropdownMenuItem onClick={() => agendaFolders.assign(d.id, null)}>
+                    Uncategorized
+                  </DropdownMenuItem>
+                  {agendaFolders.folders.map((f) => (
+                    <DropdownMenuItem key={f.id} onClick={() => agendaFolders.assign(d.id, f.id)}>
+                      {f.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+        </div>
+      </DraggableCardWrapper>
+    );
+  };
 
   return (
     <AppLayout>
-      <div
-        className="max-w-5xl mx-auto px-4 py-6 sm:py-8 md:py-12"
-        onClick={() => {
-          if (openSwipeId) closeAllSwipes();
-        }}
-      >
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex items-center justify-between gap-3 mb-6">
+      <FloatingSearch value={query} onChange={setQuery} placeholder="Search my agenda…" />
+      <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8 md:py-12">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="flex items-center justify-between gap-3 mb-2 pr-12">
             <div className="flex items-center gap-3">
               <Link
                 to="/profile"
@@ -357,187 +397,128 @@ const MyDebatesPage = () => {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Link>
-              <h2 className="text-2xl sm:text-3xl font-display font-bold">My Agenda</h2>
+              <h1 className="text-2xl sm:text-3xl font-display">My Agenda</h1>
             </div>
-            {currentList.length > 0 && (
-              <div className="flex items-center gap-2 shrink-0">
+          </div>
+          <p className="text-[15px] md:text-sm text-muted-foreground font-body mb-4 sm:mb-6">
+            Every debate, live session, and record you've joined or created.
+          </p>
+
+          {/* Filter chips + format filter + actions */}
+          <div className="space-y-3 mb-4">
+            <div className="flex gap-2 overflow-x-auto -mx-3 sm:-mx-1 px-3 sm:px-1 pb-1 scrollbar-thin">
+              <Chip active={filter === "all"} onClick={() => setFilter("all")}>
+                All · {counts.all}
+              </Chip>
+              <Chip active={filter === "active"} onClick={() => setFilter("active")}>
+                Active · {counts.active}
+              </Chip>
+              <Chip active={filter === "scheduled"} onClick={() => setFilter("scheduled")}>
+                Scheduled · {counts.scheduled}
+              </Chip>
+              <Chip active={filter === "archive"} onClick={() => setFilter("archive")}>
+                Archive · {counts.archive}
+              </Chip>
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <MyAgendaFormatFilter />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCreateFolderOpen(true)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-body hover:border-foreground/30 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> New folder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-body transition-colors border",
+                    selectionMode
+                      ? "bg-foreground text-background border-foreground"
+                      : "border-border hover:border-foreground/30",
+                  )}
+                >
+                  {selectionMode ? (
+                    <>
+                      <X className="w-3.5 h-3.5" /> Cancel
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare className="w-3.5 h-3.5" /> Select
+                    </>
+                  )}
+                </button>
                 {selectionMode && (
                   <button
                     onClick={() => {
                       const ids = selectableIdsInView();
                       setSelected(allSelected ? new Set() : new Set(ids));
                     }}
-                    className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
+                    className="text-xs font-body px-3 py-1.5 rounded-full border border-border hover:border-foreground/40 transition-colors"
                   >
                     {allSelected ? "Deselect all" : "Select all"}
                   </button>
                 )}
-                <button
-                  onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
-                  className="text-xs font-body px-3 py-2 rounded-full border border-border hover:border-foreground/40 transition-colors min-h-[36px]"
-                >
-                  {selectionMode ? "Done" : "Select"}
-                </button>
               </div>
-            )}
+            </div>
           </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 bg-secondary/50 rounded-lg p-1 mb-6">
-            <button
-              onClick={() => setSearchParams({})}
-              className={cn(
-                "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
-                activeTab === "debates"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Debates
-            </button>
-            <button
-              onClick={() => setSearchParams({ tab: "archive" })}
-              className={cn(
-                "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
-                activeTab === "archive"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Archive
-            </button>
-            <button
-              onClick={() => setSearchParams({ tab: "live" })}
-              className={cn(
-                "flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-colors min-h-[40px]",
-                activeTab === "live"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Live
-            </button>
-          </div>
-
-          {isMobile && currentList.length > 0 && (
-            <p className="text-[11px] text-muted-foreground font-body mb-3 text-center">
-              Tip: swipe a card left for Archive/Delete, right for Public/Private.
-            </p>
-          )}
 
           {loading ? (
             <p className="text-muted-foreground text-center py-12 animate-pulse">Loading…</p>
-          ) : currentList.length === 0 ? (
+          ) : visible.length === 0 ? (
             <div className="border border-dashed border-border rounded-xl px-6 py-10 text-center">
               <p className="text-sm font-body text-foreground mb-3">{emptyMessage}</p>
               <div className="flex justify-center gap-2 flex-wrap">
-                {activeTab === "live" ? (
-                  <Link
-                    to="/live/new"
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body hover:opacity-90 transition-opacity"
-                  >
-                    Start a live session
-                  </Link>
-                ) : (
-                  <>
-                    <Link
-                      to="/create"
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body hover:opacity-90 transition-opacity"
-                    >
-                      Create a debate
-                    </Link>
-                    <Link
-                      to="/explore"
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs font-body hover:border-foreground/30 transition-colors"
-                    >
-                      Explore
-                    </Link>
-                  </>
-                )}
+                <Link
+                  to="/create"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body hover:opacity-90 transition-opacity"
+                >
+                  Create a debate
+                </Link>
+                <Link
+                  to="/explore"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border text-xs font-body hover:border-foreground/30 transition-colors"
+                >
+                  Explore
+                </Link>
               </div>
             </div>
-          ) : (() => {
-            const renderCard = (d: DebateCoverItem) => {
-              const isOwner = !!user && d.created_by === user.id;
-              const removing = isRemoving(d.id);
-              const card = (
-                <DebateCoverCard
-                  d={d}
-                  selectionMode={selectionMode}
-                  selected={selected.has(d.id)}
-                  onToggleSelected={toggle}
-                  onChanged={(action, id, patch) => {
-                    if (action === "removed") animateRemove(id, removeFromList);
-                    else if (action === "updated" && patch) patchInList(id, patch);
-                  }}
-                />
-              );
-              if (!isMobile || !isOwner || selectionMode) {
-                return (
-                  <div
-                    key={`${d.kind || "debate"}-${d.id}`}
-                    className={removing ? "deleting-item" : undefined}
-                  >
-                    {card}
+          ) : (
+            <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+              <div className={cn("space-y-3", selectionMode && "pb-44 md:pb-32")}>
+                {agendaFolders.folders.map((f) => {
+                  const arr = grouped.get(f.id) || [];
+                  return (
+                    <FolderRow
+                      key={f.id}
+                      folder={{ id: f.id, user_id: user?.id || "", name: f.name, sort_index: f.sort_index, updated_at: "" }}
+                      count={arr.length}
+                      onRename={(folder) =>
+                        setRenameFolderState({ id: folder.id, name: folder.name, sort_index: 0 })
+                      }
+                      onDelete={async (folder) => {
+                        if (!confirm(`Delete folder "${folder.name}"? Items return to Uncategorized.`))
+                          return;
+                        agendaFolders.deleteFolder(folder.id);
+                        toast({ title: "Folder deleted" });
+                      }}
+                    >
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 group">
+                        {arr.map(renderCard)}
+                      </div>
+                    </FolderRow>
+                  );
+                })}
+                <FolderRow folder={null} count={(grouped.get("root") || []).length}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 group">
+                    {(grouped.get("root") || []).map(renderCard)}
                   </div>
-                );
-              }
-              return (
-                <div
-                  key={`${d.kind || "debate"}-${d.id}`}
-                  className={removing ? "deleting-item" : undefined}
-                >
-                <SwipeableDebateCard
-                  enabled
-                  isPublic={!!d.is_public}
-                  forceClose={closeSignal}
-                  onOpen={() => {
-                    if (openSwipeId && openSwipeId !== d.id) closeAllSwipes();
-                    setOpenSwipeId(d.id);
-                  }}
-                  onTogglePrivacy={() => swipeTogglePrivacy(d)}
-                  onArchive={() => swipeArchive(d)}
-                  onDelete={() => setConfirmDelete(d)}
-                >
-                  {card}
-                </SwipeableDebateCard>
-                </div>
-              );
-            };
-
-            const gridCls = cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4", selectionMode && "pb-44 md:pb-32");
-            const sectionHeader = (label: string, count: number) => (
-              <div className="flex items-baseline gap-2 mt-2 mb-3">
-                <h3 className="text-sm font-display text-foreground">{label}</h3>
-                <span className="text-xs text-muted-foreground font-body">({count})</span>
+                </FolderRow>
               </div>
-            );
-
-            if (activeTab === "archive") {
-              return (
-                <div className={cn(selectionMode && "pb-44 md:pb-32")}>
-                  {archive.length > 0 && (
-                    <>
-                      {sectionHeader("Debates", archive.length)}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                        {archive.map(renderCard)}
-                      </div>
-                    </>
-                  )}
-                  {archivedLive.length > 0 && (
-                    <>
-                      {sectionHeader("Live sessions", archivedLive.length)}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {archivedLive.map(renderCard)}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            }
-
-            return <div className={gridCls}>{currentList.map(renderCard)}</div>;
-          })()}
+            </DndContext>
+          )}
         </motion.div>
       </div>
 
@@ -547,9 +528,7 @@ const MyDebatesPage = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete this {confirmDelete?.kind === "live_session" ? "live session" : confirmDelete?.status === "draft" ? "draft" : "debate"}?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Delete this item?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently removes it and any related transcripts. This can't be undone.
             </AlertDialogDescription>
@@ -557,9 +536,14 @@ const MyDebatesPage = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.preventDefault();
-                swipeDelete();
+                const item = confirmDelete;
+                if (!item) return;
+                const table = item.kind === "live_session" ? ("live_sessions" as any) : "debates";
+                await supabase.from(table).delete().eq("id", item.id);
+                setConfirmDelete(null);
+                animateRemove(item.id, removeFromList);
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
@@ -584,7 +568,9 @@ const MyDebatesPage = () => {
       <AlertDialog open={confirmBulkDeleteOpen} onOpenChange={setConfirmBulkDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {ownedSelectedItems().length} item{ownedSelectedItems().length === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete {ownedSelectedItems().length} item{ownedSelectedItems().length === 1 ? "" : "s"}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               This permanently removes the selected items and any related transcripts. This can't be undone.
             </AlertDialogDescription>
@@ -604,8 +590,39 @@ const MyDebatesPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RenameDialog
+        open={createFolderOpen}
+        onOpenChange={setCreateFolderOpen}
+        title="New folder"
+        initialValue=""
+        placeholder="Folder name"
+        onSubmit={async (name) => {
+          if (!name) return;
+          agendaFolders.createFolder(name);
+          toast({ title: "Folder created" });
+        }}
+      />
+      <RenameDialog
+        open={!!renameFolderState}
+        onOpenChange={(v) => !v && setRenameFolderState(null)}
+        title="Rename folder"
+        initialValue={renameFolderState?.name || ""}
+        onSubmit={async (name) => {
+          if (!renameFolderState || !name) return;
+          agendaFolders.renameFolder(renameFolderState.id, name);
+          toast({ title: "Folder renamed" });
+          setRenameFolderState(null);
+        }}
+      />
     </AppLayout>
   );
 };
+
+const MyDebatesPage = () => (
+  <MyAgendaFiltersProvider>
+    <MyDebatesPageInner />
+  </MyAgendaFiltersProvider>
+);
 
 export default MyDebatesPage;
