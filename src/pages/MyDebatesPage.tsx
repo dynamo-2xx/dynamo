@@ -135,7 +135,7 @@ const MyDebatesPageInner = () => {
       // Debates (created or participated)
       const { data: created } = await supabase
         .from("debates")
-        .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
+        .select("id, topic, status, format, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false });
 
@@ -152,7 +152,7 @@ const MyDebatesPageInner = () => {
       if (extraIds.length > 0) {
         const { data } = await supabase
           .from("debates")
-          .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
+          .select("id, topic, status, format, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
           .in("id", extraIds)
           .order("created_at", { ascending: false });
         extraDebates = data || [];
@@ -163,6 +163,7 @@ const MyDebatesPageInner = () => {
         id: d.id,
         topic: d.topic,
         status: d.status,
+        format: d.format,
         cover_image_url: d.cover_image_url,
         created_at: d.created_at,
         scheduled_at: d.scheduled_at,
@@ -191,7 +192,25 @@ const MyDebatesPageInner = () => {
         participant_count: 0,
       }));
 
-      const all = [...debates, ...liveItems].sort(
+      const { data: imported } = await supabase
+        .from("imported_records" as any)
+        .select("id, title, cover_image_url, created_at, user_id, is_public")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      const importedItems: DebateCoverItem[] = (((imported as any) || []) as any[]).map((r) => ({
+        kind: "imported_record",
+        id: r.id,
+        topic: r.title || "Imported record",
+        status: "completed",
+        cover_image_url: r.cover_image_url,
+        created_at: r.created_at,
+        is_public: !!r.is_public,
+        created_by: r.user_id,
+        participant_count: 0,
+      }));
+
+      const all = [...debates, ...liveItems, ...importedItems].sort(
         (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
       );
       setItems(all);
