@@ -1,46 +1,40 @@
 ## Goal
 
-The Profile ID card on `/` is currently rendered inside an absolute-positioned overlay with a small fixed min-height (`min-h-[220px]`), while the new card is much taller. This causes:
+Three small, related changes on the homepage rows:
 
-- The rotating tagline ("What's the story today?") to be visually clipped/overlapped by the ID card.
-- The large circular Hero action button (Debate/Live/CMM/Import) to overlap the bottom of the ID card on desktop/tablet.
-- A banner that takes up too much vertical space (`aspect-[3/1]` on sm+).
-
-We'll (a) shorten the banner, (b) put the GreetingHeader in normal block flow so subsequent content can never overlap it, and (c) balance vertical rhythm so the ID card and Hero button each occupy roughly half the viewport above the fold.
+1. Add the same glass-style edge arrows (`EdgeArrow` + `useEdgeScroll`) used on Explore/AutoCarousel to the "Find people" and "My Study" rows on `/`.
+2. Redesign the My Study cards as vertical, book-like hero cards with a gradient cover by default.
+3. Fix the HTML-tag leak in the notebook preview (`<p></p><ul><li>…`).
 
 ## Changes
 
-### 1. `src/components/profile/ProfileIdCard.tsx` — shorter banner
+### 1. `src/hooks/useMyStudy.ts` — strip HTML in preview
 
-- Change banner from `aspect-[5/2] sm:aspect-[3/1]` to a shorter, height-capped style:
-  - Use `h-20 sm:h-24 md:h-28` (no aspect ratio) so the banner is a slim strip ~80–112px tall regardless of card width.
-- Slightly reduce the negative avatar overlap (`-mt-10 sm:-mt-12` → `-mt-9 sm:-mt-10`) so the avatar still hangs over the shorter banner correctly.
-- Friend-code QR stays the same size; the overall card becomes noticeably shorter.
+- Add a small `stripHtml(s)` helper inside the file: replace `<br>` with newlines, drop other tags, decode `&nbsp;` / `&amp;` / `&lt;` / `&gt;` / `&quot;` / `&#39;`, collapse whitespace.
+- Use it inside `notebookPreview` for both `my_take` and `thoughts.blocks[0].value`.
+- Update `isNotebookNonEmpty` to also strip HTML when checking the thoughts string so a notebook containing only `<p></p>` is still treated as empty.
 
-### 2. `src/components/home/GreetingHeader.tsx` — normal flow, no overlap
+### 2. `src/components/home/HomeMyStudyRow.tsx` — vertical hero cards + arrows
 
-- Remove the `relative min-h-[...] mb-0` outer wrapper + `absolute inset-0` overlays. Use normal block layout so the parent height grows to fit whichever child is rendered:
-  - Greeting state: a single `motion.h2` block.
-  - Header state: a single `motion.div` containing the `<ProfileIdCard>` + the Avg badge.
-- Keep `AnimatePresence mode="wait"` + the existing fade transition (no behavior change).
-- The Avg badge stays as an `absolute top-2 right-2` overlay anchored to the ID card wrapper (already `relative`).
-- Logged-out welcome banner: keep as-is but drop the absolute wrapper — render the gradient banner directly so it sizes naturally.
+Card redesign (book-like):
+- Replace the current short, wide card with a vertical card sized like a book: `w-[170px] sm:w-[180px]` and `aspect-[3/4]` (≈ 240px tall).
+- Card structure (column flex):
+  - Top: a gradient "cover" header that fills most of the card. Background uses `monoGradientFromSeed(notebook id or title)` (already used elsewhere). If the notebook ever has a cover image, fall back to that (none today — gradient is the default).
+  - Bottom overlay area on the cover: title rendered in `font-display` Instrument Serif, white-ish text on the gradient, 2-line clamp.
+  - Below the cover (small fixed strip): "My Thoughts" label (uppercase 10px tracked, muted) + 2-line clamp of the cleaned preview text.
+- Keep the existing top-right Published/Draft chip, but make it absolute-positioned on the cover (top-right) so the cover can fill the card.
+- Keep the date · annotation count line as a tiny meta line under the title preview.
 
-### 3. `src/pages/HomePage.tsx` — tighten spacing between header and hero
+Row arrows:
+- Wrap the horizontal scroller in a `relative` container, attach a ref, drive `useEdgeScroll` to compute `canLeft`/`canRight`, and render two `EdgeArrow`s with `onClick` calls that do `scrollBy({ left: ±cardWidth, behavior: "smooth" })`.
+- Keep the existing snap/overflow/hidden-scrollbar styling.
 
-- Reduce the gap between GreetingHeader and HeroActionShazam so the ID card and the big circular button visually share the viewport ~50/50 above the fold on desktop/tablet:
-  - Change the tagline wrapper `py-6` → `py-3 md:py-4`.
-- No structural changes; tagline becomes the breathing room between the two equally-weighted blocks.
+### 3. `src/components/home/FindPeopleRow.tsx` — arrows
 
-### 4. `src/components/home/HeroActionShazam.tsx` — trim vertical padding
-
-- Desktop block: `py-8` → `py-5` so the giant circle sits closer to the tagline and the two halves balance.
-- Mobile block: `py-6` → `py-4`.
-- Reduce outer wrapper `mb-6` → `mb-4`.
-
-No changes to functionality, data, the carousel, or downstream sections. Edit-mode camera buttons, friend-code copy, QR generation, and the Avg badge logic are untouched.
+- Same pattern: wrap the existing scroller in a `relative` container with a ref, use `useEdgeScroll`, render left/right `EdgeArrow`s. No card design changes.
 
 ## Out of scope
 
-- ProfilePage / EditProfilePage layouts (banner height change there is shared automatically via the component — confirmed intentional since the user said all three surfaces should be identical).
-- Any backend, RLS, or data changes.
+- The `/my-study` index page card design (this only updates the homepage row card).
+- Allowing user-uploaded notebook covers — keep gradient as the only default.
+- Any backend/RLS or data changes.
