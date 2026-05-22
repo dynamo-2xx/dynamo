@@ -10,7 +10,7 @@ import {
   useSensors,
   DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { toast } from "sonner";
 
 import AppLayout from "@/components/AppLayout";
@@ -327,7 +327,10 @@ const MyStudyPage = () => {
                       }}
                     >
                       <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-                        {items.map(renderCard)}
+                      <SortableContext items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                          {items.map(renderCard)}
+                        </div>
                       </SortableContext>
                     </FolderRow>
                   );
@@ -335,9 +338,11 @@ const MyStudyPage = () => {
                 <FolderRow folder={null} count={(grouped.get("root") || []).length}>
                   <SortableContext
                     items={(grouped.get("root") || []).map((i) => i.id)}
-                    strategy={verticalListSortingStrategy}
+                    strategy={rectSortingStrategy}
                   >
-                    {(grouped.get("root") || []).map(renderCard)}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {(grouped.get("root") || []).map(renderCard)}
+                    </div>
                   </SortableContext>
                 </FolderRow>
               </div>
