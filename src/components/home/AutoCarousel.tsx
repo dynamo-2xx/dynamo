@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import EdgeArrow from "@/components/explore/EdgeArrow";
 
 interface Props<T> {
   items: T[];
@@ -88,20 +88,8 @@ function AutoCarousel<T>({
 
       {items.length > 1 && (
         <>
-          <button
-            onClick={prev}
-            aria-label="Previous"
-            className="hidden sm:flex absolute left-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/85 border border-border items-center justify-center hover:bg-background transition-colors backdrop-blur-sm"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            onClick={next}
-            aria-label="Next"
-            className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-background/85 border border-border items-center justify-center hover:bg-background transition-colors backdrop-blur-sm"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <EdgeArrow side="left" visible onClick={prev} />
+          <EdgeArrow side="right" visible onClick={next} />
         </>
       )}
     </div>
