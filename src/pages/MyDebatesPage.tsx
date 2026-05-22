@@ -288,12 +288,15 @@ const MyDebatesPageInner = () => {
     const all = ownedSelectedItems();
     if (all.length === 0) return;
     setBusy(true);
-    const debateIds = all.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const debateIds = all.filter((i) => !i.kind || i.kind === "debate").map((i) => i.id);
     const liveIds = all.filter((i) => i.kind === "live_session").map((i) => i.id);
+    const importedIds = all.filter((i) => i.kind === "imported_record").map((i) => i.id);
     if (debateIds.length)
       await supabase.from("debates").update({ is_public: next }).in("id", debateIds);
     if (liveIds.length)
       await supabase.from("live_sessions" as any).update({ is_public: next } as any).in("id", liveIds);
+    if (importedIds.length)
+      await supabase.from("imported_records" as any).update({ is_public: next } as any).in("id", importedIds);
     setBusy(false);
     all.forEach((i) => patchInList(i.id, { is_public: next }));
     toast({ title: `${all.length} updated`, description: next ? "Now public" : "Now private" });
@@ -304,15 +307,16 @@ const MyDebatesPageInner = () => {
     const all = ownedSelectedItems();
     if (all.length === 0) return;
     setBusy(true);
-    const debateIds = all.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const debateIds = all.filter((i) => !i.kind || i.kind === "debate").map((i) => i.id);
     const liveIds = all.filter((i) => i.kind === "live_session").map((i) => i.id);
     if (debateIds.length)
       await supabase.from("debates").update({ status: "archived" }).in("id", debateIds);
     if (liveIds.length)
       await supabase.from("live_sessions" as any).update({ status: "archived" } as any).in("id", liveIds);
     setBusy(false);
-    all.forEach((i) => patchInList(i.id, { status: "archived" }));
-    toast({ title: `${all.length} archived` });
+    const archivable = all.filter((i) => i.kind !== "imported_record");
+    archivable.forEach((i) => patchInList(i.id, { status: "archived" }));
+    toast({ title: `${archivable.length} archived` });
     exitSelection();
   };
 
@@ -323,10 +327,12 @@ const MyDebatesPageInner = () => {
       return;
     }
     setBusy(true);
-    const debateIds = list.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const debateIds = list.filter((i) => !i.kind || i.kind === "debate").map((i) => i.id);
     const liveIds = list.filter((i) => i.kind === "live_session").map((i) => i.id);
+    const importedIds = list.filter((i) => i.kind === "imported_record").map((i) => i.id);
     if (debateIds.length) await supabase.from("debates").delete().in("id", debateIds);
     if (liveIds.length) await supabase.from("live_sessions" as any).delete().in("id", liveIds);
+    if (importedIds.length) await supabase.from("imported_records" as any).delete().in("id", importedIds);
     setBusy(false);
     setConfirmBulkDeleteOpen(false);
     animateRemove(list.map((i) => i.id), removeFromList);
