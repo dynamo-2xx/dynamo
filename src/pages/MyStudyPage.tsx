@@ -15,10 +15,11 @@ import { toast } from "sonner";
 
 import AppLayout from "@/components/AppLayout";
 import StudyFilterBar, { Filter, Sort } from "@/components/study/StudyFilterBar";
-import NotebookCard from "@/components/study/NotebookCard";
+import NotebookHeroCard from "@/components/study/NotebookHeroCard";
 import FolderRow from "@/components/study/FolderRow";
 import MultiSelectActionBar from "@/components/study/MultiSelectActionBar";
 import RenameDialog from "@/components/study/RenameDialog";
+import FloatingSearch from "@/components/explore/FloatingSearch";
 import {
   useMyStudy,
   isNotebookNonEmpty,
@@ -222,7 +223,7 @@ const MyStudyPage = () => {
   };
 
   const renderCard = (n: StudyNotebook) => (
-    <NotebookCard
+    <NotebookHeroCard
       key={n.id}
       notebook={n}
       folders={study.folders}
@@ -259,9 +260,10 @@ const MyStudyPage = () => {
 
   return (
     <AppLayout>
+      <FloatingSearch value={query} onChange={setQuery} placeholder="Search notebooks…" />
       <div className="max-w-3xl lg:max-w-4xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 md:py-8 lg:py-12">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex items-center gap-2 mb-1 sm:mb-2">
+          <div className="flex items-center gap-2 mb-1 sm:mb-2 pr-12">
             <Link
               to="/profile"
               className="text-muted-foreground hover:text-foreground p-1 -ml-1"
@@ -282,8 +284,6 @@ const MyStudyPage = () => {
             counts={counts}
             sort={sort}
             setSort={setSort}
-            query={query}
-            setQuery={setQuery}
             selectMode={selectMode}
             toggleSelectMode={() => setSelectMode((v) => !v)}
             onCreateFolder={() => setCreateFolderOpen(true)}
