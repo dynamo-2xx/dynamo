@@ -1,5 +1,4 @@
-import { Search, Plus, CheckSquare, X, MoreHorizontal } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Plus, CheckSquare, X, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,8 +16,6 @@ interface Props {
   counts: { all: number; drafts: number; published: number; trash: number };
   sort: Sort;
   setSort: (s: Sort) => void;
-  query: string;
-  setQuery: (q: string) => void;
   selectMode: boolean;
   toggleSelectMode: () => void;
   onCreateFolder: () => void;
@@ -60,23 +57,12 @@ const StudyFilterBar = ({
   counts,
   sort,
   setSort,
-  query,
-  setQuery,
   selectMode,
   toggleSelectMode,
   onCreateFolder,
 }: Props) => {
   return (
     <div className="space-y-3 mb-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search notebooks…"
-          className="pl-9 h-11 md:h-10 text-[15px] md:text-sm"
-        />
-      </div>
       <div className="flex gap-2 overflow-x-auto -mx-3 sm:-mx-1 px-3 sm:px-1 pb-1 scrollbar-thin">
         <Chip active={filter === "all"} onClick={() => setFilter("all")}>
           All · {counts.all}

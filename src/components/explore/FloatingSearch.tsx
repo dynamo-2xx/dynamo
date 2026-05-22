@@ -5,9 +5,10 @@ import { cn } from "@/lib/utils";
 interface Props {
   value: string;
   onChange: (v: string) => void;
+  placeholder?: string;
 }
 
-const FloatingSearch = ({ value, onChange }: Props) => {
+const FloatingSearch = ({ value, onChange, placeholder = "Search public debates…" }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +45,7 @@ const FloatingSearch = ({ value, onChange }: Props) => {
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onBlur={collapse}
-              placeholder="Search public debates…"
+              placeholder={placeholder}
               className="flex-1 bg-transparent border-0 outline-none px-2 py-2 text-sm font-body text-foreground placeholder:text-muted-foreground"
             />
             <button
