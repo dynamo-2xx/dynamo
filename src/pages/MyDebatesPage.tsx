@@ -71,11 +71,16 @@ const Chip = ({
 );
 
 function classifyAgenda(item: DebateCoverItem): AgendaFilter {
-  if (item.status === "archived" || item.status === "draft") return "archive";
+  if (item.status === "archived" || item.status === "draft" || item.status === "completed")
+    return "archive";
+  if (item.status === "live") return "active";
   const sched = item.scheduled_at ? new Date(item.scheduled_at).getTime() : 0;
-  if (item.status === "scheduled" || (sched > Date.now() && item.kind !== "live_session"))
+  if (item.status === "scheduled") {
+    if (sched && sched > Date.now()) return "scheduled";
+    if (item.is_public) return "active";
     return "scheduled";
-  return "active";
+  }
+  return "archive";
 }
 
 const DraggableCardWrapper = ({
@@ -130,7 +135,7 @@ const MyDebatesPageInner = () => {
       // Debates (created or participated)
       const { data: created } = await supabase
         .from("debates")
-        .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
+        .select("id, topic, status, format, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
         .eq("created_by", user.id)
         .order("created_at", { ascending: false });
 
@@ -147,7 +152,7 @@ const MyDebatesPageInner = () => {
       if (extraIds.length > 0) {
         const { data } = await supabase
           .from("debates")
-          .select("id, topic, status, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
+          .select("id, topic, status, format, cover_image_url, created_at, scheduled_at, is_public, created_by, debate_participants(count)")
           .in("id", extraIds)
           .order("created_at", { ascending: false });
         extraDebates = data || [];
@@ -158,6 +163,7 @@ const MyDebatesPageInner = () => {
         id: d.id,
         topic: d.topic,
         status: d.status,
+        format: d.format,
         cover_image_url: d.cover_image_url,
         created_at: d.created_at,
         scheduled_at: d.scheduled_at,
@@ -186,7 +192,25 @@ const MyDebatesPageInner = () => {
         participant_count: 0,
       }));
 
-      const all = [...debates, ...liveItems].sort(
+      const { data: imported } = await supabase
+        .from("imported_records" as any)
+        .select("id, title, cover_image_url, created_at, user_id, is_public")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      const importedItems: DebateCoverItem[] = (((imported as any) || []) as any[]).map((r) => ({
+        kind: "imported_record",
+        id: r.id,
+        topic: r.title || "Imported record",
+        status: "completed",
+        cover_image_url: r.cover_image_url,
+        created_at: r.created_at,
+        is_public: !!r.is_public,
+        created_by: r.user_id,
+        participant_count: 0,
+      }));
+
+      const all = [...debates, ...liveItems, ...importedItems].sort(
         (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
       );
       setItems(all);
@@ -217,7 +241,7 @@ const MyDebatesPageInner = () => {
     const q = query.trim().toLowerCase();
     return items.filter((i) => {
       if (filter !== "all" && classifyAgenda(i) !== filter) return false;
-      if (!matches({ kind: i.kind, format: null })) return false;
+      if (!matches({ kind: i.kind, format: i.format ?? null })) return false;
       if (q && !i.topic.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -264,12 +288,15 @@ const MyDebatesPageInner = () => {
     const all = ownedSelectedItems();
     if (all.length === 0) return;
     setBusy(true);
-    const debateIds = all.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const debateIds = all.filter((i) => !i.kind || i.kind === "debate").map((i) => i.id);
     const liveIds = all.filter((i) => i.kind === "live_session").map((i) => i.id);
+    const importedIds = all.filter((i) => i.kind === "imported_record").map((i) => i.id);
     if (debateIds.length)
       await supabase.from("debates").update({ is_public: next }).in("id", debateIds);
     if (liveIds.length)
       await supabase.from("live_sessions" as any).update({ is_public: next } as any).in("id", liveIds);
+    if (importedIds.length)
+      await supabase.from("imported_records" as any).update({ is_public: next } as any).in("id", importedIds);
     setBusy(false);
     all.forEach((i) => patchInList(i.id, { is_public: next }));
     toast({ title: `${all.length} updated`, description: next ? "Now public" : "Now private" });
@@ -280,15 +307,16 @@ const MyDebatesPageInner = () => {
     const all = ownedSelectedItems();
     if (all.length === 0) return;
     setBusy(true);
-    const debateIds = all.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const debateIds = all.filter((i) => !i.kind || i.kind === "debate").map((i) => i.id);
     const liveIds = all.filter((i) => i.kind === "live_session").map((i) => i.id);
     if (debateIds.length)
       await supabase.from("debates").update({ status: "archived" }).in("id", debateIds);
     if (liveIds.length)
       await supabase.from("live_sessions" as any).update({ status: "archived" } as any).in("id", liveIds);
     setBusy(false);
-    all.forEach((i) => patchInList(i.id, { status: "archived" }));
-    toast({ title: `${all.length} archived` });
+    const archivable = all.filter((i) => i.kind !== "imported_record");
+    archivable.forEach((i) => patchInList(i.id, { status: "archived" }));
+    toast({ title: `${archivable.length} archived` });
     exitSelection();
   };
 
@@ -299,10 +327,12 @@ const MyDebatesPageInner = () => {
       return;
     }
     setBusy(true);
-    const debateIds = list.filter((i) => i.kind !== "live_session").map((i) => i.id);
+    const debateIds = list.filter((i) => !i.kind || i.kind === "debate").map((i) => i.id);
     const liveIds = list.filter((i) => i.kind === "live_session").map((i) => i.id);
+    const importedIds = list.filter((i) => i.kind === "imported_record").map((i) => i.id);
     if (debateIds.length) await supabase.from("debates").delete().in("id", debateIds);
     if (liveIds.length) await supabase.from("live_sessions" as any).delete().in("id", liveIds);
+    if (importedIds.length) await supabase.from("imported_records" as any).delete().in("id", importedIds);
     setBusy(false);
     setConfirmBulkDeleteOpen(false);
     animateRemove(list.map((i) => i.id), removeFromList);
