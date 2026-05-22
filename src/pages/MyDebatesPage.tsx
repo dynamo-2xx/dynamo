@@ -71,11 +71,16 @@ const Chip = ({
 );
 
 function classifyAgenda(item: DebateCoverItem): AgendaFilter {
-  if (item.status === "archived" || item.status === "draft") return "archive";
+  if (item.status === "archived" || item.status === "draft" || item.status === "completed")
+    return "archive";
+  if (item.status === "live") return "active";
   const sched = item.scheduled_at ? new Date(item.scheduled_at).getTime() : 0;
-  if (item.status === "scheduled" || (sched > Date.now() && item.kind !== "live_session"))
+  if (item.status === "scheduled") {
+    if (sched && sched > Date.now()) return "scheduled";
+    if (item.is_public) return "active";
     return "scheduled";
-  return "active";
+  }
+  return "archive";
 }
 
 const DraggableCardWrapper = ({
