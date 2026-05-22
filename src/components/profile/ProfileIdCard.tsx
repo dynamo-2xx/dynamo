@@ -87,7 +87,7 @@ const ProfileIdCard = ({
       {/* Banner */}
       <div className="relative">
         <div
-          className="w-full aspect-[5/2] sm:aspect-[3/1] bg-cover bg-center"
+          className="w-full h-20 sm:h-24 md:h-28 bg-cover bg-center"
           style={bannerStyle as any}
           aria-hidden
         />
@@ -110,7 +110,7 @@ const ProfileIdCard = ({
 
       {/* Identity row */}
       <div className="px-4 sm:px-5 pb-4">
-        <div className="flex items-end gap-3 sm:gap-4 -mt-10 sm:-mt-12 min-w-0">
+        <div className="flex items-end gap-3 sm:gap-4 -mt-9 sm:-mt-10 min-w-0">
           <div className="relative shrink-0">
             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-accent border-4 border-card overflow-hidden flex items-center justify-center">
               {avatarUrl ? (

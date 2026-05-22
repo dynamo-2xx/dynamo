@@ -85,12 +85,12 @@ const HeroActionShazam = ({ highlight, onUnauth }: HeroActionShazamProps) => {
       tabIndex={0}
       onKeyDown={handleKeyDown}
       className={cn(
-        "mb-6 scroll-mt-4 rounded-2xl transition-all duration-500 outline-none focus-visible:ring-2 focus-visible:ring-foreground/30",
+        "mb-4 scroll-mt-4 rounded-2xl transition-all duration-500 outline-none focus-visible:ring-2 focus-visible:ring-foreground/30",
         highlight && "ring-2 ring-foreground/30",
       )}
     >
       {/* Mobile layout: stacked, swipeable */}
-      <div className="md:hidden flex flex-col items-center py-6 select-none">
+      <div className="md:hidden flex flex-col items-center py-4 select-none">
         {/* Dots */}
         <div className="flex gap-2 mb-5">
           {SLIDES.map((s, i) => (
@@ -145,7 +145,7 @@ const HeroActionShazam = ({ highlight, onUnauth }: HeroActionShazamProps) => {
       </div>
 
       {/* Desktop layout: side-by-side with arrows */}
-      <div className="hidden md:flex items-center justify-center gap-6 py-8 select-none">
+      <div className="hidden md:flex items-center justify-center gap-6 py-5 select-none">
         <button
           type="button"
           onClick={() => go(-1)}
