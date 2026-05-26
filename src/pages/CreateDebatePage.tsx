@@ -106,6 +106,7 @@ const CreateDebatePage = () => {
   const [maxSpeakersPerSide, setMaxSpeakersPerSide] = useState<number>(2);
   // Live counts of joined speakers per side, populated when a draft exists.
   const [sideSpeakerCounts, setSideSpeakerCounts] = useState<Record<string, number>>({});
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   // Live mic-prep readiness: any invitee/participant who has connected their
   // mic via /join/:code (or the host's lobby) shows up here. Drives the green
