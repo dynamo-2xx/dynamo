@@ -137,6 +137,55 @@ export function useSessionNotebook(arg: string | null | NotebookTarget) {
     if (dirtyRef.current) await persist();
   }, [persist]);
 
+  // Flush any pending edits when the hook unmounts so navigating away
+  // (e.g. /debate/:id → /my-study/:id) never loses the last debounce window.
+  const flushRef = useRef(flushNow);
+  useEffect(() => { flushRef.current = flushNow; }, [flushNow]);
+  useEffect(() => {
+    return () => {
+      void flushRef.current?.();
+    };
+  }, []);
+
+  // Realtime: keep both surfaces (record page + /my-study/:id) in sync when
+  // the same notebook row changes elsewhere. Only apply remote values that
+  // the local user isn't actively editing (no dirty pending writes).
+  useEffect(() => {
+    if (!recordId || !user) return;
+    const channel = supabase
+      .channel(`notebook:${recordType}:${recordId}:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "session_notebooks",
+          filter: `record_id=eq.${recordId}`,
+        },
+        (payload) => {
+          const row = payload.new as any as SessionNotebook;
+          if (!row || row.user_id !== user.id || row.record_type !== recordType) return;
+          setNotebook(row);
+          if (!dirtyRef.current) {
+            const incomingThoughts = (row.thoughts as any)?.blocks?.[0]?.value || "";
+            const incomingTake = row.my_take || "";
+            if (incomingThoughts !== lastPersistedThoughtsRef.current) {
+              lastPersistedThoughtsRef.current = incomingThoughts;
+              setThoughts(incomingThoughts);
+            }
+            if (incomingTake !== lastPersistedTakeRef.current) {
+              lastPersistedTakeRef.current = incomingTake;
+              setMyTake(incomingTake);
+            }
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [recordType, recordId, user]);
+
   const publish = useCallback(async () => {
     if (!recordId || !user) return;
     await flushNow();
