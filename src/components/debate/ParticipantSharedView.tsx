@@ -483,6 +483,47 @@ const ParticipantSharedView = ({
       {/* Fixed input area at bottom — text input only (mic goes directly to argument map via Deepgram) */}
       {canSpeak && (
         <div className="border-t border-border bg-card px-4 py-3 shrink-0">
+          {/* Control panel — always visible during canSpeak. Speaker Pause (30s
+              auto-resume) for active speakers; facilitator Extend/Skip/Next
+              for publishers. */}
+          {(isPublisher || (isSpeaker && isMyTurn)) && (
+            <div className="max-w-3xl mx-auto mb-2 flex items-center gap-2 overflow-x-auto">
+              {isSpeaker && isMyTurn && onToggleTimer && (
+                <button
+                  onClick={handleSpeakerPauseToggle}
+                  title={timerRunning ? "Pause turn (max 30s)" : "Resume turn"}
+                  className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]"
+                >
+                  {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{timerRunning ? "Pause" : "Resume"}</span>
+                  {!timerRunning && <span className="text-[10px] text-muted-foreground">(auto-resume 30s)</span>}
+                </button>
+              )}
+              {isPublisher && (
+                <>
+                  {!(isSpeaker && isMyTurn) && onToggleTimer && (
+                    <button
+                      onClick={onToggleTimer}
+                      title={timerRunning ? "Pause" : "Resume"}
+                      className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]"
+                    >
+                      {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      <span>{timerRunning ? "Pause" : "Resume"}</span>
+                    </button>
+                  )}
+                  <button onClick={onExtendTime} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
+                    <Plus className="w-3.5 h-3.5" /> <span>Extend</span>
+                  </button>
+                  <button onClick={onSkipTurn} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
+                    <SkipForward className="w-3.5 h-3.5" /> <span>Skip Turn</span>
+                  </button>
+                  <button onClick={onNextSubtopic} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
+                    <ChevronRight className="w-3.5 h-3.5" /> <span>Next Subtopic</span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
           <div className="flex items-end gap-3 max-w-3xl mx-auto">
             {/* Camera toggle */}
             {isSpeaker && (
