@@ -36,11 +36,20 @@ export default function FloatingIntelligence({
     [data, subtopicId],
   );
 
+  const disabled = !isPremium || scoped.length === 0;
+  const disabledTitle = !isPremium
+    ? "Upgrade to unlock Insights"
+    : "No insights generated yet";
+
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
-        className="absolute bottom-3 right-[8.5rem] z-20 inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-background/80 backdrop-blur-md border border-foreground/10 text-xs font-semibold hover:bg-background transition-colors shadow-lg"
+        onClick={() => !disabled && setOpen(true)}
+        disabled={disabled}
+        title={disabled ? disabledTitle : undefined}
+        className={`absolute bottom-3 right-[8.5rem] z-20 inline-flex items-center gap-1.5 px-3 h-9 rounded-full bg-background/80 backdrop-blur-md border border-foreground/10 text-xs font-semibold transition-colors shadow-lg ${
+          disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-background"
+        }`}
       >
         {isPremium ? <Sparkles className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
         Insights
