@@ -52,7 +52,7 @@ export default function ContinueButton({
     }
     setOpen(false);
     const newId = data as string;
-    if (kind === "debate") navigate(`/debate/${newId}/edit`);
+    if (kind === "debate") navigate(`/debate/${newId}/lobby`);
     else navigate(`/live/${newId}`);
   };
 
