@@ -88,6 +88,41 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         bySub.set(rs.subtopic_id, items);
       });
 
+      // Fallback: when no round_summaries are stored, reuse the live
+      // debate_transcripts.argument_map so the post-session record matches what
+      // viewers saw in the live argument map. Entries carry `subtopic` as a
+      // title string — match by title.
+      const subsMissing = baseSubs.filter((s) => !bySub.has(s.id));
+      if (subsMissing.length > 0) {
+        const { data: tx } = await supabase
+          .from("debate_transcripts" as any)
+          .select("argument_map")
+          .eq("debate_id", debateId)
+          .maybeSingle();
+        if (cancelled) return;
+        const map = ((tx as any)?.argument_map as any[]) || [];
+        if (map.length > 0) {
+          const titleToId = new Map<string, string>();
+          subsMissing.forEach((s) => titleToId.set(s.title.trim().toLowerCase(), s.id));
+          const byTitle = new Map<string, { side: string; content: string }[]>();
+          map.forEach((e: any) => {
+            const title = String(e?.subtopic ?? "").trim().toLowerCase();
+            const subId = titleToId.get(title);
+            if (!subId) return;
+            const arr = byTitle.get(subId) || [];
+            arr.push({
+              side: String(e?.speaker_side ?? "").trim(),
+              content: String(e?.content ?? "").trim(),
+            });
+            byTitle.set(subId, arr);
+          });
+          byTitle.forEach((items, subId) => {
+            const filtered = items.filter((i) => i.content);
+            if (filtered.length > 0) bySub.set(subId, filtered);
+          });
+        }
+      }
+
       const populated: PreviewSubtopic[] = baseSubs.map((sub) => {
         const items = bySub.get(sub.id) || [];
         if (items.length === 0) return { ...sub, threads: [], hasSummaries: false };
