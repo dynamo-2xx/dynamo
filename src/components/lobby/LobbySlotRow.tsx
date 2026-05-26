@@ -11,9 +11,10 @@ interface Props {
   slot: SlotDef;
   connection: MicConnection | null;
   onRelease?: (id: string) => void;
+  sideLabel?: string;
 }
 
-export default function LobbySlotRow({ slot, connection, onRelease }: Props) {
+export default function LobbySlotRow({ slot, connection, onRelease, sideLabel }: Props) {
   const lit = (connection?.last_audio_rms ?? 0) > 0.05;
   const bars = 12;
   return (
@@ -30,6 +31,11 @@ export default function LobbySlotRow({ slot, connection, onRelease }: Props) {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-display text-foreground truncate">
           {connection?.display_name || slot.label}
+          {sideLabel && (
+            <span className="ml-2 text-[10px] uppercase tracking-wider text-muted-foreground font-body">
+              · {sideLabel}
+            </span>
+          )}
         </p>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">
           {connection
