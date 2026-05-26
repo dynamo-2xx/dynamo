@@ -55,6 +55,10 @@ const HomePage = () => {
   const { items: forYou } = useForYouDebates(mode, 12);
   const { items: myRecent } = useMyRecentDebates(12);
 
+  useEffect(() => {
+    if (!userTouchedRef.current && hasLocation && mode !== "local") setMode("local");
+  }, [hasLocation, mode]);
+
   const actionRowRef = useRef<HTMLDivElement>(null);
   const forYouHint = useEmptyStateHint<HTMLDivElement>();
   const myRecentHint = useEmptyStateHint<HTMLDivElement>();
