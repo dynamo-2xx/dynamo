@@ -136,14 +136,14 @@ const ArgumentMapContent = ({
                     </p>
                   ) : (
                     threads.map((th, ti) => (
-                      <Collapsible key={`${st.id}-th-${ti}`} defaultOpen>
+                      <Collapsible key={`${st.id}-th-${ti}`}>
                         <CollapsibleTrigger className="w-full flex items-start gap-2 px-2 py-1.5 text-left hover:bg-foreground/[0.03] transition-colors rounded">
                           <ChevronDown className="w-3.5 h-3.5 text-foreground/40 shrink-0 mt-0.5 transition-transform [[data-state=closed]_&]:-rotate-90" />
                           <div className="flex-1 min-w-0">
                             <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-body">
                               {th.root.speaker_side}
                             </p>
-                            <p className="text-xs text-foreground font-body leading-snug truncate" data-annotatable>
+                            <p className="text-xs text-foreground font-body leading-snug line-clamp-2" data-annotatable>
                               {th.root.content}
                             </p>
                           </div>
