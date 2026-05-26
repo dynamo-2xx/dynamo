@@ -171,6 +171,35 @@ const DebateScheduledPreviewPage = () => {
     }
   };
 
+  const handleQueueToJoin = async (sideId: string) => {
+    if (!user || !id) return;
+    setQueueBusy(true);
+    try {
+      // Upsert via delete-then-insert to avoid unique constraints on (debate_id,user_id).
+      await supabase
+        .from("debate_interests")
+        .delete()
+        .eq("debate_id", id)
+        .eq("user_id", user.id);
+      const { error } = await supabase.from("debate_interests").insert({
+        debate_id: id,
+        user_id: user.id,
+        role: "queued_speaker",
+        side_id: sideId,
+        status: "pending",
+      });
+      if (error) throw error;
+      setQueuedSideId(sideId);
+      setQueueSideOpen(false);
+      toast({ description: "Queued — taking you to the lobby." });
+      navigate(`/debate/${id}/lobby`);
+    } catch (e: any) {
+      toast({ title: "Couldn't queue", description: e?.message ?? "Try again." });
+    } finally {
+      setQueueBusy(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
