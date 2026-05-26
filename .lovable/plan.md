@@ -1,69 +1,69 @@
-## Goal
-Three connected changes on the Clubs surface:
-1. **Club tagging**: admins tag their club (max 5) and mark one **primary** tag. Tags show on the About tab and power Explore-style tag shelves on `/clubs`.
-2. **Private-club gating on `/club/:id`**: non-member viewers see the hero + tabs but the Upcoming/Past lists are replaced by a **fuzzy preview with a "Request to Join" overlay**.
-3. **Fix "Couldn't create club" RLS error** on `/clubs/new` (both private and public flows).
+## 1. User story: /debate/:id/lobby (Mic-Prep)
+
+**As a host arriving at the debate lobby**, I want a single pre-session gate that lets me confirm my mic, see who else has connected, and start the room when ready — without being blocked by stragglers.
+
+Flow:
+
+1. Host lands on `/debate/:id/lobby` after creating or scheduling a debate (or from "Start" on the preview).
+2. Header shows topic, format badge, and a countdown if `scheduled_at` is set.
+3. **Join panel** (existing `InPersonJoinPanel`): join code, QR, "Project" button.   
+[Message from me: verify project button, join code, qr code can actually connect others to the debate session. As of now, none of these options work. Wire real buttons, not fake ones.]
+4. **Seat grid**: one bubble per `(side × seat)`. State per bubble: gray = empty, green pulse = connected & mic ready, red = mic failed, blue ring = queued-but-not-yet-mic-ready (see §3).
+5. Host's own mic test runs inline (waveform + device picker + mute).
+6. **Start button** enables once ≥1 mic is connected (today's gate).
+7. **Force-start button** (new) — always visible to the owner. Clicking transitions the debate to `live` immediately; un-ready participants keep their Mic-Prep running in the background and pop into the room when their mic comes online (same code path as a mid-session reconnect).
+8. Solo host with mic ready → auto-advance (lobby acts as a loading screen).
+9. Overdue banner (already implemented, +15 min) lets the host cancel.
+
+**As a queued / invited participant** on the same page: identical layout minus Start; I see my own mic test, the live seat grid, and a "Waiting for host…" status. If the host force-starts before my mic is ready, I'm dropped into the room with a "Tap to enable mic" toast.
 
 ---
 
-## Part 1 — Tagging
+## 2. Force-start (missing today)
 
-### Database (single migration)
-- `club_tags` already exists (PK `club_id + tag_id`, max-5 enforced in RLS).
-- Add `primary_tag_id uuid` column to `public.clubs` (nullable).
-- Add trigger that nulls `clubs.primary_tag_id` if the row in `club_tags` is removed; and validates that `primary_tag_id` always points to a tag also present in `club_tags` for the same club.
-- Add index `club_tags(tag_id)` for shelf lookups.
+Add an owner-only "Force start" button in `DebateLobbyPage` next to the gated "Start debate" button:
 
-### Hooks
-- Extend `useTags.ts` so `kind` accepts `"club"` → table `club_tags`, fk `club_id`. Add `setPrimaryTag(clubId, tagId | null)`.
-- Extend `useClubs.ts`: expose `primary_tag_id` on `ClubItem`; add `useClubTagShelves()` returning `{ tag, items: ClubItem[] }[]` grouped by `primary_tag_id`, sorted by `is_official` then size.
-
-### TagPicker
-- Add `kind="club"` support. Each selected chip gets a small **star** to toggle primary (single-select). Primary chip is filled + has a "Primary" label.
-- Buffered mode (used before the club exists) keeps `primaryTagId` locally; persisted after club insert.
-
-### Pages
-- **`CreateClubPage`** — new "Topics" section using buffered TagPicker + primary marker. After insert: attach tags then `setPrimaryTag(club.id, primaryTagId ?? tags[0]?.id)`.
-- **`ClubEditPage`** — Topics section bound to live `recordId={club.id}`.
-- **`ClubPage` About tab** — render chips above the description; primary chip filled, others outlined; each chip links `/clubs?tag={slug}`.
-- **`ClubsPage`** — Explore-pattern shelves: keep `FloatingSearch` + Featured + Near you + My Clubs, then insert **tag shelves** (one per tag from `useClubTagShelves()`, with `#tagName · count` and "See all →" → `/clubs?tag=slug`), then a final **More clubs** shelf for clubs with no primary tag. Support `?tag=slug` query param → render only that tag's clubs in a responsive grid (Explore "Results for…" pattern).
+- Same `update({ status: 'live', started_at: now })` mutation as Start — the only difference is removing the `minConnected` gate.
+- Confirm dialog: "Start without waiting for ready mics? Late participants will join when their mic connects."
+- Surface in `MicLobby` via a new optional `onForceStart` prop so CMM/Live can adopt it later.
 
 ---
 
-## Part 2 — Private club gating on `/club/:id`
+## 3. "Queue to join" from /debate/:id/preview
 
-When the viewer is **not** a member (and not admin) AND the club is **private** OR `requires_approval`:
-- Keep: hero card, CTA row (showing "Request to Join" / "Request pending"), and the three tabs (Events / Members / About).
-- Replace tab content with a **fuzzy preview**:
-  - Render the existing Upcoming/Past/members layouts using **placeholder skeleton cards** (3 fake rows), wrapped in a div with `blur-md select-none pointer-events-none opacity-70`.
-  - Layer an absolute overlay: lock icon + "Members only — request to join to see events and records." + a primary "Request to Join" / "Request pending" button (reuses existing `join` handler).
-- About tab: still shows description + tags (public-safe).
-- Public clubs and members: unchanged behavior.
+Add a third action to the `Interested?` popover on `DebateScheduledPreviewPage` (alongside "Message the publisher" and "Notify me when it starts"):
 
-Implementation lives entirely in `src/pages/ClubPage.tsx` via a new `PrivateGatedPreview` component rendered when `!isMember && (!club.is_public || club.requires_approval)`.
+**"Queue to join as speaker"** → opens a small side picker (reuses `sides`), then inserts a `debate_participants` row with `participant_role = 'queued_speaker'` (new role) and the chosen `side_id`. After insert, navigate the user to `/debate/:id/lobby` where they wait with the host.
 
----
+Host-side surfacing (no new tab needed — reuses the existing **Invite Speakers** block in `CreateDebatePage`):
 
-## Part 3 — Fix club creation RLS error
+- The realtime subscription on `debate_participants` already exists (lines 286–313). Extend the merge so `participant_role = 'queued_speaker'` rows render as avatar chips in the Invite Speakers list with a small "Queued" badge and a green pulse when their mic connects.
+- Host actions on a queued chip: **Accept** (promote to `speaker`, assigns the chosen `side_id`) or **Dismiss** (delete row). Acceptance gives the user a seat in the lobby grid.
+- Only the host can start the session — queued users in the lobby see "Waiting for host…".
 
-Error: `new row violates row-level security policy for table "clubs"`.
-
-The only INSERT policy is `WITH CHECK (auth.uid() = created_by)`. The failure means either `auth.uid()` is null at insert time (stale session) or `created_by` doesn't match. Plan:
-1. In `CreateClubPage.submit`, before insert, call `supabase.auth.getUser()` and use the returned `data.user.id` for `created_by` (covers cases where the context `user` is stale).
-2. Gate the page behind `ProtectedRoute` if it isn't already; redirect to `/auth` when no user.
-3. Toast a clearer message ("Please sign in again") on the RLS failure path.
-4. Verify the fix by creating both a private and a public club from `/clubs/new`.
-
-No schema change for Part 3 unless step 1–2 don't resolve it; if they don't, add a defensive `created_by` default of `auth.uid()` on the column. (Documented as fallback only.)
+Schema: add `'queued_speaker'` to the allowed values of `debate_participants.participant_role` (currently a text check or enum — migration confirms which). RLS: queued users insert their own row scoped to `auth.uid()`; host can update/delete any row on debates they created (existing policy likely already covers this — verify in migration).
 
 ---
 
-## Files touched
-- new migration: `clubs.primary_tag_id` + sync trigger + `club_tags(tag_id)` index
-- `src/hooks/useTags.ts`
-- `src/hooks/useClubs.ts`
-- `src/components/tags/TagPicker.tsx`
-- `src/pages/CreateClubPage.tsx`
-- `src/pages/ClubEditPage.tsx`
-- `src/pages/ClubPage.tsx`
-- `src/pages/ClubsPage.tsx`
+## 4. Move "Invite Now" into Invite Speakers
+
+The standalone "Invite Now" CTA currently lives outside the Invite Speakers block in `CreateDebatePage` (and/or on the preview page). Action:
+
+- Delete the standalone button.
+- Place a single "Invite Now" button inside the **Invite Speakers** card (`CreateDebatePage.tsx` ~line 1391), to the right of the username input / chips list, so all invite controls live in one place.
+- Behavior unchanged: sends pending email invites + finalizes username invites for `invitedEntries`.
+
+---
+
+## Technical summary
+
+**Files**
+
+- `src/pages/DebateLobbyPage.tsx` — add Force-start button + confirm dialog.
+- `src/components/lobby/MicLobby.tsx` — optional `onForceStart` prop + render.
+- `src/pages/DebateScheduledPreviewPage.tsx` — add "Queue to join" action to Interested popover with side-picker substep.
+- `src/pages/CreateDebatePage.tsx` — render queued participants as chips in Invite Speakers; add Accept/Dismiss; relocate "Invite Now" into this block.
+- New migration — extend `participant_role` to allow `queued_speaker`; verify RLS for host accept/dismiss.
+
+**Out of scope** (call out, don't build now): full Mic-Prep refactor that merges Debate/CMM/Live lobby pages — keep as a follow-up tracked in `mem://features/mic-prep`.  
+What does this mean? Give me a user story.  

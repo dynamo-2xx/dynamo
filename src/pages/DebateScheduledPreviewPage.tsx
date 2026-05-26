@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, HandHeart, Loader2, Bell, MessageSquare, Check } from "lucide-react";
+import { ArrowLeft, HandHeart, Loader2, Bell, MessageSquare, Check, LogIn } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,6 +39,9 @@ const DebateScheduledPreviewPage = () => {
   const [participantCount, setParticipantCount] = useState<number>(0);
   const [notifySubscribed, setNotifySubscribed] = useState(false);
   const [notifyBusy, setNotifyBusy] = useState(false);
+  const [queueBusy, setQueueBusy] = useState(false);
+  const [queueSideOpen, setQueueSideOpen] = useState(false);
+  const [queuedSideId, setQueuedSideId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -85,6 +88,16 @@ const DebateScheduledPreviewPage = () => {
           .eq("user_id", user.id)
           .maybeSingle();
         if (!cancelled) setNotifySubscribed(!!sub);
+
+        const { data: interest } = await supabase
+          .from("debate_interests")
+          .select("side_id, role")
+          .eq("debate_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!cancelled && interest?.role === "queued_speaker") {
+          setQueuedSideId(interest.side_id ?? sides[0]?.id ?? null);
+        }
       }
     })();
     return () => {
@@ -155,6 +168,35 @@ const DebateScheduledPreviewPage = () => {
       toast({ title: "Couldn't update notification", description: e?.message ?? "Try again." });
     } finally {
       setNotifyBusy(false);
+    }
+  };
+
+  const handleQueueToJoin = async (sideId: string) => {
+    if (!user || !id) return;
+    setQueueBusy(true);
+    try {
+      // Upsert via delete-then-insert to avoid unique constraints on (debate_id,user_id).
+      await supabase
+        .from("debate_interests")
+        .delete()
+        .eq("debate_id", id)
+        .eq("user_id", user.id);
+      const { error } = await supabase.from("debate_interests").insert({
+        debate_id: id,
+        user_id: user.id,
+        role: "queued_speaker",
+        side_id: sideId,
+        status: "pending",
+      });
+      if (error) throw error;
+      setQueuedSideId(sideId);
+      setQueueSideOpen(false);
+      toast({ description: "Queued — taking you to the lobby." });
+      navigate(`/debate/${id}/lobby`);
+    } catch (e: any) {
+      toast({ title: "Couldn't queue", description: e?.message ?? "Try again." });
+    } finally {
+      setQueueBusy(false);
     }
   };
 
@@ -258,6 +300,58 @@ const DebateScheduledPreviewPage = () => {
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-72 p-1.5" align="center" side="top">
+                {queueSideOpen ? (
+                  <div className="p-2">
+                    <p className="text-xs font-body text-muted-foreground mb-2">
+                      Pick a side to queue on:
+                    </p>
+                    <div className="space-y-1">
+                      {sides.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          disabled={queueBusy}
+                          onClick={() => handleQueueToJoin(s.id)}
+                          className="w-full text-left px-3 py-2 text-sm font-body rounded-md hover:bg-accent transition-colors disabled:opacity-50"
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setQueueSideOpen(false)}
+                      className="mt-1 w-full text-xs text-muted-foreground hover:text-foreground py-1.5"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (queuedSideId) {
+                      navigate(`/debate/${id}/lobby`);
+                    } else {
+                      setQueueSideOpen(true);
+                    }
+                  }}
+                  className="w-full flex items-start gap-3 p-3 rounded-md hover:bg-accent transition-colors text-left"
+                >
+                  <LogIn className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <div className="text-sm font-body font-medium flex items-center gap-1.5">
+                      {queuedSideId ? "Go to lobby" : "Queue to join as speaker"}
+                      {queuedSideId && <Check className="w-3.5 h-3.5 text-foreground" />}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {queuedSideId
+                        ? "You're queued — wait for the host to start."
+                        : "Wait in the lobby; host can accept you."}
+                    </div>
+                  </div>
+                </button>
                 <button
                   type="button"
                   onClick={() => setComposerOpen(true)}
@@ -286,6 +380,8 @@ const DebateScheduledPreviewPage = () => {
                     </div>
                   </div>
                 </button>
+                  </>
+                )}
               </PopoverContent>
             </Popover>
           </div>

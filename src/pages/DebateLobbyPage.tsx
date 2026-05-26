@@ -5,6 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
 import MicLobby from "@/components/lobby/MicLobby";
 import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
+import WaitingForHost from "@/components/lobby/WaitingForHost";
+import { useMicLobbyAttachment } from "@/hooks/useMicLobbyAttachment";
 import { toast } from "sonner";
 
 interface Side { id: string; label: string; sort_order: number; }
@@ -25,6 +27,53 @@ export default function DebateLobbyPage() {
   const [starting, setStarting] = useState(false);
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
   const [overdueMin, setOverdueMin] = useState<number>(0);
+  const [createdBy, setCreatedBy] = useState<string | null>(null);
+  const [queuedSideId, setQueuedSideId] = useState<string | null>(null);
+  const [waitStream, setWaitStream] = useState<MediaStream | null>(null);
+
+  const isCreator = !!user && !!createdBy && user.id === createdBy;
+
+  const deviceId = (typeof window !== "undefined")
+    ? (localStorage.getItem("dyn_device_id") || (() => {
+        const id = crypto.randomUUID();
+        localStorage.setItem("dyn_device_id", id);
+        return id;
+      })())
+    : "";
+
+  // Non-creator queued users: attach mic to the lobby so the host sees them ready.
+  useMicLobbyAttachment({
+    kind: "debate",
+    sessionId: !isCreator && user && id ? id : null,
+    slotKey: !isCreator && user ? `queued:${user.id}` : null,
+    userId: user?.id ?? null,
+    deviceId,
+    displayName: user?.email?.split("@")[0] || "Queued",
+    mode: "own_mic",
+    stream: waitStream,
+  });
+
+  // Acquire mic for non-creator waiting view
+  useEffect(() => {
+    if (isCreator || !user) return;
+    let active = true;
+    let stream: MediaStream | null = null;
+    navigator.mediaDevices
+      ?.getUserMedia({ audio: true })
+      .then((s) => {
+        if (!active) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        stream = s;
+        setWaitStream(s);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+    };
+  }, [isCreator, user]);
 
   useEffect(() => {
     if (!id) return;
@@ -43,10 +92,7 @@ export default function DebateLobbyPage() {
         navigate(`/debate/${id}`, { replace: true });
         return;
       }
-      if (user && d.created_by !== user.id) {
-        navigate(`/debate/${id}`, { replace: true });
-        return;
-      }
+      setCreatedBy(d.created_by);
       setTopic(d.topic);
       setJoinCode(d.join_code);
       setMaxPerSide(d.max_speakers_per_side ?? 2);
@@ -57,8 +103,38 @@ export default function DebateLobbyPage() {
         .eq("debate_id", id)
         .order("sort_order");
       setSides((s ?? []) as Side[]);
+
+      // If this user has a queued interest for this debate, remember it.
+      if (user && d.created_by !== user.id) {
+        const { data: interest } = await supabase
+          .from("debate_interests")
+          .select("side_id, role")
+          .eq("debate_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (interest?.role === "queued_speaker") {
+          setQueuedSideId(interest.side_id ?? null);
+        }
+      }
     })();
   }, [id, user, navigate]);
+
+  // Non-creator: redirect to debate room when host starts.
+  useEffect(() => {
+    if (isCreator || !id) return;
+    const ch = supabase
+      .channel(`lobby-watch-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "debates", filter: `id=eq.${id}` },
+        (payload) => {
+          const st = (payload.new as any).status;
+          if (st === "live") navigate(`/debate/${id}`, { replace: true });
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [isCreator, id, navigate]);
 
   // §4 owner no-show banner — surfaces +15m past scheduled start.
   useEffect(() => {
@@ -108,6 +184,15 @@ export default function DebateLobbyPage() {
     navigate(`/debate/${id}`, { replace: true });
   };
 
+  const handleForceStart = async () => {
+    if (!id) return;
+    const ok = window.confirm(
+      "Start without waiting for ready mics? Late participants will join when their mic connects.",
+    );
+    if (!ok) return;
+    await handleStart();
+  };
+
   return (
     <AppLayout>
       <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
@@ -115,7 +200,7 @@ export default function DebateLobbyPage() {
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Lobby</p>
           <h1 className="font-display text-2xl text-foreground">{topic}</h1>
         </div>
-        {overdueMin >= 15 && (
+        {isCreator && overdueMin >= 15 && (
           <div className="border border-foreground/10 rounded-lg p-3 bg-amber-50 text-sm font-body text-foreground flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="font-semibold">Running {overdueMin}m late</p>
@@ -130,25 +215,42 @@ export default function DebateLobbyPage() {
             </button>
           </div>
         )}
-        <InPersonJoinPanel
-          debateId={id ?? null}
-          joinCode={joinCode}
-          maxSpeakersPerSide={maxPerSide}
-          onMaxSpeakersChange={async (n) => {
-            setMaxPerSide(n);
-            if (id) await supabase.from("debates").update({ max_speakers_per_side: n }).eq("id", id);
-          }}
-          onCodeRegenerated={(c) => setJoinCode(c)}
-        />
-        <MicLobby
-          kind="debate"
-          sessionId={id ?? null}
-          slots={slots}
-          minConnected={1}
-          onStart={handleStart}
-          starting={starting}
-          startLabel="Start debate"
-        />
+        {isCreator ? (
+          <>
+            <InPersonJoinPanel
+              debateId={id ?? null}
+              joinCode={joinCode}
+              maxSpeakersPerSide={maxPerSide}
+              onMaxSpeakersChange={async (n) => {
+                setMaxPerSide(n);
+                if (id) await supabase.from("debates").update({ max_speakers_per_side: n }).eq("id", id);
+              }}
+              onCodeRegenerated={(c) => setJoinCode(c)}
+            />
+            <MicLobby
+              kind="debate"
+              sessionId={id ?? null}
+              slots={slots}
+              minConnected={1}
+              onStart={handleStart}
+              starting={starting}
+              startLabel="Start debate"
+              onForceStart={handleForceStart}
+            />
+          </>
+        ) : (
+          <WaitingForHost
+            sessionTitle={topic}
+            stream={waitStream}
+            mode="own_mic"
+            lockReason={
+              queuedSideId
+                ? `Queued for ${sides.find((s) => s.id === queuedSideId)?.label ?? "a side"} — host can accept you`
+                : "Waiting for the host"
+            }
+            onLeave={() => navigate(`/debate/${id}/preview`, { replace: true })}
+          />
+        )}
       </div>
     </AppLayout>
   );

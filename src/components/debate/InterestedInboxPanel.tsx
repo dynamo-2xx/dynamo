@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Inbox, Loader2, UserPlus } from "lucide-react";
+import { Inbox, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -236,14 +236,7 @@ const InterestedInboxPanel = ({ debateId, debateTopic, sides }: Props) => {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setInviteOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-body font-medium hover:opacity-90 transition-opacity shrink-0"
-        >
-          <UserPlus className="w-3 h-3" />
-          Invite people
-        </button>
+        {/* Invite people moved into Edit → Invite Speakers */}
       </div>
 
       {loading ? (
