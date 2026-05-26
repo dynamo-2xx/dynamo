@@ -1968,6 +1968,18 @@ const CreateDebatePage = () => {
           )}
         </AnimatePresence>
       </div>
+      {editId && draftDebateId && (
+        <InviteFriendsDialog
+          open={inviteDialogOpen}
+          onOpenChange={setInviteDialogOpen}
+          debateId={draftDebateId}
+          debateTopic={debate?.topic ?? ""}
+          sides={(draftSideIds ?? sideIds).map((sid, i) => ({
+            id: sid,
+            label: debate?.sides[i] ?? `Side ${i + 1}`,
+          }))}
+        />
+      )}
     </AppLayout>
   );
 };
