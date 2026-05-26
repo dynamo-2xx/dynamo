@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Inbox, Loader2, UserPlus } from "lucide-react";
+import { Inbox, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
