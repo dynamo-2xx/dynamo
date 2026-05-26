@@ -1453,6 +1453,11 @@ const CreateDebatePage = () => {
                                   </span>
                                 )}
                                 {u.display_name || "Interested"}
+                                {u.role === "queued_speaker" && (
+                                  <span className="ml-0.5 text-[9px] uppercase tracking-wider bg-emerald-500/15 text-emerald-700 rounded-full px-1.5 py-0.5">
+                                    Queued
+                                  </span>
+                                )}
                                 <Plus className="w-3 h-3 opacity-60" />
                               </button>
                             ))}
