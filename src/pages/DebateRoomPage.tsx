@@ -138,6 +138,7 @@ const DebateRoomPage = () => {
   const aiPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showShare, setShowShare] = useState(false);
+  const [showInviteDirect, setShowInviteDirect] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
    const turnEndTriggeredRef = useRef(false);
