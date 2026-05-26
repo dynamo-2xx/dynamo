@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Globe, Lock, MapPin, Plus, Users, Calendar, Check } from "lucide-react";
+import { ArrowLeft, Globe, Lock, MapPin, Plus, Users, Calendar, Check, Hash } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { gradientFromSeed } from "@/lib/gradient";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { useClub } from "@/hooks/useClubs";
 import { useClubEvents } from "@/hooks/useClubEvents";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useRecordTags } from "@/hooks/useTags";
 
 type Tab = "events" | "members" | "about";
 
@@ -25,6 +26,10 @@ const ClubPage = () => {
 
   const isMember = !!myRole;
   const isAdmin = myRole === "owner" || myRole === "admin";
+  const gated =
+    !isMember && !!club && (!club.is_public || Boolean((club as any).requires_approval));
+  const { tags: clubTags } = useRecordTags("club", id);
+  const primaryTagId = (club as any)?.primary_tag_id ?? null;
 
   useEffect(() => {
     if (!id) return;
@@ -211,6 +216,14 @@ const ClubPage = () => {
         </div>
 
         {tab === "events" && (
+          gated ? (
+            <GatedPreview
+              onJoin={join}
+              busy={busy}
+              pending={pendingRequest}
+              kind="events"
+            />
+          ) : (
           <div className="space-y-8">
             {isAdmin && requests.length > 0 && (
               <section>
@@ -251,9 +264,13 @@ const ClubPage = () => {
               </section>
             )}
           </div>
+          )
         )}
 
         {tab === "members" && (
+          gated ? (
+            <GatedPreview onJoin={join} busy={busy} pending={pendingRequest} kind="members" />
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {members.map((m) => (
               <div key={m.user_id} className="flex items-center gap-3 p-3 rounded-lg border border-border">
@@ -269,15 +286,37 @@ const ClubPage = () => {
               </div>
             ))}
           </div>
+          )
         )}
 
         {tab === "about" && (
-          <div className="prose prose-sm max-w-none font-body">
+          <div className="space-y-4">
+            {clubTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {clubTags.map((t) => (
+                  <Link
+                    key={t.id}
+                    to={`/clubs?tag=${t.slug}`}
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-body transition-colors",
+                      primaryTagId === t.id
+                        ? "bg-foreground text-background"
+                        : "border border-border text-foreground hover:border-foreground/40",
+                    )}
+                  >
+                    <Hash className="w-3 h-3" />
+                    {t.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+            <div className="prose prose-sm max-w-none font-body">
             {club.description ? (
               <p className="whitespace-pre-wrap">{club.description}</p>
             ) : (
               <p className="text-muted-foreground">No description yet.</p>
             )}
+            </div>
           </div>
         )}
       </div>
@@ -352,3 +391,62 @@ const EventRow = ({
 };
 
 export default ClubPage;
+
+const GatedPreview = ({
+  onJoin,
+  busy,
+  pending,
+  kind,
+}: {
+  onJoin: () => void;
+  busy: boolean;
+  pending: boolean;
+  kind: "events" | "members";
+}) => {
+  return (
+    <div className="relative">
+      <div
+        aria-hidden
+        className="blur-md select-none pointer-events-none opacity-70 space-y-3"
+      >
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-3 p-4 rounded-xl border border-border"
+          >
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-32 bg-muted rounded" />
+              <div className="h-4 w-3/4 bg-muted rounded" />
+              <div className="h-3 w-1/2 bg-muted rounded" />
+            </div>
+            <div className="h-8 w-20 bg-muted rounded-full" />
+          </div>
+        ))}
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center max-w-sm px-6 py-8 rounded-2xl bg-background/90 border border-border backdrop-blur">
+          <div className="mx-auto w-10 h-10 rounded-full bg-accent flex items-center justify-center mb-3">
+            <Lock className="w-4 h-4" />
+          </div>
+          <h3 className="font-display text-xl mb-1">Members only</h3>
+          <p className="text-sm text-muted-foreground font-body mb-4">
+            Request to join to see {kind === "events" ? "events and records" : "members"}.
+          </p>
+          {pending ? (
+            <span className="inline-block px-4 py-2 rounded-full border border-border text-xs font-body text-muted-foreground">
+              Request pending
+            </span>
+          ) : (
+            <button
+              onClick={onJoin}
+              disabled={busy}
+              className="px-4 py-2 rounded-full bg-foreground text-background text-xs font-body font-medium disabled:opacity-50"
+            >
+              Request to Join
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

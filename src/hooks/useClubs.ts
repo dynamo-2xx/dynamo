@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import type { Tag } from "./useTags";
 
 export interface ClubItem {
   id: string;
@@ -15,6 +16,7 @@ export interface ClubItem {
   is_member?: boolean;
   is_featured?: boolean;
   requires_approval?: boolean;
+  primary_tag_id?: string | null;
 }
 
 export function useClubs() {
@@ -105,4 +107,64 @@ export function useClub(clubId: string | undefined) {
   }, [refresh]);
 
   return { club, loading, myRole, memberCount, pendingRequest, refresh };
+}
+
+export interface ClubShelf {
+  tag: Tag;
+  items: ClubItem[];
+}
+
+/**
+ * Groups visible clubs by their primary_tag_id into Explore-style shelves.
+ * Pass the list of clubs from useClubs() so memberships/featured flags are reused.
+ */
+export function useClubTagShelves(clubs: ClubItem[]) {
+  const [shelves, setShelves] = useState<ClubShelf[]>([]);
+  const [untagged, setUntagged] = useState<ClubItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const tagged = clubs.filter((c) => c.primary_tag_id);
+      const unt = clubs.filter((c) => !c.primary_tag_id);
+      const tagIds = Array.from(new Set(tagged.map((c) => c.primary_tag_id!).filter(Boolean)));
+      if (tagIds.length === 0) {
+        if (!cancelled) {
+          setShelves([]);
+          setUntagged(unt);
+        }
+        return;
+      }
+      const { data } = await (supabase as any)
+        .from("tags")
+        .select("*")
+        .in("id", tagIds);
+      const tagMap = new Map<string, Tag>();
+      (data || []).forEach((t: Tag) => tagMap.set(t.id, t));
+      const groups = new Map<string, ClubItem[]>();
+      tagged.forEach((c) => {
+        const arr = groups.get(c.primary_tag_id!) || [];
+        arr.push(c);
+        groups.set(c.primary_tag_id!, arr);
+      });
+      const result: ClubShelf[] = [];
+      tagMap.forEach((tag, id) => {
+        const items = groups.get(id) || [];
+        if (items.length) result.push({ tag, items });
+      });
+      result.sort((a, b) => {
+        if (a.tag.is_official !== b.tag.is_official) return a.tag.is_official ? -1 : 1;
+        return b.items.length - a.items.length;
+      });
+      if (!cancelled) {
+        setShelves(result);
+        setUntagged(unt);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clubs]);
+
+  return { shelves, untagged };
 }

@@ -1,39 +1,69 @@
-## 1. Make `/clubs` feel like `/explore`
+## Goal
+Three connected changes on the Clubs surface:
+1. **Club tagging**: admins tag their club (max 5) and mark one **primary** tag. Tags show on the About tab and power Explore-style tag shelves on `/clubs`.
+2. **Private-club gating on `/club/:id`**: non-member viewers see the hero + tabs but the Upcoming/Past lists are replaced by a **fuzzy preview with a "Request to Join" overlay**.
+3. **Fix "Couldn't create club" RLS error** on `/clubs/new` (both private and public flows).
 
-Refactor `src/pages/ClubsPage.tsx` so it shares Explore's editorial layout, floating search, and horizontal shelves instead of the current chip-bar + single grid.
+---
 
-**Layout (top → bottom)**
-- `AppLayout` wrapper (unchanged).
-- `FloatingSearch` mounted top-right (same component Explore / My Study / My Agenda use) — replaces the inline search input.
-- Editorial header: `font-display text-3xl sm:text-4xl` "Clubs" with a muted subline ("Find communities to join, host, and debate with."). A small "Create Club" pill stays in the header for logged-in users.
-- Horizontally-scrolling shelves, each a row of `ClubCoverCard`s with edge fades + arrow buttons, in this order:
-  1. **Featured** — `c.is_featured`
-  2. **Near you** — clubs whose `location` matches the user's `profile.location` (hidden if no profile location)
-  3. **My Clubs** — `c.is_member` (logged-in only)
-  4. **Public** — `c.is_public`
-  5. **Private / Invite-only** — `!c.is_public` the user can see
-- Search mode: when `FloatingSearch` has a query, hide the shelves and render a single responsive grid of matching clubs (name + description match), mirroring Explore's "Results for …" pattern.
-- Empty state: dashed-border card identical in tone to Explore.
-- `LegalFooter` at the bottom (matches Explore).
+## Part 1 — Tagging
 
-**New component**
-- `src/components/clubs/ClubShelf.tsx` — same shape as `CompactShelf` (uses `useEdgeScroll` + `EdgeArrow` + the left/right gradient fades), but renders `ClubCoverCard`s inside fixed-width snap items (`w-[260px] sm:w-[300px]`) so horizontal scroll works cleanly.
+### Database (single migration)
+- `club_tags` already exists (PK `club_id + tag_id`, max-5 enforced in RLS).
+- Add `primary_tag_id uuid` column to `public.clubs` (nullable).
+- Add trigger that nulls `clubs.primary_tag_id` if the row in `club_tags` is removed; and validates that `primary_tag_id` always points to a tag also present in `club_tags` for the same club.
+- Add index `club_tags(tag_id)` for shelf lookups.
 
-**Removed**
-- The existing chip bar (`All / My Clubs / Public / Private`) — the shelves replace it.
+### Hooks
+- Extend `useTags.ts` so `kind` accepts `"club"` → table `club_tags`, fk `club_id`. Add `setPrimaryTag(clubId, tagId | null)`.
+- Extend `useClubs.ts`: expose `primary_tag_id` on `ClubItem`; add `useClubTagShelves()` returning `{ tag, items: ClubItem[] }[]` grouped by `primary_tag_id`, sorted by `is_official` then size.
 
-**No data-model or hook changes.** Everything is driven by the existing `useClubs()` result.
+### TagPicker
+- Add `kind="club"` support. Each selected chip gets a small **star** to toggle primary (single-select). Primary chip is filled + has a "Primary" label.
+- Buffered mode (used before the club exists) keeps `primaryTagId` locally; persisted after club insert.
 
-## 2. Swap "For You" / "Local" toggle
+### Pages
+- **`CreateClubPage`** — new "Topics" section using buffered TagPicker + primary marker. After insert: attach tags then `setPrimaryTag(club.id, primaryTagId ?? tags[0]?.id)`.
+- **`ClubEditPage`** — Topics section bound to live `recordId={club.id}`.
+- **`ClubPage` About tab** — render chips above the description; primary chip filled, others outlined; each chip links `/clubs?tag={slug}`.
+- **`ClubsPage`** — Explore-pattern shelves: keep `FloatingSearch` + Featured + Near you + My Clubs, then insert **tag shelves** (one per tag from `useClubTagShelves()`, with `#tagName · count` and "See all →" → `/clubs?tag=slug`), then a final **More clubs** shelf for clubs with no primary tag. Support `?tag=slug` query param → render only that tag's clubs in a responsive grid (Explore "Results for…" pattern).
 
-Both `src/pages/HomePage.tsx` and `src/pages/ForYouPage.tsx` currently render `[For You | Local]`. Update both so:
-- Order becomes `[Local | For You]` (Local on the left, For You on the right).
-- Default `mode` is `"local"` when the user has a saved `profile.location`; otherwise it falls back to `"trending"` so users without a location aren't shown an empty default.
-- Tapping Local without a location still opens the existing `LocationPrompt` (no change to that flow).
-- No changes to `useForYouDebates` or data fetching.
+---
+
+## Part 2 — Private club gating on `/club/:id`
+
+When the viewer is **not** a member (and not admin) AND the club is **private** OR `requires_approval`:
+- Keep: hero card, CTA row (showing "Request to Join" / "Request pending"), and the three tabs (Events / Members / About).
+- Replace tab content with a **fuzzy preview**:
+  - Render the existing Upcoming/Past/members layouts using **placeholder skeleton cards** (3 fake rows), wrapped in a div with `blur-md select-none pointer-events-none opacity-70`.
+  - Layer an absolute overlay: lock icon + "Members only — request to join to see events and records." + a primary "Request to Join" / "Request pending" button (reuses existing `join` handler).
+- About tab: still shows description + tags (public-safe).
+- Public clubs and members: unchanged behavior.
+
+Implementation lives entirely in `src/pages/ClubPage.tsx` via a new `PrivateGatedPreview` component rendered when `!isMember && (!club.is_public || club.requires_approval)`.
+
+---
+
+## Part 3 — Fix club creation RLS error
+
+Error: `new row violates row-level security policy for table "clubs"`.
+
+The only INSERT policy is `WITH CHECK (auth.uid() = created_by)`. The failure means either `auth.uid()` is null at insert time (stale session) or `created_by` doesn't match. Plan:
+1. In `CreateClubPage.submit`, before insert, call `supabase.auth.getUser()` and use the returned `data.user.id` for `created_by` (covers cases where the context `user` is stale).
+2. Gate the page behind `ProtectedRoute` if it isn't already; redirect to `/auth` when no user.
+3. Toast a clearer message ("Please sign in again") on the RLS failure path.
+4. Verify the fix by creating both a private and a public club from `/clubs/new`.
+
+No schema change for Part 3 unless step 1–2 don't resolve it; if they don't, add a defensive `created_by` default of `auth.uid()` on the column. (Documented as fallback only.)
+
+---
 
 ## Files touched
-- `src/pages/ClubsPage.tsx` — rewritten to Explore-style layout
-- `src/components/clubs/ClubShelf.tsx` — new (Explore-style horizontal shelf for clubs)
-- `src/pages/HomePage.tsx` — swap toggle order + default
-- `src/pages/ForYouPage.tsx` — swap toggle order + default
+- new migration: `clubs.primary_tag_id` + sync trigger + `club_tags(tag_id)` index
+- `src/hooks/useTags.ts`
+- `src/hooks/useClubs.ts`
+- `src/components/tags/TagPicker.tsx`
+- `src/pages/CreateClubPage.tsx`
+- `src/pages/ClubEditPage.tsx`
+- `src/pages/ClubPage.tsx`
+- `src/pages/ClubsPage.tsx`

@@ -53,7 +53,14 @@ export function useAllTags() {
 }
 
 /** Tags attached to a specific debate or live session */
-export function useRecordTags(kind: "debate" | "live_session", recordId: string | null | undefined) {
+type TagKind = "debate" | "live_session" | "club";
+
+const tableFor = (kind: TagKind) =>
+  kind === "debate" ? "debate_tags" : kind === "live_session" ? "live_session_tags" : "club_tags";
+const fkFor = (kind: TagKind) =>
+  kind === "debate" ? "debate_id" : kind === "live_session" ? "live_session_id" : "club_id";
+
+export function useRecordTags(kind: TagKind, recordId: string | null | undefined) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const [version, setVersion] = useState(0);
@@ -68,8 +75,8 @@ export function useRecordTags(kind: "debate" | "live_session", recordId: string 
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const table = kind === "debate" ? "debate_tags" : "live_session_tags";
-      const fk = kind === "debate" ? "debate_id" : "live_session_id";
+      const table = tableFor(kind);
+      const fk = fkFor(kind);
       const { data } = await (supabase as any)
         .from(table)
         .select("tag:tags(*)")
@@ -124,9 +131,9 @@ export function useTagMutations() {
   );
 
   const attachTag = useCallback(
-    async (kind: "debate" | "live_session", recordId: string, tagId: string) => {
-      const table = kind === "debate" ? "debate_tags" : "live_session_tags";
-      const fk = kind === "debate" ? "debate_id" : "live_session_id";
+    async (kind: TagKind, recordId: string, tagId: string) => {
+      const table = tableFor(kind);
+      const fk = fkFor(kind);
       const { error } = await (supabase as any).from(table).insert({ [fk]: recordId, tag_id: tagId });
       return !error;
     },
@@ -134,9 +141,9 @@ export function useTagMutations() {
   );
 
   const detachTag = useCallback(
-    async (kind: "debate" | "live_session", recordId: string, tagId: string) => {
-      const table = kind === "debate" ? "debate_tags" : "live_session_tags";
-      const fk = kind === "debate" ? "debate_id" : "live_session_id";
+    async (kind: TagKind, recordId: string, tagId: string) => {
+      const table = tableFor(kind);
+      const fk = fkFor(kind);
       const { error } = await (supabase as any)
         .from(table)
         .delete()
@@ -147,5 +154,16 @@ export function useTagMutations() {
     [],
   );
 
-  return { findOrCreateTag, attachTag, detachTag };
+  const setClubPrimaryTag = useCallback(
+    async (clubId: string, tagId: string | null) => {
+      const { error } = await (supabase as any)
+        .from("clubs")
+        .update({ primary_tag_id: tagId })
+        .eq("id", clubId);
+      return !error;
+    },
+    [],
+  );
+
+  return { findOrCreateTag, attachTag, detachTag, setClubPrimaryTag };
 }

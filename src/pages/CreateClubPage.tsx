@@ -6,6 +6,8 @@ import CoverImageUploader from "@/components/upload/CoverImageUploader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import TagPicker from "@/components/tags/TagPicker";
+import type { Tag } from "@/hooks/useTags";
 
 const CreateClubPage = () => {
   const navigate = useNavigate();
@@ -15,11 +17,20 @@ const CreateClubPage = () => {
   const [location, setLocation] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [cover, setCover] = useState<string | null>(null);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [primaryTagId, setPrimaryTagId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    // Re-confirm session to avoid stale-context RLS failures
+    const { data: auth } = await supabase.auth.getUser();
+    const authedId = auth?.user?.id || user?.id;
+    if (!authedId) {
+      toast({ title: "Please sign in again", variant: "destructive" });
+      navigate("/auth");
+      return;
+    }
     if (!name.trim()) {
       toast({ title: "Name your club", variant: "destructive" });
       return;
@@ -28,7 +39,7 @@ const CreateClubPage = () => {
     const { data, error } = await supabase
       .from("clubs")
       .insert({
-        created_by: user.id,
+        created_by: authedId,
         name: name.trim(),
         description: description.trim() || null,
         location: location.trim() || null,
@@ -37,11 +48,21 @@ const CreateClubPage = () => {
       })
       .select("id")
       .single();
-    setBusy(false);
     if (error || !data) {
+      setBusy(false);
       toast({ title: "Couldn't create club", description: error?.message, variant: "destructive" });
       return;
     }
+    // Attach tags + primary
+    if (tags.length) {
+      const rows = tags.map((t) => ({ club_id: data.id, tag_id: t.id }));
+      await (supabase as any).from("club_tags").insert(rows);
+      const primary = primaryTagId && tags.some((t) => t.id === primaryTagId) ? primaryTagId : tags[0]?.id ?? null;
+      if (primary) {
+        await (supabase as any).from("clubs").update({ primary_tag_id: primary }).eq("id", data.id);
+      }
+    }
+    setBusy(false);
     toast({ title: "Club created" });
     navigate(`/clubs/${data.id}`);
   };
@@ -122,6 +143,21 @@ const CreateClubPage = () => {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium">
+              Topics
+            </label>
+            <TagPicker
+              kind="club"
+              recordId={null}
+              buffered={tags}
+              onBufferedChange={setTags}
+              primaryTagId={primaryTagId}
+              onPrimaryChange={setPrimaryTagId}
+              max={5}
+            />
           </div>
 
           <button

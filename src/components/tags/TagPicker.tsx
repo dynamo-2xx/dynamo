@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, X, Hash, Loader2 } from "lucide-react";
+import { Plus, X, Hash, Loader2, Star } from "lucide-react";
 import { useAllTags, useRecordTags, useTagMutations, type Tag } from "@/hooks/useTags";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface TagPickerProps {
-  kind: "debate" | "live_session";
+  kind: "debate" | "live_session" | "club";
   recordId: string | null;
   /** When recordId is null (e.g. before debate is created), the picker behaves as a controlled buffer. */
   buffered?: Tag[];
   onBufferedChange?: (tags: Tag[]) => void;
   max?: number;
   compact?: boolean;
+  /** When kind="club": id of the tag marked as primary (visible on /clubs shelves). */
+  primaryTagId?: string | null;
+  onPrimaryChange?: (tagId: string | null) => void;
 }
 
 const TagPicker = ({
@@ -21,10 +24,12 @@ const TagPicker = ({
   onBufferedChange,
   max = 5,
   compact = false,
+  primaryTagId = null,
+  onPrimaryChange,
 }: TagPickerProps) => {
   const { tags: persistedTags, refresh } = useRecordTags(kind, recordId);
   const { tags: allTags } = useAllTags();
-  const { findOrCreateTag, attachTag, detachTag } = useTagMutations();
+  const { findOrCreateTag, attachTag, detachTag, setClubPrimaryTag } = useTagMutations();
 
   const selected = recordId ? persistedTags : (buffered || []);
 
@@ -101,6 +106,21 @@ const TagPicker = ({
     } else {
       onBufferedChange?.((buffered || []).filter((t) => t.id !== tag.id));
     }
+    if (kind === "club" && primaryTagId === tag.id) {
+      onPrimaryChange?.(null);
+    }
+  };
+
+  const togglePrimary = async (tag: Tag) => {
+    const next = primaryTagId === tag.id ? null : tag.id;
+    if (kind === "club" && recordId) {
+      const ok = await setClubPrimaryTag(recordId, next);
+      if (!ok) {
+        toast.error("Couldn't set primary tag");
+        return;
+      }
+    }
+    onPrimaryChange?.(next);
   };
 
   const handleCreate = async () => {
@@ -129,10 +149,29 @@ const TagPicker = ({
         {selected.map((t) => (
           <span
             key={t.id}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-foreground text-background text-[11px] font-body"
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-body",
+              kind === "club" && primaryTagId === t.id
+                ? "bg-foreground text-background ring-2 ring-foreground/30"
+                : "bg-foreground text-background",
+            )}
           >
             <Hash className="w-3 h-3" />
             {t.name}
+            {kind === "club" && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePrimary(t);
+                }}
+                className="ml-0.5 hover:opacity-80"
+                aria-label={primaryTagId === t.id ? `Unmark ${t.name} as primary` : `Mark ${t.name} as primary`}
+                title={primaryTagId === t.id ? "Primary tag" : "Mark as primary"}
+              >
+                <Star className={cn("w-3 h-3", primaryTagId === t.id ? "fill-current" : "")} />
+              </button>
+            )}
             <button
               type="button"
               onClick={(e) => {
@@ -214,7 +253,10 @@ const TagPicker = ({
       )}
 
       <p className="text-[10px] text-muted-foreground font-body">
-        {selected.length}/{max} tags · helps people on Explore find this
+        {selected.length}/{max} tags ·{" "}
+        {kind === "club"
+          ? "star one to feature your club under that tag on Clubs"
+          : "helps people on Explore find this"}
       </p>
     </div>
   );

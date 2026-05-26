@@ -452,6 +452,7 @@ export type Database = {
           is_public: boolean
           location: string | null
           name: string
+          primary_tag_id: string | null
           requires_approval: boolean
           updated_at: string
         }
@@ -467,6 +468,7 @@ export type Database = {
           is_public?: boolean
           location?: string | null
           name: string
+          primary_tag_id?: string | null
           requires_approval?: boolean
           updated_at?: string
         }
@@ -482,10 +484,19 @@ export type Database = {
           is_public?: boolean
           location?: string | null
           name?: string
+          primary_tag_id?: string | null
           requires_approval?: boolean
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clubs_primary_tag_id_fkey"
+            columns: ["primary_tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cmm_queue: {
         Row: {
