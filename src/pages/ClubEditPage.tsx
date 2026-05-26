@@ -6,6 +6,7 @@ import CoverImageUploader from "@/components/upload/CoverImageUploader";
 import { supabase } from "@/integrations/supabase/client";
 import { useClub } from "@/hooks/useClubs";
 import { toast } from "@/hooks/use-toast";
+import TagPicker from "@/components/tags/TagPicker";
 
 const ClubEditPage = () => {
   const { id } = useParams();
@@ -17,6 +18,7 @@ const ClubEditPage = () => {
   const [isPublic, setIsPublic] = useState(true);
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [cover, setCover] = useState<string | null>(null);
+  const [primaryTagId, setPrimaryTagId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -27,6 +29,7 @@ const ClubEditPage = () => {
       setIsPublic(club.is_public);
       setRequiresApproval(Boolean((club as any).requires_approval));
       setCover(club.cover_image_url);
+      setPrimaryTagId((club as any).primary_tag_id ?? null);
     }
   }, [club]);
 
@@ -116,6 +119,16 @@ const ClubEditPage = () => {
                 </p>
               </div>
             </label>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body font-medium">Topics</label>
+            <TagPicker
+              kind="club"
+              recordId={club.id}
+              primaryTagId={primaryTagId}
+              onPrimaryChange={setPrimaryTagId}
+              max={5}
+            />
           </div>
           <button type="submit" disabled={busy} className="w-full bg-foreground text-background py-3 rounded-lg font-body text-sm font-medium disabled:opacity-50">
             {busy ? "Saving…" : "Save changes"}
