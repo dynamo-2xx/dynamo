@@ -224,6 +224,26 @@ const DebateRecordPreview = ({
           <div className="space-y-2 rounded-2xl border border-border bg-card/40 p-2">
             {subs.map((sub, idx) => {
               const hasContent = sub.threads.length > 0;
+              const isLocked = !hasContent && status === "completed";
+              if (isLocked) {
+                return (
+                  <div
+                    key={sub.id}
+                    title="No discussion happened on this subtopic"
+                    className="flex items-start gap-2 w-full px-3 py-3 text-left rounded-lg opacity-40 cursor-not-allowed select-none"
+                  >
+                    <ChevronDown className="w-4 h-4 text-foreground/50 shrink-0 mt-0.5 -rotate-90" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-display text-base text-foreground leading-snug">
+                        {idx + 1}. {sub.title}
+                      </h3>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0 mt-1">
+                      Not engaged
+                    </span>
+                  </div>
+                );
+              }
               return (
                 <Collapsible key={sub.id} defaultOpen={idx === 0 && hasContent}>
                   <CollapsibleTrigger className="flex items-start gap-2 w-full px-3 py-3 text-left hover:bg-foreground/[0.03] rounded-lg transition-colors">
@@ -236,9 +256,7 @@ const DebateRecordPreview = ({
                     <span className="text-[10px] text-muted-foreground shrink-0 mt-1">
                       {hasContent
                         ? `${sub.threads.length} thread${sub.threads.length === 1 ? "" : "s"}`
-                        : status === "completed"
-                          ? "—"
-                          : "Coming soon"}
+                        : "Coming soon"}
                     </span>
                   </CollapsibleTrigger>
 
