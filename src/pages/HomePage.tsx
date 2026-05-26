@@ -46,13 +46,18 @@ const SectionHeader = ({
 
 const HomePage = () => {
   const { user, profile } = useAuth();
-  const [mode, setMode] = useState<Mode>("trending");
+  const hasLocation = !!profile?.location;
+  const [mode, setMode] = useState<Mode>(() => (profile?.location ? "local" : "trending"));
+  const userTouchedRef = useRef(false);
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
   const [highlightActions, setHighlightActions] = useState(false);
-  const hasLocation = !!profile?.location;
   const { items: forYou } = useForYouDebates(mode, 12);
   const { items: myRecent } = useMyRecentDebates(12);
+
+  useEffect(() => {
+    if (!userTouchedRef.current && hasLocation && mode !== "local") setMode("local");
+  }, [hasLocation, mode]);
 
   const actionRowRef = useRef<HTMLDivElement>(null);
   const forYouHint = useEmptyStateHint<HTMLDivElement>();
@@ -114,19 +119,23 @@ const HomePage = () => {
             right={
               <div className="inline-flex border border-border rounded-full p-0.5 shrink-0">
                 <button
-                  onClick={() => setMode("trending")}
-                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-body transition-colors ${mode === "trending" ? "bg-foreground text-background" : "text-muted-foreground"}`}
-                >
-                  For You
-                </button>
-                <button
                   onClick={() => {
+                    userTouchedRef.current = true;
                     if (!hasLocation) setLocationPromptOpen(true);
                     else setMode("local");
                   }}
                   className={`px-2.5 py-0.5 rounded-full text-[11px] font-body transition-colors ${mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"}`}
                 >
                   Local
+                </button>
+                <button
+                  onClick={() => {
+                    userTouchedRef.current = true;
+                    setMode("trending");
+                  }}
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-body transition-colors ${mode === "trending" ? "bg-foreground text-background" : "text-muted-foreground"}`}
+                >
+                  For You
                 </button>
               </div>
             }
