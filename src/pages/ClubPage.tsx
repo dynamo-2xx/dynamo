@@ -391,3 +391,62 @@ const EventRow = ({
 };
 
 export default ClubPage;
+
+const GatedPreview = ({
+  onJoin,
+  busy,
+  pending,
+  kind,
+}: {
+  onJoin: () => void;
+  busy: boolean;
+  pending: boolean;
+  kind: "events" | "members";
+}) => {
+  return (
+    <div className="relative">
+      <div
+        aria-hidden
+        className="blur-md select-none pointer-events-none opacity-70 space-y-3"
+      >
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-3 p-4 rounded-xl border border-border"
+          >
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-32 bg-muted rounded" />
+              <div className="h-4 w-3/4 bg-muted rounded" />
+              <div className="h-3 w-1/2 bg-muted rounded" />
+            </div>
+            <div className="h-8 w-20 bg-muted rounded-full" />
+          </div>
+        ))}
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-center max-w-sm px-6 py-8 rounded-2xl bg-background/90 border border-border backdrop-blur">
+          <div className="mx-auto w-10 h-10 rounded-full bg-accent flex items-center justify-center mb-3">
+            <Lock className="w-4 h-4" />
+          </div>
+          <h3 className="font-display text-xl mb-1">Members only</h3>
+          <p className="text-sm text-muted-foreground font-body mb-4">
+            Request to join to see {kind === "events" ? "events and records" : "members"}.
+          </p>
+          {pending ? (
+            <span className="inline-block px-4 py-2 rounded-full border border-border text-xs font-body text-muted-foreground">
+              Request pending
+            </span>
+          ) : (
+            <button
+              onClick={onJoin}
+              disabled={busy}
+              className="px-4 py-2 rounded-full bg-foreground text-background text-xs font-body font-medium disabled:opacity-50"
+            >
+              Request to Join
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
