@@ -1392,10 +1392,22 @@ const CreateDebatePage = () => {
                  </div>
                 {/* Invite Users (optional) */}
                 <div className="bg-background border border-border rounded-lg p-5">
-                  <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider mb-3 block">
-                    <Mail className="w-3.5 h-3.5 inline mr-1" />
-                    Invite Speakers <span className="normal-case font-normal">(optional)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-[11px] text-muted-foreground font-body font-medium uppercase tracking-wider">
+                      <Mail className="w-3.5 h-3.5 inline mr-1" />
+                      Invite Speakers <span className="normal-case font-normal">(optional)</span>
+                    </label>
+                    {editId && (
+                      <button
+                        type="button"
+                        onClick={() => setInviteDialogOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-foreground text-background text-[11px] font-body font-medium hover:opacity-90 transition-opacity"
+                      >
+                        <UserPlus className="w-3 h-3" />
+                        Invite people
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mb-2">
                     <input
                       value={inviteInput}
