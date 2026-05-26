@@ -14,6 +14,7 @@ import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import PauseButton from "@/components/sharing/PauseButton";
+import InviteFriendsDialog from "@/components/debate/InviteFriendsDialog";
 import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
