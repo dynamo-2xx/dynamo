@@ -42,12 +42,26 @@ export function PerformanceInsightsToggle({
 
   if (!isPremium) {
     return (
-      <Link to="/pricing">
-        <Button variant="outline" size="sm" className="gap-1.5">
+      <Link to="/pricing" title="Upgrade to unlock Insights">
+        <Button variant="outline" size="sm" disabled className="gap-1.5 opacity-40 cursor-not-allowed pointer-events-none">
           <Lock className="h-3.5 w-3.5" />
           <Sparkles className="h-3.5 w-3.5" /> Insights
         </Button>
       </Link>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        className="gap-1.5 opacity-40 cursor-not-allowed"
+        title="No insights generated for this session"
+      >
+        <Sparkles className="h-3.5 w-3.5" /> Insights
+      </Button>
     );
   }
 

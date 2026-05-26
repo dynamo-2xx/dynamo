@@ -1634,7 +1634,25 @@ const DebateRoomPage = () => {
                         ];
                         return palette[(idx >= 0 ? idx : 0) % palette.length];
                       };
-                      if (stTranscripts.length === 0 && orphanArgs.length === 0) return null;
+                      const isEmpty = stTranscripts.length === 0 && orphanArgs.length === 0;
+                      if (isEmpty) {
+                        return (
+                          <div
+                            key={st.id}
+                            title="No discussion happened on this subtopic"
+                            className="rounded-xl border border-border bg-card p-4 opacity-40 cursor-not-allowed select-none"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="text-sm font-display font-semibold text-foreground">
+                                {stIdx + 1}. {st.title}
+                              </h4>
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">
+                                Not engaged
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
                         <div
                           key={st.id}
