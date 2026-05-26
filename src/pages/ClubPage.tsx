@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Globe, Lock, MapPin, Plus, Users, Calendar, Check } from "lucide-react";
+import { ArrowLeft, Globe, Lock, MapPin, Plus, Users, Calendar, Check, Hash } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { gradientFromSeed } from "@/lib/gradient";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { useClub } from "@/hooks/useClubs";
 import { useClubEvents } from "@/hooks/useClubEvents";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useRecordTags } from "@/hooks/useTags";
 
 type Tab = "events" | "members" | "about";
 
@@ -25,6 +26,10 @@ const ClubPage = () => {
 
   const isMember = !!myRole;
   const isAdmin = myRole === "owner" || myRole === "admin";
+  const gated =
+    !isMember && !!club && (!club.is_public || Boolean((club as any).requires_approval));
+  const { tags: clubTags } = useRecordTags("club", id);
+  const primaryTagId = (club as any)?.primary_tag_id ?? null;
 
   useEffect(() => {
     if (!id) return;
@@ -211,6 +216,14 @@ const ClubPage = () => {
         </div>
 
         {tab === "events" && (
+          gated ? (
+            <GatedPreview
+              onJoin={join}
+              busy={busy}
+              pending={pendingRequest}
+              kind="events"
+            />
+          ) : (
           <div className="space-y-8">
             {isAdmin && requests.length > 0 && (
               <section>
@@ -251,9 +264,13 @@ const ClubPage = () => {
               </section>
             )}
           </div>
+          )
         )}
 
         {tab === "members" && (
+          gated ? (
+            <GatedPreview onJoin={join} busy={busy} pending={pendingRequest} kind="members" />
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {members.map((m) => (
               <div key={m.user_id} className="flex items-center gap-3 p-3 rounded-lg border border-border">
@@ -269,15 +286,37 @@ const ClubPage = () => {
               </div>
             ))}
           </div>
+          )
         )}
 
         {tab === "about" && (
-          <div className="prose prose-sm max-w-none font-body">
+          <div className="space-y-4">
+            {clubTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {clubTags.map((t) => (
+                  <Link
+                    key={t.id}
+                    to={`/clubs?tag=${t.slug}`}
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-body transition-colors",
+                      primaryTagId === t.id
+                        ? "bg-foreground text-background"
+                        : "border border-border text-foreground hover:border-foreground/40",
+                    )}
+                  >
+                    <Hash className="w-3 h-3" />
+                    {t.name}
+                  </Link>
+                ))}
+              </div>
+            )}
+            <div className="prose prose-sm max-w-none font-body">
             {club.description ? (
               <p className="whitespace-pre-wrap">{club.description}</p>
             ) : (
               <p className="text-muted-foreground">No description yet.</p>
             )}
+            </div>
           </div>
         )}
       </div>
