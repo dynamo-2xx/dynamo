@@ -72,11 +72,6 @@ export default function InPersonJoinPanel({
     }
   };
 
-  const openProjector = () => {
-    if (!debateId) return;
-    window.open(`/debate/${debateId}/project-code`, "_blank", "noopener,noreferrer");
-  };
-
   if (!debateId || !joinCode) {
     return (
       <div className="bg-accent/40 border border-dashed border-border rounded-lg p-4 text-xs text-muted-foreground font-body">
@@ -171,14 +166,15 @@ export default function InPersonJoinPanel({
             <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />
             New code
           </button>
-          <button
-            type="button"
-            onClick={openProjector}
+          <a
+            href={`/debate/${debateId}/project-code`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-xs font-body bg-foreground text-background rounded-md px-3 py-1.5 flex items-center gap-1 hover:opacity-90 transition-opacity"
           >
             <Tv className="w-3.5 h-3.5" />
             Project
-          </button>
+          </a>
         </div>
       </div>
 
