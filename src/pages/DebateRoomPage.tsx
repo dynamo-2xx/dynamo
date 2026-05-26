@@ -1761,14 +1761,6 @@ function SpectatorPreviewShell({
           importedSourceKind={(debate as any).imported_source_kind}
         />
 
-        {debate.status === "completed" && (
-          <FloatingIntelligence
-            sessionId={debate.id}
-            sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
-            participantId={userId ?? undefined}
-          />
-        )}
-
         <div className="mt-8">
           <RecordCommentsSection
             recordType={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
