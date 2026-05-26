@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForYouDebates } from "@/hooks/useHomeDebates";
 import { useAuth } from "@/contexts/AuthContext";
 import DebateCoverCard from "@/components/home/DebateCoverCard";
@@ -28,15 +28,20 @@ type Mode = "trending" | "local";
 const INITIAL_VISIBLE = 12;
 
 const ForYouPage = () => {
-  const [mode, setMode] = useState<Mode>("trending");
+  const { user, profile } = useAuth();
+  const hasLocation = !!profile?.location;
+  const [mode, setMode] = useState<Mode>(() => (profile?.location ? "local" : "trending"));
+  const userTouchedRef = useRef(false);
   const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const { user, profile } = useAuth();
   const { items, loading, removeItem, patchItem } = useForYouDebates(mode, 60);
   const { isRemoving, animateRemove } = useDeleteAnimation();
-  const hasLocation = !!profile?.location;
   const visible = showAll ? items : items.slice(0, INITIAL_VISIBLE);
   const hasMore = items.length > INITIAL_VISIBLE;
+
+  useEffect(() => {
+    if (!userTouchedRef.current && hasLocation && mode !== "local") setMode("local");
+  }, [hasLocation, mode]);
 
   const [selectionMode, setSelectionMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -165,6 +170,24 @@ const ForYouPage = () => {
             <div className="inline-flex border border-border rounded-full p-0.5 flex-1 sm:flex-none justify-center">
               <button
                 onClick={() => {
+                  userTouchedRef.current = true;
+                  if (!hasLocation) {
+                    setLocationPromptOpen(true);
+                    return;
+                  }
+                  setShowAll(false);
+                  setMode("local");
+                }}
+                className={cn(
+                  "flex-1 sm:flex-none px-3 py-1.5 sm:py-1 rounded-full text-xs font-body transition-colors min-h-[32px]",
+                  mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"
+                )}
+              >
+                Local
+              </button>
+              <button
+                onClick={() => {
+                  userTouchedRef.current = true;
                   setShowAll(false);
                   setMode("trending");
                 }}
@@ -174,21 +197,6 @@ const ForYouPage = () => {
                 )}
               >
                 For You
-              </button>
-              <button
-                onClick={() => {
-                  if (!hasLocation) setLocationPromptOpen(true);
-                  else {
-                    setShowAll(false);
-                    setMode("local");
-                  }
-                }}
-                className={cn(
-                  "flex-1 sm:flex-none px-3 py-1.5 sm:py-1 rounded-full text-xs font-body transition-colors min-h-[32px]",
-                  mode === "local" ? "bg-foreground text-background" : "text-muted-foreground"
-                )}
-              >
-                Local
               </button>
             </div>
           </div>
