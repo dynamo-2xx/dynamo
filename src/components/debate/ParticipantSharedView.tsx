@@ -104,6 +104,34 @@ const ParticipantSharedView = ({
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [argumentMapOpen, setArgumentMapOpen] = useState(false);
 
+  // Speaker pause: when a non-facilitator speaker pauses the turn clock we
+  // auto-resume after 30s so the debate cannot stall forever.
+  const SPEAKER_PAUSE_MAX_MS = 30_000;
+  const speakerResumeTimerRef = useRef<number | null>(null);
+  const clearSpeakerResume = () => {
+    if (speakerResumeTimerRef.current) {
+      window.clearTimeout(speakerResumeTimerRef.current);
+      speakerResumeTimerRef.current = null;
+    }
+  };
+  useEffect(() => () => clearSpeakerResume(), []);
+  const handleSpeakerPauseToggle = () => {
+    if (!onToggleTimer) return;
+    if (timerRunning) {
+      // Pausing: start auto-resume safety timer
+      onToggleTimer();
+      clearSpeakerResume();
+      speakerResumeTimerRef.current = window.setTimeout(() => {
+        onToggleTimer();
+        speakerResumeTimerRef.current = null;
+      }, SPEAKER_PAUSE_MAX_MS);
+    } else {
+      // Resuming: cancel the safety timer
+      clearSpeakerResume();
+      onToggleTimer();
+    }
+  };
+
   // Camera state — independently toggleable per participant
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -303,60 +331,8 @@ const ParticipantSharedView = ({
         </div>
       </div>
 
-      {/* Publisher facilitator controls — on mobile, the d./map/notebook trio docks to the right of this row */}
-      {isPublisher && (
-        <div className="border-b border-border bg-card/50 px-4 py-2 flex items-center gap-2 shrink-0 overflow-x-auto">
-          <button onClick={onToggleTimer} title={timerRunning ? "Pause" : "Resume"} aria-label={timerRunning ? "Pause" : "Resume"} className="flex items-center gap-1.5 bg-secondary rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
-            {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{timerRunning ? "Pause" : "Resume"}</span>
-          </button>
-          <button onClick={onExtendTime} title="Extend" aria-label="Extend" className="flex items-center gap-1.5 bg-secondary rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
-            <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Extend</span>
-          </button>
-          <button onClick={onSkipTurn} title="Skip Turn" aria-label="Skip Turn" className="flex items-center gap-1.5 bg-secondary rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
-            <SkipForward className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Skip Turn</span>
-          </button>
-          <button onClick={onNextSubtopic} title="Next Subtopic" aria-label="Next Subtopic" className="flex items-center gap-1.5 bg-secondary rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
-            <ChevronRight className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Next Subtopic</span>
-          </button>
-
-          {/* Mobile-only: d. / map / notebook docked to the right of publisher controls.
-              Always visible to any speaker — both sides need constant access to map + notebook. */}
-          {isSpeaker && (
-            <div className="sm:hidden ml-auto flex items-center gap-1.5 shrink-0">
-              {onToggleAiMessage && (
-                <DLogoButton
-                  onClick={onToggleAiMessage}
-                  active={!aiMessageCollapsed}
-                  pulse={aiMessagePulse}
-                  disabled={!aiMessage}
-                />
-              )}
-              <IconCircleButton
-                onClick={() => setArgumentMapOpen((v) => !v)}
-                active={argumentMapOpen}
-                title="Argument map"
-                ariaLabel="Toggle argument map overlay"
-              >
-                <MapIcon className="w-3.5 h-3.5" />
-              </IconCircleButton>
-              {onOpenNotebook && isSpeaker && (
-                <IconCircleButton
-                  onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
-                  active={notebookOpen}
-                  title="My notes"
-                  ariaLabel="Toggle notebook"
-                >
-                  <NotebookPen className="w-3.5 h-3.5" />
-                </IconCircleButton>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Mobile-only thin row for non-publishers — sits directly above the input */}
-      {isSpeaker && !isPublisher && (
+      {/* Mobile-only thin row — sits directly above the input for any speaker */}
+      {isSpeaker && (
         <div className="sm:hidden border-b border-border bg-card/50 px-4 py-2 flex items-center justify-end gap-1.5 shrink-0">
           {onToggleAiMessage && (
             <DLogoButton
@@ -507,6 +483,47 @@ const ParticipantSharedView = ({
       {/* Fixed input area at bottom — text input only (mic goes directly to argument map via Deepgram) */}
       {canSpeak && (
         <div className="border-t border-border bg-card px-4 py-3 shrink-0">
+          {/* Control panel — always visible during canSpeak. Speaker Pause (30s
+              auto-resume) for active speakers; facilitator Extend/Skip/Next
+              for publishers. */}
+          {(isPublisher || (isSpeaker && isMyTurn)) && (
+            <div className="max-w-3xl mx-auto mb-2 flex items-center gap-2 overflow-x-auto">
+              {isSpeaker && isMyTurn && onToggleTimer && (
+                <button
+                  onClick={handleSpeakerPauseToggle}
+                  title={timerRunning ? "Pause turn (max 30s)" : "Resume turn"}
+                  className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]"
+                >
+                  {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{timerRunning ? "Pause" : "Resume"}</span>
+                  {!timerRunning && <span className="text-[10px] text-muted-foreground">(auto-resume 30s)</span>}
+                </button>
+              )}
+              {isPublisher && (
+                <>
+                  {!(isSpeaker && isMyTurn) && onToggleTimer && (
+                    <button
+                      onClick={onToggleTimer}
+                      title={timerRunning ? "Pause" : "Resume"}
+                      className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]"
+                    >
+                      {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      <span>{timerRunning ? "Pause" : "Resume"}</span>
+                    </button>
+                  )}
+                  <button onClick={onExtendTime} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
+                    <Plus className="w-3.5 h-3.5" /> <span>Extend</span>
+                  </button>
+                  <button onClick={onSkipTurn} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
+                    <SkipForward className="w-3.5 h-3.5" /> <span>Skip Turn</span>
+                  </button>
+                  <button onClick={onNextSubtopic} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
+                    <ChevronRight className="w-3.5 h-3.5" /> <span>Next Subtopic</span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
           <div className="flex items-end gap-3 max-w-3xl mx-auto">
             {/* Camera toggle */}
             {isSpeaker && (

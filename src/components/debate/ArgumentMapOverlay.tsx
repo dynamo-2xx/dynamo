@@ -97,8 +97,8 @@ const ArgumentMapOverlay = ({
       title="Argument map"
       storageKey="argument-map"
       initialPosition={{ x: 16, y: 16 }}
-      initialWidth={480}
-      initialHeight={560}
+      initialWidth={560}
+      initialHeight={620}
       headerExtras={
         <div className="flex items-center gap-1 mr-1">
           {tabBtn("threaded", "Threaded Record")}

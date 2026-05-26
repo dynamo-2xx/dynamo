@@ -200,6 +200,35 @@ export default function DebateLobbyPage() {
   const handleStart = async () => {
     if (!id) return;
     setStarting(true);
+
+    // Promote queued speakers (debate_interests) → debate_participants so the
+    // room admits them when status flips to live.
+    try {
+      const { data: queued } = await supabase
+        .from("debate_interests")
+        .select("user_id, side_id")
+        .eq("debate_id", id)
+        .eq("role", "queued_speaker");
+      if (queued && queued.length > 0) {
+        const rows = queued
+          .filter((q: any) => q.user_id && q.side_id)
+          .map((q: any) => ({
+            debate_id: id,
+            user_id: q.user_id,
+            side_id: q.side_id,
+            participant_role: "speaker",
+          }));
+        if (rows.length > 0) {
+          await supabase
+            .from("debate_participants")
+            .upsert(rows as any, { onConflict: "debate_id,user_id", ignoreDuplicates: true });
+        }
+      }
+    } catch (e) {
+      // Non-fatal: continue with start; host can promote manually from the room.
+      console.warn("Failed to promote queued speakers", e);
+    }
+
     const { error } = await supabase
       .from("debates")
       .update({ status: "live", started_at: new Date().toISOString() })
