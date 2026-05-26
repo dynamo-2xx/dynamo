@@ -30,6 +30,7 @@ export default function DebateLobbyPage() {
   const [createdBy, setCreatedBy] = useState<string | null>(null);
   const [queuedSideId, setQueuedSideId] = useState<string | null>(null);
   const [waitStream, setWaitStream] = useState<MediaStream | null>(null);
+  const [hostStream, setHostStream] = useState<MediaStream | null>(null);
 
   const isCreator = !!user && !!createdBy && user.id === createdBy;
 
@@ -53,6 +54,18 @@ export default function DebateLobbyPage() {
     stream: waitStream,
   });
 
+  // Host: attach own mic to lobby so the host appears in the seat list too.
+  useMicLobbyAttachment({
+    kind: "debate",
+    sessionId: isCreator && id ? id : null,
+    slotKey: isCreator && user ? `host:${user.id}` : null,
+    userId: user?.id ?? null,
+    deviceId,
+    displayName: user?.email?.split("@")[0] || "Host",
+    mode: "own_mic",
+    stream: hostStream,
+  });
+
   // Acquire mic for non-creator waiting view
   useEffect(() => {
     if (isCreator || !user) return;
@@ -67,6 +80,28 @@ export default function DebateLobbyPage() {
         }
         stream = s;
         setWaitStream(s);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+    };
+  }, [isCreator, user]);
+
+  // Acquire mic for host so the green pulse + connection row works.
+  useEffect(() => {
+    if (!isCreator || !user) return;
+    let active = true;
+    let stream: MediaStream | null = null;
+    navigator.mediaDevices
+      ?.getUserMedia({ audio: true })
+      .then((s) => {
+        if (!active) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        stream = s;
+        setHostStream(s);
       })
       .catch(() => undefined);
     return () => {
@@ -161,13 +196,6 @@ export default function DebateLobbyPage() {
     navigate("/", { replace: true });
   };
 
-  const slots = sides.flatMap((s) =>
-    Array.from({ length: maxPerSide }).map((_, i) => ({
-      key: `${s.id}:${i}`,
-      label: `${s.label} · seat ${i + 1}`,
-      hint: "Open seat — share the code",
-    })),
-  );
 
   const handleStart = async () => {
     if (!id) return;
@@ -230,7 +258,9 @@ export default function DebateLobbyPage() {
             <MicLobby
               kind="debate"
               sessionId={id ?? null}
-              slots={slots}
+              slots={[]}
+              hideEmptySlots
+              sides={sides.map((s) => ({ id: s.id, label: s.label }))}
               minConnected={1}
               onStart={handleStart}
               starting={starting}
