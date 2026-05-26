@@ -3,7 +3,7 @@ import LobbySlotRow from "./LobbySlotRow";
 import type { MicConnection, SessionKind } from "@/hooks/useMicLobby";
 import { useMicLobby } from "@/hooks/useMicLobby";
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { Play, FastForward } from "lucide-react";
 
 interface SlotDef { key: string; label: string; hint?: string; }
 
@@ -17,10 +17,13 @@ interface Props {
   startLabel?: string;
   header?: ReactNode;
   footer?: ReactNode;
+  /** Owner-only escape hatch. If provided, renders a "Force start" button
+   *  that ignores the `minConnected` gate. */
+  onForceStart?: () => void;
 }
 
 export default function MicLobby({
-  kind, sessionId, slots, minConnected = 1, onStart, starting, startLabel = "Start session", header, footer,
+  kind, sessionId, slots, minConnected = 1, onStart, starting, startLabel = "Start session", header, footer, onForceStart,
 }: Props) {
   const { rows, release } = useMicLobby(kind, sessionId);
   const bySlot = new Map<string, MicConnection>();
@@ -41,6 +44,17 @@ export default function MicLobby({
         <Play className="w-4 h-4 mr-1" />
         {starting ? "Starting…" : startLabel}
       </Button>
+      {onForceStart && (
+        <Button
+          onClick={onForceStart}
+          disabled={starting}
+          variant="outline"
+          className="w-full"
+        >
+          <FastForward className="w-4 h-4 mr-1" />
+          Force start now
+        </Button>
+      )}
       {!ready && (
         <p className="text-[11px] text-muted-foreground font-body text-center">
           Connect at least {minConnected} mic{minConnected !== 1 ? "s" : ""} to start.
