@@ -30,6 +30,7 @@ export const useRecordQA = (
   const [messages, setMessages] = useState<QAMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const userIdRef = useRef<string | null>(null);
 
   // Reset when the conversation target changes.
   const lastKeyRef = useRef(conversationKey);
@@ -42,6 +43,84 @@ export const useRecordQA = (
     }
   }, [conversationKey]);
 
+  // Track current auth user (no getSession, per project rules).
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      userIdRef.current = session?.user?.id ?? null;
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Load persisted history + subscribe to realtime changes for this record.
+  // Skipped for share-token (unauthenticated) viewers.
+  useEffect(() => {
+    if (shareToken) return;
+    let cancelled = false;
+
+    (async () => {
+      const { data, error } = await supabase
+        .from("record_qa_messages")
+        .select("role, content, created_at")
+        .eq("record_type", recordType)
+        .eq("record_id", recordId)
+        .order("created_at", { ascending: true });
+      if (cancelled || error || !data) return;
+      setMessages(
+        data.map((r) => ({ role: r.role as "user" | "assistant", content: r.content })),
+      );
+    })();
+
+    const channel = supabase
+      .channel(`record-qa:${recordType}:${recordId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "record_qa_messages",
+          filter: `record_id=eq.${recordId}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            role: "user" | "assistant";
+            content: string;
+            record_type: string;
+            user_id: string;
+          };
+          if (row.record_type !== recordType) return;
+          if (userIdRef.current && row.user_id !== userIdRef.current) return;
+          setMessages((prev) => {
+            // De-dupe: skip if last message matches (optimistic insert already applied).
+            const last = prev[prev.length - 1];
+            if (last && last.role === row.role && last.content === row.content) return prev;
+            return [...prev, { role: row.role, content: row.content }];
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [recordType, recordId, shareToken]);
+
+  const persist = useCallback(
+    async (role: "user" | "assistant", content: string) => {
+      if (shareToken) return;
+      const uid = userIdRef.current;
+      if (!uid) return;
+      await supabase.from("record_qa_messages").insert({
+        user_id: uid,
+        record_type: recordType,
+        record_id: recordId,
+        role,
+        content,
+      });
+    },
+    [recordType, recordId, shareToken],
+  );
+
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || loading) return;
@@ -51,6 +130,7 @@ export const useRecordQA = (
     setMessages(allMessages);
     setInput("");
     setLoading(true);
+    void persist("user", text);
 
     try {
       const body: any = {
@@ -76,12 +156,13 @@ export const useRecordQA = (
         return;
       }
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+      void persist("assistant", data.reply);
     } catch {
       toast.error("Something went wrong.");
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages, recordType, recordId, shareToken]);
+  }, [input, loading, messages, recordType, recordId, shareToken, persist]);
 
   return { messages, input, setInput, loading, send };
 };

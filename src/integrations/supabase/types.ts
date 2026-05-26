@@ -2215,6 +2215,36 @@ export type Database = {
           },
         ]
       }
+      record_qa_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          record_id: string
+          record_type: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          record_id: string
+          record_type: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          record_id?: string
+          record_type?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       record_share_invitations: {
         Row: {
           claimed_at: string | null
