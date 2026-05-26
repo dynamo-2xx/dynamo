@@ -104,6 +104,34 @@ const ParticipantSharedView = ({
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [argumentMapOpen, setArgumentMapOpen] = useState(false);
 
+  // Speaker pause: when a non-facilitator speaker pauses the turn clock we
+  // auto-resume after 30s so the debate cannot stall forever.
+  const SPEAKER_PAUSE_MAX_MS = 30_000;
+  const speakerResumeTimerRef = useRef<number | null>(null);
+  const clearSpeakerResume = () => {
+    if (speakerResumeTimerRef.current) {
+      window.clearTimeout(speakerResumeTimerRef.current);
+      speakerResumeTimerRef.current = null;
+    }
+  };
+  useEffect(() => () => clearSpeakerResume(), []);
+  const handleSpeakerPauseToggle = () => {
+    if (!onToggleTimer) return;
+    if (timerRunning) {
+      // Pausing: start auto-resume safety timer
+      onToggleTimer();
+      clearSpeakerResume();
+      speakerResumeTimerRef.current = window.setTimeout(() => {
+        onToggleTimer();
+        speakerResumeTimerRef.current = null;
+      }, SPEAKER_PAUSE_MAX_MS);
+    } else {
+      // Resuming: cancel the safety timer
+      clearSpeakerResume();
+      onToggleTimer();
+    }
+  };
+
   // Camera state — independently toggleable per participant
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
