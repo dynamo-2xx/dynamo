@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, HandHeart, Loader2, Bell, MessageSquare, Check } from "lucide-react";
+import { ArrowLeft, HandHeart, Loader2, Bell, MessageSquare, Check, LogIn } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,6 +39,9 @@ const DebateScheduledPreviewPage = () => {
   const [participantCount, setParticipantCount] = useState<number>(0);
   const [notifySubscribed, setNotifySubscribed] = useState(false);
   const [notifyBusy, setNotifyBusy] = useState(false);
+  const [queueBusy, setQueueBusy] = useState(false);
+  const [queueSideOpen, setQueueSideOpen] = useState(false);
+  const [queuedSideId, setQueuedSideId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -85,6 +88,16 @@ const DebateScheduledPreviewPage = () => {
           .eq("user_id", user.id)
           .maybeSingle();
         if (!cancelled) setNotifySubscribed(!!sub);
+
+        const { data: interest } = await supabase
+          .from("debate_interests")
+          .select("side_id, role")
+          .eq("debate_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!cancelled && interest?.role === "queued_speaker") {
+          setQueuedSideId(interest.side_id ?? sides[0]?.id ?? null);
+        }
       }
     })();
     return () => {
