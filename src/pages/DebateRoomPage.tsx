@@ -1280,18 +1280,21 @@ const DebateRoomPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {debate.id && (
-            <>
-              <PauseButton kind="debate" id={debate.id} isHost={isCreator || isFacilitator} />
-              <ShareDialog
-                type={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
-                recordId={debate.id}
-                isCreator={isCreator}
-              />
-            </>
+          {/* Live / draft: facilitator pause (room-wide) + invite popover.
+              Completed: co-ownership Share only — no pause, no invite. */}
+          {debate.id && !isCompleted && (
+            <PauseButton kind="debate" id={debate.id} isHost={isCreator || isFacilitator} />
           )}
 
-          {isCreator && (
+          {debate.id && isCompleted && (
+            <ShareDialog
+              type={(debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"}
+              recordId={debate.id}
+              isCreator={isCreator}
+            />
+          )}
+
+          {isCreator && !isCompleted && (
             <div className="relative">
               <button
                 onClick={() => setShowShare(!showShare)}
@@ -1333,9 +1336,28 @@ const DebateRoomPage = () => {
                       </button>
                     </div>
                   </div>
+                  <div className="border-t border-border mt-3 pt-3">
+                    <button
+                      onClick={() => { setShowShare(false); setShowInviteDirect(true); }}
+                      className="w-full text-left flex items-center justify-between gap-2 bg-primary/10 text-primary rounded-lg px-3 py-2 hover:bg-primary/15 transition-colors"
+                    >
+                      <span className="text-xs font-semibold">Invite user directly</span>
+                      <span className="text-[10px]">Open ↗</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+          )}
+
+          {isCreator && !isCompleted && debate.id && (
+            <InviteFriendsDialog
+              open={showInviteDirect}
+              onOpenChange={setShowInviteDirect}
+              debateId={debate.id}
+              debateTopic={debate.topic}
+              sides={sides as any}
+            />
           )}
         </div>
       </header>
