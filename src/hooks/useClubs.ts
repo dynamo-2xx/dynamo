@@ -15,6 +15,7 @@ export interface ClubItem {
   is_member?: boolean;
   is_featured?: boolean;
   requires_approval?: boolean;
+  primary_tag_id?: string | null;
 }
 
 export function useClubs() {
