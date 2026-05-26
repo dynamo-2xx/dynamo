@@ -1,19 +1,27 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Plus, Hash, X } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import ClubCoverCard from "@/components/clubs/ClubCoverCard";
 import ClubShelf from "@/components/clubs/ClubShelf";
 import FloatingSearch from "@/components/explore/FloatingSearch";
 import LegalFooter from "@/components/legal/LegalFooter";
-import { useClubs } from "@/hooks/useClubs";
+import { useClubs, useClubTagShelves } from "@/hooks/useClubs";
+import { useAllTags } from "@/hooks/useTags";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ClubsPage = () => {
   const { user, profile } = useAuth();
   const { items, loading } = useClubs();
+  const { tags: allTags } = useAllTags();
   const [q, setQ] = useState("");
+  const [params, setParams] = useSearchParams();
+  const tagSlug = params.get("tag");
+  const activeTag = useMemo(
+    () => (tagSlug ? allTags.find((t) => t.slug === tagSlug) || null : null),
+    [allTags, tagSlug],
+  );
 
   const query = q.trim().toLowerCase();
   const userLoc = (profile?.location || "").trim().toLowerCase();
@@ -39,11 +47,15 @@ const ClubsPage = () => {
     () => (user ? items.filter((c) => c.is_member) : []),
     [items, user],
   );
-  const publicClubs = useMemo(() => items.filter((c) => c.is_public), [items]);
-  const privateClubs = useMemo(() => items.filter((c) => !c.is_public), [items]);
+  const { shelves: tagShelves, untagged } = useClubTagShelves(items);
 
   const hasAnyShelf =
-    featured.length + nearYou.length + myClubs.length + publicClubs.length + privateClubs.length > 0;
+    featured.length + nearYou.length + myClubs.length + tagShelves.length + untagged.length > 0;
+
+  const tagFiltered = useMemo(() => {
+    if (!activeTag) return [];
+    return items.filter((c) => c.primary_tag_id === activeTag.id);
+  }, [items, activeTag]);
 
   return (
     <AppLayout>
@@ -73,7 +85,40 @@ const ClubsPage = () => {
             )}
           </header>
 
-          {query ? (
+          {activeTag ? (
+            <section>
+              <div className="flex items-center justify-between mb-3 gap-3">
+                <h2 className="font-display text-lg flex items-center gap-2">
+                  <Hash className="w-4 h-4" />
+                  {activeTag.name}
+                  <span className="text-[11px] text-muted-foreground font-body">
+                    {tagFiltered.length}
+                  </span>
+                </h2>
+                <button
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    next.delete("tag");
+                    setParams(next, { replace: true });
+                  }}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-body"
+                >
+                  <X className="w-3 h-3" /> Clear
+                </button>
+              </div>
+              {tagFiltered.length === 0 ? (
+                <div className="border border-dashed border-border rounded-xl px-5 py-12 text-center text-sm text-muted-foreground font-body">
+                  No clubs are featured under #{activeTag.name} yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-7">
+                  {tagFiltered.map((c) => (
+                    <ClubCoverCard key={c.id} c={c} />
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : query ? (
             <section>
               <h2 className="font-display text-lg mb-3">Results for “{q}”</h2>
               {searchResults.length === 0 ? (
@@ -99,8 +144,10 @@ const ClubsPage = () => {
               <ClubShelf title="Featured" items={featured} />
               <ClubShelf title="Near you" items={nearYou} />
               <ClubShelf title="My Clubs" items={myClubs} />
-              <ClubShelf title="Public" items={publicClubs} />
-              <ClubShelf title="Invite-only" items={privateClubs} />
+              {tagShelves.map(({ tag, items: shelfItems }) => (
+                <ClubShelf key={tag.id} title={`#${tag.name}`} items={shelfItems} />
+              ))}
+              <ClubShelf title="More clubs" items={untagged} />
             </div>
           )}
         </motion.div>
