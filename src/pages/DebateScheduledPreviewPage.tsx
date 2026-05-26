@@ -300,6 +300,58 @@ const DebateScheduledPreviewPage = () => {
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-72 p-1.5" align="center" side="top">
+                {queueSideOpen ? (
+                  <div className="p-2">
+                    <p className="text-xs font-body text-muted-foreground mb-2">
+                      Pick a side to queue on:
+                    </p>
+                    <div className="space-y-1">
+                      {sides.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          disabled={queueBusy}
+                          onClick={() => handleQueueToJoin(s.id)}
+                          className="w-full text-left px-3 py-2 text-sm font-body rounded-md hover:bg-accent transition-colors disabled:opacity-50"
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setQueueSideOpen(false)}
+                      className="mt-1 w-full text-xs text-muted-foreground hover:text-foreground py-1.5"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (queuedSideId) {
+                      navigate(`/debate/${id}/lobby`);
+                    } else {
+                      setQueueSideOpen(true);
+                    }
+                  }}
+                  className="w-full flex items-start gap-3 p-3 rounded-md hover:bg-accent transition-colors text-left"
+                >
+                  <LogIn className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <div className="text-sm font-body font-medium flex items-center gap-1.5">
+                      {queuedSideId ? "Go to lobby" : "Queue to join as speaker"}
+                      {queuedSideId && <Check className="w-3.5 h-3.5 text-foreground" />}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {queuedSideId
+                        ? "You're queued — wait for the host to start."
+                        : "Wait in the lobby; host can accept you."}
+                    </div>
+                  </div>
+                </button>
                 <button
                   type="button"
                   onClick={() => setComposerOpen(true)}
@@ -328,6 +380,8 @@ const DebateScheduledPreviewPage = () => {
                     </div>
                   </div>
                 </button>
+                  </>
+                )}
               </PopoverContent>
             </Popover>
           </div>
