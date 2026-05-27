@@ -232,17 +232,25 @@ export function useDeepgramTranscription({
 
     try {
       let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
-        });
-      } catch (err: any) {
-        const msg = err.name === "NotAllowedError"
-          ? "Microphone access denied. Please allow microphone in your browser settings for transcription and argument mapping to work."
-          : "Could not access microphone. Transcription will not function.";
-        setMicError(msg);
-        console.error("Mic permission error:", err);
-        return;
+      // Prefer the externally-supplied stream (e.g. from the join mic-test)
+      // so we don't trigger a second getUserMedia prompt.
+      if (preferredStream && preferredStream.getAudioTracks().some((t) => t.readyState === "live")) {
+        stream = preferredStream;
+        ownsStreamRef.current = false;
+      } else {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
+          });
+          ownsStreamRef.current = true;
+        } catch (err: any) {
+          const msg = err.name === "NotAllowedError"
+            ? "Microphone access denied. Please allow microphone in your browser settings for transcription and argument mapping to work."
+            : "Could not access microphone. Transcription will not function.";
+          setMicError(msg);
+          console.error("Mic permission error:", err);
+          return;
+        }
       }
       mediaStreamRef.current = stream;
 
@@ -250,7 +258,7 @@ export function useDeepgramTranscription({
       if (tokenError || !tokenData?.key) {
         setConnectionError("Failed to initialize transcription service. Please try refreshing.");
         console.error("Failed to get Deepgram token:", tokenError);
-        stream.getTracks().forEach((t) => t.stop());
+        if (ownsStreamRef.current) stream.getTracks().forEach((t) => t.stop());
         mediaStreamRef.current = null;
         return;
       }
@@ -342,6 +350,12 @@ export function useDeepgramTranscription({
     if (statementBufferRef.current.trim()) {
       flushStatement();
     }
+    // Flush any pending debounced persistence immediately.
+    if (persistTimerRef.current) {
+      clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+      void flushPersist();
+    }
 
     if (wsRef.current) {
       wsRef.current.close();
@@ -351,12 +365,16 @@ export function useDeepgramTranscription({
     processorRef.current = null;
     audioContextRef.current?.close();
     audioContextRef.current = null;
-    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    // Only stop tracks if we own them — never tear down a stream the caller
+    // (e.g. the in-person mic bar) is still using.
+    if (ownsStreamRef.current) {
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    }
     mediaStreamRef.current = null;
     setIsConnected(false);
     setInterimText("");
     ownsStreamRef.current = false;
-  }, [flushStatement]);
+  }, [flushStatement, flushPersist]);
 
   // Auto-connect/disconnect based on isActive
   useEffect(() => {
@@ -395,6 +413,9 @@ export function useDeepgramTranscription({
         { event: "*", schema: "public", table: "debate_transcripts", filter: `debate_id=eq.${debateId}` },
         (payload) => {
           const d = payload.new as any;
+          // Ignore our own writes — otherwise every debounced upsert echoes
+          // back through realtime and races the local optimistic state.
+          if (d?.updated_at && d.updated_at === lastSelfWriteRef.current) return;
           if (Array.isArray(d?.argument_map)) {
             setArgumentMap(d.argument_map);
           }
