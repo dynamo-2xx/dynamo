@@ -88,12 +88,12 @@ const DebateEditArgumentsPage = () => {
       );
 
       const editsByKey = new Map<string, EditRow>();
-      ((edits.data as EditRow[]) || []).forEach((e) =>
+      ((edits.data as unknown as EditRow[]) || []).forEach((e) =>
         editsByKey.set(`${e.round_summary_id}:${e.item_index}`, e),
       );
 
       const built: ItemView[] = [];
-      ((summaries.data as RoundSummary[]) || []).forEach((rs) => {
+      ((summaries.data as unknown as RoundSummary[]) || []).forEach((rs) => {
         const sub = subOrder.get(rs.subtopic_id);
         if (!sub) return;
         (rs.key_arguments || []).forEach((ka, idx) => {
