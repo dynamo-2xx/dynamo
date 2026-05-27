@@ -164,7 +164,9 @@ const ParticipantSharedView = ({
     }
   };
 
-  const showSpeakerPause = isSpeaker && isMyTurn && !isPublisher && !!onToggleTimer;
+  // Publisher-speakers also need the per-turn pause — gating on `!isPublisher`
+  // hid it for the host the moment they joined as a speaker.
+  const showSpeakerPause = isSpeaker && isMyTurn && !!onToggleTimer;
   const speakerPauseActive = !timerRunning && pauseStartedAt != null;
   const pauseCountdownLabel = `${Math.ceil(pauseRemainingMs / 1000)}s`;
 
@@ -316,7 +318,9 @@ const ParticipantSharedView = ({
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden">
-      {/* Top bar */}
+      {/* Top bar — speaking context + turn clock only. The d./map/notebook/pause
+          control cluster lives in the mobile row and the desktop right cluster
+          below; duplicating it here was clunky. */}
       <div className="border-b border-border bg-card px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div>
@@ -330,63 +334,7 @@ const ParticipantSharedView = ({
             Turn {(debate.current_turn ?? 0) + 1}/{debate.turns_per_subtopic}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Constant control trio — both sides have access to d., the argument
-              map, and their notebook regardless of whose turn it is. */}
-          {isSpeaker && (
-            <div className="flex items-center gap-1.5 mr-1">
-              {onToggleAiMessage && (
-                <DLogoButton
-                  onClick={onToggleAiMessage}
-                  active={!aiMessageCollapsed}
-                  pulse={aiMessagePulse}
-                  disabled={!aiMessage}
-                />
-              )}
-              <IconCircleButton
-                onClick={() => setArgumentMapOpen((v) => !v)}
-                active={argumentMapOpen}
-                title="Argument map"
-                ariaLabel="Toggle argument map overlay"
-              >
-                <MapIcon className="w-3.5 h-3.5" />
-              </IconCircleButton>
-              {onOpenNotebook && (
-                <IconCircleButton
-                  onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
-                  active={notebookOpen}
-                  title="My notebook"
-                  ariaLabel="Toggle notebook"
-                >
-                  <NotebookPen className="w-3.5 h-3.5" />
-                </IconCircleButton>
-              )}
-              {showSpeakerPause && (
-                <IconCircleButton
-                  onClick={handleSpeakerPauseToggle}
-                  active={speakerPauseActive}
-                  disabled={timerRunning && pauseUsedThisTurn}
-                  title={
-                    speakerPauseActive
-                      ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
-                      : pauseUsedThisTurn
-                      ? "You've already used your pause this turn"
-                      : "Pause your turn (30s, one per turn)"
-                  }
-                  ariaLabel="Toggle speaker pause"
-                >
-                  {speakerPauseActive ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-                  {speakerPauseActive && (
-                    <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[9px] font-semibold tabular-nums text-amber-600 dark:text-amber-400">
-                      {pauseCountdownLabel}
-                    </span>
-                  )}
-                </IconCircleButton>
-              )}
-            </div>
-          )}
-          <DebateTimer timeLeft={timeLeft} size="md" />
-        </div>
+        <DebateTimer timeLeft={timeLeft} size="md" />
       </div>
 
       {/* Mobile-only thin row — sits directly above the input for any speaker */}
