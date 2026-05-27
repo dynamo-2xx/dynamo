@@ -28,6 +28,9 @@ interface UseDeepgramTranscriptionProps {
   currentSubtopic: string;
   sides: string[];
   isActive: boolean;
+  /** Optional pre-warmed MediaStream (e.g. handed off from /join mic-test) to
+   *  avoid a second getUserMedia prompt in Firefox/Safari. */
+  preferredStream?: MediaStream | null;
 }
 
 const mergeTranscriptEntries = (
@@ -57,6 +60,7 @@ export function useDeepgramTranscription({
   currentSubtopic,
   sides,
   isActive,
+  preferredStream,
 }: UseDeepgramTranscriptionProps) {
   const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
   const [argumentMap, setArgumentMap] = useState<ArgumentMapEntry[]>([]);
@@ -67,6 +71,9 @@ export function useDeepgramTranscription({
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  // True if the active mediaStreamRef was supplied externally; we must NOT
+  // stop its tracks on disconnect — the caller still owns it.
+  const ownsStreamRef = useRef(false);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const currentSideRef = useRef(currentSpeakerSide);
@@ -78,20 +85,38 @@ export function useDeepgramTranscription({
   const statementSideRef = useRef(currentSpeakerSide);
   const statementSubtopicRef = useRef(currentSubtopic);
 
+  // Debounced persistence + self-write filter to avoid the realtime echo loop.
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingEntriesRef = useRef<TranscriptEntry[] | null>(null);
+  const lastSelfWriteRef = useRef<string | null>(null);
+
   // Keep refs in sync
   useEffect(() => { currentSideRef.current = currentSpeakerSide; }, [currentSpeakerSide]);
   useEffect(() => { currentSubtopicRef.current = currentSubtopic; }, [currentSubtopic]);
   useEffect(() => { argumentMapRef.current = argumentMap; }, [argumentMap]);
 
-  const persistTranscriptEntries = useCallback((entries: TranscriptEntry[]) => {
-    return supabase
+  const flushPersist = useCallback(async () => {
+    const entries = pendingEntriesRef.current;
+    if (!entries) return;
+    pendingEntriesRef.current = null;
+    const updatedAt = new Date().toISOString();
+    lastSelfWriteRef.current = updatedAt;
+    await supabase
       .from("debate_transcripts" as any)
-      .upsert({
-        debate_id: debateId,
-        transcript_entries: entries,
-        updated_at: new Date().toISOString(),
-      } as any, { onConflict: "debate_id" });
+      .upsert(
+        { debate_id: debateId, transcript_entries: entries, updated_at: updatedAt } as any,
+        { onConflict: "debate_id" },
+      );
   }, [debateId]);
+
+  const persistTranscriptEntries = useCallback((entries: TranscriptEntry[]) => {
+    pendingEntriesRef.current = entries;
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      void flushPersist();
+    }, 1000);
+    return Promise.resolve({ data: null, error: null });
+  }, [flushPersist]);
 
   const persistArgumentMap = useCallback((entries: ArgumentMapEntry[]) => {
     return supabase
@@ -165,12 +190,19 @@ export function useDeepgramTranscription({
     const text = statementBufferRef.current.trim();
     if (!text) return;
 
-    // Guard: never write an entry with an empty speaker_side — that breaks the
-    // threaded record + transcript views downstream. Fall back to current side ref.
+    // Guard: never write an entry with an empty/literal speaker_side — that
+    // breaks the threaded record + transcript views downstream. If we cannot
+    // attribute the statement to a real side label, drop it rather than
+    // poison the transcript with a "Speaker" row that has no rendering rules.
     const side =
       (statementSideRef.current && statementSideRef.current.trim()) ||
       (currentSideRef.current && currentSideRef.current.trim()) ||
-      "Speaker";
+      "";
+    if (!side) {
+      console.warn("[deepgram] dropping statement with no resolvable side:", text);
+      statementBufferRef.current = "";
+      return;
+    }
 
     const entry: TranscriptEntry = {
       id: `stmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -323,6 +355,7 @@ export function useDeepgramTranscription({
     mediaStreamRef.current = null;
     setIsConnected(false);
     setInterimText("");
+    ownsStreamRef.current = false;
   }, [flushStatement]);
 
   // Auto-connect/disconnect based on isActive
