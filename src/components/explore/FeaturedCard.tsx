@@ -45,7 +45,7 @@ const FeaturedCard = ({ d }: Props) => {
         style={bg}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-        <div className="relative p-3 z-10">
+        <div className="relative p-2.5 sm:p-3 z-10">
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-body font-medium uppercase tracking-wider border border-white/25 bg-black/40 text-white backdrop-blur-sm">
             {isLive && (
               <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] animate-pulse" />
@@ -54,8 +54,8 @@ const FeaturedCard = ({ d }: Props) => {
             {label}
           </span>
         </div>
-        <div className="relative mt-auto p-3 sm:p-4 min-w-0 z-10">
-          <h3 className="font-display text-white text-sm sm:text-base md:text-lg leading-tight line-clamp-2 drop-shadow break-words [overflow-wrap:anywhere] hyphens-auto">
+        <div className="relative mt-auto p-2.5 sm:p-3 md:p-3 lg:p-4 min-w-0 z-10">
+          <h3 className="font-display text-white text-sm md:text-sm lg:text-lg leading-tight line-clamp-2 drop-shadow break-words [overflow-wrap:anywhere] hyphens-auto">
             {d.topic}
           </h3>
           <div className="mt-1.5 flex items-center gap-3 text-[11px] text-white/80 font-body">
