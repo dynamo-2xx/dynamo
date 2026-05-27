@@ -1281,10 +1281,19 @@ const DebateRoomPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Live / draft: facilitator pause (room-wide) + invite popover.
-              Completed: co-ownership Share only — no pause, no invite. */}
+          {/* Live / draft: facilitator controls (collapsed menu) for publishers,
+              read-only "Paused by host" badge for everyone else. Completed:
+              co-ownership Share only — no pause, no invite. */}
           {debate.id && !isCompleted && (
-            <PauseButton kind="debate" id={debate.id} isHost={isCreator || isFacilitator} />
+            <FacilitationMenu
+              debateId={debate.id}
+              isHost={isCreator || isFacilitator}
+              timerRunning={timerRunning}
+              onSetTimerRunning={setTimerRunning}
+              onExtendTime={handleExtendTime}
+              onSkipTurn={handleSkipTurn}
+              onNextSubtopic={handleNextSubtopic}
+            />
           )}
 
           {debate.id && isCompleted && (
