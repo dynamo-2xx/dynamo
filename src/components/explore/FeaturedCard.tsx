@@ -38,10 +38,10 @@ const FeaturedCard = ({ d }: Props) => {
     <Link
       to={to}
       data-featured-card
-      className="snap-start shrink-0 w-[78vw] sm:w-[44vw] md:w-[calc((100%-1.5rem)/3)] group"
+      className="snap-start shrink-0 w-[78vw] sm:w-[44vw] lg:w-[calc((100%-1.5rem)/3)] group"
     >
       <div
-        className="relative w-full aspect-[4/3] md:aspect-[4/3] lg:aspect-[16/11] rounded-xl overflow-hidden border border-border transition-colors group-hover:border-foreground/30 flex flex-col"
+        className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-border transition-colors group-hover:border-foreground/30 flex flex-col"
         style={bg}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
