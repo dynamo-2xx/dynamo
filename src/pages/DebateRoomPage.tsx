@@ -70,6 +70,7 @@ interface DebateData {
   prep_side1_ready: boolean;
   prep_side2_ready: boolean;
   feedback_enabled?: boolean;
+  paused_at?: string | null;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
