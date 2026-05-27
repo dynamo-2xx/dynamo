@@ -407,6 +407,36 @@ export type Database = {
           },
         ]
       }
+      club_pinned_items: {
+        Row: {
+          club_id: string
+          created_at: string
+          id: string
+          kind: string
+          pinned_by: string
+          sort_order: number
+          target_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          pinned_by: string
+          sort_order?: number
+          target_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          pinned_by?: string
+          sort_order?: number
+          target_id?: string
+        }
+        Relationships: []
+      }
       club_tags: {
         Row: {
           club_id: string
@@ -2762,6 +2792,7 @@ export type Database = {
         Row: {
           author_id: string
           body: string
+          club_id: string | null
           comment_count: number
           created_at: string
           id: string
@@ -2774,6 +2805,7 @@ export type Database = {
         Insert: {
           author_id: string
           body: string
+          club_id?: string | null
           comment_count?: number
           created_at?: string
           id?: string
@@ -2786,6 +2818,7 @@ export type Database = {
         Update: {
           author_id?: string
           body?: string
+          club_id?: string | null
           comment_count?: number
           created_at?: string
           id?: string
