@@ -511,7 +511,7 @@ const DebateRoomPage = () => {
   useEffect(() => {
     if (debate?.paused_at) {
       setTimerRunning(false);
-    } else if (debate && timeLeft > 0 && isLive && !debate.prep_phase_active) {
+    } else if (debate && timeLeft > 0 && debate.status === "live" && !debate.prep_phase_active) {
       setTimerRunning(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
