@@ -10,6 +10,8 @@ import FeaturedRow from "@/components/explore/FeaturedRow";
 import TagShelf from "@/components/explore/TagShelf";
 import CompactRecordCard from "@/components/explore/CompactRecordCard";
 import CompactShelf from "@/components/explore/CompactShelf";
+import FloatingViewToggle from "@/components/explore/FloatingViewToggle";
+import FeedView from "@/components/explore/feed/FeedView";
 import {
   ExploreFiltersProvider,
   useExploreFilters,
@@ -17,6 +19,7 @@ import {
 
 const ExplorePageInner = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [view, setView] = useState<"records" | "feed">("records");
   const { matches } = useExploreFilters();
 
   useDocumentMeta({
@@ -58,7 +61,16 @@ const ExplorePageInner = () => {
 
   return (
     <AppLayout>
-      <FloatingSearch value={searchQuery} onChange={setSearchQuery} />
+      {view === "records" && (
+        <FloatingSearch value={searchQuery} onChange={setSearchQuery} />
+      )}
+      <FloatingViewToggle
+        view={view}
+        onToggle={() => setView((v) => (v === "records" ? "feed" : "records"))}
+      />
+      {view === "feed" ? (
+        <FeedView />
+      ) : (
       <div className="max-w-7xl mx-auto min-w-0 px-4 sm:px-6 py-6 sm:py-8 md:py-10">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -115,6 +127,7 @@ const ExplorePageInner = () => {
           )}
         </motion.div>
       </div>
+      )}
       <LegalFooter />
     </AppLayout>
   );

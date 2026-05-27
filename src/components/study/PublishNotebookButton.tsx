@@ -12,6 +12,8 @@ interface Props {
   notebookId: string;
   shareToken: string | null | undefined;
   isPublished: boolean;
+  caption?: string | null;
+  onSaveCaption?: (caption: string) => Promise<unknown> | unknown;
   onPublish: () => Promise<unknown> | unknown;
   onUnpublish: () => Promise<unknown> | unknown;
   onEnsureShareToken: (id: string) => Promise<string | null>;
@@ -21,12 +23,15 @@ const PublishNotebookButton = ({
   notebookId,
   shareToken,
   isPublished,
+  caption,
+  onSaveCaption,
   onPublish,
   onUnpublish,
   onEnsureShareToken,
 }: Props) => {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [captionDraft, setCaptionDraft] = useState<string>(caption ?? "");
 
   const publicUrl = shareToken
     ? `${window.location.origin}/study/shared/${shareToken}`
@@ -80,6 +85,24 @@ const PublishNotebookButton = ({
         <p className="text-xs text-muted-foreground font-body">
           Anyone with this link can view your notebook.
         </p>
+        {onSaveCaption && (
+          <div className="space-y-1">
+            <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-body">
+              Caption (optional)
+            </label>
+            <textarea
+              value={captionDraft}
+              onChange={(e) => setCaptionDraft(e.target.value)}
+              onBlur={() => {
+                if ((caption ?? "") !== captionDraft) onSaveCaption(captionDraft);
+              }}
+              placeholder="Add a short note shown above the hero card…"
+              rows={2}
+              maxLength={500}
+              className="w-full text-xs font-body bg-transparent border border-border rounded px-2 py-1.5 outline-none focus:border-foreground/40 resize-none"
+            />
+          </div>
+        )}
         {publicUrl && (
           <div className="flex items-center gap-1 border border-border rounded px-2 py-1">
             <span className="flex-1 truncate text-[11px] font-mono">{publicUrl}</span>
