@@ -104,33 +104,75 @@ const ParticipantSharedView = ({
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [argumentMapOpen, setArgumentMapOpen] = useState(false);
 
-  // Speaker pause: when a non-facilitator speaker pauses the turn clock we
-  // auto-resume after 30s so the debate cannot stall forever.
+  // Speaker pause: when a speaker pauses their own turn clock we auto-resume
+  // after 30s so the debate cannot stall, and we only allow one pause per turn.
   const SPEAKER_PAUSE_MAX_MS = 30_000;
   const speakerResumeTimerRef = useRef<number | null>(null);
+  const pauseStartedAtRef = useRef<number | null>(null);
+  const [pauseRemainingMs, setPauseRemainingMs] = useState(0);
+  const [pauseUsedThisTurn, setPauseUsedThisTurn] = useState(false);
   const clearSpeakerResume = () => {
     if (speakerResumeTimerRef.current) {
       window.clearTimeout(speakerResumeTimerRef.current);
       speakerResumeTimerRef.current = null;
     }
+    pauseStartedAtRef.current = null;
+    setPauseRemainingMs(0);
   };
   useEffect(() => () => clearSpeakerResume(), []);
+
+  // Reset the "one pause per turn" guard whenever the turn identity changes.
+  const turnKey = `${debate.current_subtopic_index}:${debate.current_turn}:${debate.current_speaker_side_id ?? ""}`;
+  useEffect(() => {
+    setPauseUsedThisTurn(false);
+    clearSpeakerResume();
+  }, [turnKey]);
+
+  // 1Hz countdown while the speaker pause is active.
+  useEffect(() => {
+    if (pauseStartedAtRef.current == null) return;
+    const interval = window.setInterval(() => {
+      if (pauseStartedAtRef.current == null) return;
+      const elapsed = Date.now() - pauseStartedAtRef.current;
+      const remaining = Math.max(0, SPEAKER_PAUSE_MAX_MS - elapsed);
+      setPauseRemainingMs(remaining);
+      if (remaining <= 0) {
+        // Auto-resume safety net fires in its own setTimeout; just stop ticking.
+        window.clearInterval(interval);
+      }
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [pauseRemainingMs === SPEAKER_PAUSE_MAX_MS]);
+
   const handleSpeakerPauseToggle = () => {
     if (!onToggleTimer) return;
     if (timerRunning) {
-      // Pausing: start auto-resume safety timer
+      // Pausing — only if the speaker hasn't already used their per-turn pause.
+      if (pauseUsedThisTurn) {
+        toast.message("You've already used your pause this turn.");
+        return;
+      }
       onToggleTimer();
-      clearSpeakerResume();
+      setPauseUsedThisTurn(true);
+      pauseStartedAtRef.current = Date.now();
+      setPauseRemainingMs(SPEAKER_PAUSE_MAX_MS);
+      clearSpeakerResume = clearSpeakerResume;
       speakerResumeTimerRef.current = window.setTimeout(() => {
         onToggleTimer();
         speakerResumeTimerRef.current = null;
+        pauseStartedAtRef.current = null;
+        setPauseRemainingMs(0);
       }, SPEAKER_PAUSE_MAX_MS);
     } else {
-      // Resuming: cancel the safety timer
+      // Manual resume.
       clearSpeakerResume();
       onToggleTimer();
     }
   };
+
+  const showSpeakerPause = isSpeaker && isMyTurn && !isPublisher && !!onToggleTimer;
+  const speakerPauseActive = !timerRunning && pauseStartedAtRef.current != null;
+  const pauseCountdownLabel = `${Math.ceil(pauseRemainingMs / 1000)}s`;
 
   // Camera state — independently toggleable per participant
   const localVideoRef = useRef<HTMLVideoElement>(null);
