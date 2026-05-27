@@ -55,7 +55,7 @@ const FeaturedCard = ({ d }: Props) => {
           </span>
         </div>
         <div className="relative mt-auto p-2.5 sm:p-3 lg:p-4 min-w-0 z-10">
-          <h3 className="font-display text-white text-sm md:text-base lg:text-lg leading-tight line-clamp-2 drop-shadow break-words [overflow-wrap:anywhere] hyphens-auto">
+          <h3 className="font-display text-white text-sm sm:text-base lg:text-lg leading-tight line-clamp-2 drop-shadow break-words [overflow-wrap:anywhere] hyphens-auto">
             {d.topic}
           </h3>
           <div className="mt-1.5 flex items-center gap-3 text-[11px] text-white/80 font-body">
