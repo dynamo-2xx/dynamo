@@ -176,7 +176,10 @@ export function useClubFeed(clubId: string | undefined, recordIds: string[]) {
         nbReq = nbQ;
       }
 
-      const [takesRes, nbRes] = await Promise.all([takesQ, nbReq]);
+      const [takesRes, nbRes] = await Promise.all([
+        takesQ as unknown as Promise<any>,
+        nbReq,
+      ]);
       const takesData = ((takesRes.data as any) || []) as Take[];
       const nbData = ((nbRes.data as any) || []) as FeedNotebook[];
 
