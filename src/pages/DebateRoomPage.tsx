@@ -298,13 +298,18 @@ const DebateRoomPage = () => {
     currentSpeakerSide: currentSideForTranscript?.label || "",
     currentSubtopic: currentSubtopicForTranscript?.title || "",
     sides: sides.map((s) => s.label),
-    // Privacy: only transcribe when the speaker has explicitly turned on the
-    // mic (deepgramActive) AND the room is not paused by the facilitator.
+    // Privacy: only transcribe when (a) the room is live, (b) THIS user is the
+    // active speaker on the current turn, (c) they have explicitly enabled the
+    // mic, and (d) neither the facilitator nor the speaker has paused.
+    // Without the isMyTurn gate an off-turn speaker who left the mic on would
+    // keep streaming audio and have it attributed to the new speaker's side.
     isActive:
       debate?.status === "live" &&
       userRole !== "spectator" &&
       deepgramActive &&
-      !debate?.paused_at,
+      !debate?.paused_at &&
+      !debate?.speaker_paused_at,
+    preferredStream: handoffStream,
   });
 
   // Request media permissions at session start for non-spectators
