@@ -641,6 +641,23 @@ const ParticipantSharedView = ({
                     <NotebookPen className="w-3.5 h-3.5" />
                   </IconCircleButton>
                 )}
+                {showSpeakerPause && (
+                  <IconCircleButton
+                    onClick={handleSpeakerPauseToggle}
+                    active={speakerPauseActive}
+                    disabled={timerRunning && pauseUsedThisTurn}
+                    title={
+                      speakerPauseActive
+                        ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
+                        : pauseUsedThisTurn
+                        ? "You've already used your pause this turn"
+                        : "Pause your turn (30s, one per turn)"
+                    }
+                    ariaLabel="Toggle speaker pause"
+                  >
+                    {speakerPauseActive ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                  </IconCircleButton>
+                )}
               </div>
             </div>
           </div>
