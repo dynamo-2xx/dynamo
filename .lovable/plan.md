@@ -1,73 +1,42 @@
-## Goal
+## Plan
 
-Add a fourth tab — **Explore** — to `/clubs/:id` alongside Events / Members / About. It mirrors the global Explore page but scoped to this club, with the same records ↔ feed toggle button.
+### 1. Header: collapsible "Facilitation" menu (publishers only)
+In `src/pages/DebateRoomPage.tsx`, replace the current header `<PauseButton>` with a `<Popover>` triggered by a small `Facilitation` chip (Settings/Sliders icon + label), rendered only when `isPublisher` (`isCreator || isFacilitator`) and `!isCompleted`. Popover content stacks vertically:
 
-## What shows up
+- **Pause / Resume room** — room-wide host pause (writes `paused_at` on `debates`). When paused, label switches to `Resume room · m:ss` and the chip itself shows an amber dot so it's visible without opening.
+- **Extend time** — calls existing `handleExtendTime`.
+- **Skip turn** — existing `onSkipTurn`.
+- **Next subtopic** — existing `onNextSubtopic`.
 
-**Records view** (default)
+These handlers already exist on `DebateRoomPage` and are passed into `ParticipantSharedView`. Lift the wiring up: pass them into the new header menu instead (or keep them on the page and just call them from the popover, which lives on the page anyway).
 
-- All session records spawned from this club's events: pull `club_events.session_id` for this `club_id`, then resolve into debates / live sessions / CMMs (CMMs are stored in `debates` with `format='change_my_mind'`).
-- Rendered with the existing `CompactRecordCard` / shelf components so it visually matches `/explore`.
-- Sections: **Live now**, **Upcoming** (events with a scheduled session), **Completed**.
+### 2. Fix the room-wide pause so it actually pauses
+The current top "Pause" used `usePauseControl`, which only stores `paused_at` and ticks an elapsed counter — it never freezes the turn clock. Fix: when the host toggles "Pause room" we must also stop the turn timer for everyone.
 
-**Feed view** (toggle)
+- On pause: call the existing `onToggleTimer` (if `timerRunning`) **and** write `paused_at` via `usePauseControl.pause()`. Persist `paused_at` so refresh restores the paused state.
+- On resume: clear `paused_at` and restart the turn timer (`onToggleTimer` if `!timerRunning`).
+- In `ParticipantSharedView` / `DebateRoomPage` timer effect, treat `debate.paused_at != null` as a hard block: do not advance `timeLeft`, do not auto-advance turns, and ignore Deepgram-driven turn ends. The existing "Paused by host" badge for non-hosts stays via `usePauseControl` read-only mode.
+- Show the label as `Resume room · m:ss` where `m:ss` is the elapsed pause time from `pausedAt` — this is the "counts upward" behavior, but now correctly framed as *how long the room has been paused*, not a pretend timer.
 
-- **Notebooks**: `session_notebooks` where `published = true`, `deleted_at is null`, and `record_id` ∈ club session ids.
-- **Takes**: `takes` where `is_public = true` and `club_id = this club`.
-- Reuses `TakeCard` and `FeedNotebookCard`. Same infinite-scroll pattern as `useFeed`, but a club-scoped variant (no For You / Local tabs — single chronological stream).
-- **Composer** is shown to members only and posts a Take with `club_id` pre-filled. Non-members see a "Join to post" hint instead.
+### 3. Remove facilitator controls from the bottom panel
+In `src/components/debate/ParticipantSharedView.tsx` (~lines 502–524), delete the publisher branch entirely: no more Pause/Resume, Extend, Skip Turn, Next Subtopic in the bottom row. The bottom row keeps only speaker-facing affordances.
 
-## Visibility
+Drop the now-unused `onExtendTime` / `onSkipTurn` / `onNextSubtopic` props from `ParticipantSharedView` if nothing else needs them (or keep the props but stop rendering — verify call sites). The header menu calls these directly from the page.
 
-- Public clubs: tab is visible to everyone (anon + auth), no gating. Matches `Records spawned from club events`/notebooks/takes which are already publicly readable when their parent record is public.
-- Private clubs: tab is gated by the existing `GatedPreview` blurred panel, same as Events/Members.
+### 4. Speaker pause becomes a small icon button in the control row
+In `ParticipantSharedView`, the bottom control row already has small icon-circle buttons for `d.` (FloatingIntelligence), Argument Map, and Notebook (the row visible in the screenshot near the composer). Add the speaker pause there as a fourth peer:
 
-## Files
+- Icon-only circle button (matching `IconCircleButton` styling used by the others), `Pause` icon when running, `Play` icon when paused.
+- Visible only when `isSpeaker && isMyTurn && !isPublisher` (publishers pause via the header menu).
+- Same 30s auto-resume safety + visible countdown already in step 3 of the prior plan: while paused, render a tiny countdown badge (`0:30 → 0:00`) next to or under the icon.
+- One pause per turn: `pauseUsedThisTurn` ref resets on `(current_subtopic_index, current_turn, current_speaker_side_id)` change; once used, the button is disabled with tooltip "1 pause per turn used".
 
-**New**
+### 5. Mobile layout sanity
+The Facilitation popover keeps the header from overflowing on narrow screens (884px and below). The chip itself is icon + short label; on `<640px` we can drop the label and show icon-only. Popover content is a single column so it never overlaps the transcript or composer.
 
-- `src/hooks/useClubExplore.ts` — fetches club records (via `club_events.session_id` + record table lookups) and club-scoped notebooks + takes. Exposes `{ records, feedItems, loadMore, hasMore, loading }`.
-- `src/components/clubs/ClubExploreTab.tsx` — owns the local `view: "records" | "feed"` state and renders either the records shelves or the feed list. Holds the toggle button inline (top-right of the tab content, not the floating global one — keeps it scoped to the tab).
-- `src/components/clubs/ClubTakeComposer.tsx` — thin wrapper that calls `useTakes.create` with `club_id` injected; gated on `isMember`.
+### Files touched
+- `src/pages/DebateRoomPage.tsx` — new Facilitation popover in header, wires Pause/Extend/Skip/Next; removes the bare `<PauseButton>`; ensures `paused_at` blocks the turn timer.
+- `src/components/debate/ParticipantSharedView.tsx` — remove publisher control row; add speaker pause as a small icon button alongside d./map/notebook; countdown + one-per-turn guard.
+- `src/components/sharing/PauseButton.tsx` — keep as-is for CMM / Live, but the debate room stops using it directly.
 
-**Edited**
-
-- `src/pages/ClubPage.tsx` — extend `Tab` union to `"events" | "explore" | "members" | "about"`, add tab button, render `<ClubExploreTab clubId={club.id} isMember={isMember} gated={gated} />`.
-
-## Data model change
-
-`public.takes` gains an optional `club_id uuid` column.
-
-```sql
-ALTER TABLE public.takes ADD COLUMN club_id uuid NULL;
-CREATE INDEX takes_club_id_created_at_idx
-  ON public.takes (club_id, created_at DESC)
-  WHERE club_id IS NOT NULL;
-```
-
-RLS: existing public-read policy still applies. Insert policy stays `author_id = auth.uid()`; we add a guard so a take can only carry `club_id` if the author is a member of that club:
-
-```text
-CHECK (club_id IS NULL OR public.is_club_member(club_id))
-```
-
-implemented as an additional RLS WITH CHECK on INSERT/UPDATE.
-
-No change to `session_notebooks` — they're already joined via their `record_id`.
-
-## Out of scope
-
-- Editing the records/feed toggle button to be the same floating button as `/explore` (we keep it inline in the tab to avoid colliding with the club page chrome). also add the search bar button. 
-- Per-tag filtering inside the club Explore. Add this. Admins have tag console.
-- Pinning / featured curation by club admins (could come later). Add this feature through the row where the + New Event is. it opens up a search bar and index of records/feed. 
-
-```text
-ClubPage
-└── Tabs: Events | Explore | Members | About
-        └── ClubExploreTab
-            ├── [Records ⇄ Feed] toggle (inline top-right)
-            ├── Records: shelves of club-event records
-            └── Feed:
-                ├── ClubTakeComposer (members only)
-                └── infinite list of takes + notebooks
-```
+No DB / backend changes; `paused_at` and `usePauseControl` already exist. No changes to CMM or Live rooms.
