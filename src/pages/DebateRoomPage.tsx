@@ -13,7 +13,8 @@ import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechI
 import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import ShareDialog from "@/components/sharing/ShareDialog";
-import PauseButton from "@/components/sharing/PauseButton";
+import FacilitationMenu from "@/components/debate/FacilitationMenu";
+import { usePauseControl } from "@/hooks/usePauseControl";
 import InviteFriendsDialog from "@/components/debate/InviteFriendsDialog";
 import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
