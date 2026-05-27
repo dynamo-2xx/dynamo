@@ -108,7 +108,7 @@ const ParticipantSharedView = ({
   // after 30s so the debate cannot stall, and we only allow one pause per turn.
   const SPEAKER_PAUSE_MAX_MS = 30_000;
   const speakerResumeTimerRef = useRef<number | null>(null);
-  const pauseStartedAtRef = useRef<number | null>(null);
+  const [pauseStartedAt, setPauseStartedAt] = useState<number | null>(null);
   const [pauseRemainingMs, setPauseRemainingMs] = useState(0);
   const [pauseUsedThisTurn, setPauseUsedThisTurn] = useState(false);
   const clearSpeakerResume = () => {
@@ -116,7 +116,7 @@ const ParticipantSharedView = ({
       window.clearTimeout(speakerResumeTimerRef.current);
       speakerResumeTimerRef.current = null;
     }
-    pauseStartedAtRef.current = null;
+    setPauseStartedAt(null);
     setPauseRemainingMs(0);
   };
   useEffect(() => () => clearSpeakerResume(), []);
@@ -126,51 +126,46 @@ const ParticipantSharedView = ({
   useEffect(() => {
     setPauseUsedThisTurn(false);
     clearSpeakerResume();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnKey]);
 
   // 1Hz countdown while the speaker pause is active.
   useEffect(() => {
-    if (pauseStartedAtRef.current == null) return;
-    const interval = window.setInterval(() => {
-      if (pauseStartedAtRef.current == null) return;
-      const elapsed = Date.now() - pauseStartedAtRef.current;
-      const remaining = Math.max(0, SPEAKER_PAUSE_MAX_MS - elapsed);
+    if (pauseStartedAt == null) return;
+    const tick = () => {
+      const remaining = Math.max(0, SPEAKER_PAUSE_MAX_MS - (Date.now() - pauseStartedAt));
       setPauseRemainingMs(remaining);
-      if (remaining <= 0) {
-        // Auto-resume safety net fires in its own setTimeout; just stop ticking.
-        window.clearInterval(interval);
-      }
-    }, 250);
+    };
+    tick();
+    const interval = window.setInterval(tick, 250);
     return () => window.clearInterval(interval);
-  }, [pauseRemainingMs === SPEAKER_PAUSE_MAX_MS]);
+  }, [pauseStartedAt]);
 
   const handleSpeakerPauseToggle = () => {
     if (!onToggleTimer) return;
     if (timerRunning) {
-      // Pausing — only if the speaker hasn't already used their per-turn pause.
       if (pauseUsedThisTurn) {
         toast.message("You've already used your pause this turn.");
         return;
       }
       onToggleTimer();
       setPauseUsedThisTurn(true);
-      pauseStartedAtRef.current = Date.now();
+      setPauseStartedAt(Date.now());
       setPauseRemainingMs(SPEAKER_PAUSE_MAX_MS);
       speakerResumeTimerRef.current = window.setTimeout(() => {
         onToggleTimer();
         speakerResumeTimerRef.current = null;
-        pauseStartedAtRef.current = null;
+        setPauseStartedAt(null);
         setPauseRemainingMs(0);
       }, SPEAKER_PAUSE_MAX_MS);
     } else {
-      // Manual resume.
       clearSpeakerResume();
       onToggleTimer();
     }
   };
 
   const showSpeakerPause = isSpeaker && isMyTurn && !isPublisher && !!onToggleTimer;
-  const speakerPauseActive = !timerRunning && pauseStartedAtRef.current != null;
+  const speakerPauseActive = !timerRunning && pauseStartedAt != null;
   const pauseCountdownLabel = `${Math.ceil(pauseRemainingMs / 1000)}s`;
 
   // Camera state — independently toggleable per participant
