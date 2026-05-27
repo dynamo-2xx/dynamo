@@ -13,7 +13,8 @@ import SpeechInput, { type SpeechInputHandle } from "@/components/debate/SpeechI
 import FacilitatorView from "@/components/debate/FacilitatorView";
 import ParticipantSharedView from "@/components/debate/ParticipantSharedView";
 import ShareDialog from "@/components/sharing/ShareDialog";
-import PauseButton from "@/components/sharing/PauseButton";
+import FacilitationMenu from "@/components/debate/FacilitationMenu";
+import { usePauseControl } from "@/hooks/usePauseControl";
 import InviteFriendsDialog from "@/components/debate/InviteFriendsDialog";
 import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
@@ -69,6 +70,7 @@ interface DebateData {
   prep_side1_ready: boolean;
   prep_side2_ready: boolean;
   feedback_enabled?: boolean;
+  paused_at?: string | null;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
@@ -488,6 +490,9 @@ const DebateRoomPage = () => {
 
    // Timer — 1-second countdown driven by local interval
   useEffect(() => {
+    // Hard block when the host has paused the room: the turn clock must not
+    // advance for anyone (including the host) until paused_at is cleared.
+    if (debate?.paused_at) return;
     if (timerRunning && timeLeft > 0) {
       timerWasActiveRef.current = true;
       timerRef.current = setInterval(() => {
@@ -498,7 +503,19 @@ const DebateRoomPage = () => {
       }, 1000);
     }
     return () => clearInterval(timerRef.current);
-  }, [timerRunning, timeLeft]);
+  }, [timerRunning, timeLeft, debate?.paused_at]);
+
+  // When the room becomes paused, stop the local timerRunning flag so that
+  // anything observing it (UI, AI, auto-advance) treats the clock as stopped.
+  // When it resumes, restart the clock if there's time left on the turn.
+  useEffect(() => {
+    if (debate?.paused_at) {
+      setTimerRunning(false);
+    } else if (debate && timeLeft > 0 && debate.status === "live" && !debate.prep_phase_active) {
+      setTimerRunning(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debate?.paused_at]);
 
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
@@ -1280,10 +1297,19 @@ const DebateRoomPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Live / draft: facilitator pause (room-wide) + invite popover.
-              Completed: co-ownership Share only — no pause, no invite. */}
+          {/* Live / draft: facilitator controls (collapsed menu) for publishers,
+              read-only "Paused by host" badge for everyone else. Completed:
+              co-ownership Share only — no pause, no invite. */}
           {debate.id && !isCompleted && (
-            <PauseButton kind="debate" id={debate.id} isHost={isCreator || isFacilitator} />
+            <FacilitationMenu
+              debateId={debate.id}
+              isHost={isCreator || isFacilitator}
+              timerRunning={timerRunning}
+              onSetTimerRunning={setTimerRunning}
+              onExtendTime={handleExtendTime}
+              onSkipTurn={handleSkipTurn}
+              onNextSubtopic={handleNextSubtopic}
+            />
           )}
 
           {debate.id && isCompleted && (

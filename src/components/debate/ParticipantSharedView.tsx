@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, MicOff, Send, SkipForward, ChevronDown,
-  Users, Pause, Play, Plus, ChevronRight,
+  Users, Pause, Play,
   Video, VideoOff, Maximize2, Minimize2, Map as MapIcon, NotebookPen,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
@@ -104,33 +104,69 @@ const ParticipantSharedView = ({
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [argumentMapOpen, setArgumentMapOpen] = useState(false);
 
-  // Speaker pause: when a non-facilitator speaker pauses the turn clock we
-  // auto-resume after 30s so the debate cannot stall forever.
+  // Speaker pause: when a speaker pauses their own turn clock we auto-resume
+  // after 30s so the debate cannot stall, and we only allow one pause per turn.
   const SPEAKER_PAUSE_MAX_MS = 30_000;
   const speakerResumeTimerRef = useRef<number | null>(null);
+  const [pauseStartedAt, setPauseStartedAt] = useState<number | null>(null);
+  const [pauseRemainingMs, setPauseRemainingMs] = useState(0);
+  const [pauseUsedThisTurn, setPauseUsedThisTurn] = useState(false);
   const clearSpeakerResume = () => {
     if (speakerResumeTimerRef.current) {
       window.clearTimeout(speakerResumeTimerRef.current);
       speakerResumeTimerRef.current = null;
     }
+    setPauseStartedAt(null);
+    setPauseRemainingMs(0);
   };
   useEffect(() => () => clearSpeakerResume(), []);
+
+  // Reset the "one pause per turn" guard whenever the turn identity changes.
+  const turnKey = `${debate.current_subtopic_index}:${debate.current_turn}:${debate.current_speaker_side_id ?? ""}`;
+  useEffect(() => {
+    setPauseUsedThisTurn(false);
+    clearSpeakerResume();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnKey]);
+
+  // 1Hz countdown while the speaker pause is active.
+  useEffect(() => {
+    if (pauseStartedAt == null) return;
+    const tick = () => {
+      const remaining = Math.max(0, SPEAKER_PAUSE_MAX_MS - (Date.now() - pauseStartedAt));
+      setPauseRemainingMs(remaining);
+    };
+    tick();
+    const interval = window.setInterval(tick, 250);
+    return () => window.clearInterval(interval);
+  }, [pauseStartedAt]);
+
   const handleSpeakerPauseToggle = () => {
     if (!onToggleTimer) return;
     if (timerRunning) {
-      // Pausing: start auto-resume safety timer
+      if (pauseUsedThisTurn) {
+        toast.message("You've already used your pause this turn.");
+        return;
+      }
       onToggleTimer();
-      clearSpeakerResume();
+      setPauseUsedThisTurn(true);
+      setPauseStartedAt(Date.now());
+      setPauseRemainingMs(SPEAKER_PAUSE_MAX_MS);
       speakerResumeTimerRef.current = window.setTimeout(() => {
         onToggleTimer();
         speakerResumeTimerRef.current = null;
+        setPauseStartedAt(null);
+        setPauseRemainingMs(0);
       }, SPEAKER_PAUSE_MAX_MS);
     } else {
-      // Resuming: cancel the safety timer
       clearSpeakerResume();
       onToggleTimer();
     }
   };
+
+  const showSpeakerPause = isSpeaker && isMyTurn && !isPublisher && !!onToggleTimer;
+  const speakerPauseActive = !timerRunning && pauseStartedAt != null;
+  const pauseCountdownLabel = `${Math.ceil(pauseRemainingMs / 1000)}s`;
 
   // Camera state — independently toggleable per participant
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -325,6 +361,28 @@ const ParticipantSharedView = ({
                   <NotebookPen className="w-3.5 h-3.5" />
                 </IconCircleButton>
               )}
+              {showSpeakerPause && (
+                <IconCircleButton
+                  onClick={handleSpeakerPauseToggle}
+                  active={speakerPauseActive}
+                  disabled={timerRunning && pauseUsedThisTurn}
+                  title={
+                    speakerPauseActive
+                      ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
+                      : pauseUsedThisTurn
+                      ? "You've already used your pause this turn"
+                      : "Pause your turn (30s, one per turn)"
+                  }
+                  ariaLabel="Toggle speaker pause"
+                >
+                  {speakerPauseActive ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                  {speakerPauseActive && (
+                    <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[9px] font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                      {pauseCountdownLabel}
+                    </span>
+                  )}
+                </IconCircleButton>
+              )}
             </div>
           )}
           <DebateTimer timeLeft={timeLeft} size="md" />
@@ -358,6 +416,23 @@ const ParticipantSharedView = ({
               ariaLabel="Toggle notebook"
             >
               <NotebookPen className="w-3.5 h-3.5" />
+            </IconCircleButton>
+          )}
+          {showSpeakerPause && (
+            <IconCircleButton
+              onClick={handleSpeakerPauseToggle}
+              active={speakerPauseActive}
+              disabled={timerRunning && pauseUsedThisTurn}
+              title={
+                speakerPauseActive
+                  ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
+                  : pauseUsedThisTurn
+                  ? "You've already used your pause this turn"
+                  : "Pause your turn (30s, one per turn)"
+              }
+              ariaLabel="Toggle speaker pause"
+            >
+              {speakerPauseActive ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
             </IconCircleButton>
           )}
         </div>
@@ -483,47 +558,10 @@ const ParticipantSharedView = ({
       {/* Fixed input area at bottom — text input only (mic goes directly to argument map via Deepgram) */}
       {canSpeak && (
         <div className="border-t border-border bg-card px-4 py-3 shrink-0">
-          {/* Control panel — always visible during canSpeak. Speaker Pause (30s
-              auto-resume) for active speakers; facilitator Extend/Skip/Next
-              for publishers. */}
-          {(isPublisher || (isSpeaker && isMyTurn)) && (
-            <div className="max-w-3xl mx-auto mb-2 flex items-center gap-2 overflow-x-auto">
-              {isSpeaker && isMyTurn && onToggleTimer && (
-                <button
-                  onClick={handleSpeakerPauseToggle}
-                  title={timerRunning ? "Pause turn (max 30s)" : "Resume turn"}
-                  className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]"
-                >
-                  {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                  <span>{timerRunning ? "Pause" : "Resume"}</span>
-                  {!timerRunning && <span className="text-[10px] text-muted-foreground">(auto-resume 30s)</span>}
-                </button>
-              )}
-              {isPublisher && (
-                <>
-                  {!(isSpeaker && isMyTurn) && onToggleTimer && (
-                    <button
-                      onClick={onToggleTimer}
-                      title={timerRunning ? "Pause" : "Resume"}
-                      className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]"
-                    >
-                      {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                      <span>{timerRunning ? "Pause" : "Resume"}</span>
-                    </button>
-                  )}
-                  <button onClick={onExtendTime} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
-                    <Plus className="w-3.5 h-3.5" /> <span>Extend</span>
-                  </button>
-                  <button onClick={onSkipTurn} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
-                    <SkipForward className="w-3.5 h-3.5" /> <span>Skip Turn</span>
-                  </button>
-                  <button onClick={onNextSubtopic} className="flex items-center gap-1.5 bg-secondary rounded-lg px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors shrink-0 min-h-[36px]">
-                    <ChevronRight className="w-3.5 h-3.5" /> <span>Next Subtopic</span>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+          {/* Facilitator controls live in the header "Facilitation" popover;
+              the speaker's per-turn Pause moved into the small icon row below
+              alongside d. / argument map / notebook. The bottom panel stays
+              focused on the composer + speaker tools only. */}
           <div className="flex items-end gap-3 max-w-3xl mx-auto">
             {/* Camera toggle */}
             {isSpeaker && (
@@ -596,6 +634,23 @@ const ParticipantSharedView = ({
                     ariaLabel="Toggle notebook"
                   >
                     <NotebookPen className="w-3.5 h-3.5" />
+                  </IconCircleButton>
+                )}
+                {showSpeakerPause && (
+                  <IconCircleButton
+                    onClick={handleSpeakerPauseToggle}
+                    active={speakerPauseActive}
+                    disabled={timerRunning && pauseUsedThisTurn}
+                    title={
+                      speakerPauseActive
+                        ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
+                        : pauseUsedThisTurn
+                        ? "You've already used your pause this turn"
+                        : "Pause your turn (30s, one per turn)"
+                    }
+                    ariaLabel="Toggle speaker pause"
+                  >
+                    {speakerPauseActive ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                   </IconCircleButton>
                 )}
               </div>
