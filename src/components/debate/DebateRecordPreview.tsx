@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, Calendar as CalendarIcon, Users, Download } from "lucide-react";
+import { ChevronDown, Calendar as CalendarIcon, Users, Download, RotateCcw } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { gradientFromSeed } from "@/lib/gradient";
 import { cn } from "@/lib/utils";
@@ -279,12 +279,7 @@ const DebateRecordPreview = ({
                               <CollapsibleContent>
                                 <ul className="pl-7 pr-3 py-2 space-y-2">
                                   {t.summaries.map((s) => (
-                                    <li key={s.id} className="flex items-start gap-2">
-                                      <span className={cn("mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-current", colorClass)} />
-                                      <p className="text-sm font-body text-foreground/90 leading-relaxed" data-annotatable>
-                                        {s.content}
-                                      </p>
-                                    </li>
+                                    <SummaryItem key={s.id} summary={s} colorClass={colorClass} />
                                   ))}
                                 </ul>
                               </CollapsibleContent>
