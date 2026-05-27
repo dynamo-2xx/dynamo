@@ -300,7 +300,13 @@ const DebateRoomPage = () => {
     currentSpeakerSide: currentSideForTranscript?.label || "",
     currentSubtopic: currentSubtopicForTranscript?.title || "",
     sides: sides.map((s) => s.label),
-    isActive: debate?.status === "live" && userRole !== "spectator",
+    // Privacy: only transcribe when the speaker has explicitly turned on the
+    // mic (deepgramActive) AND the room is not paused by the facilitator.
+    isActive:
+      debate?.status === "live" &&
+      userRole !== "spectator" &&
+      deepgramActive &&
+      !debate?.paused_at,
   });
 
   // Request media permissions at session start for non-spectators
