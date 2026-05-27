@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, MicOff, Send, SkipForward, ChevronDown,
   Users, Pause, Play,
-  Video, VideoOff, Maximize2, Minimize2, Map as MapIcon, NotebookPen,
+  Video, VideoOff, Maximize2, Minimize2, Map as MapIcon, BookOpen,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
@@ -13,7 +13,6 @@ import RoundSummaryCard from "./RoundSummaryCard";
 import DLogoButton from "./DLogoButton";
 import IconCircleButton from "./IconCircleButton";
 import ArgumentMapOverlay from "./ArgumentMapOverlay";
-import NotebookOverlay from "./NotebookOverlay";
 import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
