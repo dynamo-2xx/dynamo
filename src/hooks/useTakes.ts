@@ -13,7 +13,6 @@ export interface Take {
   created_at: string;
   // hydrated
   author_name?: string | null;
-  author_username?: string | null;
   author_avatar?: string | null;
 }
 
@@ -61,7 +60,7 @@ export async function hydrateTakeAuthors(takes: Take[]): Promise<Take[]> {
   if (ids.length === 0) return takes;
   const { data } = await supabase
     .from("profiles")
-    .select("user_id, display_name, username, avatar_url")
+    .select("user_id, display_name, avatar_url")
     .in("user_id", ids);
   const byId = new Map<string, any>();
   (data || []).forEach((p: any) => byId.set(p.user_id, p));
@@ -69,8 +68,7 @@ export async function hydrateTakeAuthors(takes: Take[]): Promise<Take[]> {
     const p = byId.get(t.author_id);
     return {
       ...t,
-      author_name: p?.display_name ?? p?.username ?? null,
-      author_username: p?.username ?? null,
+      author_name: p?.display_name ?? null,
       author_avatar: p?.avatar_url ?? null,
     };
   });
