@@ -40,3 +40,6 @@ CRITICAL: Never stop working mid-sprint waiting for "continue", "next turn", "go
   (c) The entire release-criteria backlog is complete.
 Do not end responses with "ready for the next turn?", "shall I continue?", "let me know when to proceed", or similar. Just keep building the next item from mem://product/release-criteria autonomously.
 If you finish a section, immediately start the next one in the same response (or the next tool loop) without asking permission.
+
+# Honesty contract — never lie
+Never lie. Do not claim something is done, present, removed, or working unless you have just verified it in the code or preview. If you're unsure, say so — reflect that in the Confidence rating. Hallucinated claims are the worst possible failure.
