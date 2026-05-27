@@ -10,6 +10,32 @@ import LegalFooter from "@/components/legal/LegalFooter";
 import { useClubs, useClubTagShelves } from "@/hooks/useClubs";
 import { useAllTags } from "@/hooks/useTags";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+
+type ClubsMode = "for_you" | "local";
+
+const ModeTab = ({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      "px-3 py-1.5 rounded-full text-sm font-body transition-colors",
+      active
+        ? "bg-foreground text-background"
+        : "text-muted-foreground hover:text-foreground",
+    )}
+  >
+    {children}
+  </button>
+);
 
 const ClubsPage = () => {
   const { user, profile } = useAuth();
@@ -18,6 +44,7 @@ const ClubsPage = () => {
   const [q, setQ] = useState("");
   const [params, setParams] = useSearchParams();
   const tagSlug = params.get("tag");
+  const [mode, setMode] = useState<ClubsMode>("for_you");
   const activeTag = useMemo(
     () => (tagSlug ? allTags.find((t) => t.slug === tagSlug) || null : null),
     [allTags, tagSlug],
@@ -26,36 +53,53 @@ const ClubsPage = () => {
   const query = q.trim().toLowerCase();
   const userLoc = (profile?.location || "").trim().toLowerCase();
 
+  const matchesLocal = (loc: string | null | undefined) => {
+    if (!userLoc) return false;
+    const l = (loc || "").toLowerCase();
+    if (!l) return false;
+    return l.includes(userLoc) || userLoc.includes(l);
+  };
+
+  // Mode-scoped pool: For you = all clubs; Local = clubs matching user's location.
+  const pool = useMemo(() => {
+    if (mode === "local") return items.filter((c) => matchesLocal(c.location));
+    return items;
+  }, [items, mode, userLoc]);
+
   const searchResults = useMemo(() => {
     if (!query) return [];
-    return items.filter((c) => {
+    return pool.filter((c) => {
       const hay = `${c.name} ${c.description || ""}`.toLowerCase();
       return hay.includes(query);
     });
-  }, [items, query]);
+  }, [pool, query]);
 
-  const featured = useMemo(() => items.filter((c) => c.is_featured), [items]);
+  const featured = useMemo(() => pool.filter((c) => c.is_featured), [pool]);
   const nearYou = useMemo(() => {
+    if (mode === "local") return []; // pool is already local-scoped
     if (!userLoc) return [];
-    return items.filter((c) => {
-      const loc = (c.location || "").toLowerCase();
-      if (!loc) return false;
-      return loc.includes(userLoc) || userLoc.includes(loc);
-    });
-  }, [items, userLoc]);
-  const myClubs = useMemo(
-    () => (user ? items.filter((c) => c.is_member) : []),
-    [items, user],
+    return items.filter((c) => matchesLocal(c.location));
+  }, [items, mode, userLoc]);
+  const popular = useMemo(
+    () =>
+      [...pool]
+        .sort((a, b) => (b.member_count || 0) - (a.member_count || 0))
+        .slice(0, 12),
+    [pool],
   );
-  const { shelves: tagShelves, untagged } = useClubTagShelves(items);
+  const myClubs = useMemo(
+    () => (user ? pool.filter((c) => c.is_member) : []),
+    [pool, user],
+  );
+  const { shelves: tagShelves, untagged } = useClubTagShelves(pool);
 
   const hasAnyShelf =
     featured.length + nearYou.length + myClubs.length + tagShelves.length + untagged.length > 0;
 
   const tagFiltered = useMemo(() => {
     if (!activeTag) return [];
-    return items.filter((c) => c.primary_tag_id === activeTag.id);
-  }, [items, activeTag]);
+    return pool.filter((c) => c.primary_tag_id === activeTag.id);
+  }, [pool, activeTag]);
 
   return (
     <AppLayout>
@@ -84,6 +128,22 @@ const ClubsPage = () => {
               </Link>
             )}
           </header>
+
+          {!activeTag && !query && (
+            <div className="flex items-center gap-1 -mt-4">
+              <ModeTab active={mode === "for_you"} onClick={() => setMode("for_you")}>
+                For you
+              </ModeTab>
+              <ModeTab active={mode === "local"} onClick={() => setMode("local")}>
+                Local
+              </ModeTab>
+              {mode === "local" && !userLoc && (
+                <span className="ml-2 text-[11px] text-muted-foreground font-body">
+                  Set your location in your profile to see local clubs.
+                </span>
+              )}
+            </div>
+          )}
 
           {activeTag ? (
             <section>
@@ -142,7 +202,11 @@ const ClubsPage = () => {
           ) : (
             <div className="space-y-9">
               <ClubShelf title="Featured" items={featured} />
-              <ClubShelf title="Near you" items={nearYou} />
+              {mode === "for_you" && <ClubShelf title="Near you" items={nearYou} />}
+              <ClubShelf
+                title={mode === "local" ? "Popular locally" : "Popular"}
+                items={popular}
+              />
               <ClubShelf title="My Clubs" items={myClubs} />
               {tagShelves.map(({ tag, items: shelfItems }) => (
                 <ClubShelf key={tag.id} title={`#${tag.name}`} items={shelfItems} />
