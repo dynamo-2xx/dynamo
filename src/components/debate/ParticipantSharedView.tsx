@@ -355,14 +355,14 @@ const ParticipantSharedView = ({
           >
             <MapIcon className="w-3.5 h-3.5" />
           </IconCircleButton>
-          {onOpenNotebook && isSpeaker && (
+          {onOpenNotebook && (
             <IconCircleButton
               onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
               active={notebookOpen}
-              title="My notes"
+              title="Notebook"
               ariaLabel="Toggle notebook"
             >
-              <NotebookPen className="w-3.5 h-3.5" />
+              <BookOpen className="w-3.5 h-3.5" />
             </IconCircleButton>
           )}
           {showSpeakerPause && (
@@ -488,16 +488,6 @@ const ParticipantSharedView = ({
             })}
           />
 
-          {/* Translucent notebook overlay */}
-          <NotebookOverlay
-            open={notebookOpen}
-            onClose={() => onCloseNotebook?.()}
-            value={notebookContent}
-            onChange={(v) => onNotebookContentChange?.(v)}
-            recordType="debate"
-            recordId={debate.id}
-          />
-
           {/* §21 Premium Performance Intelligence — floating bubble */}
           <FloatingIntelligence
             sessionId={debate.id}
@@ -578,14 +568,14 @@ const ParticipantSharedView = ({
                 >
                   <MapIcon className="w-3.5 h-3.5" />
                 </IconCircleButton>
-                {onOpenNotebook && isSpeaker && (
+                {onOpenNotebook && (
                   <IconCircleButton
                     onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
                     active={notebookOpen}
-                    title="My notes"
+                    title="Notebook"
                     ariaLabel="Toggle notebook"
                   >
-                    <NotebookPen className="w-3.5 h-3.5" />
+                    <BookOpen className="w-3.5 h-3.5" />
                   </IconCircleButton>
                 )}
                 {showSpeakerPause && (
