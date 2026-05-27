@@ -5,6 +5,8 @@ export interface PreviewSummary {
   id: string;
   side: string;
   content: string;
+  originalContent?: string;
+  isEdited?: boolean;
 }
 
 export interface PreviewThread {
@@ -78,14 +80,56 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
       if (cancelled) return;
 
       const bySub = new Map<string, { side: string; content: string }[]>();
+      // Track round_summary id + item_index so we can overlay per-item edits.
+      const itemMeta = new Map<string, { roundSummaryId: string; itemIndex: number }>();
       (roundSummaries || []).forEach((rs: any) => {
         const items = ((rs.key_arguments as any[]) || [])
-          .map((k) => ({
+          .map((k, idx) => ({
             side: String(k?.side ?? "").trim(),
             content: String(k?.content ?? "").trim(),
+            _idx: idx,
+            _rsid: rs.id,
           }))
           .filter((k) => k.content);
-        bySub.set(rs.subtopic_id, items);
+        items.forEach((it) => {
+          itemMeta.set(`${it._rsid}:${it._idx}`, {
+            roundSummaryId: it._rsid,
+            itemIndex: it._idx,
+          });
+        });
+        bySub.set(
+          rs.subtopic_id,
+          items.map((it) => ({ side: it.side, content: it.content })),
+        );
+      });
+
+      // Load per-item edits and build an overlay map keyed by rsid:idx.
+      const editOverlay = new Map<string, { edited: string; original: string }>();
+      const rsIds = (roundSummaries || []).map((rs: any) => rs.id);
+      if (rsIds.length > 0) {
+        const { data: editRows } = await supabase
+          .from("round_summary_item_edits" as any)
+          .select("round_summary_id, item_index, original_content, edited_content")
+          .in("round_summary_id", rsIds);
+        if (cancelled) return;
+        (editRows as any[] | null)?.forEach((er) => {
+          editOverlay.set(`${er.round_summary_id}:${er.item_index}`, {
+            edited: String(er.edited_content ?? "").trim(),
+            original: String(er.original_content ?? "").trim(),
+          });
+        });
+      }
+
+      // Re-walk bySub items so edited content overrides the original wording.
+      (roundSummaries || []).forEach((rs: any) => {
+        const list = bySub.get(rs.subtopic_id) || [];
+        const next = list.map((it, idx) => {
+          const key = `${rs.id}:${idx}`;
+          const edit = editOverlay.get(key);
+          if (!edit) return it;
+          return { ...it, content: edit.edited, _original: edit.original, _edited: true } as any;
+        });
+        bySub.set(rs.subtopic_id, next);
       });
 
       // Fallback: when no round_summaries are stored, reuse the live
@@ -129,10 +173,16 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
 
         // Group by side, ordered by sideLabels.
         const grouped = new Map<string, PreviewSummary[]>();
-        items.forEach((it, idx) => {
+        items.forEach((it: any, idx) => {
           const key = it.side || "Unattributed";
           const arr = grouped.get(key) || [];
-          arr.push({ id: `${sub.id}:${idx}`, side: key, content: it.content });
+          arr.push({
+            id: `${sub.id}:${idx}`,
+            side: key,
+            content: it.content,
+            originalContent: it._original,
+            isEdited: !!it._edited,
+          });
           grouped.set(key, arr);
         });
 

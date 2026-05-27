@@ -2362,6 +2362,45 @@ export type Database = {
           },
         ]
       }
+      round_summary_item_edits: {
+        Row: {
+          created_at: string
+          debate_id: string
+          edited_by: string
+          edited_content: string
+          id: string
+          item_index: number
+          original_content: string
+          round_summary_id: string
+          side_label: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          debate_id: string
+          edited_by: string
+          edited_content: string
+          id?: string
+          item_index: number
+          original_content: string
+          round_summary_id: string
+          side_label: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          debate_id?: string
+          edited_by?: string
+          edited_content?: string
+          id?: string
+          item_index?: number
+          original_content?: string
+          round_summary_id?: string
+          side_label?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sales_leads: {
         Row: {
           contact_email: string
