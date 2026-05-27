@@ -381,6 +381,11 @@ const ParticipantSharedView = ({
               ariaLabel="Toggle speaker pause"
             >
               {speakerPauseActive ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+              {speakerPauseActive && (
+                <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[9px] font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                  {pauseCountdownLabel}
+                </span>
+              )}
             </IconCircleButton>
           )}
         </div>
