@@ -37,10 +37,7 @@ import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ContinueButton from "@/components/record/ContinueButton";
-import ArgumentMapOverlay from "@/components/debate/ArgumentMapOverlay";
-import NotebookOverlay from "@/components/debate/NotebookOverlay";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
-import { Map as MapIcon, NotebookPen } from "lucide-react";
 
 
 type UserRole = "facilitator" | "speaker" | "spectator";
@@ -71,6 +68,7 @@ interface DebateData {
   prep_side2_ready: boolean;
   feedback_enabled?: boolean;
   paused_at?: string | null;
+  speaker_paused_at?: string | null;
 }
 
 interface Side { id: string; label: string; sort_order: number; }
