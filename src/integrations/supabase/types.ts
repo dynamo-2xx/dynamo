@@ -1251,6 +1251,9 @@ export type Database = {
           prep_time_max: string
           prep_time_min: string
           scheduled_at: string | null
+          speaker_pause_owner_id: string | null
+          speaker_pause_used_turn_key: string | null
+          speaker_paused_at: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["debate_status"]
           time_per_turn: string
@@ -1301,6 +1304,9 @@ export type Database = {
           prep_time_max?: string
           prep_time_min?: string
           scheduled_at?: string | null
+          speaker_pause_owner_id?: string | null
+          speaker_pause_used_turn_key?: string | null
+          speaker_paused_at?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["debate_status"]
           time_per_turn?: string
@@ -1351,6 +1357,9 @@ export type Database = {
           prep_time_max?: string
           prep_time_min?: string
           scheduled_at?: string | null
+          speaker_pause_owner_id?: string | null
+          speaker_pause_used_turn_key?: string | null
+          speaker_paused_at?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["debate_status"]
           time_per_turn?: string
@@ -3366,6 +3375,7 @@ export type Database = {
           status: string
         }[]
       }
+      resume_speaker_pause: { Args: { _debate_id: string }; Returns: undefined }
       search_profile_cards: {
         Args: { _limit?: number; _q: string }
         Returns: {
