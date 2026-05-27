@@ -41,7 +41,7 @@ const FeaturedCard = ({ d }: Props) => {
       className="snap-start shrink-0 w-[78vw] sm:w-[44vw] md:w-[calc((100%-1.5rem)/3)] group"
     >
       <div
-        className="relative w-full aspect-[16/10] rounded-xl overflow-hidden border border-border transition-colors group-hover:border-foreground/30 flex flex-col"
+        className="relative w-full aspect-[4/3] md:aspect-[5/4] lg:aspect-[16/10] rounded-xl overflow-hidden border border-border transition-colors group-hover:border-foreground/30 flex flex-col"
         style={bg}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
@@ -54,8 +54,8 @@ const FeaturedCard = ({ d }: Props) => {
             {label}
           </span>
         </div>
-        <div className="relative mt-auto p-2.5 sm:p-3 md:p-3 lg:p-4 min-w-0 z-10">
-          <h3 className="font-display text-white text-sm md:text-sm lg:text-lg leading-tight line-clamp-2 drop-shadow break-words [overflow-wrap:anywhere] hyphens-auto">
+        <div className="relative mt-auto p-2.5 sm:p-3 lg:p-4 min-w-0 z-10">
+          <h3 className="font-display text-white text-sm md:text-base lg:text-lg leading-tight line-clamp-2 drop-shadow break-words [overflow-wrap:anywhere] hyphens-auto">
             {d.topic}
           </h3>
           <div className="mt-1.5 flex items-center gap-3 text-[11px] text-white/80 font-body">
