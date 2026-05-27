@@ -54,6 +54,40 @@ const sideColorClass = (sideLabel: string, labels: string[]): string => {
   return SIDE_CLASS[(idx >= 0 ? idx : 0) % SIDE_CLASS.length];
 };
 
+const SummaryItem = ({
+  summary,
+  colorClass,
+}: {
+  summary: { id: string; content: string; originalContent?: string; isEdited?: boolean };
+  colorClass: string;
+}) => {
+  const [showOriginal, setShowOriginal] = useState(false);
+  const displayed =
+    summary.isEdited && showOriginal && summary.originalContent
+      ? summary.originalContent
+      : summary.content;
+  return (
+    <li className="flex items-start gap-2">
+      <span className={cn("mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-current", colorClass)} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-body text-foreground/90 leading-relaxed" data-annotatable>
+          {displayed}
+        </p>
+        {summary.isEdited && (
+          <button
+            onClick={() => setShowOriginal((v) => !v)}
+            className="mt-1 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+            title="Toggle original / edited"
+          >
+            <RotateCcw className="w-3 h-3" />
+            {showOriginal ? "original" : "edited"}
+          </button>
+        )}
+      </div>
+    </li>
+  );
+};
+
 const DebateRecordPreview = ({
   debateId,
   topic,
