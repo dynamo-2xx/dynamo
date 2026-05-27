@@ -2574,6 +2574,7 @@ export type Database = {
           forked_from_id: string | null
           id: string
           my_take: string | null
+          publish_caption: string | null
           published: boolean
           published_at: string | null
           record_id: string
@@ -2594,6 +2595,7 @@ export type Database = {
           forked_from_id?: string | null
           id?: string
           my_take?: string | null
+          publish_caption?: string | null
           published?: boolean
           published_at?: string | null
           record_id: string
@@ -2614,6 +2616,7 @@ export type Database = {
           forked_from_id?: string | null
           id?: string
           my_take?: string | null
+          publish_caption?: string | null
           published?: boolean
           published_at?: string | null
           record_id?: string
@@ -2751,6 +2754,53 @@ export type Database = {
             columns: ["parent_tag_id"]
             isOneToOne: false
             referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      takes: {
+        Row: {
+          author_id: string
+          body: string
+          comment_count: number
+          created_at: string
+          id: string
+          is_public: boolean
+          like_count: number
+          location: string | null
+          parent_take_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          comment_count?: number
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          like_count?: number
+          location?: string | null
+          parent_take_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          comment_count?: number
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          like_count?: number
+          location?: string | null
+          parent_take_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "takes_parent_take_id_fkey"
+            columns: ["parent_take_id"]
+            isOneToOne: false
+            referencedRelation: "takes"
             referencedColumns: ["id"]
           },
         ]
