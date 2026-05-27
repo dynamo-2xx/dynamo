@@ -10,6 +10,7 @@ export interface Take {
   comment_count: number;
   is_public: boolean;
   location: string | null;
+  club_id?: string | null;
   created_at: string;
   // hydrated
   author_name?: string | null;
@@ -21,7 +22,7 @@ export function useTakeCreate() {
   const [busy, setBusy] = useState(false);
 
   const createTake = useCallback(
-    async (body: string): Promise<Take | null> => {
+    async (body: string, opts?: { clubId?: string | null }): Promise<Take | null> => {
       if (!user) return null;
       const trimmed = body.trim();
       if (!trimmed) return null;
@@ -40,6 +41,7 @@ export function useTakeCreate() {
             author_id: user.id,
             body: trimmed,
             location: prof?.location ?? null,
+            club_id: opts?.clubId ?? null,
           })
           .select("*")
           .single();
