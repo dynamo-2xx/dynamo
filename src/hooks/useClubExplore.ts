@@ -160,7 +160,7 @@ export function useClubFeed(clubId: string | undefined, recordIds: string[]) {
         .limit(PAGE);
       if (before) takesQ = takesQ.lt("created_at", before);
 
-      let nbReq: Promise<any> = Promise.resolve({ data: [] as any[] });
+      let nbReq: any = Promise.resolve({ data: [] as any[] });
       if (recordIds.length > 0) {
         let nbQ = supabase
           .from("session_notebooks" as any)
@@ -176,10 +176,7 @@ export function useClubFeed(clubId: string | undefined, recordIds: string[]) {
         nbReq = nbQ;
       }
 
-      const [takesRes, nbRes] = await Promise.all([
-        takesQ as unknown as Promise<any>,
-        nbReq,
-      ]);
+      const [takesRes, nbRes] = await Promise.all([takesQ, nbReq]);
       const takesData = ((takesRes.data as any) || []) as Take[];
       const nbData = ((nbRes.data as any) || []) as FeedNotebook[];
 
