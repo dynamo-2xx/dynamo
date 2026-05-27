@@ -18,6 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
 import { toast } from "sonner";
+import { useSpeakerPause } from "@/hooks/useSpeakerPause";
 
 interface Side { id: string; label: string; sort_order: number; }
 interface Subtopic { id: string; title: string; sort_order: number; }
@@ -103,70 +104,30 @@ const ParticipantSharedView = ({
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [argumentMapOpen, setArgumentMapOpen] = useState(false);
 
-  // Speaker pause: when a speaker pauses their own turn clock we auto-resume
-  // after 30s so the debate cannot stall, and we only allow one pause per turn.
-  const SPEAKER_PAUSE_MAX_MS = 30_000;
-  const speakerResumeTimerRef = useRef<number | null>(null);
-  const [pauseStartedAt, setPauseStartedAt] = useState<number | null>(null);
-  const [pauseRemainingMs, setPauseRemainingMs] = useState(0);
-  const [pauseUsedThisTurn, setPauseUsedThisTurn] = useState(false);
-  const clearSpeakerResume = () => {
-    if (speakerResumeTimerRef.current) {
-      window.clearTimeout(speakerResumeTimerRef.current);
-      speakerResumeTimerRef.current = null;
-    }
-    setPauseStartedAt(null);
-    setPauseRemainingMs(0);
-  };
-  useEffect(() => () => clearSpeakerResume(), []);
-
-  // Reset the "one pause per turn" guard whenever the turn identity changes.
+  // Server-backed speaker pause (separate from the host's facilitator pause).
+  // Persisted on `debates.speaker_paused_at`, gated to one per turn via
+  // `speaker_pause_used_turn_key`, with server-trusted 30s auto-resume.
   const turnKey = `${debate.current_subtopic_index}:${debate.current_turn}:${debate.current_speaker_side_id ?? ""}`;
-  useEffect(() => {
-    setPauseUsedThisTurn(false);
-    clearSpeakerResume();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turnKey]);
-
-  // 1Hz countdown while the speaker pause is active.
-  useEffect(() => {
-    if (pauseStartedAt == null) return;
-    const tick = () => {
-      const remaining = Math.max(0, SPEAKER_PAUSE_MAX_MS - (Date.now() - pauseStartedAt));
-      setPauseRemainingMs(remaining);
-    };
-    tick();
-    const interval = window.setInterval(tick, 250);
-    return () => window.clearInterval(interval);
-  }, [pauseStartedAt]);
+  const {
+    isPaused: speakerPauseActive,
+    usedThisTurn: pauseUsedThisTurn,
+    remainingMs: pauseRemainingMs,
+    pause: pauseSpeaker,
+    resume: resumeSpeaker,
+  } = useSpeakerPause({
+    debateId: debate.id,
+    turnKey,
+    canControl: isSpeaker && isMyTurn,
+    ownerId: userId ?? null,
+  });
 
   const handleSpeakerPauseToggle = () => {
-    if (!onToggleTimer) return;
-    if (timerRunning) {
-      if (pauseUsedThisTurn) {
-        toast.message("You've already used your pause this turn.");
-        return;
-      }
-      onToggleTimer();
-      setPauseUsedThisTurn(true);
-      setPauseStartedAt(Date.now());
-      setPauseRemainingMs(SPEAKER_PAUSE_MAX_MS);
-      speakerResumeTimerRef.current = window.setTimeout(() => {
-        onToggleTimer();
-        speakerResumeTimerRef.current = null;
-        setPauseStartedAt(null);
-        setPauseRemainingMs(0);
-      }, SPEAKER_PAUSE_MAX_MS);
-    } else {
-      clearSpeakerResume();
-      onToggleTimer();
-    }
+    if (speakerPauseActive) void resumeSpeaker();
+    else void pauseSpeaker();
   };
 
-  // Publisher-speakers also need the per-turn pause — gating on `!isPublisher`
-  // hid it for the host the moment they joined as a speaker.
-  const showSpeakerPause = isSpeaker && isMyTurn && !!onToggleTimer;
-  const speakerPauseActive = !timerRunning && pauseStartedAt != null;
+  // Publisher-speakers also need the per-turn pause.
+  const showSpeakerPause = isSpeaker && isMyTurn;
   const pauseCountdownLabel = `${Math.ceil(pauseRemainingMs / 1000)}s`;
 
   // Camera state — independently toggleable per participant
