@@ -156,7 +156,6 @@ const ParticipantSharedView = ({
       setPauseUsedThisTurn(true);
       pauseStartedAtRef.current = Date.now();
       setPauseRemainingMs(SPEAKER_PAUSE_MAX_MS);
-      clearSpeakerResume = clearSpeakerResume;
       speakerResumeTimerRef.current = window.setTimeout(() => {
         onToggleTimer();
         speakerResumeTimerRef.current = null;
