@@ -539,6 +539,15 @@ const DebateRoomPage = () => {
   const activeSpeakerParticipant = sideSpeakers[currentSpeakerIndex];
   const isMyTurn = activeSpeakerParticipant?.user_id === user?.id && debate?.status === "live";
 
+  // Privacy: when this user is no longer the active speaker, force their mic
+  // off so Deepgram disconnects. Prevents off-turn speakers from continuing
+  // to stream audio that gets mis-attributed to the new speaker's side.
+  useEffect(() => {
+    if (!isMyTurn && deepgramActive) {
+      setDeepgramActive(false);
+    }
+  }, [isMyTurn, deepgramActive]);
+
   const isCreator = user?.id === debate?.created_by;
   const isFacilitator = userRole === "facilitator";
   const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
@@ -561,6 +570,8 @@ const DebateRoomPage = () => {
   // Enter preparation phase between turns (called by any speaker/facilitator when timer expires)
   const enterPrepPhase = useCallback(() => {
      if (!debate || !myParticipant || debate.prep_phase_active) return;
+     // Privacy: stop transcription before we transition into prep.
+     setDeepgramActive(false);
 
      const outgoingSideLabel = currentSide?.label || "";
      // Determine role: if I'm on the side that was just speaking, I'm "outgoing"; otherwise "incoming"
@@ -1246,6 +1257,9 @@ const DebateRoomPage = () => {
   const endTurnEarly = () => {
      if (!isMyTurn) return;
      turnEndTriggeredRef.current = true;
+    // Privacy: end-turn-early must also stop local transcription so the mic
+    // doesn't keep streaming during the prep phase or the next speaker's turn.
+    setDeepgramActive(false);
     setTimerRunning(false);
     setTimeLeft(0);
     enterPrepPhase();
