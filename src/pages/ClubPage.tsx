@@ -10,8 +10,9 @@ import { useClubEvents } from "@/hooks/useClubEvents";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useRecordTags } from "@/hooks/useTags";
+import ClubExploreTab from "@/components/clubs/ClubExploreTab";
 
-type Tab = "events" | "members" | "about";
+type Tab = "events" | "explore" | "members" | "about";
 
 const ClubPage = () => {
   const { id } = useParams();
@@ -201,7 +202,7 @@ const ClubPage = () => {
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-border mb-6">
-          {(["events", "members", "about"] as Tab[]).map((t) => (
+          {(["events", "explore", "members", "about"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -214,6 +215,14 @@ const ClubPage = () => {
             </button>
           ))}
         </div>
+
+        {tab === "explore" && (
+          gated ? (
+            <GatedPreview onJoin={join} busy={busy} pending={pendingRequest} kind="events" />
+          ) : (
+            <ClubExploreTab clubId={club.id} isMember={isMember} isAdmin={isAdmin} />
+          )
+        )}
 
         {tab === "events" && (
           gated ? (
