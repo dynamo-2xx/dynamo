@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Mic, MicOff, Send, SkipForward, ChevronDown,
   Users, Pause, Play,
-  Video, VideoOff, Maximize2, Minimize2, Map as MapIcon, NotebookPen,
+  Video, VideoOff, Maximize2, Minimize2, Map as MapIcon, BookOpen,
 } from "lucide-react";
 import DebateTimer from "./DebateTimer";
 import MessengerChat from "./MessengerChat";
@@ -13,7 +13,6 @@ import RoundSummaryCard from "./RoundSummaryCard";
 import DLogoButton from "./DLogoButton";
 import IconCircleButton from "./IconCircleButton";
 import ArgumentMapOverlay from "./ArgumentMapOverlay";
-import NotebookOverlay from "./NotebookOverlay";
 import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
@@ -356,14 +355,14 @@ const ParticipantSharedView = ({
           >
             <MapIcon className="w-3.5 h-3.5" />
           </IconCircleButton>
-          {onOpenNotebook && isSpeaker && (
+          {onOpenNotebook && (
             <IconCircleButton
               onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
               active={notebookOpen}
-              title="My notes"
+              title="Notebook"
               ariaLabel="Toggle notebook"
             >
-              <NotebookPen className="w-3.5 h-3.5" />
+              <BookOpen className="w-3.5 h-3.5" />
             </IconCircleButton>
           )}
           {showSpeakerPause && (
@@ -489,16 +488,6 @@ const ParticipantSharedView = ({
             })}
           />
 
-          {/* Translucent notebook overlay */}
-          <NotebookOverlay
-            open={notebookOpen}
-            onClose={() => onCloseNotebook?.()}
-            value={notebookContent}
-            onChange={(v) => onNotebookContentChange?.(v)}
-            recordType="debate"
-            recordId={debate.id}
-          />
-
           {/* §21 Premium Performance Intelligence — floating bubble */}
           <FloatingIntelligence
             sessionId={debate.id}
@@ -579,14 +568,14 @@ const ParticipantSharedView = ({
                 >
                   <MapIcon className="w-3.5 h-3.5" />
                 </IconCircleButton>
-                {onOpenNotebook && isSpeaker && (
+                {onOpenNotebook && (
                   <IconCircleButton
                     onClick={() => (notebookOpen ? onCloseNotebook?.() : onOpenNotebook())}
                     active={notebookOpen}
-                    title="My notes"
+                    title="Notebook"
                     ariaLabel="Toggle notebook"
                   >
-                    <NotebookPen className="w-3.5 h-3.5" />
+                    <BookOpen className="w-3.5 h-3.5" />
                   </IconCircleButton>
                 )}
                 {showSpeakerPause && (

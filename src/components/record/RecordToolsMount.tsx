@@ -16,6 +16,12 @@ interface RecordToolsMountProps {
   subtopics: string[];
   summaries?: LiveSummary[];
   speakerNames?: Record<string, string>;
+  /** When true, hide the floating bottom-right notebook FAB (the panel can still be opened via controlled `open`). */
+  hideFab?: boolean;
+  /** Controlled open state. When provided, the internal toggle defers to this. */
+  open?: boolean;
+  /** Notified whenever the panel opens/closes (both controlled and uncontrolled). */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -30,8 +36,17 @@ const RecordToolsMount = ({
   subtopics,
   summaries = [],
   speakerNames = {},
+  hideFab = false,
+  open: openProp,
+  onOpenChange,
 }: RecordToolsMountProps) => {
-  const [open, setOpen] = useState(false);
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = openProp ?? openInternal;
+  const setOpen = (next: boolean | ((v: boolean) => boolean)) => {
+    const value = typeof next === "function" ? (next as (v: boolean) => boolean)(open) : next;
+    if (openProp === undefined) setOpenInternal(value);
+    onOpenChange?.(value);
+  };
   const notebook = useSessionNotebook({ recordType, recordId });
   const supportsAnnotations = recordType !== "imported_record";
   const annotations = useSessionAnnotations({
@@ -66,13 +81,15 @@ const RecordToolsMount = ({
         />
       )}
 
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-6 right-6 z-40 w-11 h-11 rounded-full bg-background border border-foreground/10 shadow-sm flex items-center justify-center hover:bg-foreground/[0.04] transition-colors"
-        aria-label="Open notebook"
-      >
-        <BookOpen className="w-5 h-5 text-foreground" />
-      </button>
+      {!hideFab && (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="fixed bottom-6 right-6 z-40 w-11 h-11 rounded-full bg-background border border-foreground/10 shadow-sm flex items-center justify-center hover:bg-foreground/[0.04] transition-colors"
+          aria-label="Open notebook"
+        >
+          <BookOpen className="w-5 h-5 text-foreground" />
+        </button>
+      )}
 
       <NotebookPanel
         open={open}
