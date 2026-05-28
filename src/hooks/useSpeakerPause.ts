@@ -76,22 +76,26 @@ export function useSpeakerPause(opts: {
       return;
     }
     const startedAt = new Date(state.speaker_paused_at).getTime();
+    // Each client deterministically computes an auto-resume window. The pause
+    // owner fires the RPC immediately at t=PAUSE_MAX_MS. Any other client acts
+    // as a safety net after a small grace so the room never stalls if the
+    // owner has disconnected. The RPC itself is idempotent.
+    const isOwner = !!ownerId && state.speaker_pause_owner_id === ownerId;
+    const triggerAt = isOwner ? PAUSE_MAX_MS : PAUSE_MAX_MS + 1_500;
+    let fired = false;
     const tick = () => {
       const remaining = Math.max(0, PAUSE_MAX_MS - (Date.now() - startedAt));
       setRemainingMs(remaining);
-      if (remaining <= 0 && canControl && debateId) {
-        // Auto-resume — only the owner of the pause issues the RPC to avoid
-        // every client racing the resume; fall back to anyone with control if
-        // owner mismatch (e.g. rejoin) so the room never stalls.
-        if (!state.speaker_pause_owner_id || state.speaker_pause_owner_id === ownerId) {
-          void supabase.rpc("resume_speaker_pause" as any, { _debate_id: debateId });
-        }
+      const elapsed = Date.now() - startedAt;
+      if (!fired && elapsed >= triggerAt && debateId) {
+        fired = true;
+        void supabase.rpc("resume_speaker_pause" as any, { _debate_id: debateId });
       }
     };
     tick();
     const interval = window.setInterval(tick, 250);
     return () => window.clearInterval(interval);
-  }, [isPaused, state.speaker_paused_at, state.speaker_pause_owner_id, canControl, debateId, ownerId]);
+  }, [isPaused, state.speaker_paused_at, state.speaker_pause_owner_id, debateId, ownerId]);
 
   const pause = useCallback(async () => {
     if (!debateId || !canControl) return;
