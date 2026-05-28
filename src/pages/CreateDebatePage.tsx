@@ -52,6 +52,23 @@ const TAGLINES = [
 const TIME_OPTIONS = ["30s", "1 min", "2 min", "3 min", "5 min"];
 const PREP_TIME_OPTIONS = ["0s", "15s", "30s", "45s", "1 min", "1.5 min", "2 min", "2.5 min", "3 min", "3.5 min", "4 min", "4.5 min", "5 min"];
 
+const normalizeSideLabels = (raw: unknown): string[] => {
+  const labels = Array.isArray(raw)
+    ? raw.map((s) => String(s ?? "").trim()).filter(Boolean)
+    : [];
+  const first = labels[0] || "In Favor";
+  const second =
+    labels.find((label, idx) => idx > 0 && label.toLowerCase() !== first.toLowerCase()) ||
+    "Opposed";
+  return [first, second];
+};
+
+const normalizeDebateTemplate = (value: GeneratedDebate): GeneratedDebate => ({
+  ...value,
+  subtopics: value.subtopics.map((s) => s.trim()).filter(Boolean),
+  sides: normalizeSideLabels(value.sides),
+});
+
 const CreateDebatePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
