@@ -111,12 +111,17 @@ You will receive transcript entries as JSON objects, each with an "id", "speaker
    - Threads are SCOPED WITHIN A SUBTOPIC. When the subtopic changes, any open thread is closed.
    - Use stable thread IDs of the form "thread-1", "thread-2", etc. — number them in order of first appearance.
    - Every entry MUST be assigned to exactly one thread.
+   - PREFER FEWER, DEEPER THREADS. Default to attaching an entry as a counter or continuation of the nearest open thread it is logically related to. ONLY create a brand-new thread when the speaker is clearly introducing a substantively different claim that does not respond to or extend any prior open thread.
+   - Quotes, stakes, evidence, and supporting examples are NEVER root arguments — they must always be "continuation" (if same side reinforces) or "counter" (if other side rebuts) of an existing thread, with parent_entry_id set.
+   - If two candidate threads in the same subtopic would have nearly-identical titles (e.g. both "Contesting cost estimates"), MERGE them into one thread — re-use the earlier thread_id for the later entries.
+   - Do not create more than one open thread per (subtopic, speaker_side) pair unless that side has clearly pivoted to a substantively new claim.
 
 6. THREAD TITLES:
    - For EACH thread, generate a short 3–7 word title in sentence case that captures the SPECIFIC point being argued (NOT the subtopic name).
    - Example: under subtopic "Infrastructure Costs", a thread title could be "Funding via municipal bonds" or "Long-term maintenance burden" — never just "Infrastructure Costs".
    - If a thread only has 1 entry and the point is unclear, use a tentative noun phrase from the entry itself.
    - Title MUST be different from the subtopic label.
+   - Titles within the same subtopic MUST be distinct (no two threads with the same or near-identical title). If you would otherwise produce duplicates, merge those threads instead.
 
 EXAMPLE — given entries:
   [{"id": "e1", "speaker": "Speaker 1", "text": "We should fund the bridge with municipal bonds."},
