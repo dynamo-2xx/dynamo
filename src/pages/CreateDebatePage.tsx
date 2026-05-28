@@ -831,7 +831,7 @@ const CreateDebatePage = () => {
   };
 
 
-  const handleCreateDebate = async (publishMode: boolean = false) => {
+  const handleCreateDebate = async (publishMode: boolean = false, startNow: boolean = false) => {
     if (!debate || !user) return;
     setSaving(true);
 
@@ -1088,15 +1088,18 @@ const CreateDebatePage = () => {
         }
       }
 
-      if (editId) {
-        toast.success("Debate updated");
+      if (startNow) {
+        // Publisher passes through mic-prep just like every other speaker.
+        toast.success(editId ? "Starting debate — test your mic." : "Published! Test your mic to start.");
+        navigate(`/debate/${dbDebate.id}/lobby`);
+      } else if (editId) {
+        toast.success(publishMode ? "Debate published" : "Debate updated");
         navigate(`/debate/${editId}/preview`);
       } else if (publishMode) {
-        // Publisher must pass through mic-prep just like every other speaker.
-        toast.success("Debate published! Test your mic to start.");
-        navigate(`/debate/${dbDebate.id}/lobby`);
+        toast.success("Debate published");
+        navigate(`/debate/${dbDebate.id}/preview`);
       } else {
-        toast.success("Debate created!");
+        toast.success("Draft saved");
         navigate(`/debate/${dbDebate.id}`);
       }
     } catch (err: any) {
