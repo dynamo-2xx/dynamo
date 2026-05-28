@@ -362,6 +362,15 @@ const DebateRoomPage = () => {
       const d = debateRes.data as unknown as DebateData;
       const parts = (participantsRes.data || []) as unknown as Participant[];
 
+      // If the debate hasn't started yet, send EVERYONE (creator + invitees +
+      // queued speakers) to the mic-prep lobby. Previously non-creator
+      // invitees landed in an empty room because the lobby route was only
+      // reached via the create flow.
+      if (d.status === "draft" || d.status === "scheduled") {
+        navigate(`/debate/${id}/lobby`, { replace: true });
+        return;
+      }
+
       setDebate(d);
       setSides(sidesRes.data || []);
       setSubtopics(subtopicsRes.data || []);
