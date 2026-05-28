@@ -1483,6 +1483,22 @@ const DebateRoomPage = () => {
         </div>
       </header>
 
+      {/* Wave 6 §2 — host failover prompt. Visible only when the original host
+          appears offline (>60s without heartbeat) and the viewer is allowed to
+          take over. Auto-disappears once someone claims. */}
+      {hostFailover.canClaim && !isCompleted && (
+        <div className="mx-3 mt-2 flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 rounded-lg px-3 py-2 text-xs">
+          <span>Host appears offline. Take over to keep the debate moving.</span>
+          <button
+            type="button"
+            onClick={onClaimHost}
+            className="bg-amber-600 text-white font-semibold px-3 py-1 rounded-md hover:bg-amber-700 transition-colors"
+          >
+            Take control
+          </button>
+        </div>
+      )}
+
       {/* Mic/Connection error banners */}
       {micError && (
         <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2.5 flex items-center gap-2">
