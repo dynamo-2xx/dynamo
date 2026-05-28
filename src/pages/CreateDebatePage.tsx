@@ -57,6 +57,10 @@ const CreateDebatePage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get("edit");
+  // Effective edit id: once a draft has been persisted (either via ?edit= in the
+  // URL OR via the auto-draft effect that runs when we reach the invite step),
+  // the invite panel should behave as in edit-mode: enable inline "Invite people"
+  // dialog, show the "Interested" list, and route invitees to the mic-prep lobby.
   const [step, setStep] = useState<1 | 2 | 3 | 4>(editId ? 2 : 1);
   const [editLoading, setEditLoading] = useState(!!editId);
   const [loadedStatus, setLoadedStatus] = useState<string | null>(null);
