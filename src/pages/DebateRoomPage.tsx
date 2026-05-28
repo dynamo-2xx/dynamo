@@ -575,6 +575,39 @@ const DebateRoomPage = () => {
   const canSpeak = isSpeaker && isMyTurn && isLive && !prepPhaseRole;
   const micEnabled = canSpeak;
 
+  // Wave 6 §2 — Host failover. If owner heartbeat lapses >60s, any speaker /
+  // facilitator / creator can reclaim the host role so the room never stalls.
+  const hostFailover = useDebateHostFailover({
+    debateId: id,
+    userId: user?.id,
+    status: debate?.status,
+    isParticipant: !!myParticipant || isCreator || isFacilitator,
+  });
+  const onClaimHost = useCallback(async () => {
+    const ok = await hostFailover.claim();
+    if (ok) toast.success("You're now hosting this debate");
+    else toast.error("Couldn't take host — original host is still active");
+  }, [hostFailover]);
+
+  // Wave 6 §4 — Public/private toggle for completed records.
+  const [togglingPublic, setTogglingPublic] = useState(false);
+  const onTogglePublic = useCallback(async () => {
+    if (!debate || !isCreator) return;
+    const next = !debate.is_public;
+    setTogglingPublic(true);
+    const { error } = await supabase
+      .from("debates")
+      .update({ is_public: next })
+      .eq("id", debate.id);
+    setTogglingPublic(false);
+    if (error) {
+      toast.error("Couldn't update visibility");
+      return;
+    }
+    setDebate((prev) => (prev ? { ...prev, is_public: next } : prev));
+    toast.success(next ? "Record is now public" : "Record is now private");
+  }, [debate, isCreator]);
+
   const advancingRef = useRef(false);
 
    // Determine which side index (0 or 1) the current user is on
