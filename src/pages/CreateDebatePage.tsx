@@ -157,10 +157,15 @@ const CreateDebatePage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // When the user flips to In-person mode and we don't have a debate row yet,
-  // persist a minimal draft so a join_code is auto-generated and visible.
+  // Persist a minimal draft as soon as the user reaches the invite step (3),
+  // OR flips to In-person mode (which needs a join_code immediately).
+  // This makes the prompt-template /create flow behave like the edit-debate
+  // /create flow: invitee search, "Interested" list, and inline "Invite people"
+  // dialog all light up because `editId` (via URL) is now populated.
   useEffect(() => {
-    if (joinMode !== "in_person") return;
+    const needsDraftForInPerson = joinMode === "in_person";
+    const needsDraftForInvite = step >= 3;
+    if (!needsDraftForInPerson && !needsDraftForInvite) return;
     if (draftDebateId) return; // already have one (edit mode or previously created)
     if (!debate || !user) return;
 
@@ -246,7 +251,7 @@ const CreateDebatePage = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joinMode, draftDebateId, debate, user]);
+  }, [joinMode, step, draftDebateId, debate, user]);
 
   // Persist max_speakers_per_side changes immediately on existing drafts.
   useEffect(() => {
