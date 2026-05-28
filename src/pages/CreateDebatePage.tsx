@@ -287,6 +287,14 @@ const CreateDebatePage = () => {
   }, [debate?.subtopics]);
 
   useEffect(() => {
+    if (!debate || debate.sides.length <= 2) return;
+    setDebate(normalizeDebateTemplate(debate));
+    setSideIds((prev) => prev.slice(0, 2));
+    setDraftSideIds((prev) => (prev ? prev.slice(0, 2) : prev));
+    setCreatorSideIndex((prev) => Math.min(prev, 1));
+  }, [debate]);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setTaglineIndex((prev) => (prev + 1) % TAGLINES.length);
     }, 5000);
