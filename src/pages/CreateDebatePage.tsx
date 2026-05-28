@@ -486,7 +486,7 @@ const CreateDebatePage = () => {
         navigate(`/debate/${editId}/preview`, { replace: true });
         return;
       }
-      setDebate({
+      const loadedTemplate = normalizeDebateTemplate({
         topic: d.topic,
         subtopics: (subs || []).map((s: any) => s.title),
         sides: (sds || []).map((s: any) => s.label),
@@ -494,7 +494,9 @@ const CreateDebatePage = () => {
         timePerTurn: d.time_per_turn,
         prepTime: d.prep_time_min || "30s",
       });
-      setSideIds((sds || []).map((s: any) => s.id as string));
+      const loadedSideIds = (sds || []).slice(0, 2).map((s: any) => s.id as string);
+      setDebate(loadedTemplate);
+      setSideIds(loadedSideIds);
       setIsPublic(d.is_public);
       setLocation(d.location || "");
       setScheduledAt(
@@ -511,7 +513,7 @@ const CreateDebatePage = () => {
       // Edit mode: this debate already exists, so it has a join_code we can show.
       setDraftDebateId(editId);
       setDraftJoinCode(d.join_code ?? null);
-      setDraftSideIds((sds || []).map((s: any) => s.id as string));
+      setDraftSideIds(loadedSideIds);
       setMaxSpeakersPerSide((d as any).max_speakers_per_side ?? 2);
 
       // Load creator's existing side assignment from debate_participants
