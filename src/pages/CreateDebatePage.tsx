@@ -57,6 +57,10 @@ const CreateDebatePage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get("edit");
+  // Effective edit id: once a draft has been persisted (either via ?edit= in the
+  // URL OR via the auto-draft effect that runs when we reach the invite step),
+  // the invite panel should behave as in edit-mode: enable inline "Invite people"
+  // dialog, show the "Interested" list, and route invitees to the mic-prep lobby.
   const [step, setStep] = useState<1 | 2 | 3 | 4>(editId ? 2 : 1);
   const [editLoading, setEditLoading] = useState(!!editId);
   const [loadedStatus, setLoadedStatus] = useState<string | null>(null);
@@ -157,10 +161,15 @@ const CreateDebatePage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // When the user flips to In-person mode and we don't have a debate row yet,
-  // persist a minimal draft so a join_code is auto-generated and visible.
+  // Persist a minimal draft as soon as the user reaches the invite step (3),
+  // OR flips to In-person mode (which needs a join_code immediately).
+  // This makes the prompt-template /create flow behave like the edit-debate
+  // /create flow: invitee search, "Interested" list, and inline "Invite people"
+  // dialog all light up because `editId` (via URL) is now populated.
   useEffect(() => {
-    if (joinMode !== "in_person") return;
+    const needsDraftForInPerson = joinMode === "in_person";
+    const needsDraftForInvite = step >= 3;
+    if (!needsDraftForInPerson && !needsDraftForInvite) return;
     if (draftDebateId) return; // already have one (edit mode or previously created)
     if (!debate || !user) return;
 
@@ -246,7 +255,7 @@ const CreateDebatePage = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joinMode, draftDebateId, debate, user]);
+  }, [joinMode, step, draftDebateId, debate, user]);
 
   // Persist max_speakers_per_side changes immediately on existing drafts.
   useEffect(() => {
@@ -1397,7 +1406,7 @@ const CreateDebatePage = () => {
                       <Mail className="w-3.5 h-3.5 inline mr-1" />
                       Invite Speakers <span className="normal-case font-normal">(optional)</span>
                     </label>
-                    {editId && (
+                    {(editId || draftDebateId) && (
                       <button
                         type="button"
                         onClick={() => setInviteDialogOpen(true)}
@@ -1426,8 +1435,8 @@ const CreateDebatePage = () => {
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  {/* Interested users (edit mode only) */}
-                  {editId ? (
+                  {/* Interested users (visible as soon as a draft exists) */}
+                  {(editId || draftDebateId) ? (
                     interestedUsers.filter(
                       (u) => !invitedEntries.some((e) => e.userId === u.user_id),
                     ).length > 0 ? (
