@@ -264,9 +264,22 @@ const ArgumentMapContent = ({
                           </span>
                         </CollapsibleTrigger>
                         <CollapsibleContent className="pl-5 py-1 space-y-1.5">
-                          <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
-                            {th.root.content}
-                          </p>
+                          {editable && onEditEntry ? (
+                            <EditableBubbleText
+                              entry={th.root}
+                              onSave={onEditEntry}
+                              onRevert={onRevertEntry}
+                            />
+                          ) : (
+                            <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
+                              {th.root.content}
+                              {th.root.edited && (
+                                <span className="ml-1 text-[9px] uppercase tracking-wide text-muted-foreground/80">
+                                  (edited)
+                                </span>
+                              )}
+                            </p>
+                          )}
                           {th.root.quote && (
                             <p className="text-[11px] italic text-muted-foreground border-l-2 border-foreground/15 pl-2" data-annotatable>
                               "{th.root.quote}"
@@ -282,9 +295,22 @@ const ArgumentMapContent = ({
                                   {c.type}
                                 </span>
                               </div>
-                              <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
-                                {c.content}
-                              </p>
+                              {editable && onEditEntry ? (
+                                <EditableBubbleText
+                                  entry={c}
+                                  onSave={onEditEntry}
+                                  onRevert={onRevertEntry}
+                                />
+                              ) : (
+                                <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
+                                  {c.content}
+                                  {c.edited && (
+                                    <span className="ml-1 text-[9px] uppercase tracking-wide text-muted-foreground/80">
+                                      (edited)
+                                    </span>
+                                  )}
+                                </p>
+                              )}
                               {c.quote && (
                                 <p className="text-[11px] italic text-muted-foreground mt-0.5" data-annotatable>
                                   "{c.quote}"
