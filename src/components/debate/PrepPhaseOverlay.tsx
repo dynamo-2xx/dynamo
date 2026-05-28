@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Edit3, Check, ArrowRight, Loader2 } from "lucide-react";
+import { Edit3, Check, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ArgumentMapContent, {
   type TranscriptEntryInput,
@@ -43,6 +43,9 @@ interface PrepPhaseOverlayProps {
   /** Backing record for the notebook panel — both required to mount it. */
   recordType?: "debate" | "live_session" | "change_my_mind";
   recordId?: string;
+  /** Inline-edit handlers for argument-map bubbles (prep window only). */
+  onEditArgumentMapEntry?: (id: string, newContent: string) => void | Promise<void>;
+  onRevertArgumentMapEntry?: (id: string) => void | Promise<void>;
 }
 
 function parseTimeLabel(seconds: number): string {
@@ -71,11 +74,11 @@ const PrepPhaseOverlay = ({
   argumentMap = [],
   recordType,
   recordId,
+  onEditArgumentMapEntry,
+  onRevertArgumentMapEntry,
 }: PrepPhaseOverlayProps) => {
   const [selectedTime, setSelectedTime] = useState<number | null>(prepTimeMax);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [editedSummary, setEditedSummary] = useState(lastAiSummary || "");
-  const [summarySubmitted, setSummarySubmitted] = useState(false);
   const [markedReady, setMarkedReady] = useState(false);
   const [leftTab, setLeftTab] = useState<"threaded" | "transcript">("threaded");
   const syncedDuration = selectedPrepDuration || selectedTime;
@@ -101,11 +104,6 @@ const PrepPhaseOverlay = ({
 
     return () => clearInterval(interval);
   }, [prepStartedAt, syncedDuration, onReady, markedReady]);
-
-  const handleSubmitSummary = () => {
-    onSummaryEdited?.(editedSummary);
-    setSummarySubmitted(true);
-  };
 
   const handleReady = () => {
     if (markedReady) return;
@@ -159,6 +157,9 @@ const PrepPhaseOverlay = ({
           transcriptEntries={tList}
           argumentMap={argumentMap}
           inline
+          editable={Boolean(onEditArgumentMapEntry)}
+          onEditEntry={onEditArgumentMapEntry}
+          onRevertEntry={onRevertArgumentMapEntry}
         />
       </div>
     </div>
