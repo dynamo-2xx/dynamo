@@ -132,6 +132,51 @@ export function useDeepgramTranscription({
       } as any, { onConflict: "debate_id" });
   }, [debateId]);
 
+  /**
+   * Inline-edit a single argument-map bubble (during prep window). Preserves
+   * the AI-original text in `original_content` so any viewer can revert.
+   * Idempotent: passing the original text clears the edited flag.
+   */
+  const editArgumentMapEntry = useCallback(
+    async (entryId: string, newContent: string) => {
+      let next: ArgumentMapEntry[] = [];
+      setArgumentMap((prev) => {
+        next = prev.map((e) => {
+          if (e.id !== entryId) return e;
+          const original = e.original_content ?? e.content;
+          const trimmed = newContent.trim();
+          const isOriginal = trimmed === original.trim();
+          return {
+            ...e,
+            content: trimmed,
+            original_content: original,
+            edited: !isOriginal,
+          };
+        });
+        argumentMapRef.current = next;
+        return next;
+      });
+      await persistArgumentMap(next);
+    },
+    [persistArgumentMap],
+  );
+
+  const revertArgumentMapEntry = useCallback(
+    async (entryId: string) => {
+      let next: ArgumentMapEntry[] = [];
+      setArgumentMap((prev) => {
+        next = prev.map((e) => {
+          if (e.id !== entryId || !e.original_content) return e;
+          return { ...e, content: e.original_content, edited: false };
+        });
+        argumentMapRef.current = next;
+        return next;
+      });
+      await persistArgumentMap(next);
+    },
+    [persistArgumentMap],
+  );
+
   // Generate AI summary for a single statement
   const generateSummary = useCallback(async (entryId: string, text: string, speakerSide: string) => {
     if (!text.trim()) return;
