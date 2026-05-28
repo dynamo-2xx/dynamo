@@ -13,13 +13,17 @@ export interface TranscriptEntry {
 
 export interface ArgumentMapEntry {
   id: string;
-  type: "claim" | "counter" | "stake" | "quote" | "evidence";
+  type: "claim" | "argument" | "counter" | "stake" | "quote" | "evidence";
   speaker_side: string;
   content: string;
   quote?: string;
   parent_index?: number;
   subtopic: string;
   created_at: number;
+  /** Original AI-generated content, preserved when a user edits the bubble. */
+  original_content?: string;
+  /** True when content has been hand-edited away from original_content. */
+  edited?: boolean;
 }
 
 interface UseDeepgramTranscriptionProps {
