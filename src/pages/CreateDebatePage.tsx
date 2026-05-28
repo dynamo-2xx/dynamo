@@ -615,7 +615,7 @@ const CreateDebatePage = () => {
       if (response.error) throw response.error;
 
       const data = response.data;
-      setDebate({
+      const nextTemplate = normalizeDebateTemplate({
         topic: data.topic,
         subtopics: data.subtopics,
         sides: data.sides,
@@ -623,11 +623,12 @@ const CreateDebatePage = () => {
         timePerTurn: data.time_per_turn,
         prepTime: "1 min",
       });
-      setSideIds((data.sides as string[]).map((_, i) => `new-side-${i}`));
+      setDebate(nextTemplate);
+      setSideIds(nextTemplate.sides.map((_, i) => `new-side-${i}`));
       setStep(3);
     } catch (err) {
       console.error("Generation failed:", err);
-      setDebate({
+      const fallbackTemplate = normalizeDebateTemplate({
         topic: prompt.charAt(0).toUpperCase() + prompt.slice(1) + (prompt.endsWith("?") ? "" : "?"),
         subtopics: ["Key considerations", "Potential impacts", "Alternative approaches"],
         sides: ["For", "Against"],
@@ -635,7 +636,8 @@ const CreateDebatePage = () => {
         timePerTurn: "2 min",
         prepTime: "1 min",
       });
-      setSideIds(["new-side-0", "new-side-1"]);
+      setDebate(fallbackTemplate);
+      setSideIds(fallbackTemplate.sides.map((_, i) => `new-side-${i}`));
       setStep(3);
       toast.error("AI generation had an issue — using a default structure. You can edit everything.");
     }
