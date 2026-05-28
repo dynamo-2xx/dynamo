@@ -1621,6 +1621,27 @@ export type Database = {
         }
         Relationships: []
       }
+      launch_config: {
+        Row: {
+          id: boolean
+          is_public_launched: boolean
+          launched_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          is_public_launched?: boolean
+          launched_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          is_public_launched?: boolean
+          launched_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       live_session_entries: {
         Row: {
           client_ts: string

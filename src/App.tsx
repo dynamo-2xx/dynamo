@@ -74,6 +74,8 @@ import IntelligencePage from "./pages/IntelligencePage";
 import ImportToRecordPage from "./pages/ImportToRecordPage";
 import ImportedRecordPage from "./pages/ImportedRecordPage";
 import { PaywallGate } from "@/components/paywall/PaywallGate";
+import WaitlistPage from "./pages/WaitlistPage";
+import LaunchGate from "@/components/LaunchGate";
 
 const queryClient = new QueryClient();
 
@@ -92,7 +94,8 @@ const App = () => (
             <OfflineBanner />
             <InstallAppChip />
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/waitlist" element={<WaitlistPage />} />
+              <Route path="/" element={<LaunchGate><Index /></LaunchGate>} />
               <Route path="/explore" element={<ExplorePage />} />
               <Route path="/share/:token" element={<ShareClaimPage />} />
               <Route path="/clubs" element={<ClubsPage />} />

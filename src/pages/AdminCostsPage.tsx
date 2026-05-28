@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pencil, Download } from "lucide-react";
 import { FOUNDER_USER_ID } from "@/lib/founder";
+import LaunchFlagControl from "@/components/admin/LaunchFlagControl";
 
 type Settings = {
   id: string;
@@ -222,6 +223,8 @@ export default function AdminCostsPage() {
           Month-to-date spend vs editable budgets. Founder only.
         </p>
       </header>
+
+      <LaunchFlagControl />
 
       {/* Headline bars */}
       <section className="grid md:grid-cols-2 gap-6">
