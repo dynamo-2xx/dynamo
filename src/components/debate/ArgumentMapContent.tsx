@@ -1,4 +1,5 @@
-import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, Pencil, Check, X, RotateCcw } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export interface TranscriptEntryInput {
@@ -12,13 +13,15 @@ export interface TranscriptEntryInput {
 
 export interface ArgumentMapEntryInput {
   id: string;
-  type: "claim" | "counter" | "stake" | "quote" | "evidence" | string;
+  type: "claim" | "argument" | "counter" | "stake" | "quote" | "evidence" | string;
   speaker_side: string;
   content: string;
   quote?: string;
   parent_index?: number;
   subtopic: string;
   created_at: number;
+  original_content?: string;
+  edited?: boolean;
 }
 
 export interface SubtopicInput {
@@ -41,6 +44,10 @@ interface ArgumentMapContentProps {
   analysis?: AnalysisEntry[];
   /** When true, render inside a flat container (e.g. prep window) instead of overlay padding. */
   inline?: boolean;
+  /** When true, each threaded-record bubble exposes an inline edit affordance. */
+  editable?: boolean;
+  onEditEntry?: (id: string, newContent: string) => void | Promise<void>;
+  onRevertEntry?: (id: string) => void | Promise<void>;
 }
 
 const typeChipColor = (t: string) => {
@@ -49,6 +56,8 @@ const typeChipColor = (t: string) => {
       return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
     case "claim":
       return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+    case "argument":
+      return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400";
     case "stake":
       return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
     case "quote":
@@ -78,6 +87,106 @@ function buildThreads(entries: ArgumentMapEntryInput[]) {
   return roots;
 }
 
+/**
+ * Inline editor for a single argument-map bubble. Used only in the prep
+ * window. Transcript text is NEVER editable — only the AI-derived bubble copy.
+ */
+const EditableBubbleText = ({
+  entry,
+  onSave,
+  onRevert,
+}: {
+  entry: ArgumentMapEntryInput;
+  onSave: (id: string, newContent: string) => void | Promise<void>;
+  onRevert?: (id: string) => void | Promise<void>;
+}) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(entry.content);
+  const [saving, setSaving] = useState(false);
+
+  if (!editing) {
+    return (
+      <div className="group/edit relative">
+        <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap pr-6" data-annotatable>
+          {entry.content}
+        </p>
+        <div className="absolute top-0 right-0 flex items-center gap-1 opacity-0 group-hover/edit:opacity-100 transition-opacity">
+          {entry.edited && entry.original_content && onRevert && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void onRevert(entry.id);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+              title="Revert to AI original"
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDraft(entry.content);
+              setEditing(true);
+            }}
+            className="text-muted-foreground hover:text-foreground"
+            title="Edit"
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+        </div>
+        {entry.edited && (
+          <span className="ml-1 text-[9px] uppercase tracking-wide text-muted-foreground/80 align-middle">
+            (edited)
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        rows={Math.max(2, Math.min(8, Math.ceil(draft.length / 70)))}
+        className="w-full bg-secondary/30 border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-body resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+        autoFocus
+      />
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={saving || !draft.trim()}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await onSave(entry.id, draft);
+              setEditing(false);
+            } finally {
+              setSaving(false);
+            }
+          }}
+          className="text-[10px] flex items-center gap-1 bg-primary text-primary-foreground px-2 py-0.5 rounded font-semibold disabled:opacity-50"
+        >
+          <Check className="w-3 h-3" /> Save
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(entry.content);
+            setEditing(false);
+          }}
+          className="text-[10px] flex items-center gap-1 text-muted-foreground hover:text-foreground px-2 py-0.5"
+        >
+          <X className="w-3 h-3" /> Cancel
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const ArgumentMapContent = ({
   tab,
   subtopics,
@@ -85,6 +194,9 @@ const ArgumentMapContent = ({
   argumentMap,
   analysis = [],
   inline = false,
+  editable = false,
+  onEditEntry,
+  onRevertEntry,
 }: ArgumentMapContentProps) => {
   const padding = inline ? "" : "px-3 py-3";
 
