@@ -293,6 +293,8 @@ const DebateRoomPage = () => {
     micError,
     connectionError,
     addTextEntry,
+    editArgumentMapEntry,
+    revertArgumentMapEntry,
   } = useDeepgramTranscription({
     debateId: id || "",
     currentSpeakerSide: currentSideForTranscript?.label || "",
@@ -1563,6 +1565,8 @@ const DebateRoomPage = () => {
                 argumentMap={argumentMap}
                 recordType="debate"
                 recordId={debate.id}
+                onEditArgumentMapEntry={editArgumentMapEntry}
+                onRevertArgumentMapEntry={revertArgumentMapEntry}
               />
             )}
             {/* Notebook button now lives inside ParticipantSharedView's metadata-row stack */}

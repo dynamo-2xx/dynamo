@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Edit3, Check, ArrowRight, Loader2 } from "lucide-react";
+import { Edit3, Check, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ArgumentMapContent, {
   type TranscriptEntryInput,
@@ -43,6 +43,9 @@ interface PrepPhaseOverlayProps {
   /** Backing record for the notebook panel — both required to mount it. */
   recordType?: "debate" | "live_session" | "change_my_mind";
   recordId?: string;
+  /** Inline-edit handlers for argument-map bubbles (prep window only). */
+  onEditArgumentMapEntry?: (id: string, newContent: string) => void | Promise<void>;
+  onRevertArgumentMapEntry?: (id: string) => void | Promise<void>;
 }
 
 function parseTimeLabel(seconds: number): string {
@@ -71,11 +74,11 @@ const PrepPhaseOverlay = ({
   argumentMap = [],
   recordType,
   recordId,
+  onEditArgumentMapEntry,
+  onRevertArgumentMapEntry,
 }: PrepPhaseOverlayProps) => {
   const [selectedTime, setSelectedTime] = useState<number | null>(prepTimeMax);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [editedSummary, setEditedSummary] = useState(lastAiSummary || "");
-  const [summarySubmitted, setSummarySubmitted] = useState(false);
   const [markedReady, setMarkedReady] = useState(false);
   const [leftTab, setLeftTab] = useState<"threaded" | "transcript">("threaded");
   const syncedDuration = selectedPrepDuration || selectedTime;
@@ -101,11 +104,6 @@ const PrepPhaseOverlay = ({
 
     return () => clearInterval(interval);
   }, [prepStartedAt, syncedDuration, onReady, markedReady]);
-
-  const handleSubmitSummary = () => {
-    onSummaryEdited?.(editedSummary);
-    setSummarySubmitted(true);
-  };
 
   const handleReady = () => {
     if (markedReady) return;
@@ -159,6 +157,9 @@ const PrepPhaseOverlay = ({
           transcriptEntries={tList}
           argumentMap={argumentMap}
           inline
+          editable={Boolean(onEditArgumentMapEntry)}
+          onEditEntry={onEditArgumentMapEntry}
+          onRevertEntry={onRevertArgumentMapEntry}
         />
       </div>
     </div>
@@ -247,11 +248,11 @@ const PrepPhaseOverlay = ({
             <div className="text-center shrink-0">
               <Edit3 className="w-8 h-8 text-primary mx-auto mb-3" />
               <h2 className="text-lg font-display font-bold text-foreground mb-1">
-                Review Your Summary
+                Review & Refine
               </h2>
               <p className="text-sm text-muted-foreground font-body">
                 {hasPrepTimerStarted
-                  ? "Verify and edit the AI-generated summary of your statement."
+                  ? "Hover any bubble in the Argument Map to edit its wording. Transcript stays untouched."
                   : "Waiting for the other side to choose the prep time."}
               </p>
               {timeRemaining !== null && (
@@ -260,35 +261,6 @@ const PrepPhaseOverlay = ({
                 </div>
               )}
             </div>
-
-            {/* Slim summary editor banner */}
-            {lastAiSummary && (
-              <div className="shrink-0 bg-card border border-border rounded-xl p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                    AI summary of your last turn
-                  </p>
-                  {summarySubmitted && (
-                    <span className="text-[10px] text-primary font-semibold flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Saved
-                    </span>
-                  )}
-                </div>
-                <textarea
-                  value={editedSummary}
-                  onChange={(e) => setEditedSummary(e.target.value)}
-                  rows={2}
-                  className="w-full bg-secondary/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground font-body resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
-                />
-                <button
-                  onClick={handleSubmitSummary}
-                  disabled={summarySubmitted}
-                  className="mt-1.5 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-md font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 font-body"
-                >
-                  {summarySubmitted ? "Summary Saved" : "Save Summary"}
-                </button>
-              </div>
-            )}
 
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
               {argumentMapColumn}

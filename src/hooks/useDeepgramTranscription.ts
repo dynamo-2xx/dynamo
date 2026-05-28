@@ -13,13 +13,17 @@ export interface TranscriptEntry {
 
 export interface ArgumentMapEntry {
   id: string;
-  type: "claim" | "counter" | "stake" | "quote" | "evidence";
+  type: "claim" | "argument" | "counter" | "stake" | "quote" | "evidence";
   speaker_side: string;
   content: string;
   quote?: string;
   parent_index?: number;
   subtopic: string;
   created_at: number;
+  /** Original AI-generated content, preserved when a user edits the bubble. */
+  original_content?: string;
+  /** True when content has been hand-edited away from original_content. */
+  edited?: boolean;
 }
 
 interface UseDeepgramTranscriptionProps {
@@ -127,6 +131,51 @@ export function useDeepgramTranscription({
         updated_at: new Date().toISOString(),
       } as any, { onConflict: "debate_id" });
   }, [debateId]);
+
+  /**
+   * Inline-edit a single argument-map bubble (during prep window). Preserves
+   * the AI-original text in `original_content` so any viewer can revert.
+   * Idempotent: passing the original text clears the edited flag.
+   */
+  const editArgumentMapEntry = useCallback(
+    async (entryId: string, newContent: string) => {
+      let next: ArgumentMapEntry[] = [];
+      setArgumentMap((prev) => {
+        next = prev.map((e) => {
+          if (e.id !== entryId) return e;
+          const original = e.original_content ?? e.content;
+          const trimmed = newContent.trim();
+          const isOriginal = trimmed === original.trim();
+          return {
+            ...e,
+            content: trimmed,
+            original_content: original,
+            edited: !isOriginal,
+          };
+        });
+        argumentMapRef.current = next;
+        return next;
+      });
+      await persistArgumentMap(next);
+    },
+    [persistArgumentMap],
+  );
+
+  const revertArgumentMapEntry = useCallback(
+    async (entryId: string) => {
+      let next: ArgumentMapEntry[] = [];
+      setArgumentMap((prev) => {
+        next = prev.map((e) => {
+          if (e.id !== entryId || !e.original_content) return e;
+          return { ...e, content: e.original_content, edited: false };
+        });
+        argumentMapRef.current = next;
+        return next;
+      });
+      await persistArgumentMap(next);
+    },
+    [persistArgumentMap],
+  );
 
   // Generate AI summary for a single statement
   const generateSummary = useCallback(async (entryId: string, text: string, speakerSide: string) => {
@@ -462,5 +511,7 @@ export function useDeepgramTranscription({
     connect,
     disconnect,
     addTextEntry,
+    editArgumentMapEntry,
+    revertArgumentMapEntry,
   };
 }

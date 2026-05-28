@@ -446,7 +446,8 @@ serve(async (req) => {
     const systemPrompt = `You are an AI debate analyst. Analyze the latest transcript chunk from a live debate and identify structured argument entries.
 
 For each distinct argument or point made, classify it as one of:
-- "claim": A new argument or assertion
+- "claim": A bare assertion or position statement (e.g. "X is good", "Y is wrong") — the bottom-line stance, WITHOUT the reasoning that supports it.
+- "argument": A claim PLUS the reasoning/justification that supports it (e.g. "X is good BECAUSE...", "We should Y SINCE..."). Prefer "argument" over "claim" whenever the speaker provides any rationale, mechanism, comparison, or explanatory because/since/given clause. Only fall back to "claim" when the speaker truly states a position with no supporting reasoning.
 - "counter": A direct response to a prior argument (include parent_id reference)
 - "stake": What the speaker claims is at risk
 - "quote": A notable quote worth preserving
@@ -499,7 +500,7 @@ Extract all arguments, quotes, stakes, and counter-arguments from this chunk.`;
                     items: {
                       type: "object",
                       properties: {
-                        type: { type: "string", enum: ["claim", "counter", "stake", "quote", "evidence"] },
+                        type: { type: "string", enum: ["claim", "argument", "counter", "stake", "quote", "evidence"] },
                         speaker_side: { type: "string" },
                         content: { type: "string" },
                         quote: { type: "string" },
