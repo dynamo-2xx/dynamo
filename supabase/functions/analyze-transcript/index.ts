@@ -111,12 +111,17 @@ You will receive transcript entries as JSON objects, each with an "id", "speaker
    - Threads are SCOPED WITHIN A SUBTOPIC. When the subtopic changes, any open thread is closed.
    - Use stable thread IDs of the form "thread-1", "thread-2", etc. — number them in order of first appearance.
    - Every entry MUST be assigned to exactly one thread.
+   - PREFER FEWER, DEEPER THREADS. Default to attaching an entry as a counter or continuation of the nearest open thread it is logically related to. ONLY create a brand-new thread when the speaker is clearly introducing a substantively different claim that does not respond to or extend any prior open thread.
+   - Quotes, stakes, evidence, and supporting examples are NEVER root arguments — they must always be "continuation" (if same side reinforces) or "counter" (if other side rebuts) of an existing thread, with parent_entry_id set.
+   - If two candidate threads in the same subtopic would have nearly-identical titles (e.g. both "Contesting cost estimates"), MERGE them into one thread — re-use the earlier thread_id for the later entries.
+   - Do not create more than one open thread per (subtopic, speaker_side) pair unless that side has clearly pivoted to a substantively new claim.
 
 6. THREAD TITLES:
    - For EACH thread, generate a short 3–7 word title in sentence case that captures the SPECIFIC point being argued (NOT the subtopic name).
    - Example: under subtopic "Infrastructure Costs", a thread title could be "Funding via municipal bonds" or "Long-term maintenance burden" — never just "Infrastructure Costs".
    - If a thread only has 1 entry and the point is unclear, use a tentative noun phrase from the entry itself.
    - Title MUST be different from the subtopic label.
+   - Titles within the same subtopic MUST be distinct (no two threads with the same or near-identical title). If you would otherwise produce duplicates, merge those threads instead.
 
 EXAMPLE — given entries:
   [{"id": "e1", "speaker": "Speaker 1", "text": "We should fund the bridge with municipal bonds."},
@@ -253,6 +258,36 @@ serve(async (req) => {
           for (const t of result.threads) {
             if (t.thread_id && t.title) threads[t.thread_id] = { title: t.title, subtopic: t.subtopic || "" };
           }
+        }
+        // Safety net: merge threads in the same subtopic whose normalized
+        // titles collide. Keeps the earliest thread_id and remaps later
+        // entries to it so the UI never renders sibling "Contesting X" /
+        // "Contest X" threads. Matches the prompt's "no duplicate titles"
+        // contract but defends against the model occasionally ignoring it.
+        const normalize = (s: string) =>
+          s.toLowerCase().replace(/[^a-z0-9 ]+/g, "").replace(/\s+/g, " ").trim();
+        const canonicalByKey = new Map<string, string>(); // `${subtopic}::${normTitle}` -> thread_id
+        const remap: Record<string, string> = {};
+        // Preserve first-appearance order from result.threads.
+        for (const tid of Object.keys(threads)) {
+          const t = threads[tid];
+          const key = `${t.subtopic}::${normalize(t.title)}`;
+          const existing = canonicalByKey.get(key);
+          if (existing) {
+            remap[tid] = existing;
+          } else {
+            canonicalByKey.set(key, tid);
+          }
+        }
+        if (Object.keys(remap).length > 0) {
+          for (const eid of Object.keys(entry_thread_map)) {
+            const cur = entry_thread_map[eid];
+            if (remap[cur.thread_id]) {
+              entry_thread_map[eid] = { ...cur, thread_id: remap[cur.thread_id] };
+            }
+          }
+          for (const dup of Object.keys(remap)) delete threads[dup];
+          console.log(`Merged ${Object.keys(remap).length} duplicate-title threads.`);
         }
         console.log(`Pass 1: ${result.subtopics?.length || 0} subtopics, ${Object.keys(entry_subtopic_map).length} mapped entries, ${Object.keys(threads).length} threads`);
         return new Response(JSON.stringify({ subtopics: result.subtopics || [], entry_subtopic_map, entry_thread_map, threads }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

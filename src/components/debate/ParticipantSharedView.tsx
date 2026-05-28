@@ -458,8 +458,12 @@ const ParticipantSharedView = ({
         </div>
       </div>
 
-      {/* Fixed input area at bottom — text input only (mic goes directly to argument map via Deepgram) */}
-      {canSpeak && (
+      {/* Fixed input area at bottom. The whole panel renders for any speaker
+          (on-turn or off-turn) so camera / notebook / argument-map / d. remain
+          accessible all the time. Per-control gating below disables only the
+          mic, the text composer, send, and end-turn-early when it isn't this
+          speaker's turn — the visual scaffolding never disappears. */}
+      {isSpeaker && (
         <div className="border-t border-border bg-card px-4 py-3 shrink-0">
           {/* Facilitator controls live in the header "Facilitation" popover;
               the speaker's per-turn Pause moved into the small icon row below
@@ -483,12 +487,19 @@ const ParticipantSharedView = ({
             {/* Mic / Deepgram toggle */}
             <button
               onClick={handleToggleMic}
-              className={`p-3 rounded-lg transition-colors shrink-0 ${
+              disabled={!isMyTurn}
+              title={
+                !isMyTurn
+                  ? "Mic is off — it's not your turn"
+                  : deepgramActive
+                  ? "Stop live transcription"
+                  : "Start live transcription"
+              }
+              className={`p-3 rounded-lg transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                 deepgramActive
                   ? "bg-primary text-primary-foreground hover:bg-primary/90 animate-pulse"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
-              title={deepgramActive ? "Stop live transcription" : "Start live transcription"}
             >
               {deepgramActive ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
             </button>
@@ -497,16 +508,17 @@ const ParticipantSharedView = ({
               <textarea
                 value={argumentText}
                 onChange={(e) => onArgumentTextChange(e.target.value)}
-                placeholder="Type your argument here…"
+                placeholder={isMyTurn ? "Type your argument here…" : "Waiting for your turn…"}
+                disabled={!isMyTurn}
                 rows={2}
-                className="flex-1 bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none font-body"
+                className="flex-1 bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none font-body disabled:opacity-50 disabled:cursor-not-allowed"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); }
                 }}
               />
               <button
                 onClick={onSubmit}
-                disabled={!argumentText.trim() || submitting}
+                disabled={!argumentText.trim() || submitting || !isMyTurn}
                 className="bg-primary text-primary-foreground p-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 <Send className="w-5 h-5" />
@@ -567,7 +579,8 @@ const ParticipantSharedView = ({
           <div className="flex justify-end mt-2 max-w-3xl mx-auto">
             <button
               onClick={onEndTurnEarly}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-body"
+              disabled={!isMyTurn}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-body disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <SkipForward className="w-3.5 h-3.5" />
               End my turn early
@@ -576,9 +589,11 @@ const ParticipantSharedView = ({
         </div>
       )}
 
-      {/* Waiting message */}
+      {/* Lightweight waiting hint above the composer for off-turn speakers.
+          The full control panel is still rendered above so they can keep
+          taking notes, exploring the argument map, and toggling camera. */}
       {isSpeaker && !isMyTurn && (
-        <div className="border-t border-border bg-card/50 px-4 py-3 text-center text-sm text-muted-foreground font-body shrink-0">
+        <div className="border-t border-border bg-card/30 px-4 py-1.5 text-center text-[11px] text-muted-foreground font-body shrink-0">
           Waiting for {currentSide?.label} to respond…
         </div>
       )}

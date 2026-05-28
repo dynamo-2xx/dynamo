@@ -11,6 +11,7 @@
 - **RLS**: Debate-scoped tables gate SELECT via `public.can_view_debate(debate_id)`. Never `USING (true)` on debate data.
 - **Motion**: Card flip animation is removed product-wide. Transcript ↔ Summary uses two-tab pattern (Argument Map bubble pattern) everywhere.
 - **A11y**: Honor `prefers-reduced-motion` + manual settings toggle. All user-facing strings routed through `i18n` wrapper from launch.
+- **Reliability bar**: Build with the intent of an exceptionally reliable, seamless tool ready for consumer + enterprise — defensive coding, idempotent writes, server-trusted state, no half-wired UI. See [Reliability bar](mem://preferences/reliability-bar).
 
 ## Memories
 - [Release Criteria](mem://product/release-criteria) — Public-ready definition (waitlist, happy path, mic-prep, study)
