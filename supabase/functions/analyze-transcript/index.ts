@@ -259,6 +259,36 @@ serve(async (req) => {
             if (t.thread_id && t.title) threads[t.thread_id] = { title: t.title, subtopic: t.subtopic || "" };
           }
         }
+        // Safety net: merge threads in the same subtopic whose normalized
+        // titles collide. Keeps the earliest thread_id and remaps later
+        // entries to it so the UI never renders sibling "Contesting X" /
+        // "Contest X" threads. Matches the prompt's "no duplicate titles"
+        // contract but defends against the model occasionally ignoring it.
+        const normalize = (s: string) =>
+          s.toLowerCase().replace(/[^a-z0-9 ]+/g, "").replace(/\s+/g, " ").trim();
+        const canonicalByKey = new Map<string, string>(); // `${subtopic}::${normTitle}` -> thread_id
+        const remap: Record<string, string> = {};
+        // Preserve first-appearance order from result.threads.
+        for (const tid of Object.keys(threads)) {
+          const t = threads[tid];
+          const key = `${t.subtopic}::${normalize(t.title)}`;
+          const existing = canonicalByKey.get(key);
+          if (existing) {
+            remap[tid] = existing;
+          } else {
+            canonicalByKey.set(key, tid);
+          }
+        }
+        if (Object.keys(remap).length > 0) {
+          for (const eid of Object.keys(entry_thread_map)) {
+            const cur = entry_thread_map[eid];
+            if (remap[cur.thread_id]) {
+              entry_thread_map[eid] = { ...cur, thread_id: remap[cur.thread_id] };
+            }
+          }
+          for (const dup of Object.keys(remap)) delete threads[dup];
+          console.log(`Merged ${Object.keys(remap).length} duplicate-title threads.`);
+        }
         console.log(`Pass 1: ${result.subtopics?.length || 0} subtopics, ${Object.keys(entry_subtopic_map).length} mapped entries, ${Object.keys(threads).length} threads`);
         return new Response(JSON.stringify({ subtopics: result.subtopics || [], entry_subtopic_map, entry_thread_map, threads }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
