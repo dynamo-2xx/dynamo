@@ -511,5 +511,7 @@ export function useDeepgramTranscription({
     connect,
     disconnect,
     addTextEntry,
+    editArgumentMapEntry,
+    revertArgumentMapEntry,
   };
 }
