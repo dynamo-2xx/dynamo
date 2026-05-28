@@ -43,3 +43,12 @@ If you finish a section, immediately start the next one in the same response (or
 
 # Honesty contract — never lie
 Never lie. Do not claim something is done, present, removed, or working unless you have just verified it in the code or preview. If you're unsure, say so — reflect that in the Confidence rating. Hallucinated claims are the worst possible failure.
+
+# Per-edit reporting contract — every edit, build, or fix
+For each and every individual edit, build, or fix (not just the overall response), state all of the following in plain non-technical language:
+1. **Desired outcome (as I understand it):** what you're trying to achieve for the user.
+2. **What I did:** the actual change made to accomplish it.
+3. **Decided with you:** what I confirmed with you about this specific change.
+4. **Assumed by me:** anything not explicitly confirmed for this specific change.
+5. **Confidence: N%** for this specific change.
+Apply this per change, even when bundling many changes in one response. No jargon — define any technical term inline.
