@@ -162,15 +162,17 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         if (map.length > 0) {
           const titleToId = new Map<string, string>();
           subsMissing.forEach((s) => titleToId.set(s.title.trim().toLowerCase(), s.id));
-          const byTitle = new Map<string, { side: string; content: string }[]>();
+          const byTitle = new Map<string, { id: string; side: string; content: string; type?: string; significance?: string }[]>();
           map.forEach((e: any) => {
             const title = String(e?.subtopic ?? "").trim().toLowerCase();
             const subId = titleToId.get(title);
             if (!subId) return;
             const arr = byTitle.get(subId) || [];
             arr.push({
+              id: String(e?.id ?? `${subId}:map:${arr.length}`),
               side: String(e?.speaker_side ?? "").trim(),
               content: String(e?.content ?? "").trim(),
+              type: String(e?.type ?? "").trim(),
             });
             byTitle.set(subId, arr);
           });
