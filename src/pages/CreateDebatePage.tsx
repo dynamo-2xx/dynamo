@@ -126,6 +126,121 @@ const CreateDebatePage = () => {
     [liveMicRows],
   );
 
+  // Reloader for invitations + interested + participant counts. Called by both
+  // the initial editId loader AND a realtime subscription so the drag-and-drop
+  // side boxes update the instant someone marks interested, accepts an invite,
+  // or joins a side. Works for both the prompt-template flow (draftDebateId set
+  // after step 3) and the edit-debate flow (draftDebateId === editId).
+  const reloadInvitesData = useCallback(async () => {
+    const did = draftDebateId;
+    if (!did || !user) return;
+    const [{ data: invs }, { data: interests }, { data: parts }, { data: d }] = await Promise.all([
+      supabase
+        .from("debate_invitations")
+        .select("invited_user_id, invited_username, invited_email, side_id")
+        .eq("debate_id", did),
+      supabase
+        .from("debate_interests")
+        .select("user_id, side_id, role")
+        .eq("debate_id", did),
+      supabase
+        .from("debate_participants")
+        .select("user_id, side_id, participant_role")
+        .eq("debate_id", did),
+      supabase.from("debates").select("created_by").eq("id", did).maybeSingle(),
+    ]);
+
+    const invitedIds = new Set<string>();
+    const userIds = (invs || []).map((i: any) => i.invited_user_id).filter(Boolean);
+    userIds.forEach((id: string) => invitedIds.add(id));
+    let profMap = new Map<string, any>();
+    if (userIds.length > 0) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url")
+        .in("user_id", userIds);
+      profMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+    }
+    setInvitedEntries(
+      (invs || []).map((i: any) => {
+        const p: any = profMap.get(i.invited_user_id);
+        return {
+          username: i.invited_username || p?.display_name || i.invited_email || "Invitee",
+          userId: i.invited_user_id,
+          sideId: i.side_id ?? null,
+          avatarUrl: p?.avatar_url ?? null,
+          email: i.invited_email ?? null,
+          source: "manual" as const,
+        };
+      }),
+    );
+
+    const createdBy = d?.created_by ?? user.id;
+    const partIds = new Set((parts || []).map((p: any) => p.user_id));
+    const filtered = (interests || []).filter(
+      (i: any) =>
+        i.user_id !== createdBy &&
+        !partIds.has(i.user_id) &&
+        !invitedIds.has(i.user_id),
+    );
+    if (filtered.length > 0) {
+      const ids = filtered.map((i: any) => i.user_id);
+      const { data: iProfs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url")
+        .in("user_id", ids);
+      const iMap = new Map((iProfs || []).map((p: any) => [p.user_id, p]));
+      setInterestedUsers(
+        filtered.map((i: any) => ({
+          user_id: i.user_id,
+          display_name: (iMap.get(i.user_id) as any)?.display_name ?? null,
+          avatar_url: (iMap.get(i.user_id) as any)?.avatar_url ?? null,
+          side_id: i.side_id ?? null,
+          role: i.role,
+        })),
+      );
+    } else {
+      setInterestedUsers([]);
+    }
+
+    const counts: Record<string, number> = {};
+    (parts || []).forEach((p: any) => {
+      if (p.participant_role === "speaker" && p.side_id) {
+        counts[p.side_id] = (counts[p.side_id] || 0) + 1;
+      }
+    });
+    setSideSpeakerCounts(counts);
+  }, [draftDebateId, user]);
+
+  // Realtime: keep the template's invitee/interested chips in sync on both
+  // host AND invitee ends whenever invitations, interests, or participants
+  // change for this debate. This is what makes the profile bubble appear
+  // in the drag-and-drop side boxes the moment someone joins.
+  useEffect(() => {
+    if (!draftDebateId) return;
+    const channel = supabase
+      .channel(`create-invites-${draftDebateId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "debate_invitations", filter: `debate_id=eq.${draftDebateId}` },
+        () => reloadInvitesData(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "debate_interests", filter: `debate_id=eq.${draftDebateId}` },
+        () => reloadInvitesData(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${draftDebateId}` },
+        () => reloadInvitesData(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [draftDebateId, reloadInvitesData]);
+
   // Sync editor items whenever the underlying debate.subtopics changes from outside
   // (initial generation, collaborative-mode add/remove). We preserve existing IDs by title match
   // so user keystrokes don't trigger a re-sync that wipes focus.
@@ -716,7 +831,7 @@ const CreateDebatePage = () => {
   };
 
 
-  const handleCreateDebate = async (publishMode: boolean = false) => {
+  const handleCreateDebate = async (publishMode: boolean = false, startNow: boolean = false) => {
     if (!debate || !user) return;
     setSaving(true);
 
@@ -973,15 +1088,18 @@ const CreateDebatePage = () => {
         }
       }
 
-      if (editId) {
-        toast.success("Debate updated");
+      if (startNow) {
+        // Publisher passes through mic-prep just like every other speaker.
+        toast.success(editId ? "Starting debate — test your mic." : "Published! Test your mic to start.");
+        navigate(`/debate/${dbDebate.id}/lobby`);
+      } else if (editId) {
+        toast.success(publishMode ? "Debate published" : "Debate updated");
         navigate(`/debate/${editId}/preview`);
       } else if (publishMode) {
-        // Publisher must pass through mic-prep just like every other speaker.
-        toast.success("Debate published! Test your mic to start.");
-        navigate(`/debate/${dbDebate.id}/lobby`);
+        toast.success("Debate published");
+        navigate(`/debate/${dbDebate.id}/preview`);
       } else {
-        toast.success("Debate created!");
+        toast.success("Draft saved");
         navigate(`/debate/${dbDebate.id}`);
       }
     } catch (err: any) {
@@ -1904,80 +2022,41 @@ const CreateDebatePage = () => {
                   </AnimatePresence>
                 </div>
 
-                {/* Actions */}
-                {(() => {
-                  const isPublished = !!editId && loadedStatus === "scheduled";
-                  const leftLabel = saving
-                    ? "Saving…"
-                    : isPublished
-                      ? "Save Debate"
-                      : invitedEntries.length > 0
-                        ? "Save & Invite"
-                        : "Save Draft";
-                  const rightLabel = isPublished
-                    ? saving ? "Starting…" : "Start Debate"
-                    : saving ? "Publishing…" : "Publish Debate";
-                  const handleRight = async () => {
-                    if (!isPublished) {
-                      handleCreateDebate(true);
-                      return;
-                    }
-                    if (!editId) return;
-                    setSaving(true);
-                    try {
-                      // Route into the Mic Lobby — start gate is in the lobby.
-                      navigate(`/debate/${editId}/lobby`);
-                    } catch (err: any) {
-                      toast.error(err.message || "Failed to start debate");
-                      setSaving(false);
-                    }
-                  };
-                  const canSendInvitesNow =
-                    !isPublished && invitedEntries.length > 0 && !saving;
-                  return (
-                    <div className="flex flex-col gap-3 pt-2">
-                      {canSendInvitesNow && (
-                        <button
-                          type="button"
-                          onClick={() => handleCreateDebate(false)}
-                          disabled={saving}
-                          className="w-full flex items-center justify-center gap-2 border border-dashed border-foreground/30 rounded-full py-2.5 font-body text-xs font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
-                          title="Save draft and email invitees now so they can test their mic before you publish"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          Send invites now ({invitedEntries.length})
-                          <span className="text-[10px] text-muted-foreground font-normal">
-                            — they'll see a green chime when ready
-                          </span>
-                        </button>
-                      )}
-                      <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={() => handleCreateDebate(false)}
-                        disabled={saving}
-                        className="flex-1 flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
-                      >
-                        {leftLabel}
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handleRight}
-                        disabled={saving}
-                        className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                      >
-                        {rightLabel}
-                        {isPublished ? <Play className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                      </button>
-                      </div>
-                    </div>
-                  );
-                })()}
+                {/* Actions — three options: Save Draft, Publish, Start Now.
+                    Identical in the prompt-template flow and the edit-debate flow. */}
+                <div className="flex flex-col gap-3 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      onClick={() => handleCreateDebate(false, false)}
+                      disabled={saving}
+                      className="flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
+                    >
+                      {saving ? "Saving…" : "Save Draft"}
+                    </button>
+                    <button
+                      onClick={() => handleCreateDebate(true, false)}
+                      disabled={saving}
+                      className="flex items-center justify-center gap-2 border border-foreground rounded-full py-3 font-body text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                      {saving ? "Publishing…" : "Publish Debate"}
+                    </button>
+                    <button
+                      onClick={() => handleCreateDebate(true, true)}
+                      disabled={saving}
+                      className="flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                      <Play className="w-4 h-4" />
+                      {saving ? "Starting…" : "Start Debate Now"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-      {editId && draftDebateId && (
+      {draftDebateId && (
         <InviteFriendsDialog
           open={inviteDialogOpen}
           onOpenChange={setInviteDialogOpen}
