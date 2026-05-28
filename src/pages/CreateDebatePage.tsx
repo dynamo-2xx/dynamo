@@ -126,6 +126,121 @@ const CreateDebatePage = () => {
     [liveMicRows],
   );
 
+  // Reloader for invitations + interested + participant counts. Called by both
+  // the initial editId loader AND a realtime subscription so the drag-and-drop
+  // side boxes update the instant someone marks interested, accepts an invite,
+  // or joins a side. Works for both the prompt-template flow (draftDebateId set
+  // after step 3) and the edit-debate flow (draftDebateId === editId).
+  const reloadInvitesData = useCallback(async () => {
+    const did = draftDebateId;
+    if (!did || !user) return;
+    const [{ data: invs }, { data: interests }, { data: parts }, { data: d }] = await Promise.all([
+      supabase
+        .from("debate_invitations")
+        .select("invited_user_id, invited_username, invited_email, side_id")
+        .eq("debate_id", did),
+      supabase
+        .from("debate_interests")
+        .select("user_id, side_id, role")
+        .eq("debate_id", did),
+      supabase
+        .from("debate_participants")
+        .select("user_id, side_id, participant_role")
+        .eq("debate_id", did),
+      supabase.from("debates").select("created_by").eq("id", did).maybeSingle(),
+    ]);
+
+    const invitedIds = new Set<string>();
+    const userIds = (invs || []).map((i: any) => i.invited_user_id).filter(Boolean);
+    userIds.forEach((id: string) => invitedIds.add(id));
+    let profMap = new Map<string, any>();
+    if (userIds.length > 0) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url")
+        .in("user_id", userIds);
+      profMap = new Map((profs || []).map((p: any) => [p.user_id, p]));
+    }
+    setInvitedEntries(
+      (invs || []).map((i: any) => {
+        const p: any = profMap.get(i.invited_user_id);
+        return {
+          username: i.invited_username || p?.display_name || i.invited_email || "Invitee",
+          userId: i.invited_user_id,
+          sideId: i.side_id ?? null,
+          avatarUrl: p?.avatar_url ?? null,
+          email: i.invited_email ?? null,
+          source: "manual" as const,
+        };
+      }),
+    );
+
+    const createdBy = d?.created_by ?? user.id;
+    const partIds = new Set((parts || []).map((p: any) => p.user_id));
+    const filtered = (interests || []).filter(
+      (i: any) =>
+        i.user_id !== createdBy &&
+        !partIds.has(i.user_id) &&
+        !invitedIds.has(i.user_id),
+    );
+    if (filtered.length > 0) {
+      const ids = filtered.map((i: any) => i.user_id);
+      const { data: iProfs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url")
+        .in("user_id", ids);
+      const iMap = new Map((iProfs || []).map((p: any) => [p.user_id, p]));
+      setInterestedUsers(
+        filtered.map((i: any) => ({
+          user_id: i.user_id,
+          display_name: (iMap.get(i.user_id) as any)?.display_name ?? null,
+          avatar_url: (iMap.get(i.user_id) as any)?.avatar_url ?? null,
+          side_id: i.side_id ?? null,
+          role: i.role,
+        })),
+      );
+    } else {
+      setInterestedUsers([]);
+    }
+
+    const counts: Record<string, number> = {};
+    (parts || []).forEach((p: any) => {
+      if (p.participant_role === "speaker" && p.side_id) {
+        counts[p.side_id] = (counts[p.side_id] || 0) + 1;
+      }
+    });
+    setSideSpeakerCounts(counts);
+  }, [draftDebateId, user]);
+
+  // Realtime: keep the template's invitee/interested chips in sync on both
+  // host AND invitee ends whenever invitations, interests, or participants
+  // change for this debate. This is what makes the profile bubble appear
+  // in the drag-and-drop side boxes the moment someone joins.
+  useEffect(() => {
+    if (!draftDebateId) return;
+    const channel = supabase
+      .channel(`create-invites-${draftDebateId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "debate_invitations", filter: `debate_id=eq.${draftDebateId}` },
+        () => reloadInvitesData(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "debate_interests", filter: `debate_id=eq.${draftDebateId}` },
+        () => reloadInvitesData(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "debate_participants", filter: `debate_id=eq.${draftDebateId}` },
+        () => reloadInvitesData(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [draftDebateId, reloadInvitesData]);
+
   // Sync editor items whenever the underlying debate.subtopics changes from outside
   // (initial generation, collaborative-mode add/remove). We preserve existing IDs by title match
   // so user keystrokes don't trigger a re-sync that wipes focus.
