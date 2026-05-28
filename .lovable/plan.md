@@ -113,3 +113,20 @@ Written to `mem://preferences/reliability-bar` and added as a one-liner to `mem:
 3. ~~Argument-map rename~~ — keep current name per user.
 4. **Public/private toggle** — creator-only chip in the completed-record header, writes `debates.is_public`.
 5. **Smoke-test checklist** — `docs/debate-smoke-test.md` covering create → lobby → live → prep → completion → failover.
+
+---
+
+# Wave 7 — §0 Waitlist gate  🟢 shipped
+
+- New `launch_config` singleton table with `is_public_launched` flag (admin-only update via RLS).
+- `useLaunchFlag` hook polls every 60s for non-deploy flips.
+- `<LaunchGate>` wrapper bounces anonymous visitors to `/waitlist` until the founder opens the gates. Whitelisted: /auth, /terms, /privacy, /guidelines, /legal, /status, /join, /preview, /share, projector + audience views.
+- New `WaitlistPage` reuses the existing `waitlist-signup` edge function and shows the user's position.
+- `LaunchFlagControl` admin chip on `/admin/costs` lets the founder toggle the gate with a confirm dialog.
+
+---
+
+# Remaining sections — status
+
+- §1 Auth/Onboarding, §3 My Study, §4 In-person, §5 Data Safety, §6 Performance, §7 Mobile, §8 Notifications, §9 Content & Legal, §10 Analytics, §11 Launch, §13 Errors, §14 i18n, §15 Trust & Safety, §16 Email, §18 Cost Tracking, §19 Backup/DR, §20 Legal, §21 Perf Intelligence, §22 Clubs — implemented (see memory index).
+- **Blocked on user input:** §12 Monetization + §17 Billing Ops (Stripe connection), §16 Email (sender-domain confirmation), §20 Legal (copy sign-off), brand assets for OG cards.
