@@ -54,11 +54,27 @@ const sideColorClass = (sideLabel: string, labels: string[]): string => {
   return SIDE_CLASS[(idx >= 0 ? idx : 0) % SIDE_CLASS.length];
 };
 
+const tagClass = (type?: string) => {
+  switch ((type || "").toLowerCase()) {
+    case "counter":
+    case "rebuttal":
+      return "bg-destructive/10 text-destructive";
+    case "stake":
+      return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
+    case "quote":
+      return "bg-purple-500/10 text-purple-600 dark:text-purple-400";
+    case "evidence":
+      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    default:
+      return "bg-primary/10 text-primary";
+  }
+};
+
 const SummaryItem = ({
   summary,
   colorClass,
 }: {
-  summary: { id: string; content: string; originalContent?: string; isEdited?: boolean };
+  summary: { id: string; content: string; type?: string; significance?: string; originalContent?: string; isEdited?: boolean };
   colorClass: string;
 }) => {
   const [showOriginal, setShowOriginal] = useState(false);
@@ -73,6 +89,20 @@ const SummaryItem = ({
         <p className="text-sm font-body text-foreground/90 leading-relaxed" data-annotatable>
           {displayed}
         </p>
+        {(summary.type || summary.significance) && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {summary.type && (
+              <span className={cn("text-[9px] uppercase font-semibold px-1.5 py-0.5 rounded", tagClass(summary.type))}>
+                {summary.type}
+              </span>
+            )}
+            {summary.significance && (
+              <span className="text-[10px] text-muted-foreground line-clamp-1">
+                {summary.significance}
+              </span>
+            )}
+          </div>
+        )}
         {summary.isEdited && (
           <button
             onClick={() => setShowOriginal((v) => !v)}
