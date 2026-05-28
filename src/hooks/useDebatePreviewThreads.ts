@@ -5,6 +5,8 @@ export interface PreviewSummary {
   id: string;
   side: string;
   content: string;
+  type?: string;
+  significance?: string;
   originalContent?: string;
   isEdited?: boolean;
 }
@@ -57,7 +59,7 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
       if (cancelled) return;
 
       const sides = (sds || []) as Array<{ id: string; label: string; sort_order: number }>;
-      const labels = sides.map((s) => s.label);
+      const labels = Array.from(new Set(sides.map((s) => s.label).filter(Boolean))).slice(0, 2);
       setSideLabels(labels);
 
       const baseSubs: PreviewSubtopic[] = (subs || []).map((s: any) => ({
@@ -75,11 +77,11 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
 
       const { data: roundSummaries } = await supabase
         .from("round_summaries")
-        .select("subtopic_id, key_arguments")
+        .select("id, subtopic_id, key_arguments")
         .eq("debate_id", debateId);
       if (cancelled) return;
 
-      const bySub = new Map<string, { side: string; content: string }[]>();
+      const bySub = new Map<string, { id: string; side: string; content: string; type?: string; significance?: string }[]>();
       // Track round_summary id + item_index so we can overlay per-item edits.
       const itemMeta = new Map<string, { roundSummaryId: string; itemIndex: number }>();
       (roundSummaries || []).forEach((rs: any) => {
@@ -87,6 +89,8 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
           .map((k, idx) => ({
             side: String(k?.side ?? "").trim(),
             content: String(k?.content ?? "").trim(),
+            type: String(k?.type ?? "").trim(),
+            significance: String(k?.significance ?? "").trim(),
             _idx: idx,
             _rsid: rs.id,
           }))
@@ -97,9 +101,19 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
             itemIndex: it._idx,
           });
         });
+        const existing = bySub.get(rs.subtopic_id) || [];
         bySub.set(
           rs.subtopic_id,
-          items.map((it) => ({ side: it.side, content: it.content })),
+          [
+            ...existing,
+            ...items.map((it) => ({
+              id: `${it._rsid}:${it._idx}`,
+              side: it.side,
+              content: it.content,
+              type: it.type,
+              significance: it.significance,
+            })),
+          ],
         );
       });
 
@@ -123,8 +137,8 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
       // Re-walk bySub items so edited content overrides the original wording.
       (roundSummaries || []).forEach((rs: any) => {
         const list = bySub.get(rs.subtopic_id) || [];
-        const next = list.map((it, idx) => {
-          const key = `${rs.id}:${idx}`;
+        const next = list.map((it) => {
+          const key = it.id;
           const edit = editOverlay.get(key);
           if (!edit) return it;
           return { ...it, content: edit.edited, _original: edit.original, _edited: true } as any;
