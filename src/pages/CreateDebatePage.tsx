@@ -2022,80 +2022,41 @@ const CreateDebatePage = () => {
                   </AnimatePresence>
                 </div>
 
-                {/* Actions */}
-                {(() => {
-                  const isPublished = !!editId && loadedStatus === "scheduled";
-                  const leftLabel = saving
-                    ? "Saving…"
-                    : isPublished
-                      ? "Save Debate"
-                      : invitedEntries.length > 0
-                        ? "Save & Invite"
-                        : "Save Draft";
-                  const rightLabel = isPublished
-                    ? saving ? "Starting…" : "Start Debate"
-                    : saving ? "Publishing…" : "Publish Debate";
-                  const handleRight = async () => {
-                    if (!isPublished) {
-                      handleCreateDebate(true);
-                      return;
-                    }
-                    if (!editId) return;
-                    setSaving(true);
-                    try {
-                      // Route into the Mic Lobby — start gate is in the lobby.
-                      navigate(`/debate/${editId}/lobby`);
-                    } catch (err: any) {
-                      toast.error(err.message || "Failed to start debate");
-                      setSaving(false);
-                    }
-                  };
-                  const canSendInvitesNow =
-                    !isPublished && invitedEntries.length > 0 && !saving;
-                  return (
-                    <div className="flex flex-col gap-3 pt-2">
-                      {canSendInvitesNow && (
-                        <button
-                          type="button"
-                          onClick={() => handleCreateDebate(false)}
-                          disabled={saving}
-                          className="w-full flex items-center justify-center gap-2 border border-dashed border-foreground/30 rounded-full py-2.5 font-body text-xs font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
-                          title="Save draft and email invitees now so they can test their mic before you publish"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          Send invites now ({invitedEntries.length})
-                          <span className="text-[10px] text-muted-foreground font-normal">
-                            — they'll see a green chime when ready
-                          </span>
-                        </button>
-                      )}
-                      <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={() => handleCreateDebate(false)}
-                        disabled={saving}
-                        className="flex-1 flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
-                      >
-                        {leftLabel}
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handleRight}
-                        disabled={saving}
-                        className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                      >
-                        {rightLabel}
-                        {isPublished ? <Play className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                      </button>
-                      </div>
-                    </div>
-                  );
-                })()}
+                {/* Actions — three options: Save Draft, Publish, Start Now.
+                    Identical in the prompt-template flow and the edit-debate flow. */}
+                <div className="flex flex-col gap-3 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      onClick={() => handleCreateDebate(false, false)}
+                      disabled={saving}
+                      className="flex items-center justify-center gap-2 border border-border rounded-full py-3 font-body text-sm font-medium text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
+                    >
+                      {saving ? "Saving…" : "Save Draft"}
+                    </button>
+                    <button
+                      onClick={() => handleCreateDebate(true, false)}
+                      disabled={saving}
+                      className="flex items-center justify-center gap-2 border border-foreground rounded-full py-3 font-body text-sm font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                      {saving ? "Publishing…" : "Publish Debate"}
+                    </button>
+                    <button
+                      onClick={() => handleCreateDebate(true, true)}
+                      disabled={saving}
+                      className="flex items-center justify-center gap-2 bg-foreground text-background rounded-full py-3 font-body text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                      <Play className="w-4 h-4" />
+                      {saving ? "Starting…" : "Start Debate Now"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-      {editId && draftDebateId && (
+      {draftDebateId && (
         <InviteFriendsDialog
           open={inviteDialogOpen}
           onOpenChange={setInviteDialogOpen}
