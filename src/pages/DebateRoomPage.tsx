@@ -1393,6 +1393,28 @@ const DebateRoomPage = () => {
             />
           )}
 
+          {/* Wave 6 §4 — Public / Private toggle, creator-only, completed records.
+              Default is whatever the row says (typically private). */}
+          {isCreator && isCompleted && (
+            <button
+              type="button"
+              onClick={onTogglePublic}
+              disabled={togglingPublic}
+              className="flex items-center gap-1.5 bg-secondary text-secondary-foreground px-3 py-2 rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors disabled:opacity-60"
+              title={debate.is_public ? "Public — anyone can view" : "Private — only invitees can view"}
+            >
+              {debate.is_public ? (
+                <>
+                  <Globe className="w-3.5 h-3.5" /> Public
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5" /> Private
+                </>
+              )}
+            </button>
+          )}
+
           {isCreator && !isCompleted && (
             <div className="relative">
               <button
