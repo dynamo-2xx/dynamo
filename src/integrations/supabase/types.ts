@@ -1211,6 +1211,8 @@ export type Database = {
       }
       debates: {
         Row: {
+          active_host_heartbeat_at: string | null
+          active_host_user_id: string | null
           community_tag: string | null
           continuation_index: number
           continuation_root_id: string | null
@@ -1264,6 +1266,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_host_heartbeat_at?: string | null
+          active_host_user_id?: string | null
           community_tag?: string | null
           continuation_index?: number
           continuation_root_id?: string | null
@@ -1317,6 +1321,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_host_heartbeat_at?: string | null
+          active_host_user_id?: string | null
           community_tag?: string | null
           continuation_index?: number
           continuation_root_id?: string | null
@@ -2966,6 +2972,7 @@ export type Database = {
         Returns: boolean
       }
       cancel_account_deletion: { Args: never; Returns: undefined }
+      claim_debate_host: { Args: { _debate_id: string }; Returns: boolean }
       cmm_end_round: {
         Args: { _debate_id: string; _outcome?: string }
         Returns: {
@@ -3064,6 +3071,10 @@ export type Database = {
           id: string
           invite_token: string
         }[]
+      }
+      debate_host_heartbeat: {
+        Args: { _debate_id: string }
+        Returns: undefined
       }
       debate_tag_count: { Args: { _debate_id: string }; Returns: number }
       decide_record_change: {

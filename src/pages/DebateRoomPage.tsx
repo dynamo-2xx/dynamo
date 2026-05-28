@@ -38,6 +38,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ContinueButton from "@/components/record/ContinueButton";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
+import { useDebateHostFailover } from "@/hooks/useDebateHostFailover";
+import { Lock, Globe } from "lucide-react";
 
 
 type UserRole = "facilitator" | "speaker" | "spectator";
@@ -572,6 +574,39 @@ const DebateRoomPage = () => {
   const isLive = debate?.status === "live";
   const canSpeak = isSpeaker && isMyTurn && isLive && !prepPhaseRole;
   const micEnabled = canSpeak;
+
+  // Wave 6 §2 — Host failover. If owner heartbeat lapses >60s, any speaker /
+  // facilitator / creator can reclaim the host role so the room never stalls.
+  const hostFailover = useDebateHostFailover({
+    debateId: id,
+    userId: user?.id,
+    status: debate?.status,
+    isParticipant: !!myParticipant || isCreator || isFacilitator,
+  });
+  const onClaimHost = useCallback(async () => {
+    const ok = await hostFailover.claim();
+    if (ok) toast.success("You're now hosting this debate");
+    else toast.error("Couldn't take host — original host is still active");
+  }, [hostFailover]);
+
+  // Wave 6 §4 — Public/private toggle for completed records.
+  const [togglingPublic, setTogglingPublic] = useState(false);
+  const onTogglePublic = useCallback(async () => {
+    if (!debate || !isCreator) return;
+    const next = !debate.is_public;
+    setTogglingPublic(true);
+    const { error } = await supabase
+      .from("debates")
+      .update({ is_public: next })
+      .eq("id", debate.id);
+    setTogglingPublic(false);
+    if (error) {
+      toast.error("Couldn't update visibility");
+      return;
+    }
+    setDebate((prev) => (prev ? { ...prev, is_public: next } : prev));
+    toast.success(next ? "Record is now public" : "Record is now private");
+  }, [debate, isCreator]);
 
   const advancingRef = useRef(false);
 
@@ -1358,6 +1393,28 @@ const DebateRoomPage = () => {
             />
           )}
 
+          {/* Wave 6 §4 — Public / Private toggle, creator-only, completed records.
+              Default is whatever the row says (typically private). */}
+          {isCreator && isCompleted && (
+            <button
+              type="button"
+              onClick={onTogglePublic}
+              disabled={togglingPublic}
+              className="flex items-center gap-1.5 bg-secondary text-secondary-foreground px-3 py-2 rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors disabled:opacity-60"
+              title={debate.is_public ? "Public — anyone can view" : "Private — only invitees can view"}
+            >
+              {debate.is_public ? (
+                <>
+                  <Globe className="w-3.5 h-3.5" /> Public
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5" /> Private
+                </>
+              )}
+            </button>
+          )}
+
           {isCreator && !isCompleted && (
             <div className="relative">
               <button
@@ -1425,6 +1482,22 @@ const DebateRoomPage = () => {
           )}
         </div>
       </header>
+
+      {/* Wave 6 §2 — host failover prompt. Visible only when the original host
+          appears offline (>60s without heartbeat) and the viewer is allowed to
+          take over. Auto-disappears once someone claims. */}
+      {hostFailover.canClaim && !isCompleted && (
+        <div className="mx-3 mt-2 flex items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 rounded-lg px-3 py-2 text-xs">
+          <span>Host appears offline. Take over to keep the debate moving.</span>
+          <button
+            type="button"
+            onClick={onClaimHost}
+            className="bg-amber-600 text-white font-semibold px-3 py-1 rounded-md hover:bg-amber-700 transition-colors"
+          >
+            Take control
+          </button>
+        </div>
+      )}
 
       {/* Mic/Connection error banners */}
       {micError && (
