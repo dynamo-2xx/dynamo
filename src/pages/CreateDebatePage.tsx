@@ -1406,7 +1406,7 @@ const CreateDebatePage = () => {
                       <Mail className="w-3.5 h-3.5 inline mr-1" />
                       Invite Speakers <span className="normal-case font-normal">(optional)</span>
                     </label>
-                    {editId && (
+                    {(editId || draftDebateId) && (
                       <button
                         type="button"
                         onClick={() => setInviteDialogOpen(true)}
@@ -1435,8 +1435,8 @@ const CreateDebatePage = () => {
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  {/* Interested users (edit mode only) */}
-                  {editId ? (
+                  {/* Interested users (visible as soon as a draft exists) */}
+                  {(editId || draftDebateId) ? (
                     interestedUsers.filter(
                       (u) => !invitedEntries.some((e) => e.userId === u.user_id),
                     ).length > 0 ? (
