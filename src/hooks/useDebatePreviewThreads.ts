@@ -5,6 +5,8 @@ export interface PreviewSummary {
   id: string;
   side: string;
   content: string;
+  type?: string;
+  significance?: string;
   originalContent?: string;
   isEdited?: boolean;
 }
@@ -26,6 +28,22 @@ interface Args {
   debateId: string | undefined;
   status: string | undefined;
 }
+
+const normalizedKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+
+const uniqueLabels = (raw: Array<{ label: string }>) => {
+  const seen = new Set<string>();
+  return raw
+    .map((s) => s.label.trim())
+    .filter(Boolean)
+    .filter((label) => {
+      const key = normalizedKey(label);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 2);
+};
 
 /**
  * Per-subtopic AI summary view: subtopic → thread (per side) → summaries.
@@ -57,7 +75,7 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
       if (cancelled) return;
 
       const sides = (sds || []) as Array<{ id: string; label: string; sort_order: number }>;
-      const labels = sides.map((s) => s.label);
+      const labels = uniqueLabels(sides);
       setSideLabels(labels);
 
       const baseSubs: PreviewSubtopic[] = (subs || []).map((s: any) => ({
@@ -75,31 +93,35 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
 
       const { data: roundSummaries } = await supabase
         .from("round_summaries")
-        .select("subtopic_id, key_arguments")
+        .select("id, subtopic_id, key_arguments")
         .eq("debate_id", debateId);
       if (cancelled) return;
 
-      const bySub = new Map<string, { side: string; content: string }[]>();
-      // Track round_summary id + item_index so we can overlay per-item edits.
-      const itemMeta = new Map<string, { roundSummaryId: string; itemIndex: number }>();
+      const bySub = new Map<string, { id: string; side: string; content: string; type?: string; significance?: string }[]>();
       (roundSummaries || []).forEach((rs: any) => {
         const items = ((rs.key_arguments as any[]) || [])
           .map((k, idx) => ({
             side: String(k?.side ?? "").trim(),
             content: String(k?.content ?? "").trim(),
+            type: String(k?.type ?? "").trim(),
+            significance: String(k?.significance ?? "").trim(),
             _idx: idx,
             _rsid: rs.id,
           }))
           .filter((k) => k.content);
-        items.forEach((it) => {
-          itemMeta.set(`${it._rsid}:${it._idx}`, {
-            roundSummaryId: it._rsid,
-            itemIndex: it._idx,
-          });
-        });
+        const existing = bySub.get(rs.subtopic_id) || [];
         bySub.set(
           rs.subtopic_id,
-          items.map((it) => ({ side: it.side, content: it.content })),
+          [
+            ...existing,
+            ...items.map((it) => ({
+              id: `${it._rsid}:${it._idx}`,
+              side: it.side,
+              content: it.content,
+              type: it.type,
+              significance: it.significance,
+            })),
+          ],
         );
       });
 
@@ -123,8 +145,8 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
       // Re-walk bySub items so edited content overrides the original wording.
       (roundSummaries || []).forEach((rs: any) => {
         const list = bySub.get(rs.subtopic_id) || [];
-        const next = list.map((it, idx) => {
-          const key = `${rs.id}:${idx}`;
+        const next = list.map((it) => {
+          const key = it.id;
           const edit = editOverlay.get(key);
           if (!edit) return it;
           return { ...it, content: edit.edited, _original: edit.original, _edited: true } as any;
@@ -148,15 +170,17 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         if (map.length > 0) {
           const titleToId = new Map<string, string>();
           subsMissing.forEach((s) => titleToId.set(s.title.trim().toLowerCase(), s.id));
-          const byTitle = new Map<string, { side: string; content: string }[]>();
+          const byTitle = new Map<string, { id: string; side: string; content: string; type?: string; significance?: string }[]>();
           map.forEach((e: any) => {
             const title = String(e?.subtopic ?? "").trim().toLowerCase();
             const subId = titleToId.get(title);
             if (!subId) return;
             const arr = byTitle.get(subId) || [];
             arr.push({
+              id: String(e?.id ?? `${subId}:map:${arr.length}`),
               side: String(e?.speaker_side ?? "").trim(),
               content: String(e?.content ?? "").trim(),
+              type: String(e?.type ?? "").trim(),
             });
             byTitle.set(subId, arr);
           });
@@ -174,12 +198,15 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         // Group by side, ordered by sideLabels.
         const grouped = new Map<string, PreviewSummary[]>();
         items.forEach((it: any, idx) => {
-          const key = it.side || "Unattributed";
+          const canonicalLabel = labels.find((label) => normalizedKey(label) === normalizedKey(String(it.side || "")));
+          const key = canonicalLabel || String(it.side || "Unattributed").trim() || "Unattributed";
           const arr = grouped.get(key) || [];
           arr.push({
-            id: `${sub.id}:${idx}`,
+            id: it.id || `${sub.id}:${idx}`,
             side: key,
             content: it.content,
+            type: it.type,
+            significance: it.significance,
             originalContent: it._original,
             isEdited: !!it._edited,
           });

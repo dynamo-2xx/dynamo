@@ -52,6 +52,23 @@ const TAGLINES = [
 const TIME_OPTIONS = ["30s", "1 min", "2 min", "3 min", "5 min"];
 const PREP_TIME_OPTIONS = ["0s", "15s", "30s", "45s", "1 min", "1.5 min", "2 min", "2.5 min", "3 min", "3.5 min", "4 min", "4.5 min", "5 min"];
 
+const normalizeSideLabels = (raw: unknown): string[] => {
+  const labels = Array.isArray(raw)
+    ? raw.map((s) => String(s ?? "").trim()).filter(Boolean)
+    : [];
+  const first = labels[0] || "In Favor";
+  const second =
+    labels.find((label, idx) => idx > 0 && label.toLowerCase() !== first.toLowerCase()) ||
+    "Opposed";
+  return [first, second];
+};
+
+const normalizeDebateTemplate = (value: GeneratedDebate): GeneratedDebate => ({
+  ...value,
+  subtopics: value.subtopics.map((s) => s.trim()).filter(Boolean),
+  sides: normalizeSideLabels(value.sides),
+});
+
 const CreateDebatePage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -270,6 +287,14 @@ const CreateDebatePage = () => {
   }, [debate?.subtopics]);
 
   useEffect(() => {
+    if (!debate || debate.sides.length <= 2) return;
+    setDebate(normalizeDebateTemplate(debate));
+    setSideIds((prev) => prev.slice(0, 2));
+    setDraftSideIds((prev) => (prev ? prev.slice(0, 2) : prev));
+    setCreatorSideIndex((prev) => Math.min(prev, 1));
+  }, [debate]);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setTaglineIndex((prev) => (prev + 1) % TAGLINES.length);
     }, 5000);
@@ -469,7 +494,7 @@ const CreateDebatePage = () => {
         navigate(`/debate/${editId}/preview`, { replace: true });
         return;
       }
-      setDebate({
+      const loadedTemplate = normalizeDebateTemplate({
         topic: d.topic,
         subtopics: (subs || []).map((s: any) => s.title),
         sides: (sds || []).map((s: any) => s.label),
@@ -477,7 +502,9 @@ const CreateDebatePage = () => {
         timePerTurn: d.time_per_turn,
         prepTime: d.prep_time_min || "30s",
       });
-      setSideIds((sds || []).map((s: any) => s.id as string));
+      const loadedSideIds = (sds || []).slice(0, 2).map((s: any) => s.id as string);
+      setDebate(loadedTemplate);
+      setSideIds(loadedSideIds);
       setIsPublic(d.is_public);
       setLocation(d.location || "");
       setScheduledAt(
@@ -494,7 +521,7 @@ const CreateDebatePage = () => {
       // Edit mode: this debate already exists, so it has a join_code we can show.
       setDraftDebateId(editId);
       setDraftJoinCode(d.join_code ?? null);
-      setDraftSideIds((sds || []).map((s: any) => s.id as string));
+      setDraftSideIds(loadedSideIds);
       setMaxSpeakersPerSide((d as any).max_speakers_per_side ?? 2);
 
       // Load creator's existing side assignment from debate_participants
@@ -596,7 +623,7 @@ const CreateDebatePage = () => {
       if (response.error) throw response.error;
 
       const data = response.data;
-      setDebate({
+      const nextTemplate = normalizeDebateTemplate({
         topic: data.topic,
         subtopics: data.subtopics,
         sides: data.sides,
@@ -604,11 +631,12 @@ const CreateDebatePage = () => {
         timePerTurn: data.time_per_turn,
         prepTime: "1 min",
       });
-      setSideIds((data.sides as string[]).map((_, i) => `new-side-${i}`));
+      setDebate(nextTemplate);
+      setSideIds(nextTemplate.sides.map((_, i) => `new-side-${i}`));
       setStep(3);
     } catch (err) {
       console.error("Generation failed:", err);
-      setDebate({
+      const fallbackTemplate = normalizeDebateTemplate({
         topic: prompt.charAt(0).toUpperCase() + prompt.slice(1) + (prompt.endsWith("?") ? "" : "?"),
         subtopics: ["Key considerations", "Potential impacts", "Alternative approaches"],
         sides: ["For", "Against"],
@@ -616,7 +644,8 @@ const CreateDebatePage = () => {
         timePerTurn: "2 min",
         prepTime: "1 min",
       });
-      setSideIds(["new-side-0", "new-side-1"]);
+      setDebate(fallbackTemplate);
+      setSideIds(fallbackTemplate.sides.map((_, i) => `new-side-${i}`));
       setStep(3);
       toast.error("AI generation had an issue — using a default structure. You can edit everything.");
     }
@@ -834,6 +863,10 @@ const CreateDebatePage = () => {
   const handleCreateDebate = async (publishMode: boolean = false, startNow: boolean = false) => {
     if (!debate || !user) return;
     setSaving(true);
+    const debateToSave = normalizeDebateTemplate(debate);
+    if (debateToSave.sides.length !== debate.sides.length || debateToSave.sides.some((s, i) => s !== debate.sides[i])) {
+      setDebate(debateToSave);
+    }
 
     try {
       let dbDebate: any;
@@ -843,12 +876,12 @@ const CreateDebatePage = () => {
         const { data: updated, error: updErr } = await supabase
           .from("debates")
           .update({
-            topic: debate.topic,
+            topic: debateToSave.topic,
             is_public: isPublic,
-            turns_per_subtopic: debate.turnsPerSubtopic,
-            time_per_turn: debate.timePerTurn,
-            prep_time_min: debate.prepTime,
-            prep_time_max: debate.prepTime,
+            turns_per_subtopic: debateToSave.turnsPerSubtopic,
+            time_per_turn: debateToSave.timePerTurn,
+            prep_time_min: debateToSave.prepTime,
+            prep_time_max: debateToSave.prepTime,
             status: publishMode ? "scheduled" : (scheduledAt ? "scheduled" : "draft"),
             location: location.trim() || null,
             scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
@@ -866,7 +899,7 @@ const CreateDebatePage = () => {
         await supabase.from("debate_subtopics").delete().eq("debate_id", editId);
         await supabase.from("debate_sides").delete().eq("debate_id", editId);
 
-        const subtopicInserts = debate.subtopics.map((title, i) => ({
+        const subtopicInserts = debateToSave.subtopics.map((title, i) => ({
           debate_id: editId,
           title,
           sort_order: i,
@@ -876,7 +909,7 @@ const CreateDebatePage = () => {
           if (subError) throw subError;
         }
 
-        const sideInserts = debate.sides.map((label, i) => ({
+        const sideInserts = debateToSave.sides.map((label, i) => ({
           debate_id: editId,
           label,
           sort_order: i,
@@ -890,13 +923,13 @@ const CreateDebatePage = () => {
         const { data: created, error: debateError } = await supabase
           .from("debates")
           .insert({
-            topic: debate.topic,
+            topic: debateToSave.topic,
             created_by: user.id,
             is_public: isPublic,
-            turns_per_subtopic: debate.turnsPerSubtopic,
-            time_per_turn: debate.timePerTurn,
-            prep_time_min: debate.prepTime,
-            prep_time_max: debate.prepTime,
+            turns_per_subtopic: debateToSave.turnsPerSubtopic,
+            time_per_turn: debateToSave.timePerTurn,
+            prep_time_min: debateToSave.prepTime,
+            prep_time_max: debateToSave.prepTime,
             facilitator_type: "ai",
             status: publishMode ? "scheduled" : (scheduledAt ? "scheduled" : "draft"),
             location: location.trim() || null,
@@ -912,7 +945,7 @@ const CreateDebatePage = () => {
         dbDebate = created;
 
         // Create subtopics
-        const subtopicInserts = debate.subtopics.map((title, i) => ({
+        const subtopicInserts = debateToSave.subtopics.map((title, i) => ({
           debate_id: dbDebate.id,
           title,
           sort_order: i,
@@ -921,7 +954,7 @@ const CreateDebatePage = () => {
         if (subError) throw subError;
 
         // Create sides
-        const sideInserts = debate.sides.map((label, i) => ({
+        const sideInserts = debateToSave.sides.map((label, i) => ({
           debate_id: dbDebate.id,
           label,
           sort_order: i,

@@ -87,6 +87,14 @@ function buildThreads(entries: ArgumentMapEntryInput[]) {
   return roots;
 }
 
+const humanizeType = (value: string) => value.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+
+const threadTitle = (entry: ArgumentMapEntryInput, index: number) => {
+  const side = entry.speaker_side || "Unattributed";
+  const type = humanizeType(entry.type || "argument");
+  return `${side} · ${type} ${index + 1}`;
+};
+
 /**
  * Inline editor for a single argument-map bubble. Used only in the prep
  * window. Transcript text is NEVER editable — only the AI-derived bubble copy.
@@ -253,10 +261,10 @@ const ArgumentMapContent = ({
                           <ChevronDown className="w-3.5 h-3.5 text-foreground/40 shrink-0 mt-0.5 transition-transform [[data-state=closed]_&]:-rotate-90" />
                           <div className="flex-1 min-w-0">
                             <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-body">
-                              {th.root.speaker_side}
+                              {threadTitle(th.root, ti)}
                             </p>
-                            <p className="text-xs text-foreground font-body leading-snug line-clamp-2" data-annotatable>
-                              {th.root.content}
+                            <p className="text-xs text-foreground/70 font-body leading-snug">
+                              {th.children.length} repl{th.children.length === 1 ? "y" : "ies"}
                             </p>
                           </div>
                           <span className={`text-[9px] uppercase font-semibold px-1.5 py-0.5 rounded shrink-0 ${typeChipColor(th.root.type)}`}>
