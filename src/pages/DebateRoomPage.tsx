@@ -38,6 +38,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ContinueButton from "@/components/record/ContinueButton";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
+import { useDebateHostFailover } from "@/hooks/useDebateHostFailover";
+import { Lock, Globe } from "lucide-react";
 
 
 type UserRole = "facilitator" | "speaker" | "spectator";
