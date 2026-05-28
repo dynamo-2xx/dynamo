@@ -190,12 +190,14 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         // Group by side, ordered by sideLabels.
         const grouped = new Map<string, PreviewSummary[]>();
         items.forEach((it: any, idx) => {
-          const key = it.side || "Unattributed";
+          const key = labels.find((label) => label.toLowerCase() === String(it.side || "").toLowerCase()) || it.side || "Unattributed";
           const arr = grouped.get(key) || [];
           arr.push({
-            id: `${sub.id}:${idx}`,
+            id: it.id || `${sub.id}:${idx}`,
             side: key,
             content: it.content,
+            type: it.type,
+            significance: it.significance,
             originalContent: it._original,
             isEdited: !!it._edited,
           });
