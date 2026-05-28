@@ -1,4 +1,4 @@
-# Wave 5 — Happy-path & control-panel fixes
+# Wave 5 — Happy-path & control-panel fixes  🟢 shipped
 
 Implemented in this order so the most user-visible breakage lands first and the riskiest AI-prompt work lands last with the most room to test.
 
@@ -103,3 +103,13 @@ Written to `mem://preferences/reliability-bar` and added as a one-liner to `mem:
 
 - New file `mem://preferences/reliability-bar` with the rule above.
 - Add to `mem://index.md` Core: `Reliability bar: build for consumer + enterprise — exceptionally reliable, seamless.`
+
+---
+
+# Wave 6 — Reliability + ship-ready polish  🟢 shipped
+
+1. **Host failover (§2)** — `active_host_user_id` + `active_host_heartbeat_at` on `debates`. Active host beats every 20s; any speaker/facilitator/creator can claim via `claim_debate_host` RPC after 60s stale. Banner in DebateRoomPage surfaces the option.
+2. ~~Notebook tabs (My Take/Thoughts/Annotations)~~ — already shipped; user confirmed current notebook is correct.
+3. ~~Argument-map rename~~ — keep current name per user.
+4. **Public/private toggle** — creator-only chip in the completed-record header, writes `debates.is_public`.
+5. **Smoke-test checklist** — `docs/debate-smoke-test.md` covering create → lobby → live → prep → completion → failover.
