@@ -29,6 +29,22 @@ interface Args {
   status: string | undefined;
 }
 
+const normalizedKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+
+const uniqueLabels = (raw: Array<{ label: string }>) => {
+  const seen = new Set<string>();
+  return raw
+    .map((s) => s.label.trim())
+    .filter(Boolean)
+    .filter((label) => {
+      const key = normalizedKey(label);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 2);
+};
+
 /**
  * Per-subtopic AI summary view: subtopic → thread (per side) → summaries.
  * Source: round_summaries.key_arguments. No transcript text is exposed here.
@@ -59,7 +75,7 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
       if (cancelled) return;
 
       const sides = (sds || []) as Array<{ id: string; label: string; sort_order: number }>;
-      const labels = Array.from(new Set(sides.map((s) => s.label).filter(Boolean))).slice(0, 2);
+      const labels = uniqueLabels(sides);
       setSideLabels(labels);
 
       const baseSubs: PreviewSubtopic[] = (subs || []).map((s: any) => ({
@@ -82,8 +98,6 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
       if (cancelled) return;
 
       const bySub = new Map<string, { id: string; side: string; content: string; type?: string; significance?: string }[]>();
-      // Track round_summary id + item_index so we can overlay per-item edits.
-      const itemMeta = new Map<string, { roundSummaryId: string; itemIndex: number }>();
       (roundSummaries || []).forEach((rs: any) => {
         const items = ((rs.key_arguments as any[]) || [])
           .map((k, idx) => ({
@@ -95,12 +109,6 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
             _rsid: rs.id,
           }))
           .filter((k) => k.content);
-        items.forEach((it) => {
-          itemMeta.set(`${it._rsid}:${it._idx}`, {
-            roundSummaryId: it._rsid,
-            itemIndex: it._idx,
-          });
-        });
         const existing = bySub.get(rs.subtopic_id) || [];
         bySub.set(
           rs.subtopic_id,
@@ -190,7 +198,8 @@ export function useDebatePreviewThreads({ debateId, status }: Args) {
         // Group by side, ordered by sideLabels.
         const grouped = new Map<string, PreviewSummary[]>();
         items.forEach((it: any, idx) => {
-          const key = labels.find((label) => label.toLowerCase() === String(it.side || "").toLowerCase()) || it.side || "Unattributed";
+          const canonicalLabel = labels.find((label) => normalizedKey(label) === normalizedKey(String(it.side || "")));
+          const key = canonicalLabel || String(it.side || "Unattributed").trim() || "Unattributed";
           const arr = grouped.get(key) || [];
           arr.push({
             id: it.id || `${sub.id}:${idx}`,
