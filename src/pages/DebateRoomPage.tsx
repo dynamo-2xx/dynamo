@@ -293,6 +293,8 @@ const DebateRoomPage = () => {
     micError,
     connectionError,
     addTextEntry,
+    editArgumentMapEntry,
+    revertArgumentMapEntry,
   } = useDeepgramTranscription({
     debateId: id || "",
     currentSpeakerSide: currentSideForTranscript?.label || "",
