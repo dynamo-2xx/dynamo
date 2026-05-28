@@ -502,6 +502,10 @@ const DebateRoomPage = () => {
     // Hard block when the host has paused the room: the turn clock must not
     // advance for anyone (including the host) until paused_at is cleared.
     if (debate?.paused_at) return;
+    // Same hard block when the current speaker has invoked their per-turn
+    // pause. Without this the visible countdown keeps ticking even though
+    // Deepgram and the turn are halted, burning seconds off the speaker's turn.
+    if (debate?.speaker_paused_at) return;
     if (timerRunning && timeLeft > 0) {
       timerWasActiveRef.current = true;
       timerRef.current = setInterval(() => {
@@ -512,19 +516,19 @@ const DebateRoomPage = () => {
       }, 1000);
     }
     return () => clearInterval(timerRef.current);
-  }, [timerRunning, timeLeft, debate?.paused_at]);
+  }, [timerRunning, timeLeft, debate?.paused_at, debate?.speaker_paused_at]);
 
   // When the room becomes paused, stop the local timerRunning flag so that
   // anything observing it (UI, AI, auto-advance) treats the clock as stopped.
   // When it resumes, restart the clock if there's time left on the turn.
   useEffect(() => {
-    if (debate?.paused_at) {
+    if (debate?.paused_at || debate?.speaker_paused_at) {
       setTimerRunning(false);
     } else if (debate && timeLeft > 0 && debate.status === "live" && !debate.prep_phase_active) {
       setTimerRunning(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debate?.paused_at]);
+  }, [debate?.paused_at, debate?.speaker_paused_at]);
 
   const currentSubtopic = subtopics[debate?.current_subtopic_index ?? 0];
   const currentSide = sides.find((s) => s.id === debate?.current_speaker_side_id) || sides[0];
