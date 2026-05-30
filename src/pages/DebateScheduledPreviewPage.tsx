@@ -101,11 +101,11 @@ const DebateScheduledPreviewPage = () => {
           setSpectatorQueued(true);
         }
 
-        const { data: inv } = await supabase
+        const { data: inv } = await (supabase as any)
           .from("debate_invitations")
           .select("id")
           .eq("debate_id", id)
-          .eq("invitee_user_id", user.id)
+          .eq("invited_user_id", user.id)
           .maybeSingle();
         if (!cancelled) setInvitedAsSpeaker(!!inv);
 
