@@ -759,7 +759,8 @@ const DebateRoomPage = () => {
 
         nextSubIdx += 1;
         nextTurn = 0;
-        nextSideIdx = 0;
+        // Keep alternation across subtopic boundaries.
+        nextSideIdx = (currentSideIdx + 1) % sides.length;
 
         if (nextSubIdx >= subtopics.length) {
           await persistTranscripts();
@@ -809,6 +810,9 @@ const DebateRoomPage = () => {
           current_turn: nextTurn,
           current_speaker_side_id: sides[nextSideIdx]?.id,
           turn_started_at: turnNow,
+          paused_at: null,
+          speaker_paused_at: null,
+          speaker_pause_owner_id: null,
         } as any)
         .eq("id", id)
         .eq("prep_phase_active", true)
