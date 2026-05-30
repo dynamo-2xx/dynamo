@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ArrowLeft, HandHeart, Loader2, Bell, MessageSquare, Check, LogIn } from "lucide-react";
+import { ArrowLeft, HandHeart, Loader2, Bell, MessageSquare, Check, LogIn, Eye } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +42,10 @@ const DebateScheduledPreviewPage = () => {
   const [queueBusy, setQueueBusy] = useState(false);
   const [queueSideOpen, setQueueSideOpen] = useState(false);
   const [queuedSideId, setQueuedSideId] = useState<string | null>(null);
+  const [invitedAsSpeaker, setInvitedAsSpeaker] = useState(false);
+  const [isParticipant, setIsParticipant] = useState(false);
+  const [spectatorQueued, setSpectatorQueued] = useState(false);
+  const [spectatorBusy, setSpectatorBusy] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -54,11 +58,6 @@ const DebateScheduledPreviewPage = () => {
         supabase.from("debate_sides").select("*").eq("debate_id", id).order("sort_order"),
       ]);
       if (cancelled) return;
-
-      if (d && (d.status === "live" || d.status === "completed")) {
-        navigate(`/debate/${id}`, { replace: true });
-        return;
-      }
 
       setDebate(d);
       setSubtopics((subs as Subtopic[]) || []);
@@ -98,12 +97,63 @@ const DebateScheduledPreviewPage = () => {
         if (!cancelled && interest?.role === "queued_speaker") {
           setQueuedSideId(interest.side_id ?? sides[0]?.id ?? null);
         }
+        if (!cancelled && (interest as any)?.role === "spectator") {
+          setSpectatorQueued(true);
+        }
+
+        const { data: inv } = await supabase
+          .from("debate_invitations")
+          .select("id")
+          .eq("debate_id", id)
+          .eq("invitee_user_id", user.id)
+          .maybeSingle();
+        if (!cancelled) setInvitedAsSpeaker(!!inv);
+
+        const { data: part } = await supabase
+          .from("debate_participants")
+          .select("id")
+          .eq("debate_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!cancelled) setIsParticipant(!!part);
       }
     })();
+
+    // Realtime: react to status changes (pending → live → completed) so the
+    // preview gains its LIVE pill (and eventually the record view) without a
+    // manual refresh.
+    const channel = supabase
+      .channel(`debate-status-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "debates", filter: `id=eq.${id}` },
+        (payload) => {
+          if (cancelled) return;
+          setDebate((d: any) => ({ ...(d ?? {}), ...(payload.new as any) }));
+        },
+      )
+      .subscribe();
+
+    const onVis = () => {
+      if (document.visibilityState !== "visible" || cancelled) return;
+      supabase
+        .from("debates")
+        .select("status,ended_at,edit_window_ends_at")
+        .eq("id", id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (cancelled || !data) return;
+          setDebate((d: any) => ({ ...(d ?? {}), ...(data as any) }));
+        });
+    };
+    document.addEventListener("visibilitychange", onVis);
+
     return () => {
       cancelled = true;
+      supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVis);
     };
-  }, [id, user, navigate]);
+  }, [id, user]);
 
   if (loading) {
     return (
@@ -128,6 +178,36 @@ const DebateScheduledPreviewPage = () => {
 
   const isOwner = !!user && user.id === debate.created_by;
   const showInterestedCta = !!user && !isOwner;
+  const isLive = debate.status === "live";
+  const isCompleted = debate.status === "completed";
+  const canJoinAsSpectator =
+    isLive && !!user && !isOwner && !invitedAsSpeaker && !isParticipant;
+
+  const handleJoinAsSpectator = async () => {
+    if (!user || !id) return;
+    setSpectatorBusy(true);
+    try {
+      // Upsert via delete-then-insert; default role for debate_interests is 'spectator'.
+      await supabase
+        .from("debate_interests")
+        .delete()
+        .eq("debate_id", id)
+        .eq("user_id", user.id);
+      const { error } = await supabase.from("debate_interests").insert({
+        debate_id: id,
+        user_id: user.id,
+        role: "spectator",
+        status: "pending",
+      } as any);
+      if (error) throw error;
+      setSpectatorQueued(true);
+      navigate(`/debate/${id}`);
+    } catch (e: any) {
+      toast({ title: "Couldn't join", description: e?.message ?? "Try again." });
+    } finally {
+      setSpectatorBusy(false);
+    }
+  };
 
   const handleToggleNotify = async () => {
     if (!user || !id) return;
