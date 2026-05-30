@@ -1,132 +1,58 @@
-# Wave 5 — Happy-path & control-panel fixes  🟢 shipped
+## What I'll fix
 
-Implemented in this order so the most user-visible breakage lands first and the riskiest AI-prompt work lands last with the most room to test.
+### 1. Notebook design asymmetry (My Take "Suggest" missing + consolidate to one UI)
 
-Also save a new core memory rule:
-> **Reliability bar:** Build with the intent of creating a tool with an exceptionally reliable, seamless experience ready for consumers and enterprise customers.
+**Desired outcome:** The notebook looks identical everywhere it appears (debate room, record preview, post-session record, prep window). The "Suggest from my Thoughts + Annotations" button on the My Take tab works everywhere. `/my-study/:notebookId` is untouched.
 
-Written to `mem://preferences/reliability-bar` and added as a one-liner to `mem://index.md` Core.
+**Root cause:** `MyTakeTab` only renders the Suggest button when it receives `recordType` + `recordId`. The shared `NotebookPanel` never passes those down. `SessionRecordViewV2` also never passes `recordType`/`recordId` to `NotebookPanel`. Two old, divergent components still exist: `NotebookOverlay.tsx` (dead) and `PrepNotebookPanel.tsx` (used inside prep) — both are raw `<textarea>` versions with no Suggest, no tabs parity, no Dynamo.
 
----
+**Changes:**
+- `NotebookPanel`: pass `recordType` + `recordId` into `MyTakeTab` in `renderTab`. Result: Suggest button appears in every consumer of `NotebookPanel`.
+- `SessionRecordViewV2`: pass `recordType="live_session"` + `recordId={sessionId}` to its `NotebookPanel` so live-session notebooks also get Suggest.
+- `PrepNotebookPanel`: replace its body with `NotebookPanel` mounted in inline (non-floating) mode so the prep window shows the exact same UI as the room and record. (Add a small `inline` prop to `NotebookPanel` that renders the contents without the fixed-position chrome / drag header, since prep already has its own column container.)
+- Delete `src/components/debate/NotebookOverlay.tsx` (no remaining importers).
 
-## #16 — Speaker pause: resume, auto-resume, frozen turn clock
+### 2. Debate-room notebook should drag across the entire screen
 
-**Current incorrect state**
-- Resume button is wired but the RPC clears `speaker_paused_at` without the client re-rendering reliably (state stays "paused" in UI).
-- 30s auto-resume only fires if `canControl` is true AND `state.speaker_pause_owner_id === ownerId`; on reload `ownerId` resolves a tick late so the guard fails silently and the pause never lifts.
-- Turn timer keeps counting down because `turn_started_at` is not shifted forward on resume in every path.
+**Desired outcome:** The floating notebook can be dragged anywhere in the viewport, not clipped to the room's main panel.
 
-**Desired**
-- Resume button instantly clears pause for everyone in the room.
-- If nobody resumes, 30s auto-resume fires deterministically.
-- During pause the turn clock visibly freezes (countdown frozen on all clients); on resume, `turn_started_at` is shifted forward by the pause duration so no time is lost.
+**Status:** `NotebookPanel` already uses `position: fixed` with viewport-bound clamping, so positionally it can go anywhere. The visible "clipping" the user is seeing is the drag-bounds math using `size.w/size.h` against `window.innerWidth/innerHeight`, which is correct. I'll audit at runtime — most likely cause is an ancestor in `DebateRoomPage` with a CSS `transform`/`filter` that creates a containing block for `position: fixed`. If found, hoist the panel out via a portal to `document.body` so it truly floats over the entire screen.
 
-**Fix**
-- `useSpeakerPause`: drop the `canControl` requirement from the auto-resume branch; let any client whose `ownerId` matches OR whose `canControl` is true after a 5s grace fire the RPC, so the room never stalls.
-- Audit `resume_speaker_pause` RPC: confirm it both clears the 3 pause columns AND updates `turn_started_at = turn_started_at + (now() - speaker_paused_at)` in one statement. If missing, add it.
-- In the turn-timer hook/component, subtract elapsed pause when `speaker_paused_at` is non-null so the visible countdown freezes immediately (don't wait for `turn_started_at` to update on resume).
+**Change:** Wrap the desktop branch of `NotebookPanel`'s return in `createPortal(..., document.body)`. No layout regressions because it's already `position: fixed; z-index: 50`.
 
-## #18 — Non-speaker loses entire control panel
+### 3. Facilitator pause must pause the preparation-window timer
 
-**Current incorrect state**
-- The control panel (mic, camera, notebook, argument map, pause) is conditionally rendered only when `isMyTurn`, so non-speakers see a blank toolbar.
+**Desired outcome:** When the facilitator presses Pause during a prep window, the prep countdown freezes; Resume continues from where it left off.
 
-**Desired**
-- Both speaker and non-speaker always see the full control panel. Buttons gate per-feature:
-  - Mic toggle + speaker-pause: enabled only when `isMyTurn`.
-  - Camera, notebook, argument map, end-turn-early (where applicable): enabled for both.
+**Change:** In `PrepPhaseOverlay`, read `isPaused` + `pausedAt` from `usePauseControl` (same hook the room already uses) and:
+- Stop decrementing the local countdown while `isPaused` is true.
+- When resumed, recompute remaining time as `original_remaining − (resume_time − pause_time)`.
+- Suppress the auto-mark-ready-at-zero side-effect while paused.
 
-**Fix**
-- In `DebateRoomPage.tsx` (and `ParticipantSharedView.tsx` if it owns the toolbar), remove the outer `isMyTurn` conditional and replace with per-button `disabled={!isMyTurn}` only on mic + pause. Camera/notebook/argument map render unconditionally.
+No DB schema change — `paused_at` already exists on `debates`.
 
-## #19 — Remove dead "edit threads" tab; add inline bubble edit
+### 4. Invited speakers stuck in mic-prep lobby after host starts
 
-**Current incorrect state**
-- A top tab/bar above the argument map + notebook does nothing.
-- Argument-map bubbles have no edit affordance, so the prep-window "edit your AI-generated stance" never actually lands.
+**Desired outcome:** When the host flips the debate to `live`, every queued/accepted speaker in the lobby is auto-navigated into `/debate/:id` within ~2s. The "Waiting for host to start…" copy disappears.
 
-**Desired**
-- Remove the dead tab.
-- Each argument-map bubble shows a pencil icon during the prep window. Clicking it opens an inline editor.
-- Once edited, the bubble shows an "edited" chip.
-- Any viewer can tap the chip to revert to the AI original. Both `original_text` and `edited_text` are stored so the revert is non-destructive.
+**Investigation summary:** Both `DebateLobbyPage` and `JoinDebatePage` subscribe to `postgres_changes` on `debates` and navigate on `status === 'live'`. The fact this fails for some users points to either (a) the `debates` table not being in the `supabase_realtime` publication, or (b) the realtime subscription racing the page mount (the user landed *before* the channel was ready, then the host flipped status, then the channel attached too late).
 
-**Fix**
-- Delete the dead tab JSX + state from the argument-map host.
-- Migration: add `original_text text` and `edited_text text` to the argument-map node table (need to confirm table name during build — likely `debate_arguments` or similar).
-- Add pencil → inline `<textarea>` → save flow on each bubble, gated by `debate.prep_phase_active === true` for the editor, but the "edited" chip and revert action visible always.
+**Changes:**
+- Migration: ensure `debates` table is part of `supabase_realtime` publication (`ALTER PUBLICATION supabase_realtime ADD TABLE public.debates` — no-op if already there) and set `REPLICA IDENTITY FULL` so the `payload.new` row is complete.
+- Add a poll-fallback in `DebateLobbyPage`, `JoinDebatePage`, and `WaitingForHost`: every 4s while in waiting phase, `select status from debates where id = :id`; if `live`, navigate. Belt + suspenders so realtime gaps never strand a user.
+- Audit `LiveLobbyPage` + `CmmLobbyPage` for the same gap and add the same poll fallback.
 
-## #17 — Threaded record quality
+## Verification
 
-**Current incorrect state**
-- Live room shows one subtopic split into 4 sibling threads instead of one nested tree.
-- Post-session archive shows multiple threads with identical titles (e.g. two "Contest …") and drops the per-statement tag chips.
+- Build passes.
+- Visit debate room → open notebook → My Take tab → see "Suggest from my Thoughts + Annotations" button.
+- Drag notebook into a corner of the screen previously unreachable; confirm it follows the cursor edge to edge.
+- Start a debate, hit Pause during prep → prep timer stops; Resume → prep timer resumes.
+- Two-browser test: host on /lobby, invited speaker on /lobby → host clicks Start → speaker navigates to /debate/:id within ~4s even if realtime is laggy.
 
-**Desired**
-- AI threader groups by argumentative relationship: a quote / stake / evidence becomes a child of its parent claim, not a sibling thread.
-- Threads with identical titles get merged into one (preferring the earliest by timestamp).
-- Per-statement tag chips persist into the post-session archive renderer.
+## Confidence
 
-**Fix**
-- `supabase/functions/ai-facilitator/index.ts`: update the threading prompt to explicitly forbid creating a new top-level thread when a statement is a sub-move (quote/stake/evidence/counter-evidence) of an existing one. Provide 1-shot examples. Return `parent_thread_id` and `thread_role` consistently.
-- Add a server-side merge pass: when two threads in the same subtopic have identical normalized titles, fold the later one's entries into the earlier one's `thread_id`.
-- In the archive renderer (`LiveThreadView` + the post-session counterpart), pass through `tags` from the transcript entry to `TranscriptCard` and render the chip row.
-
-## #15 — Prompt-template `/create` invite panel sends invitees to a blank room
-
-**Current incorrect state**
-- Invites sent from the prompt-template `/create` (the first-touch flow) drop joiners into an empty waiting page with no mic-prep, no roster, no host preview.
-- The edit-draft `/create?edit=…` already has the good experience (inline user-search, mic-prep lobby, host sees joining profiles + mic status).
-
-**Desired**
-- Invitees from either entry point land in the same mic-prep lobby and the host sees them appear with mic status.
-
-**Fix**
-- Compare `CreateDebatePage.tsx` prompt-template invite panel vs the edit-draft invite panel.
-- Extract the working panel into a shared component (e.g. `<DebateInvitePanel debateId draftMode />`) and mount it from both flows.
-- Confirm the invite link points at the lobby route, not the empty room, in both cases.
-
----
-
-## Technical notes
-
-- Migration scope: 1 RPC audit (`resume_speaker_pause`) + 2 new columns on the argument-map table for #19. Additive only.
-- Files likely touched:
-  - `src/hooks/useSpeakerPause.ts`, `src/pages/DebateRoomPage.tsx`, `src/components/debate/ParticipantSharedView.tsx` (#16, #18)
-  - argument-map components (#19)
-  - `supabase/functions/ai-facilitator/index.ts`, `src/components/live/LiveThreadView.tsx`, post-session archive renderer (#17)
-  - `src/pages/CreateDebatePage.tsx` + a new `DebateInvitePanel` (#15)
-- Out of scope: Waves 1–4 already-in-flight items; facilitator AI behavior beyond the threading prompt.
-- QA: full happy-path on Desktop Chrome + iOS Safari with two browsers (host + invitee) before merging #15 and #17.
-
-## Memory write
-
-- New file `mem://preferences/reliability-bar` with the rule above.
-- Add to `mem://index.md` Core: `Reliability bar: build for consumer + enterprise — exceptionally reliable, seamless.`
-
----
-
-# Wave 6 — Reliability + ship-ready polish  🟢 shipped
-
-1. **Host failover (§2)** — `active_host_user_id` + `active_host_heartbeat_at` on `debates`. Active host beats every 20s; any speaker/facilitator/creator can claim via `claim_debate_host` RPC after 60s stale. Banner in DebateRoomPage surfaces the option.
-2. ~~Notebook tabs (My Take/Thoughts/Annotations)~~ — already shipped; user confirmed current notebook is correct.
-3. ~~Argument-map rename~~ — keep current name per user.
-4. **Public/private toggle** — creator-only chip in the completed-record header, writes `debates.is_public`.
-5. **Smoke-test checklist** — `docs/debate-smoke-test.md` covering create → lobby → live → prep → completion → failover.
-
----
-
-# Wave 7 — §0 Waitlist gate  🟢 shipped
-
-- New `launch_config` singleton table with `is_public_launched` flag (admin-only update via RLS).
-- `useLaunchFlag` hook polls every 60s for non-deploy flips.
-- `<LaunchGate>` wrapper bounces anonymous visitors to `/waitlist` until the founder opens the gates. Whitelisted: /auth, /terms, /privacy, /guidelines, /legal, /status, /join, /preview, /share, projector + audience views.
-- New `WaitlistPage` reuses the existing `waitlist-signup` edge function and shows the user's position.
-- `LaunchFlagControl` admin chip on `/admin/costs` lets the founder toggle the gate with a confirm dialog.
-
----
-
-# Remaining sections — status
-
-- §1 Auth/Onboarding, §3 My Study, §4 In-person, §5 Data Safety, §6 Performance, §7 Mobile, §8 Notifications, §9 Content & Legal, §10 Analytics, §11 Launch, §13 Errors, §14 i18n, §15 Trust & Safety, §16 Email, §18 Cost Tracking, §19 Backup/DR, §20 Legal, §21 Perf Intelligence, §22 Clubs — implemented (see memory index).
-- **Blocked on user input:** §12 Monetization + §17 Billing Ops (Stripe connection), §16 Email (sender-domain confirmation), §20 Legal (copy sign-off), brand assets for OG cards.
+- Notebook unification + Suggest: **95%** — wiring change with a clear root cause.
+- Free-drag (portal): **80%** — depends on confirming a `transform` ancestor; portal is the safe catch-all.
+- Pause during prep: **90%** — reuses existing hook + a small timer guard.
+- Lobby auto-launch: **75%** — realtime publication + poll fallback should cover every case; final confirmation needs the two-browser test.
