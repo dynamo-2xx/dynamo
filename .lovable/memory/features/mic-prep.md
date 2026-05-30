@@ -22,13 +22,11 @@ The mic-prep green/red pulse is **not** one-time. It becomes a permanent in-room
   - **Live**: live-transcription bubble + persistent joined-users avatar list at top of display; camera border when camera on.
   - **CMM**: identical pattern to Debate/Live.
 
-## Multi-speaker side picker (Debate, side with >1 speaker)
-Triggered in the prep window between turns.
-- **Vote** on which side-mate speaks next. Self-votes allowed.
-- **Tie-breaker**: random selection, **excluding the most recent speaker on that side**. First turn (no prior speaker) → any tied user eligible.
-- **Side-private comms** during prep: text channel + voice (profile pic with green/red pulse) so co-speakers can negotiate.
-- **AI summary edit rights**: only the speaker who actually spoke can edit their own argument card. No cross-side-mate edits.
-- **Notebook**: extra **shared side tab** appears when side has >1 speaker. All other notebook tabs remain private per user.
+## Multi-speaker side picker — POST-LAUNCH (not in v1)
+Deferred until after v1 launch. v1 debates assume one speaker per side. Do not build vote/tie-break/side-private comms/shared notebook side-tab until explicitly re-scoped.
+
+## Prep window columns — 2-column only
+The prep workspace is **2 columns**: Argument Map (left) + Notebook (right). Do **not** add a 3rd "your stance" column — that experience lives in the Notebook's My Take tab and a separate column would be redundant.
 
 ## Projector layout trigger
 - Explicit `?view=projector` URL (Zoom Rooms / Google Meet companion-mode pattern).
@@ -39,6 +37,6 @@ Triggered in the prep window between turns.
 - **Projector / large-screen**: equal-sized bubbles in a grid, big title + topic + QR/join code, heartbeat dot + "Waiting on N of M" counter. No personal mic-test UI.
 
 ## Per-format conditionals
-- **Debate**: facilitator slot (slender left tab), side picker shown when side has >1 speaker.
+- **Debate**: facilitator slot (slender left tab). Multi-speaker side picker is post-launch.
 - **Live**: Echo Guard toggle, expected-speaker-count field for diarization seeding.
 - **CMM**: host + currently active challenger only.
