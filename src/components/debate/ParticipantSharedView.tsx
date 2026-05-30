@@ -192,7 +192,12 @@ const ParticipantSharedView = ({
   const activeSide = sides.find((s) => s.id === debate.current_speaker_side_id) || sides[0];
 
   const currentSubtopicArgs = args.filter((a) => a.subtopic_id === currentSubtopic?.id);
-  const chatMessages = currentSubtopicArgs.map((a) => {
+  // Build the live chat stream from BOTH submitted arguments and finalized
+  // transcript entries for the current subtopic, so spoken turns appear in
+  // the main panel even when no camera is on. Dedup by trimmed lowercase text
+  // (text submissions create both an arg row and a transcript entry for the
+  // AI summarizer) and sort by timestamp.
+  const argMessages = currentSubtopicArgs.map((a) => {
     const p = participants.find((p) => p.id === a.participant_id);
     const side = sides.find((s) => s.id === p?.side_id);
     return {
@@ -202,8 +207,32 @@ const ParticipantSharedView = ({
       sideOrder: side?.sort_order ?? 0,
       createdAt: a.created_at,
       isEdited: a.is_edited,
+      _ts: new Date(a.created_at).getTime(),
+      _key: a.content.trim().toLowerCase(),
     };
   });
+  const transcriptMessages = transcriptEntries
+    .filter((e) => e.is_final && e.subtopic === currentSubtopic?.title)
+    .map((e) => {
+      const side = sides.find((s) => s.label.toLowerCase() === e.speaker_side.toLowerCase());
+      return {
+        id: e.id,
+        content: e.text,
+        sideLabel: e.speaker_side,
+        sideOrder: side?.sort_order ?? 0,
+        createdAt: new Date(e.timestamp).toISOString(),
+        isEdited: false,
+        _ts: e.timestamp,
+        _key: e.text.trim().toLowerCase(),
+      };
+    });
+  const argKeys = new Set(argMessages.map((m) => m._key));
+  const chatMessages = [
+    ...argMessages,
+    ...transcriptMessages.filter((m) => !argKeys.has(m._key)),
+  ]
+    .sort((a, b) => a._ts - b._ts)
+    .map(({ _ts, _key, ...rest }) => rest);
 
   const getSideOrder = (sideLabel: string): number => {
     const side = sides.find((s) => s.label.toLowerCase() === sideLabel.toLowerCase());
