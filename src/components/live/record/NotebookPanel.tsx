@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   BookOpen,
@@ -276,6 +277,8 @@ const NotebookPanel = ({
           onPublish={onPublish}
           onUnpublish={onUnpublish}
           isPublished={isPublished}
+          recordType={recordType === "imported_record" ? undefined : (recordType as any)}
+          recordId={recordType === "imported_record" ? undefined : (recordId ?? null)}
         />
       );
     return (
@@ -490,7 +493,7 @@ const NotebookPanel = ({
   }
 
   // Desktop: floating draggable/resizable panel
-  return (
+  const desktopPanel = (
     <div
       style={{
         position: "fixed",
@@ -525,6 +528,9 @@ const NotebookPanel = ({
       />
     </div>
   );
+  return typeof document !== "undefined"
+    ? createPortal(desktopPanel, document.body)
+    : desktopPanel;
 };
 
 export default NotebookPanel;

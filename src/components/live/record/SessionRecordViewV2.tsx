@@ -821,6 +821,8 @@ const SessionRecordViewV2 = ({
           open={notebookOpen}
           onClose={() => setNotebookOpen(false)}
           sessionId={sessionId}
+          recordType="live_session"
+          recordId={sessionId}
           thoughts={notebook.thoughts}
           setThoughts={notebook.setThoughts}
           myTake={notebook.myTake}
