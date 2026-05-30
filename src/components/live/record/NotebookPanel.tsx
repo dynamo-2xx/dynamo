@@ -42,6 +42,8 @@ interface NotebookPanelProps {
   /** Optional: when set, Dynamo Q&A targets a debate or CMM record instead of a live session. */
   recordType?: "live_session" | "debate" | "change_my_mind" | "imported_record";
   recordId?: string;
+  /** When true, renders inline (no floating chrome / drag header / portal). */
+  inline?: boolean;
   thoughts: string;
   setThoughts: (v: string) => void;
   myTake: string;
@@ -98,6 +100,7 @@ const NotebookPanel = ({
   sessionId,
   recordType,
   recordId,
+  inline = false,
   thoughts,
   setThoughts,
   myTake,
