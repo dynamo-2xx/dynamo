@@ -168,7 +168,23 @@ export default function DebateLobbyPage() {
         },
       )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    // Poll fallback — covers the case where realtime is slow or the channel
+    // attaches after the host has already flipped the status. Ensures every
+    // queued speaker auto-joins within ~4s of the host pressing Start.
+    const poll = window.setInterval(async () => {
+      const { data } = await supabase
+        .from("debates")
+        .select("status")
+        .eq("id", id)
+        .maybeSingle();
+      if ((data as any)?.status === "live") {
+        navigate(`/debate/${id}`, { replace: true });
+      }
+    }, 4000);
+    return () => {
+      supabase.removeChannel(ch);
+      window.clearInterval(poll);
+    };
   }, [isCreator, id, navigate]);
 
   // §4 owner no-show banner — surfaces +15m past scheduled start.

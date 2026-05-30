@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   BookOpen,
@@ -41,6 +42,8 @@ interface NotebookPanelProps {
   /** Optional: when set, Dynamo Q&A targets a debate or CMM record instead of a live session. */
   recordType?: "live_session" | "debate" | "change_my_mind" | "imported_record";
   recordId?: string;
+  /** When true, renders inline (no floating chrome / drag header / portal). */
+  inline?: boolean;
   thoughts: string;
   setThoughts: (v: string) => void;
   myTake: string;
@@ -97,6 +100,7 @@ const NotebookPanel = ({
   sessionId,
   recordType,
   recordId,
+  inline = false,
   thoughts,
   setThoughts,
   myTake,
@@ -234,6 +238,87 @@ const NotebookPanel = ({
 
   if (!open) return null;
 
+  // Inline mode: render just the tabs + body inside the parent container.
+  if (inline) {
+    const renderTab = (t: Tab) => {
+      if (t === "thoughts")
+        return (
+          <ThoughtsTab
+            thoughts={thoughts}
+            setThoughts={setThoughts}
+            readerNotes={reader.inThoughts}
+            onDismissReaderNote={reader.dismiss}
+            onJumpReaderNote={(n) => {
+              if (n.anchor_kind === "my_take") setTab("my_take");
+              else setTab("thoughts");
+              if (!n.read_at) reader.markRead(n.id);
+            }}
+          />
+        );
+      if (t === "annotations")
+        return (
+          <AnnotationsTab
+            annotations={annotations}
+            onJump={onJumpToAnnotation}
+            onRemove={onRemoveAnnotation}
+            onUpdate={onUpdateAnnotation}
+          />
+        );
+      if (t === "my_take")
+        return (
+          <MyTakeTab
+            myTake={myTake}
+            setMyTake={setMyTake}
+            onDelete={onDeleteMyTake}
+            onPublish={onPublish}
+            onUnpublish={onUnpublish}
+            isPublished={isPublished}
+            recordType={recordType === "imported_record" ? undefined : (recordType as any)}
+            recordId={recordType === "imported_record" ? undefined : (recordId ?? null)}
+          />
+        );
+      return (
+        <DynamoChatPane
+          messages={qa.messages}
+          input={qa.input}
+          setInput={qa.setInput}
+          loading={qa.loading}
+          onSend={qa.send}
+          transcriptEntries={transcriptEntries}
+          subtopics={subtopics}
+          summaries={summaries}
+          speakerNames={speakerNames}
+        />
+      );
+    };
+    return (
+      <div className="bg-background border border-foreground/10 rounded-lg flex flex-col h-full overflow-hidden">
+        <div className="flex items-end gap-1 px-2 pt-1.5 border-b border-foreground/10 bg-foreground/[0.02] overflow-x-auto">
+          {tabsArr.map((id) => {
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className={cn(
+                  "relative shrink-0 px-3 pt-2 pb-2.5 text-[13px] md:text-xs font-medium rounded-t-md border border-b-0 transition-colors min-h-[44px] md:min-h-0 whitespace-nowrap",
+                  active
+                    ? "bg-background border-foreground/10 text-foreground -mb-px z-10"
+                    : "bg-foreground/[0.04] border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {id === "dynamo" && <Sparkles className="w-3 h-3 inline -mt-0.5 mr-1" />}
+                {tabLabel(id)}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 min-h-0">{renderTab(tab)}</div>
+      </div>
+    );
+  }
+
   const handleJumpReaderNote = (n: ReaderNote) => {
     if (n.anchor_kind === "my_take") {
       setTab("my_take");
@@ -276,6 +361,8 @@ const NotebookPanel = ({
           onPublish={onPublish}
           onUnpublish={onUnpublish}
           isPublished={isPublished}
+          recordType={recordType === "imported_record" ? undefined : (recordType as any)}
+          recordId={recordType === "imported_record" ? undefined : (recordId ?? null)}
         />
       );
     return (
@@ -490,7 +577,7 @@ const NotebookPanel = ({
   }
 
   // Desktop: floating draggable/resizable panel
-  return (
+  const desktopPanel = (
     <div
       style={{
         position: "fixed",
@@ -525,6 +612,9 @@ const NotebookPanel = ({
       />
     </div>
   );
+  return typeof document !== "undefined"
+    ? createPortal(desktopPanel, document.body)
+    : desktopPanel;
 };
 
 export default NotebookPanel;

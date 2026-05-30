@@ -46,6 +46,10 @@ interface PrepPhaseOverlayProps {
   /** Inline-edit handlers for argument-map bubbles (prep window only). */
   onEditArgumentMapEntry?: (id: string, newContent: string) => void | Promise<void>;
   onRevertArgumentMapEntry?: (id: string) => void | Promise<void>;
+  /** Facilitator pause state — freezes the prep countdown when true. */
+  isPaused?: boolean;
+  /** ISO timestamp of when the pause began (used to compute pause duration). */
+  pausedAt?: string | null;
 }
 
 function parseTimeLabel(seconds: number): string {
@@ -76,6 +80,8 @@ const PrepPhaseOverlay = ({
   recordId,
   onEditArgumentMapEntry,
   onRevertArgumentMapEntry,
+  isPaused = false,
+  pausedAt = null,
 }: PrepPhaseOverlayProps) => {
   const [selectedTime, setSelectedTime] = useState<number | null>(prepTimeMax);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -83,6 +89,28 @@ const PrepPhaseOverlay = ({
   const [leftTab, setLeftTab] = useState<"threaded" | "transcript">("threaded");
   const syncedDuration = selectedPrepDuration || selectedTime;
   const hasPrepTimerStarted = Boolean(prepStartedAt && syncedDuration);
+  // Tracks total ms spent paused so far in this prep window. Each completed
+  // pause adds (resumeTime - pauseTime) and the countdown subtracts the live
+  // pause delta while paused.
+  const [accumulatedPauseMs, setAccumulatedPauseMs] = useState(0);
+  const [pauseStartMs, setPauseStartMs] = useState<number | null>(null);
+
+  // Capture pause start; on resume, fold the elapsed pause time into the total.
+  useEffect(() => {
+    if (isPaused && pausedAt) {
+      const start = new Date(pausedAt).getTime();
+      setPauseStartMs(start);
+    } else if (!isPaused && pauseStartMs != null) {
+      setAccumulatedPauseMs((prev) => prev + (Date.now() - pauseStartMs));
+      setPauseStartMs(null);
+    }
+  }, [isPaused, pausedAt, pauseStartMs]);
+
+  // Reset pause accumulation whenever a new prep window starts.
+  useEffect(() => {
+    setAccumulatedPauseMs(0);
+    setPauseStartMs(null);
+  }, [prepStartedAt]);
 
   useEffect(() => {
     if (!prepStartedAt) return;
@@ -90,10 +118,15 @@ const PrepPhaseOverlay = ({
     if (!duration) return;
 
     const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - prepStartedAt) / 1000);
+      const livePauseMs =
+        isPaused && pauseStartMs != null ? Date.now() - pauseStartMs : 0;
+      const pausedMsTotal = accumulatedPauseMs + livePauseMs;
+      const elapsed = Math.floor(
+        (Date.now() - prepStartedAt - pausedMsTotal) / 1000,
+      );
       const remaining = Math.max(0, duration - elapsed);
       setTimeRemaining(remaining);
-      if (remaining === 0) {
+      if (remaining === 0 && !isPaused) {
         clearInterval(interval);
         if (!markedReady) {
           setMarkedReady(true);
@@ -103,7 +136,15 @@ const PrepPhaseOverlay = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [prepStartedAt, syncedDuration, onReady, markedReady]);
+  }, [
+    prepStartedAt,
+    syncedDuration,
+    onReady,
+    markedReady,
+    isPaused,
+    pauseStartMs,
+    accumulatedPauseMs,
+  ]);
 
   const handleReady = () => {
     if (markedReady) return;

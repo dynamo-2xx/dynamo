@@ -567,6 +567,12 @@ const DebateRoomPage = () => {
 
   const isCreator = user?.id === debate?.created_by;
   const isFacilitator = userRole === "facilitator";
+  // Pause control (used by facilitator pause button; also freezes prep timer).
+  const pauseCtl = usePauseControl({
+    kind: "debate",
+    id: debate?.id ?? null,
+    isHost: isCreator || isFacilitator,
+  });
   const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
   const isSpectator = userRole === "spectator";
   const isCompleted = debate?.status === "completed";
@@ -1649,6 +1655,8 @@ const DebateRoomPage = () => {
                 recordId={debate.id}
                 onEditArgumentMapEntry={editArgumentMapEntry}
                 onRevertArgumentMapEntry={revertArgumentMapEntry}
+                isPaused={pauseCtl.isPaused}
+                pausedAt={pauseCtl.pausedAt}
               />
             )}
             {/* Notebook button now lives inside ParticipantSharedView's metadata-row stack */}
