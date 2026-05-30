@@ -380,6 +380,13 @@ const CreateDebatePage = () => {
         setDraftSideIds(ids);
         // Adopt the freshly-minted side IDs so subsequent invitations resolve correctly.
         setSideIds(ids);
+        // Remember this draft as the user's reusable "test debate" so the
+        // next Test Mode iteration reuses it instead of spawning a new row.
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("dyn_test_debate_id", created.id);
+          }
+        } catch { /* ignore */ }
         // Switch the URL to edit mode without a navigation flash so the rest of the
         // form (publish flow, invitations) treats this as an edit.
         const url = new URL(window.location.href);
@@ -654,7 +661,7 @@ const CreateDebatePage = () => {
   // TEST MODE: bypass the AI generator with a pre-loaded template so the
   // creator can iterate on debate configuration without burning AI credits.
   // Everything (topic, sides, subtopics, timing) is still editable in step 3.
-  const handleTestMode = useCallback(() => {
+  const handleTestMode = useCallback(async () => {
     const testTopic = prompt.trim() || "Should remote work be the default for knowledge workers?";
     setMode("adversarial");
     setResolutionPreview("Where could we compromise — and if not, why is the divide irreducible?");
@@ -675,9 +682,44 @@ const CreateDebatePage = () => {
     setDebate(tpl);
     setSideIds(tpl.sides.map((_, i) => `new-side-${i}`));
     setPrompt(testTopic);
+    // Reuse an existing draft test debate so iterating in Test Mode doesn't
+    // spawn a new debate row every time (which previously caused invitees
+    // to land in a stale debate while the host launched a fresh one).
+    try {
+      const existingId = typeof window !== "undefined"
+        ? localStorage.getItem("dyn_test_debate_id")
+        : null;
+      if (existingId && user) {
+        const { data: existing } = await supabase
+          .from("debates")
+          .select("id, status, created_by")
+          .eq("id", existingId)
+          .maybeSingle();
+        if (existing && existing.created_by === user.id && existing.status === "draft") {
+          const { data: sds } = await supabase
+            .from("debate_sides")
+            .select("id, sort_order")
+            .eq("debate_id", existing.id)
+            .order("sort_order");
+          const ids = (sds || []).map((s: any) => s.id as string);
+          setDraftDebateId(existing.id);
+          if (ids.length) {
+            setSideIds(ids);
+            setDraftSideIds(ids);
+          }
+          const url = new URL(window.location.href);
+          url.searchParams.set("edit", existing.id);
+          window.history.replaceState({}, "", url.toString());
+        } else if (typeof window !== "undefined") {
+          localStorage.removeItem("dyn_test_debate_id");
+        }
+      }
+    } catch (e) {
+      console.warn("Test mode draft reuse failed", e);
+    }
     setStep(3);
     toast.success("Test mode: pre-loaded template (no AI credits used).");
-  }, [prompt]);
+  }, [prompt, user]);
 
   const handleGenerationComplete = useCallback(() => {}, []);
 

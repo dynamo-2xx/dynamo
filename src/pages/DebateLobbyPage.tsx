@@ -290,7 +290,7 @@ export default function DebateLobbyPage() {
               }}
               onCodeRegenerated={(c) => setJoinCode(c)}
             />
-            <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} />
+            <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} hostUserId={createdBy} />
             <MicLobby
               kind="debate"
               sessionId={id ?? null}
@@ -306,7 +306,7 @@ export default function DebateLobbyPage() {
           </>
         ) : (
           <>
-            <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} />
+            <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} hostUserId={createdBy} />
             <WaitingForHost
               sessionTitle={topic}
               stream={waitStream}
