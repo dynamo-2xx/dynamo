@@ -81,8 +81,23 @@ const JoinDebatePage = () => {
         },
       )
       .subscribe();
+    // Poll fallback — guarantees the join page navigates into the room even
+    // when realtime drops the UPDATE event (race on channel-attach, network
+    // hiccup, etc.).
+    const poll = window.setInterval(async () => {
+      const { data } = await supabase
+        .from("debates")
+        .select("status")
+        .eq("id", debateId)
+        .maybeSingle();
+      if ((data as any)?.status === "live") {
+        if (waitStream) setHandoffStream(waitStream);
+        navigate(`/debate/${debateId}`, { replace: true });
+      }
+    }, 4000);
     return () => {
       supabase.removeChannel(ch);
+      window.clearInterval(poll);
     };
   }, [phase, debateId, navigate, waitStream]);
 
