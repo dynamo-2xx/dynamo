@@ -6,6 +6,7 @@ import AppLayout from "@/components/AppLayout";
 import MicLobby from "@/components/lobby/MicLobby";
 import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
 import WaitingForHost from "@/components/lobby/WaitingForHost";
+import QueuedSpeakerBubbles from "@/components/lobby/QueuedSpeakerBubbles";
 import { useMicLobbyAttachment } from "@/hooks/useMicLobbyAttachment";
 import { toast } from "sonner";
 
@@ -289,6 +290,7 @@ export default function DebateLobbyPage() {
               }}
               onCodeRegenerated={(c) => setJoinCode(c)}
             />
+            <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} />
             <MicLobby
               kind="debate"
               sessionId={id ?? null}
@@ -303,17 +305,20 @@ export default function DebateLobbyPage() {
             />
           </>
         ) : (
-          <WaitingForHost
-            sessionTitle={topic}
-            stream={waitStream}
-            mode="own_mic"
-            lockReason={
-              queuedSideId
-                ? `Queued for ${sides.find((s) => s.id === queuedSideId)?.label ?? "a side"} — host can accept you`
-                : "Waiting for the host"
-            }
-            onLeave={() => navigate(`/debate/${id}/preview`, { replace: true })}
-          />
+          <>
+            <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} />
+            <WaitingForHost
+              sessionTitle={topic}
+              stream={waitStream}
+              mode="own_mic"
+              lockReason={
+                queuedSideId
+                  ? `Queued for ${sides.find((s) => s.id === queuedSideId)?.label ?? "a side"} — host can accept you`
+                  : "Waiting for the host"
+              }
+              onLeave={() => navigate(`/debate/${id}/preview`, { replace: true })}
+            />
+          </>
         )}
       </div>
     </AppLayout>
