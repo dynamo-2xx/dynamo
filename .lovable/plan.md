@@ -1,149 +1,59 @@
-# Debate launch, turn, transcript, and notebook fixes
+## 1. X on invited chip rescinds invitation / kicks from lobby
 
-## Desired outcome
+In `CreateDebatePage.tsx` `removeInvite(entry)`, in addition to removing from local `invitedEntries` state, when `debate.id` exists also:
 
-- Host lobby shows the host plus every accepted/queued speaker waiting with a mic connection.
-- When the host launches, all queued speakers are promoted into the live debate room as speakers on their chosen/assigned sides.
-- Facilitator controls do not accidentally pause or freeze turns.
-- Turns alternate side-to-side; no side gets two speaking turns in a row, including across subtopics.
-- Live speech transcription appears in the visible transcript/main panel and feeds the argument map.
-- Completed `/debate/:id` still has the notebook button at bottom-right.
+- If `entry.userId`: delete from `debate_invitations` where `(debate_id, invited_user_id)` and delete from `debate_interests` where `(debate_id, user_id)` (covers both "accepted invitee" and "queued speaker" cases — kicks them out of the lobby).
+- If `entry.email` (manual entry, no user yet): delete from `debate_invitations` where `(debate_id, invited_email)`.
 
-## 1. Host lobby should show all joined speakers
+Realtime already syncs `debate_participants`/lobby rows so the kicked user's `DebateLobbyPage` will lose its waiting hold; on next poll/realtime they fall back to spectator/preview.
 
-**Files:**
-- `src/pages/DebateLobbyPage.tsx`
-- `src/components/lobby/MicLobby.tsx` if needed
+## 2. Queued speaker avatar bubbles in both lobbies
 
-`MicLobby` already reads connected rows from `mic_connections`, and `DebateLobbyPage` already passes `hideEmptySlots`, so the display logic is mostly in place.
+In `DebateLobbyPage.tsx`, fetch and subscribe to:
 
-I will fix the source of missing users by ensuring all accepted/queued speaker flows attach with side-based slot keys that the host lobby can resolve:
+- `debate_interests` rows with `role='queued_speaker'`
+- `debate_invitations` rows with `status='accepted'`
+join with `profiles(display_name, avatar_url)` and render a small `<QueuedSpeakers>` strip (avatar bubble + name + side chip + green pulse if their mic is in `mic_lobby`) above `MicLobby` for BOTH the host view and the waiting-invitee view. Same component, same data, no role gating.
 
-- accepted invitees and in-person queued speakers should write mic rows as `${sideId}:${userId}` instead of a generic `queued:${userId}` whenever a side is known.
-- the host continues to use `host:${userId}`.
-- `MicLobby.sideLabelFor()` will keep resolving side IDs into actual side labels and display “Host” for the host row.
+## 3. Argument map draggable beyond the main panel
 
-This makes the lobby roster match the real waiting queue rather than showing only the host.
+Convert `FloatingOverlay` from absolute-in-parent to a portal mounted on `document.body`, with `position: fixed`. Clamp drag/resize to the viewport (`window.innerWidth/innerHeight`) instead of the parent's `clientWidth/Height`. Adjust initial position to be relative to viewport. This lets the user drag the argument map over the sidebar, transcript pane, or anywhere on screen.
 
-## 2. Carry accepted/queued speakers into live session on host launch
+## 4. Live transcription shows in the main panel (camera off)
 
-**Files:**
-- `src/pages/DebateLobbyPage.tsx`
-- `src/pages/JoinDebatePage.tsx` if the accepted-invite queue path needs normalization
+In `ParticipantSharedView.tsx` `bothOff` branch, currently `MessengerChat messages={chatMessages}` where `chatMessages` is built from `args` only. Merge `transcriptEntries.filter(e => e.is_final && e.subtopic === currentSubtopic.title)` into `chatMessages` (mapped to the same `{id, content, sideLabel, sideOrder, createdAt, isEdited:false}` shape, dedup against args by trimmed lowercase text), sorted by timestamp. Also render the current `interimText` as a translucent footer overlay above the composer so spoken-but-not-finalized words appear live, matching the camera-on overlay.
 
-The launch flow currently promotes only `debate_interests.role = 'queued_speaker'` into `debate_participants`. That misses some accepted invitation paths if they are only stored in `debate_invitations.status = 'accepted'` and not mirrored into `debate_interests`.
+## 5 & 6. Pause buttons only pause/unpause; extend is pure +60s
 
-I will update `handleStart()` so launching a debate promotes both sources:
+The bug is that `resume_speaker_pause` RPC shifts `turn_started_at` forward by the pause duration, then realtime fires line 454 in `DebateRoomPage.tsx` which recomputes `timeLeft = full - elapsed`. If the local timer drifted from the server `turn_started_at` (because pause snapshotted a smaller `timeLeft` than the server reckons), the resume payload visually "resets" the timer to the server's value.
 
-1. `debate_interests` rows with `role = 'queued_speaker'` and a `side_id`.
-2. `debate_invitations` rows with `status = 'accepted'`, `invited_user_id`, and `side_id`.
+Replace shift-based pause with snapshot-based pause for both facilitator and speaker pauses:
 
-Both sources will be merged/deduped by `user_id`, then upserted into `debate_participants` with:
+a) Add migration: new column `debates.pause_remaining_seconds int`. New RPCs:
 
-```ts
-{
-  debate_id: id,
-  user_id,
-  side_id,
-  participant_role: "speaker"
-}
-```
+- `pause_debate(_debate_id)` / `resume_debate(_debate_id)` — sets/clears `paused_at` and snapshots/restores `pause_remaining_seconds` and `turn_started_at` so the resumed timer continues from exactly the seconds left at pause time.
+- Rewrite `resume_speaker_pause` to use the same snapshot model instead of `make_interval` shifting.
 
-The existing `onConflict: "debate_id,user_id"` pattern remains so users are not duplicated. After status flips to `live`, the existing realtime + polling navigation sends waiting users into `/debate/:id`.
+   On resume, the RPC sets `turn_started_at = now() - (time_per_turn_seconds - pause_remaining_seconds) * interval '1 second'` and clears `paused_at` / `speaker_paused_at` + `pause_remaining_seconds`.
 
-## 3. Extend time should add 1 minute without pausing/freezing
+b) `usePauseControl.pause/resume` and `useSpeakerPause.pause/resume` call the new RPCs (single atomic UPDATE; no client-side time math; no double effects).
 
-**File:**
-- `src/pages/DebateRoomPage.tsx`
+c) `DebateRoomPage` timer effect: keep the existing `paused_at || speaker_paused_at` gate, and on resume let the realtime payload re-derive `timeLeft` from the new `turn_started_at` (already wired at line 454).
 
-`handleExtendTime()` currently only increments local `timeLeft`, so other clients re-sync from unchanged `turn_started_at` and the extension can look broken or frozen.
+d) Extend time stays pure: keeps current behavior of rolling `turn_started_at` back 60s and `setTimeLeft(t => t+60)`; never touches `paused_at`/`speaker_paused_at` (already true). Verify no resume side-effect was accidentally tied to extend.
 
-I will make the extension authoritative by updating `debates.turn_started_at` backwards by 60 seconds. Every client then derives the same extra minute from the existing timer sync.
+This guarantees: pause freezes the visible clock; resume continues from that exact value; extend just adds 60s. No "reset to full time" on resume; facilitator resume reliably clears `paused_at`.
 
-No `paused_at` or `speaker_paused_at` changes will happen in this path.
+## Technical notes
 
-## 4. Top panel flips Speaking side / Listening side on click
+Files touched:
 
-**File:**
-- `src/components/debate/ParticipantSharedView.tsx`
+- `src/pages/CreateDebatePage.tsx` (#1)
+- `src/pages/DebateLobbyPage.tsx` + new `src/components/lobby/QueuedSpeakerBubbles.tsx` (#2)
+- `src/components/debate/FloatingOverlay.tsx` (#3, portal + fixed positioning, viewport clamp)
+- `src/components/debate/ParticipantSharedView.tsx` (#4, merge transcripts into `chatMessages`, add interim overlay to camera-off branch)
+- New migration `supabase/migrations/<ts>_pause_snapshot.sql` (#5/#6)
+- `src/hooks/usePauseControl.ts` and `src/hooks/useSpeakerPause.ts` (call new RPCs)
 
-I will make the top-left side block clickable:
-
-- default state: `SPEAKING` + active side label.
-- clicked state: `LISTENING` + the other side label(s).
-- clicking again toggles back.
-
-This is display-only and will not affect turn state, mic state, or permissions.
-
-## 5. Enforce alternating turns and fix timer starts
-
-**File:**
-- `src/pages/DebateRoomPage.tsx`
-
-There are two turn-advance paths that reset the next subtopic to side 0. That can produce side A twice in a row when crossing a subtopic boundary.
-
-I will update both advance paths so the side always advances from the current side:
-
-- `advanceTurn()`
-- `completePrepPhaseAndAdvance()`
-
-When moving to a new subtopic, `current_turn` resets to 0, but `current_speaker_side_id` continues alternating from the side that just spoke.
-
-I will also clear stale pause flags whenever a new turn starts:
-
-```ts
-paused_at: null,
-speaker_paused_at: null,
-speaker_pause_owner_id: null
-```
-
-This prevents a facilitator pause or speaker pause from carrying into the next turn and blocking the timer.
-
-## 6. Live transcription must display in transcript/main panel and feed argument map
-
-**Files:**
-- `src/hooks/useDeepgramTranscription.ts`
-- `src/pages/DebateRoomPage.tsx`
-- `src/components/debate/ParticipantSharedView.tsx` if the transcript surface needs a stronger live feed
-
-The hook already creates transcript entries and calls AI analysis, but persistence currently overwrites pieces of `debate_transcripts` through separate upserts:
-
-- transcript-entry writes can omit `argument_map`
-- argument-map writes can omit `transcript_entries`
-
-That can cause live speech to exist transiently but not remain available to the main panel or argument map.
-
-I will change persistence to fetch-and-merge before writing:
-
-- transcript entries merge with existing `transcript_entries` by `id`.
-- argument-map entries merge with existing `argument_map` by `id`.
-- writes preserve both columns every time.
-
-Then I will verify the `ParticipantSharedView` receives `transcriptEntries` and `argumentMap` and renders them in the live transcript/main-panel surfaces already wired from `DebateRoomPage`.
-
-## 7. Completed debate needs notebook FAB
-
-**File:**
-- `src/pages/DebateRoomPage.tsx`
-
-`RecordToolsMount` is currently rendered with `hideFab`, while the in-room notebook button disappears once `ParticipantSharedView` is not rendered for completed sessions.
-
-I will make the FAB visible only after completion:
-
-```tsx
-hideFab={!isCompleted}
-```
-
-The existing `notebookOpen` state and transcript/subtopic props stay the same.
-
-## Acceptance checks
-
-- Host lobby shows host + all accepted/queued speakers with mic rows before launch.
-- Host launch promotes accepted invitees and in-person queued speakers into `debate_participants` before setting the debate live.
-- Waiting speakers automatically navigate into `/debate/:id` after launch.
-- Extend time adds 60 seconds across clients without pausing.
-- Top panel toggles between Speaking and Listening labels.
-- Turns alternate continuously across subtopics.
-- Timer starts on every new turn after pause/skip/advance.
-- Live speech appears in the transcript/main panel and is retained in `debate_transcripts` along with the argument map.
-- Completed debate route shows a bottom-right notebook button.
+No UI/visual redesign — only behavioral fixes and one small bubble strip in the lobby.  
+7. BONUS: the joined speakers never made it out of the lobby, still. explain to me what the problem is and how you're going to solve it then solve it. this is such a key part of the build.
