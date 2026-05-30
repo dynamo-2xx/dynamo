@@ -103,6 +103,10 @@ const ParticipantSharedView = ({
 }: ParticipantSharedViewProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [argumentMapOpen, setArgumentMapOpen] = useState(false);
+  // Local toggle: viewers can flip the top-bar label between
+  // "SPEAKING <active side>" and "LISTENING <other side(s)>" so it's always
+  // clear which side the camera/transcript belongs to. Purely cosmetic.
+  const [showAsListening, setShowAsListening] = useState(false);
 
   // Server-backed speaker pause (separate from the host's facilitator pause).
   // Persisted on `debates.speaker_paused_at`, gated to one per turn via
@@ -283,10 +287,24 @@ const ParticipantSharedView = ({
           below; duplicating it here was clunky. */}
       <div className="border-b border-border bg-card px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-body">Speaking</p>
-            <h2 className="text-xl font-display font-bold text-foreground">{activeSide?.label}</h2>
-          </div>
+          {(() => {
+            const otherSides = sides.filter((s) => s.id !== activeSide?.id);
+            const otherLabel = otherSides.map((s) => s.label).join(" · ") || activeSide?.label;
+            const eyebrow = showAsListening ? "Listening" : "Speaking";
+            const label = showAsListening ? otherLabel : activeSide?.label;
+            return (
+              <button
+                type="button"
+                onClick={() => setShowAsListening((v) => !v)}
+                aria-pressed={showAsListening}
+                title="Flip view"
+                className="text-left rounded-md -mx-1 px-1 py-0.5 hover:bg-foreground/[0.04] transition-colors"
+              >
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-body">{eyebrow}</p>
+                <h2 className="text-xl font-display font-bold text-foreground">{label}</h2>
+              </button>
+            );
+          })()}
           <div className="bg-primary/10 rounded-lg px-3 py-1">
             <span className="text-xs font-display font-semibold text-primary">{currentSubtopic?.title}</span>
           </div>

@@ -105,10 +105,25 @@ export function useDeepgramTranscription({
     pendingEntriesRef.current = null;
     const updatedAt = new Date().toISOString();
     lastSelfWriteRef.current = updatedAt;
+    // Fetch-and-merge: preserve any argument_map column and dedupe entries
+    // by id so an upsert never blows away a sibling column or other clients'
+    // recent finals.
+    const { data: existing } = await supabase
+      .from("debate_transcripts" as any)
+      .select("transcript_entries, argument_map")
+      .eq("debate_id", debateId)
+      .maybeSingle();
+    const prior = ((existing as any)?.transcript_entries as TranscriptEntry[] | undefined) ?? [];
+    const merged = mergeTranscriptEntries(prior, entries);
     await supabase
       .from("debate_transcripts" as any)
       .upsert(
-        { debate_id: debateId, transcript_entries: entries, updated_at: updatedAt } as any,
+        {
+          debate_id: debateId,
+          transcript_entries: merged,
+          argument_map: (existing as any)?.argument_map ?? argumentMapRef.current ?? [],
+          updated_at: updatedAt,
+        } as any,
         { onConflict: "debate_id" },
       );
   }, [debateId]);
@@ -122,13 +137,23 @@ export function useDeepgramTranscription({
     return Promise.resolve({ data: null, error: null });
   }, [flushPersist]);
 
-  const persistArgumentMap = useCallback((entries: ArgumentMapEntry[]) => {
+  const persistArgumentMap = useCallback(async (entries: ArgumentMapEntry[]) => {
+    // Fetch-and-merge: preserve transcript_entries so a map write never
+    // overwrites the live transcript column with NULL.
+    const updatedAt = new Date().toISOString();
+    lastSelfWriteRef.current = updatedAt;
+    const { data: existing } = await supabase
+      .from("debate_transcripts" as any)
+      .select("transcript_entries")
+      .eq("debate_id", debateId)
+      .maybeSingle();
     return supabase
       .from("debate_transcripts" as any)
       .upsert({
         debate_id: debateId,
         argument_map: entries,
-        updated_at: new Date().toISOString(),
+        transcript_entries: (existing as any)?.transcript_entries ?? [],
+        updated_at: updatedAt,
       } as any, { onConflict: "debate_id" });
   }, [debateId]);
 

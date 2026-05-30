@@ -759,7 +759,8 @@ const DebateRoomPage = () => {
 
         nextSubIdx += 1;
         nextTurn = 0;
-        nextSideIdx = 0;
+        // Keep alternation across subtopic boundaries.
+        nextSideIdx = (currentSideIdx + 1) % sides.length;
 
         if (nextSubIdx >= subtopics.length) {
           await persistTranscripts();
@@ -809,6 +810,9 @@ const DebateRoomPage = () => {
           current_turn: nextTurn,
           current_speaker_side_id: sides[nextSideIdx]?.id,
           turn_started_at: turnNow,
+          paused_at: null,
+          speaker_paused_at: null,
+          speaker_pause_owner_id: null,
         } as any)
         .eq("id", id)
         .eq("prep_phase_active", true)
@@ -999,6 +1003,7 @@ const DebateRoomPage = () => {
     await supabase.from("debates").update({
       status: "live", started_at: now, turn_started_at: now,
       current_subtopic_index: 0, current_turn: 0, current_speaker_side_id: sides[0]?.id,
+      paused_at: null, speaker_paused_at: null, speaker_pause_owner_id: null,
     }).eq("id", id);
 
     try {
@@ -1034,7 +1039,9 @@ const DebateRoomPage = () => {
 
         nextSubIdx += 1;
         nextTurn = 0;
-        nextSideIdx = 0;
+        // Keep alternation across subtopic boundaries — never let one side
+        // get two speaking turns in a row.
+        nextSideIdx = (currentSideIdx + 1) % sides.length;
 
         if (nextSubIdx >= subtopics.length) {
           // Persist transcripts before marking complete
@@ -1063,6 +1070,7 @@ const DebateRoomPage = () => {
       const turnNow = new Date().toISOString();
       await supabase.from("debates").update({
         current_subtopic_index: nextSubIdx, current_turn: nextTurn, current_speaker_side_id: sides[nextSideIdx]?.id, turn_started_at: turnNow,
+        paused_at: null, speaker_paused_at: null, speaker_pause_owner_id: null,
       }).eq("id", id);
 
       setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
@@ -1269,7 +1277,18 @@ const DebateRoomPage = () => {
   };
 
   const handleExtendTime = () => {
+    if (!id || !debate) return;
+    // Authoritative: roll turn_started_at back 60s so every client (host,
+    // speakers, audience, projector) derives the same +60 from the timer
+    // sync without flipping any pause flags.
+    const base = debate.turn_started_at ? new Date(debate.turn_started_at).getTime() : Date.now();
+    const newStart = new Date(base - 60_000).toISOString();
+    lastSyncedTurnStartRef.current = newStart;
     setTimeLeft((t) => t + 60);
+    void supabase
+      .from("debates")
+      .update({ turn_started_at: newStart })
+      .eq("id", id);
     toast.info("Extended by 1 minute");
   };
 
@@ -1301,6 +1320,7 @@ const DebateRoomPage = () => {
       await supabase.from("debates").update({
         current_subtopic_index: nextSubIdx, current_turn: 0,
         current_speaker_side_id: sides[0]?.id, turn_started_at: turnNow,
+        paused_at: null, speaker_paused_at: null, speaker_pause_owner_id: null,
       }).eq("id", id);
       setTimeLeft(parseTimeToSeconds(debate.time_per_turn));
       setTimerRunning(true);
@@ -1860,7 +1880,7 @@ const DebateRoomPage = () => {
         <RecordToolsMount
           recordType="debate"
           recordId={id}
-          hideFab
+          hideFab={!isCompleted}
           open={notebookOpen}
           onOpenChange={setNotebookOpen}
           transcriptEntries={transcriptEntries.map((e: any) => ({

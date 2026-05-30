@@ -217,28 +217,44 @@ export default function DebateLobbyPage() {
     if (!id) return;
     setStarting(true);
 
-    // Promote queued speakers (debate_interests) → debate_participants so the
-    // room admits them when status flips to live.
+    // Promote ALL waiting speakers → debate_participants so the room admits
+    // them when status flips to live. Sources:
+    //   (a) debate_interests with role='queued_speaker' (in-person queue)
+    //   (b) debate_invitations with status='accepted' (accepted invites)
     try {
-      const { data: queued } = await supabase
-        .from("debate_interests")
-        .select("user_id, side_id")
-        .eq("debate_id", id)
-        .eq("role", "queued_speaker");
-      if (queued && queued.length > 0) {
-        const rows = queued
-          .filter((q: any) => q.user_id && q.side_id)
-          .map((q: any) => ({
-            debate_id: id,
-            user_id: q.user_id,
-            side_id: q.side_id,
-            participant_role: "speaker",
-          }));
-        if (rows.length > 0) {
-          await supabase
-            .from("debate_participants")
-            .upsert(rows as any, { onConflict: "debate_id,user_id", ignoreDuplicates: true });
+      const [queuedRes, acceptedRes] = await Promise.all([
+        supabase
+          .from("debate_interests")
+          .select("user_id, side_id")
+          .eq("debate_id", id)
+          .eq("role", "queued_speaker"),
+        supabase
+          .from("debate_invitations")
+          .select("invited_user_id, side_id, status")
+          .eq("debate_id", id)
+          .eq("status", "accepted"),
+      ]);
+
+      const byUser = new Map<string, { user_id: string; side_id: string }>();
+      (queuedRes.data ?? []).forEach((q: any) => {
+        if (q.user_id && q.side_id) byUser.set(q.user_id, { user_id: q.user_id, side_id: q.side_id });
+      });
+      (acceptedRes.data ?? []).forEach((a: any) => {
+        if (a.invited_user_id && a.side_id && !byUser.has(a.invited_user_id)) {
+          byUser.set(a.invited_user_id, { user_id: a.invited_user_id, side_id: a.side_id });
         }
+      });
+
+      const rows = Array.from(byUser.values()).map((r) => ({
+        debate_id: id,
+        user_id: r.user_id,
+        side_id: r.side_id,
+        participant_role: "speaker",
+      }));
+      if (rows.length > 0) {
+        await supabase
+          .from("debate_participants")
+          .upsert(rows as any, { onConflict: "debate_id,user_id", ignoreDuplicates: true });
       }
     } catch (e) {
       // Non-fatal: continue with start; host can promote manually from the room.
