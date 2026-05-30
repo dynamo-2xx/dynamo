@@ -651,6 +651,34 @@ const CreateDebatePage = () => {
     }
   }, [prompt]);
 
+  // TEST MODE: bypass the AI generator with a pre-loaded template so the
+  // creator can iterate on debate configuration without burning AI credits.
+  // Everything (topic, sides, subtopics, timing) is still editable in step 3.
+  const handleTestMode = useCallback(() => {
+    const testTopic = prompt.trim() || "Should remote work be the default for knowledge workers?";
+    setMode("adversarial");
+    setResolutionPreview("Where could we compromise — and if not, why is the divide irreducible?");
+    setResolutionAdded(false);
+    setHoveringCollab(false);
+    const tpl = normalizeDebateTemplate({
+      topic: testTopic.endsWith("?") ? testTopic : testTopic + "?",
+      subtopics: [
+        "Productivity and focus",
+        "Team culture and collaboration",
+        "Equity, access, and wellbeing",
+      ],
+      sides: ["For", "Against"],
+      turnsPerSubtopic: 2,
+      timePerTurn: "2 min",
+      prepTime: "1 min",
+    });
+    setDebate(tpl);
+    setSideIds(tpl.sides.map((_, i) => `new-side-${i}`));
+    setPrompt(testTopic);
+    setStep(3);
+    toast.success("Test mode: pre-loaded template (no AI credits used).");
+  }, [prompt]);
+
   const handleGenerationComplete = useCallback(() => {}, []);
 
   // Fetch the AI-suggested resolution subtopic (cached after first fetch)
@@ -1190,6 +1218,16 @@ const CreateDebatePage = () => {
                 >
                   <Sparkles className="w-4 h-4" />
                   Create
+                </button>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleTestMode}
+                  className="text-xs font-body text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
+                  title="Skip AI generation — load a default editable template"
+                >
+                  Test mode (skip AI, use template)
                 </button>
               </div>
             </motion.div>
