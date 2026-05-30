@@ -1244,6 +1244,7 @@ export type Database = {
           location: string | null
           max_speakers_per_side: number
           pause_reason: string | null
+          pause_remaining_seconds: number | null
           paused_at: string | null
           prep_duration_seconds: number | null
           prep_phase_active: boolean
@@ -1299,6 +1300,7 @@ export type Database = {
           location?: string | null
           max_speakers_per_side?: number
           pause_reason?: string | null
+          pause_remaining_seconds?: number | null
           paused_at?: string | null
           prep_duration_seconds?: number | null
           prep_phase_active?: boolean
@@ -1354,6 +1356,7 @@ export type Database = {
           location?: string | null
           max_speakers_per_side?: number
           pause_reason?: string | null
+          pause_remaining_seconds?: number | null
           paused_at?: string | null
           prep_duration_seconds?: number | null
           prep_phase_active?: boolean
@@ -2972,6 +2975,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _parse_time_to_seconds: { Args: { t: string }; Returns: number }
       accept_share_invitation: {
         Args: { _token: string }
         Returns: {
@@ -3348,6 +3352,22 @@ export type Database = {
         Args: { _device_id: string; _session_id: string }
         Returns: undefined
       }
+      pause_debate: {
+        Args: { _debate_id: string; _remaining_seconds: number }
+        Returns: undefined
+      }
+      pause_speaker_pause: {
+        Args: {
+          _debate_id: string
+          _remaining_seconds: number
+          _turn_key: string
+        }
+        Returns: undefined
+      }
+      promote_lobby_to_participants: {
+        Args: { _debate_id: string }
+        Returns: number
+      }
       propose_record_change: {
         Args: {
           _change_type: Database["public"]["Enums"]["record_change_type"]
@@ -3407,6 +3427,7 @@ export type Database = {
           status: string
         }[]
       }
+      resume_debate: { Args: { _debate_id: string }; Returns: undefined }
       resume_speaker_pause: { Args: { _debate_id: string }; Returns: undefined }
       search_profile_cards: {
         Args: { _limit?: number; _q: string }
