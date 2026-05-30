@@ -804,13 +804,43 @@ const CreateDebatePage = () => {
     setInviteInput("");
   };
 
-  const removeInvite = (entry: InvitedEntry) => {
+  const removeInvite = async (entry: InvitedEntry) => {
     setInvitedEntries((prev) =>
       prev.filter((e) => !(e.username === entry.username && e.userId === entry.userId)),
     );
-    // Restore to interested pool if it came from there
-    if (entry.source === "interested" && entry.userId) {
-      // No-op: interested list is the source-of-truth view; we filter it client-side below.
+    // Persist deletion so the X actually rescinds the invitation and
+    // boots the user from the lobby. Without this they stay queued and
+    // get promoted to speaker the moment the host clicks Start.
+    const did = draftDebateId;
+    if (!did) return;
+    try {
+      if (entry.userId) {
+        await Promise.all([
+          supabase
+            .from("debate_invitations")
+            .delete()
+            .eq("debate_id", did)
+            .eq("invited_user_id", entry.userId),
+          supabase
+            .from("debate_interests")
+            .delete()
+            .eq("debate_id", did)
+            .eq("user_id", entry.userId),
+          supabase
+            .from("debate_participants")
+            .delete()
+            .eq("debate_id", did)
+            .eq("user_id", entry.userId),
+        ]);
+      } else if (entry.email) {
+        await supabase
+          .from("debate_invitations")
+          .delete()
+          .eq("debate_id", did)
+          .eq("invited_email", entry.email);
+      }
+    } catch (err) {
+      console.warn("Failed to rescind invitation", err);
     }
   };
 

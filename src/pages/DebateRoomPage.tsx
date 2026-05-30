@@ -572,6 +572,7 @@ const DebateRoomPage = () => {
     kind: "debate",
     id: debate?.id ?? null,
     isHost: isCreator || isFacilitator,
+    remainingSeconds: timeLeft,
   });
   const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
   const isSpectator = userRole === "spectator";
@@ -1404,6 +1405,7 @@ const DebateRoomPage = () => {
               debateId={debate.id}
               isHost={isCreator || isFacilitator}
               timerRunning={timerRunning}
+              timeLeft={timeLeft}
               onSetTimerRunning={setTimerRunning}
               onExtendTime={handleExtendTime}
               onSkipTurn={handleSkipTurn}

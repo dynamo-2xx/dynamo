@@ -24,8 +24,10 @@ export function useSpeakerPause(opts: {
   /** Only the active speaker may pause; everyone observes. */
   canControl: boolean;
   ownerId: string | null | undefined;
+  /** Current remaining seconds on the turn timer when pause is clicked. */
+  remainingSeconds?: number;
 }) {
-  const { debateId, turnKey, canControl, ownerId } = opts;
+  const { debateId, turnKey, canControl, ownerId, remainingSeconds } = opts;
   const [state, setState] = useState<State>({
     speaker_paused_at: null,
     speaker_pause_owner_id: null,
@@ -104,16 +106,13 @@ export function useSpeakerPause(opts: {
       return;
     }
     if (isPaused) return;
-    const { error } = await supabase
-      .from("debates")
-      .update({
-        speaker_paused_at: new Date().toISOString(),
-        speaker_pause_owner_id: ownerId ?? null,
-        speaker_pause_used_turn_key: turnKey,
-      } as any)
-      .eq("id", debateId);
+    const { error } = await supabase.rpc("pause_speaker_pause" as any, {
+      _debate_id: debateId,
+      _remaining_seconds: Math.max(0, Math.floor(remainingSeconds ?? 0)),
+      _turn_key: turnKey,
+    });
     if (error) toast.error(error.message);
-  }, [debateId, canControl, usedThisTurn, isPaused, ownerId, turnKey]);
+  }, [debateId, canControl, usedThisTurn, isPaused, turnKey, remainingSeconds]);
 
   const resume = useCallback(async () => {
     if (!debateId || !canControl) return;

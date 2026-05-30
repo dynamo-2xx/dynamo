@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef, useState, PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { GripHorizontal, X } from "lucide-react";
 
@@ -100,13 +101,15 @@ const FloatingOverlay = ({
     if (!dragState.current) return;
     const dx = e.clientX - dragState.current.startX;
     const dy = e.clientY - dragState.current.startY;
-    const parent = panelRef.current?.offsetParent as HTMLElement | null;
     const panel = panelRef.current;
     let nextX = dragState.current.baseX + dx;
     let nextY = dragState.current.baseY + dy;
-    if (parent && panel) {
-      const maxX = parent.clientWidth - panel.offsetWidth;
-      const maxY = parent.clientHeight - panel.offsetHeight;
+    if (panel) {
+      // Clamp to the viewport — the overlay is portaled to <body> and uses
+      // position: fixed, so it can be dragged anywhere on screen (over the
+      // sidebar, transcript pane, etc.), not just inside the main panel.
+      const maxX = window.innerWidth - panel.offsetWidth;
+      const maxY = window.innerHeight - panel.offsetHeight;
       nextX = Math.max(0, Math.min(maxX, nextX));
       nextY = Math.max(0, Math.min(maxY, nextY));
     }
@@ -133,13 +136,10 @@ const FloatingOverlay = ({
     if (!resizeState.current) return;
     const dw = e.clientX - resizeState.current.startX;
     const dh = e.clientY - resizeState.current.startY;
-    const parent = panelRef.current?.offsetParent as HTMLElement | null;
     let nextW = Math.max(280, resizeState.current.baseW + dw);
     let nextH = Math.max(220, resizeState.current.baseH + dh);
-    if (parent) {
-      nextW = Math.min(parent.clientWidth - state.x - 8, nextW);
-      nextH = Math.min(parent.clientHeight - state.y - 8, nextH);
-    }
+    nextW = Math.min(window.innerWidth - state.x - 8, nextW);
+    nextH = Math.min(window.innerHeight - state.y - 8, nextH);
     setState((s) => ({ ...s, w: nextW, h: nextH }));
   };
   const onResizeUp = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -147,7 +147,7 @@ const FloatingOverlay = ({
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
   };
 
-  return (
+  const content = (
     <AnimatePresence>
       {open && (
         <>
@@ -158,7 +158,7 @@ const FloatingOverlay = ({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="absolute inset-0 z-30"
+            className="fixed inset-0 z-[60]"
           />
           <motion.div
             ref={panelRef}
@@ -166,8 +166,8 @@ const FloatingOverlay = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            style={{ left: state.x, top: state.y, width: state.w, height: state.h, maxWidth: "calc(100% - 16px)", maxHeight: "calc(100% - 16px)" }}
-            className="absolute z-40 flex flex-col rounded-2xl border border-foreground/10 bg-background/85 backdrop-blur-xl shadow-2xl overflow-hidden"
+            style={{ left: state.x, top: state.y, width: state.w, height: state.h, maxWidth: "calc(100vw - 16px)", maxHeight: "calc(100vh - 16px)" }}
+            className="fixed z-[70] flex flex-col rounded-2xl border border-foreground/10 bg-background/85 backdrop-blur-xl shadow-2xl overflow-hidden"
           >
             <div
               onPointerDown={onPointerDown}
@@ -220,6 +220,9 @@ const FloatingOverlay = ({
       )}
     </AnimatePresence>
   );
+
+  if (typeof document === "undefined") return content;
+  return createPortal(content, document.body);
 };
 
 export default FloatingOverlay;
