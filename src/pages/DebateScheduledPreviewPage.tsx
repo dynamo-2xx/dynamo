@@ -136,15 +136,15 @@ const DebateScheduledPreviewPage = () => {
 
     const onVis = () => {
       if (document.visibilityState !== "visible" || cancelled) return;
-      supabase
-        .from("debates")
-        .select("status,ended_at,edit_window_ends_at")
-        .eq("id", id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (cancelled || !data) return;
-          setDebate((d: any) => ({ ...(d ?? {}), ...(data as any) }));
-        });
+      (async () => {
+        const { data } = await (supabase as any)
+          .from("debates")
+          .select("status,ended_at,edit_window_ends_at")
+          .eq("id", id)
+          .maybeSingle();
+        if (cancelled || !data) return;
+        setDebate((d: any) => ({ ...(d ?? {}), ...data }));
+      })();
     };
     document.addEventListener("visibilitychange", onVis);
 
