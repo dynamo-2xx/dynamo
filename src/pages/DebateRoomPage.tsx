@@ -1876,7 +1876,7 @@ const DebateRoomPage = () => {
         <RecordToolsMount
           recordType="debate"
           recordId={id}
-          hideFab
+          hideFab={!isCompleted}
           open={notebookOpen}
           onOpenChange={setNotebookOpen}
           transcriptEntries={transcriptEntries.map((e: any) => ({
