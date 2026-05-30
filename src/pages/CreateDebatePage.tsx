@@ -1220,6 +1220,16 @@ const CreateDebatePage = () => {
                   Create
                 </button>
               </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleTestMode}
+                  className="text-xs font-body text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
+                  title="Skip AI generation — load a default editable template"
+                >
+                  Test mode (skip AI, use template)
+                </button>
+              </div>
             </motion.div>
           )}
 
