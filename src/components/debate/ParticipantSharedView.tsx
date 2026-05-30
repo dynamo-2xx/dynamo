@@ -426,8 +426,13 @@ const ParticipantSharedView = ({
         <div className="flex flex-col min-h-0 overflow-hidden w-full relative">
           {/* Both cameras off → show live thread */}
           {bothOff && (
-            <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 relative">
               <MessengerChat messages={chatMessages} />
+              {interimText && (
+                <div className="absolute bottom-0 left-0 right-0 bg-background/85 backdrop-blur-sm border-t border-border px-4 py-2 text-center">
+                  <p className="text-sm text-foreground/80 font-body italic leading-relaxed">{interimText}</p>
+                </div>
+              )}
             </div>
           )}
           {/* Both cameras on → split 50/50 */}
