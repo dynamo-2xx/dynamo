@@ -7,6 +7,7 @@ interface Props {
   debateId: string;
   isHost: boolean;
   timerRunning: boolean;
+  timeLeft: number;
   onSetTimerRunning: (running: boolean) => void;
   onExtendTime: () => void;
   onSkipTurn: () => void;
@@ -31,6 +32,7 @@ const FacilitationMenu = ({
   debateId,
   isHost,
   timerRunning,
+  timeLeft,
   onSetTimerRunning,
   onExtendTime,
   onSkipTurn,
@@ -40,6 +42,7 @@ const FacilitationMenu = ({
     kind: "debate",
     id: debateId,
     isHost,
+    remainingSeconds: timeLeft,
   });
 
   // Read-only badge for participants when the host has paused the room.
