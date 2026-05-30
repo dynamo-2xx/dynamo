@@ -1405,6 +1405,7 @@ const DebateRoomPage = () => {
               debateId={debate.id}
               isHost={isCreator || isFacilitator}
               timerRunning={timerRunning}
+              timeLeft={timeLeft}
               onSetTimerRunning={setTimerRunning}
               onExtendTime={handleExtendTime}
               onSkipTurn={handleSkipTurn}
