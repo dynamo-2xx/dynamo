@@ -380,6 +380,13 @@ const CreateDebatePage = () => {
         setDraftSideIds(ids);
         // Adopt the freshly-minted side IDs so subsequent invitations resolve correctly.
         setSideIds(ids);
+        // Remember this draft as the user's reusable "test debate" so the
+        // next Test Mode iteration reuses it instead of spawning a new row.
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("dyn_test_debate_id", created.id);
+          }
+        } catch { /* ignore */ }
         // Switch the URL to edit mode without a navigation flash so the rest of the
         // form (publish flow, invitations) treats this as an edit.
         const url = new URL(window.location.href);
