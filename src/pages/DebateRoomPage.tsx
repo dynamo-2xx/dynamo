@@ -572,6 +572,7 @@ const DebateRoomPage = () => {
     kind: "debate",
     id: debate?.id ?? null,
     isHost: isCreator || isFacilitator,
+    remainingSeconds: timeLeft,
   });
   const isSpeaker = userRole === "speaker" || (isFacilitator && facilitatorSpeaking);
   const isSpectator = userRole === "spectator";
