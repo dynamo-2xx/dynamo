@@ -1,58 +1,61 @@
-## What I'll fix
+## Goal
 
-### 1. Notebook design asymmetry (My Take "Suggest" missing + consolidate to one UI)
+Make `/debate/:id/preview` (the public scheduled-preview page) behave correctly across all three debate states:
 
-**Desired outcome:** The notebook looks identical everywhere it appears (debate room, record preview, post-session record, prep window). The "Suggest from my Thoughts + Annotations" button on the My Take tab works everywhere. `/my-study/:notebookId` is untouched.
+| State | Behavior |
+|---|---|
+| `pending` (pre-launch) | Preview as today (unchanged). |
+| `live` | Same preview, with a red **LIVE** pill in the header. The "Interested?" popover offers a **Join as spectator** action (for users not already invited as a speaker), in addition to existing "Queue as speaker / Notify / Message". |
+| `completed` | Render the post-session record inline at the same URL, so a refresh swaps preview → record. |
 
-**Root cause:** `MyTakeTab` only renders the Suggest button when it receives `recordType` + `recordId`. The shared `NotebookPanel` never passes those down. `SessionRecordViewV2` also never passes `recordType`/`recordId` to `NotebookPanel`. Two old, divergent components still exist: `NotebookOverlay.tsx` (dead) and `PrepNotebookPanel.tsx` (used inside prep) — both are raw `<textarea>` versions with no Suggest, no tabs parity, no Dynamo.
+This is scoped to `DebateScheduledPreviewPage.tsx`. The invite-token page (`DebatePreviewPage.tsx` at `/preview/:token`) is for invited speakers and is left as-is.
 
-**Changes:**
-- `NotebookPanel`: pass `recordType` + `recordId` into `MyTakeTab` in `renderTab`. Result: Suggest button appears in every consumer of `NotebookPanel`.
-- `SessionRecordViewV2`: pass `recordType="live_session"` + `recordId={sessionId}` to its `NotebookPanel` so live-session notebooks also get Suggest.
-- `PrepNotebookPanel`: replace its body with `NotebookPanel` mounted in inline (non-floating) mode so the prep window shows the exact same UI as the room and record. (Add a small `inline` prop to `NotebookPanel` that renders the contents without the fixed-position chrome / drag header, since prep already has its own column container.)
-- Delete `src/components/debate/NotebookOverlay.tsx` (no remaining importers).
+## Changes
 
-### 2. Debate-room notebook should drag across the entire screen
+### 1. `src/pages/DebateScheduledPreviewPage.tsx`
 
-**Desired outcome:** The floating notebook can be dragged anywhere in the viewport, not clipped to the room's main panel.
+- **Remove** the early redirect block (lines 58–61) that pushes to `/debate/:id` when status is `live` or `completed`.
+- **Subscribe** to realtime `UPDATE` on the `debates` row by `id`, so a status change (pending → live → completed) flips the UI without a manual refresh. Fallback: a single re-fetch on tab `visibilitychange`.
+- **Render branches:**
+  - If `debate.status === 'completed'`: render the existing post-session record view used at `/debate/:id` for completed debates. Concretely, lazy-load and render the same component(s) `DebateRoomPage` mounts for the completed branch (the record/transcript view + completion summary), keeping `AppLayout` chrome. If extracting that branch as a shared `<DebateRecordView debateId={…} />` component is too invasive, fall back to `<Navigate to={`/debate/${id}`} replace />` on completed only — but the default approach is inline.
+  - Otherwise: render the current `DebateRecordPreview` as today.
+- **Live tag:** when `debate.status === 'live'`, pass a `live` flag (or render a `<span>LIVE</span>` red pill above/inside `DebateRecordPreview`'s header). Pulse animation, monochrome with a red accent dot to fit the design system.
+- **Interested popover (live only):** add a new option **"Join as spectator"** when:
+  - user is signed in,
+  - not the owner,
+  - not already a `debate_participants` row,
+  - not invited as a speaker (no accepted `debate_invitations` for this user).
+  Clicking it inserts a `debate_interests` row with `role='spectator'` (default), then navigates to `/debate/:id` (DebateRoomPage already handles spectator role end-to-end).
+- Keep the existing "Queue to join as speaker", "Message the publisher", and "Notify me when it starts" options. "Notify me" hides itself when status is `live` or `completed`.
 
-**Status:** `NotebookPanel` already uses `position: fixed` with viewport-bound clamping, so positionally it can go anywhere. The visible "clipping" the user is seeing is the drag-bounds math using `size.w/size.h` against `window.innerWidth/innerHeight`, which is correct. I'll audit at runtime — most likely cause is an ancestor in `DebateRoomPage` with a CSS `transform`/`filter` that creates a containing block for `position: fixed`. If found, hoist the panel out via a portal to `document.body` so it truly floats over the entire screen.
+### 2. No DB migration required
 
-**Change:** Wrap the desktop branch of `NotebookPanel`'s return in `createPortal(..., document.body)`. No layout regressions because it's already `position: fixed; z-index: 50`.
+`debate_interests.role` already supports `'spectator'` (default). `debate_participants` is unchanged; spectators don't insert a participant row — DebateRoomPage already auto-treats non-participants as spectators (`setUserRole("spectator")` at line 388 of `DebateRoomPage.tsx`).
 
-### 3. Facilitator pause must pause the preparation-window timer
+### 3. Realtime
 
-**Desired outcome:** When the facilitator presses Pause during a prep window, the prep countdown freezes; Resume continues from where it left off.
+Add the standard pattern used elsewhere in the codebase:
 
-**Change:** In `PrepPhaseOverlay`, read `isPaused` + `pausedAt` from `usePauseControl` (same hook the room already uses) and:
-- Stop decrementing the local countdown while `isPaused` is true.
-- When resumed, recompute remaining time as `original_remaining − (resume_time − pause_time)`.
-- Suppress the auto-mark-ready-at-zero side-effect while paused.
+```ts
+supabase
+  .channel(`debate-status-${id}`)
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'debates', filter: `id=eq.${id}` },
+      (p) => setDebate((d) => ({ ...d, ...p.new })))
+  .subscribe();
+```
 
-No DB schema change — `paused_at` already exists on `debates`.
+`debates` is already in `supabase_realtime` (added in the prior lobby-auto-launch migration), so no migration is needed.
 
-### 4. Invited speakers stuck in mic-prep lobby after host starts
+## Acceptance
 
-**Desired outcome:** When the host flips the debate to `live`, every queued/accepted speaker in the lobby is auto-navigated into `/debate/:id` within ~2s. The "Waiting for host to start…" copy disappears.
+- Opening `/debate/:id/preview` while status is `pending` looks identical to today.
+- When the host launches the session, the preview stays mounted and gains a red **LIVE** pill within a couple of seconds (realtime), and the "Interested?" popover gains a "Join as spectator" entry.
+- A non-invited viewer can click "Join as spectator" and land in `/debate/:id` as a spectator with no participant-row side-effects.
+- When the session ends, refreshing `/debate/:id/preview` shows the post-session record view inline at the same URL (no redirect bounce).
+- The invite-token flow (`/preview/:token`) is unchanged.
 
-**Investigation summary:** Both `DebateLobbyPage` and `JoinDebatePage` subscribe to `postgres_changes` on `debates` and navigate on `status === 'live'`. The fact this fails for some users points to either (a) the `debates` table not being in the `supabase_realtime` publication, or (b) the realtime subscription racing the page mount (the user landed *before* the channel was ready, then the host flipped status, then the channel attached too late).
+## Out of scope
 
-**Changes:**
-- Migration: ensure `debates` table is part of `supabase_realtime` publication (`ALTER PUBLICATION supabase_realtime ADD TABLE public.debates` — no-op if already there) and set `REPLICA IDENTITY FULL` so the `payload.new` row is complete.
-- Add a poll-fallback in `DebateLobbyPage`, `JoinDebatePage`, and `WaitingForHost`: every 4s while in waiting phase, `select status from debates where id = :id`; if `live`, navigate. Belt + suspenders so realtime gaps never strand a user.
-- Audit `LiveLobbyPage` + `CmmLobbyPage` for the same gap and add the same poll fallback.
-
-## Verification
-
-- Build passes.
-- Visit debate room → open notebook → My Take tab → see "Suggest from my Thoughts + Annotations" button.
-- Drag notebook into a corner of the screen previously unreachable; confirm it follows the cursor edge to edge.
-- Start a debate, hit Pause during prep → prep timer stops; Resume → prep timer resumes.
-- Two-browser test: host on /lobby, invited speaker on /lobby → host clicks Start → speaker navigates to /debate/:id within ~4s even if realtime is laggy.
-
-## Confidence
-
-- Notebook unification + Suggest: **95%** — wiring change with a clear root cause.
-- Free-drag (portal): **80%** — depends on confirming a `transform` ancestor; portal is the safe catch-all.
-- Pause during prep: **90%** — reuses existing hook + a small timer guard.
-- Lobby auto-launch: **75%** — realtime publication + poll fallback should cover every case; final confirmation needs the two-browser test.
+- Live realtime swap preview → record at the exact moment of completion (we only guarantee it on refresh, as the user requested).
+- Adding a spectator surface to the invite-token preview page.
+- Any DB schema changes.
