@@ -218,46 +218,19 @@ export default function DebateLobbyPage() {
     setStarting(true);
 
     // Promote ALL waiting speakers → debate_participants so the room admits
-    // them when status flips to live. Sources:
-    //   (a) debate_interests with role='queued_speaker' (in-person queue)
-    //   (b) debate_invitations with status='accepted' (accepted invites)
+    // them when status flips to live. We MUST go through a SECURITY DEFINER
+    // RPC because the participants INSERT policy only lets a user insert
+    // their own row — a host-side upsert would be silently dropped for every
+    // other speaker, leaving them stuck in the lobby. The RPC pulls from both
+    // debate_interests (queued_speaker) and debate_invitations (accepted) and
+    // dedupes by user_id.
     try {
-      const [queuedRes, acceptedRes] = await Promise.all([
-        supabase
-          .from("debate_interests")
-          .select("user_id, side_id")
-          .eq("debate_id", id)
-          .eq("role", "queued_speaker"),
-        supabase
-          .from("debate_invitations")
-          .select("invited_user_id, side_id, status")
-          .eq("debate_id", id)
-          .eq("status", "accepted"),
-      ]);
-
-      const byUser = new Map<string, { user_id: string; side_id: string }>();
-      (queuedRes.data ?? []).forEach((q: any) => {
-        if (q.user_id && q.side_id) byUser.set(q.user_id, { user_id: q.user_id, side_id: q.side_id });
-      });
-      (acceptedRes.data ?? []).forEach((a: any) => {
-        if (a.invited_user_id && a.side_id && !byUser.has(a.invited_user_id)) {
-          byUser.set(a.invited_user_id, { user_id: a.invited_user_id, side_id: a.side_id });
-        }
-      });
-
-      const rows = Array.from(byUser.values()).map((r) => ({
-        debate_id: id,
-        user_id: r.user_id,
-        side_id: r.side_id,
-        participant_role: "speaker",
-      }));
-      if (rows.length > 0) {
-        await supabase
-          .from("debate_participants")
-          .upsert(rows as any, { onConflict: "debate_id,user_id", ignoreDuplicates: true });
-      }
+      const { error: promoteErr } = await supabase.rpc(
+        "promote_lobby_to_participants" as any,
+        { _debate_id: id },
+      );
+      if (promoteErr) console.warn("Failed to promote queued speakers", promoteErr);
     } catch (e) {
-      // Non-fatal: continue with start; host can promote manually from the room.
       console.warn("Failed to promote queued speakers", e);
     }
 
