@@ -408,6 +408,25 @@ const DebateScheduledPreviewPage = () => {
                   </div>
                 ) : (
                   <>
+                {canJoinAsSpectator && (
+                  <button
+                    type="button"
+                    disabled={spectatorBusy}
+                    onClick={handleJoinAsSpectator}
+                    className="w-full flex items-start gap-3 p-3 rounded-md hover:bg-accent transition-colors text-left disabled:opacity-50"
+                  >
+                    <Eye className="w-4 h-4 mt-0.5 text-muted-foreground" />
+                    <div className="flex-1">
+                      <div className="text-sm font-body font-medium flex items-center gap-1.5">
+                        {spectatorQueued ? "Watch live" : "Join as spectator"}
+                        {spectatorQueued && <Check className="w-3.5 h-3.5 text-foreground" />}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        It's live — watch without taking the mic.
+                      </div>
+                    </div>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -443,6 +462,7 @@ const DebateScheduledPreviewPage = () => {
                     <div className="text-xs text-muted-foreground">Start a DM about joining or scheduling.</div>
                   </div>
                 </button>
+                {!isLive && !isCompleted && (
                 <button
                   type="button"
                   disabled={notifyBusy}
@@ -460,6 +480,7 @@ const DebateScheduledPreviewPage = () => {
                     </div>
                   </div>
                 </button>
+                )}
                   </>
                 )}
               </PopoverContent>
