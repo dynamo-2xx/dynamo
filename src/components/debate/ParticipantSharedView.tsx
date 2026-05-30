@@ -123,6 +123,7 @@ const ParticipantSharedView = ({
     turnKey,
     canControl: isSpeaker && isMyTurn,
     ownerId: userId ?? null,
+    remainingSeconds: timeLeft,
   });
 
   const handleSpeakerPauseToggle = () => {
