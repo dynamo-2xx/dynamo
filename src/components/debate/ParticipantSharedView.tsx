@@ -382,9 +382,11 @@ const ParticipantSharedView = ({
             <IconCircleButton
               onClick={handleSpeakerPauseToggle}
               active={speakerPauseActive}
-              disabled={timerRunning && pauseUsedThisTurn}
+              disabled={speakerPauseDisabled}
               title={
-                speakerPauseActive
+                !isMyTurn
+                  ? "Pause unlocks on your turn"
+                  : speakerPauseActive
                   ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
                   : pauseUsedThisTurn
                   ? "You've already used your pause this turn"
@@ -612,9 +614,11 @@ const ParticipantSharedView = ({
                   <IconCircleButton
                     onClick={handleSpeakerPauseToggle}
                     active={speakerPauseActive}
-                    disabled={timerRunning && pauseUsedThisTurn}
+                    disabled={speakerPauseDisabled}
                     title={
-                      speakerPauseActive
+                      !isMyTurn
+                        ? "Pause unlocks on your turn"
+                        : speakerPauseActive
                         ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
                         : pauseUsedThisTurn
                         ? "You've already used your pause this turn"
