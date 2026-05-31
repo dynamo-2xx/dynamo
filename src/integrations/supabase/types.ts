@@ -3352,6 +3352,16 @@ export type Database = {
         Args: { _device_id: string; _session_id: string }
         Returns: undefined
       }
+      lookup_debate_by_join_code: {
+        Args: { _code: string }
+        Returns: {
+          format: string
+          id: string
+          max_speakers_per_side: number
+          status: string
+          topic: string
+        }[]
+      }
       pause_debate: {
         Args: { _debate_id: string; _remaining_seconds: number }
         Returns: undefined
