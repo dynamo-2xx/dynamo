@@ -110,12 +110,12 @@ const JoinDebatePage = () => {
     }
 
     const loadDebate = async () => {
-      // Find debate by join_code
-      const { data: debate, error } = await supabase
-        .from("debates")
-        .select("id, topic")
-        .eq("join_code", code?.toUpperCase())
-        .single();
+      // Find debate by join_code via SECURITY DEFINER RPC so we can resolve
+      // codes for debates the visitor isn't yet a participant of (RLS on
+      // `debates` would otherwise hide scheduled rows from invitees).
+      const { data: lookupRows, error } = await supabase
+        .rpc("lookup_debate_by_join_code", { _code: (code || "").toUpperCase() });
+      const debate = Array.isArray(lookupRows) ? (lookupRows[0] as any) : (lookupRows as any);
 
       if (error || !debate) {
         setStatus("Invalid join code.");
@@ -139,15 +139,14 @@ const JoinDebatePage = () => {
       }
 
       // Fetch sides and participants to determine availability
-      const [debateMetaRes, sidesRes, partsRes] = await Promise.all([
-        supabase.from("debates").select("max_speakers_per_side").eq("id", debate.id).single(),
+      const [sidesRes, partsRes] = await Promise.all([
         supabase.from("debate_sides").select("*").eq("debate_id", debate.id).order("sort_order"),
         supabase.from("debate_participants").select("*").eq("debate_id", debate.id),
       ]);
 
       const debateSides = (sidesRes.data || []) as Side[];
       const debateParticipants = (partsRes.data || []) as Participant[];
-      const cap = (debateMetaRes.data as any)?.max_speakers_per_side ?? 2;
+      const cap = (debate as any)?.max_speakers_per_side ?? 2;
 
       setDebateId(debate.id);
       setDebateTopic(debate.topic);
