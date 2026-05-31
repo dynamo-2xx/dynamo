@@ -7,6 +7,7 @@ import MicLobby from "@/components/lobby/MicLobby";
 import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
 import WaitingForHost from "@/components/lobby/WaitingForHost";
 import QueuedSpeakerBubbles from "@/components/lobby/QueuedSpeakerBubbles";
+import LobbyInvitePanel from "@/components/lobby/LobbyInvitePanel";
 import { useMicLobbyAttachment } from "@/hooks/useMicLobbyAttachment";
 import { toast } from "sonner";
 
@@ -290,6 +291,7 @@ export default function DebateLobbyPage() {
               }}
               onCodeRegenerated={(c) => setJoinCode(c)}
             />
+            <LobbyInvitePanel debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} />
             <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} hostUserId={createdBy} />
             <MicLobby
               kind="debate"
