@@ -131,8 +131,12 @@ const ParticipantSharedView = ({
     else void pauseSpeaker();
   };
 
-  // Publisher-speakers also need the per-turn pause.
-  const showSpeakerPause = isSpeaker && isMyTurn;
+  // Every speaker keeps the per-turn pause button visible (same model as the
+  // camera / notebook / argument-map toggles). It just goes disabled when it
+  // isn't this speaker's turn so the toolbar is identical for host and guest
+  // speakers — only the host's facilitation menu is host-only.
+  const showSpeakerPause = isSpeaker;
+  const speakerPauseDisabled = !isMyTurn || (timerRunning && pauseUsedThisTurn);
   const pauseCountdownLabel = `${Math.ceil(pauseRemainingMs / 1000)}s`;
 
   // Camera state — independently toggleable per participant
@@ -378,9 +382,11 @@ const ParticipantSharedView = ({
             <IconCircleButton
               onClick={handleSpeakerPauseToggle}
               active={speakerPauseActive}
-              disabled={timerRunning && pauseUsedThisTurn}
+              disabled={speakerPauseDisabled}
               title={
-                speakerPauseActive
+                !isMyTurn
+                  ? "Pause unlocks on your turn"
+                  : speakerPauseActive
                   ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
                   : pauseUsedThisTurn
                   ? "You've already used your pause this turn"
@@ -608,9 +614,11 @@ const ParticipantSharedView = ({
                   <IconCircleButton
                     onClick={handleSpeakerPauseToggle}
                     active={speakerPauseActive}
-                    disabled={timerRunning && pauseUsedThisTurn}
+                    disabled={speakerPauseDisabled}
                     title={
-                      speakerPauseActive
+                      !isMyTurn
+                        ? "Pause unlocks on your turn"
+                        : speakerPauseActive
                         ? `Resume turn (auto-resume in ${pauseCountdownLabel})`
                         : pauseUsedThisTurn
                         ? "You've already used your pause this turn"
