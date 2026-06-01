@@ -12,7 +12,7 @@ const LegalFooter = () => {
           <Link to="/guidelines" className="hover:text-foreground transition-colors">Guidelines</Link>
           <Link to="/legal/subprocessors" className="hover:text-foreground transition-colors">Subprocessors</Link>
         </div>
-        <div>© {year} Dynamo</div>
+        <div>© {year} D.</div>
       </div>
     </footer>
   );

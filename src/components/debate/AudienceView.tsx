@@ -94,7 +94,7 @@ const AudienceView = ({
                 <Zap className="w-3 h-3 text-primary" />
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-primary mb-0.5 font-display">Dynamo.</p>
+                <p className="text-[10px] font-semibold text-primary mb-0.5 font-display">D.</p>
                 <p className="text-xs text-foreground leading-relaxed font-body">{aiMessage}</p>
               </div>
             </div>
