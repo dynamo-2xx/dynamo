@@ -17,14 +17,14 @@ const DLogoButton = ({ onClick, active, pulse, disabled }: DLogoButtonProps) => 
     active={active}
     pulse={pulse}
     disabled={disabled}
-    title="Replay d.'s message"
+    title="Replay Dynamo.'s message"
     ariaLabel="Open AI facilitator message"
   >
     <span
       className="font-display leading-none text-[14px]"
       style={{ fontFamily: "'Instrument Serif', serif" }}
     >
-      d.
+      Dynamo.
     </span>
   </IconCircleButton>
 );
