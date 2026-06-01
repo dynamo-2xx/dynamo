@@ -66,39 +66,35 @@ const ProfilePage = () => {
             <ProfileIdCard variant="display" />
           </div>
 
-          {/* Activity */}
-          <div className="bg-background border border-border rounded-lg divide-y divide-border mb-6">
+          {/* Activity — 2×2 block grid */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
             <Link
               to="/my-study"
-              className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
+              className="flex flex-col items-start gap-2 p-5 border border-border rounded-xl hover:bg-accent transition-colors group"
             >
-              <NotebookPen className="w-4 h-4 text-muted-foreground" />
-              <span className="flex-1">My Study</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <NotebookPen className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="text-sm font-body font-medium">My Study</span>
             </Link>
             <Link
               to="/my-debates"
-              className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
+              className="flex flex-col items-start gap-2 p-5 border border-border rounded-xl hover:bg-accent transition-colors group"
             >
-              <MessageSquare className="w-4 h-4 text-muted-foreground" />
-              <span className="flex-1">My Agenda</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <MessageSquare className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="text-sm font-body font-medium">My Agenda</span>
             </Link>
             <Link
               to="/profile/connections"
-              className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
+              className="flex flex-col items-start gap-2 p-5 border border-border rounded-xl hover:bg-accent transition-colors group"
             >
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="flex-1">Connections</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <Users className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="text-sm font-body font-medium">Connections</span>
             </Link>
             <Link
               to="/notifications"
-              className="flex items-center gap-3 px-5 py-4 text-sm font-body font-medium hover:bg-accent transition-colors"
+              className="flex flex-col items-start gap-2 p-5 border border-border rounded-xl hover:bg-accent transition-colors group"
             >
-              <Bell className="w-4 h-4 text-muted-foreground" />
-              <span className="flex-1">Inbox</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <Bell className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="text-sm font-body font-medium">Inbox</span>
             </Link>
           </div>
 
