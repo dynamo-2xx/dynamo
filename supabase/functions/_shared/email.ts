@@ -48,7 +48,7 @@ export function brandedShell(opts: { title: string; bodyHtml: string; footerNote
       <div style="font-family:'Instrument Serif',serif;font-size:28px;letter-spacing:-0.01em;margin-bottom:24px;">${opts.title}</div>
       <div style="font-size:15px;line-height:1.55;">${opts.bodyHtml}</div>
       <div style="margin-top:32px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.08);font-size:12px;color:#6b7280;">
-        ${opts.footerNote ?? `You're receiving this from Dynamo. <a href="https://dynamo.today/settings/email" style="color:#6b7280;">Manage email preferences</a>.`}
+        ${opts.footerNote ?? `You're receiving this from D. <a href="https://dynamo.today/settings/email" style="color:#6b7280;">Manage email preferences</a>.`}
       </div>
     </div>
   </body></html>`;

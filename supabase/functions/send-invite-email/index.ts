@@ -119,7 +119,7 @@ serve(async (req) => {
               You're invited to a debate
             </h1>
             <p style="color: #6b5f7d; font-size: 14px; margin-bottom: 24px;">
-              <strong>${publisherName}</strong> has invited you to join a structured debate on Dynamo.
+              <strong>${publisherName}</strong> has invited you to join a structured debate on D.
             </p>
             <div style="background: #f7f5f2; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
               <p style="font-family: Georgia, serif; font-size: 18px; font-weight: 600; color: #2d1854; margin: 0 0 8px 0;">

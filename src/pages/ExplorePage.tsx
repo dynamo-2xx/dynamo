@@ -25,7 +25,7 @@ const ExplorePageInner = () => {
   useDocumentMeta({
     title: "Explore Debates — Dynamo",
     description:
-      "Discover live debates, trending topics, and the best public records on Dynamo. Bring people to the power.",
+      "Discover live debates, trending topics, and the best public records on D. Bring people to the power.",
     type: "website",
     canonical:
       typeof window !== "undefined" ? `${window.location.origin}/explore` : undefined,

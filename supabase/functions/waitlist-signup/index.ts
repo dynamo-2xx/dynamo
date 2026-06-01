@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     if (firstTime) {
       const html = brandedShell({
         title: "You're on the list.",
-        bodyHtml: `<p>Welcome to Dynamo. You're <strong>#${position}</strong> in line.</p>
+        bodyHtml: `<p>Welcome to D. You're <strong>#${position}</strong> in line.</p>
           <p>Dynamo turns real conversations into permanent civic record. We'll email you the moment your slot opens.</p>
           <p style="color:#6b7280;font-size:13px;">If this wasn't you, ignore this email — we won't add you again.</p>`,
       });
