@@ -45,7 +45,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         >
           <img src={logoSmiley} alt="D. logo" className="w-9 h-9 dark:invert transition-transform group-hover:scale-105" />
           <span className="font-body text-foreground text-sm font-medium tracking-[0.16em] uppercase">
-            DYNAMO
+            D.
           </span>
         </button>
         <nav className="flex flex-col gap-0.5 flex-1">
