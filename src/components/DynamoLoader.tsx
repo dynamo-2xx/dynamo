@@ -36,7 +36,7 @@ const DynamoLoader = ({ onComplete, duration = 2500 }: DynamoLoaderProps) => {
         transition={{ duration: 0.5 }}
         className="mb-6 text-[11px] md:text-xs font-body font-medium tracking-[0.4em] text-muted-foreground uppercase select-none"
       >
-        DYNAMO
+        D.
       </motion.div>
       <div className="text-3xl md:text-5xl lg:text-6xl font-display tracking-tight select-none">
         {SLOGAN.split("").map((char, i) => (
