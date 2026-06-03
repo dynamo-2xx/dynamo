@@ -133,12 +133,22 @@ const HeroActionShazam = ({ highlight, onUnauth }: HeroActionShazamProps) => {
             onClick={handleActivate}
             onFocus={triggerPulse}
             aria-label={slide.label}
-            className="relative w-44 h-44 rounded-full bg-foreground text-background flex items-center justify-center shadow-xl active:scale-95 transition-transform"
+            className={cn(
+              "relative w-44 h-44 rounded-full bg-foreground text-background flex items-center justify-center shadow-xl active:scale-95 transition-transform",
+              shake && "animate-shake",
+            )}
           >
             {pulse && !dragging && (
               <span className="absolute inset-0 rounded-full bg-foreground/20 animate-ping pointer-events-none" />
             )}
-            <Icon className="w-16 h-16 relative z-10" strokeWidth={1.5} />
+            <Icon className={cn("w-16 h-16 relative z-10", slide.comingSoon && "opacity-30")} strokeWidth={1.5} />
+            {slide.comingSoon && (
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/40 backdrop-blur-[2px] pointer-events-none">
+                <span className="font-body text-[10px] tracking-[0.18em] uppercase text-background">
+                  Coming soon…
+                </span>
+              </span>
+            )}
           </button>
         </motion.div>
 
@@ -182,12 +192,22 @@ const HeroActionShazam = ({ highlight, onUnauth }: HeroActionShazamProps) => {
             onClick={handleActivate}
             onFocus={triggerPulse}
             aria-label={slide.label}
-            className="relative w-48 h-48 rounded-full bg-foreground text-background flex items-center justify-center shadow-xl active:scale-95 transition-transform"
+            className={cn(
+              "relative w-48 h-48 rounded-full bg-foreground text-background flex items-center justify-center shadow-xl active:scale-95 transition-transform",
+              shake && "animate-shake",
+            )}
           >
             {pulse && !dragging && (
               <span className="absolute inset-0 rounded-full bg-foreground/20 animate-ping pointer-events-none" />
             )}
-            <Icon className="w-20 h-20 relative z-10" strokeWidth={1.5} />
+            <Icon className={cn("w-20 h-20 relative z-10", slide.comingSoon && "opacity-30")} strokeWidth={1.5} />
+            {slide.comingSoon && (
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/40 backdrop-blur-[2px] pointer-events-none">
+                <span className="font-body text-[11px] tracking-[0.18em] uppercase text-background">
+                  Coming soon…
+                </span>
+              </span>
+            )}
           </button>
         </motion.div>
 
