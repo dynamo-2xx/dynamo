@@ -31,20 +31,8 @@ serve(async (req) => {
     }
 
     const supa = createClient(SUPA_URL, SRK);
-
-    // Idempotency: skip if deep annotations already exist for this user on this session.
-    const { count } = await supa
-      .from("performance_annotations")
-      .select("id", { count: "exact", head: true })
-      .eq("session_id", session_id)
-      .eq("session_kind", session_kind)
-      .eq("participant_id", user.id)
-      .eq("pass_kind", "deep");
-    if ((count ?? 0) > 0) {
-      return new Response(JSON.stringify({ ok: true, skipped: "already_analyzed" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Note: analyze-performance is idempotent for deep pass (delete-then-insert),
+    // so we no longer skip when prior rows exist. Re-runs replace prior deep rows.
 
     // Gather passages for the user.
     let passages: Array<{ transcript_entry_id?: string; text: string; subtopic_id?: string | null }> = [];
