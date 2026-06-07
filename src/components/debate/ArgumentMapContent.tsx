@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, Pencil, Check, X, RotateCcw } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import InsightText from "@/components/insights/InsightText";
 
 export interface TranscriptEntryInput {
   id: string;
@@ -116,7 +117,7 @@ const EditableBubbleText = ({
     return (
       <div className="group/edit relative">
         <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap pr-6" data-annotatable>
-          {entry.content}
+          <InsightText entryId={entry.id} text={entry.content} />
         </p>
         <div className="absolute top-0 right-0 flex items-center gap-1 opacity-0 group-hover/edit:opacity-100 transition-opacity">
           {entry.edited && entry.original_content && onRevert && (
@@ -279,14 +280,19 @@ const ArgumentMapContent = ({
                               onRevert={onRevertEntry}
                             />
                           ) : (
-                            <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
-                              {th.root.content}
-                              {th.root.edited && (
-                                <span className="ml-1 text-[9px] uppercase tracking-wide text-muted-foreground/80">
-                                  (edited)
-                                </span>
-                              )}
-                            </p>
+                            <>
+                              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 font-body mb-0.5">
+                                {th.root.speaker_side}
+                              </p>
+                              <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
+                                <InsightText entryId={th.root.id} text={th.root.content} />
+                                {th.root.edited && (
+                                  <span className="ml-1 text-[9px] uppercase tracking-wide text-muted-foreground/80">
+                                    (edited)
+                                  </span>
+                                )}
+                              </p>
+                            </>
                           )}
                           {th.root.quote && (
                             <p className="text-[11px] italic text-muted-foreground border-l-2 border-foreground/15 pl-2" data-annotatable>
@@ -311,7 +317,7 @@ const ArgumentMapContent = ({
                                 />
                               ) : (
                                 <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
-                                  {c.content}
+                                  <InsightText entryId={c.id} text={c.content} />
                                   {c.edited && (
                                     <span className="ml-1 text-[9px] uppercase tracking-wide text-muted-foreground/80">
                                       (edited)
@@ -382,7 +388,7 @@ const ArgumentMapContent = ({
                         {e.speaker_side}
                       </p>
                       <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
-                        {e.text}
+                        <InsightText entryId={e.id} text={e.text} />
                       </p>
                     </div>
                   ))

@@ -7,6 +7,7 @@ import ArgumentMapContent, {
   type TranscriptEntryInput,
   type SubtopicInput,
 } from "./ArgumentMapContent";
+import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 
 /** Legacy node shape kept for back-compat with existing call sites. */
 interface ArgumentNode {
@@ -100,9 +101,12 @@ const ArgumentMapOverlay = ({
       initialWidth={560}
       initialHeight={620}
       headerExtras={
-        <div className="flex items-center gap-1 mr-1">
-          {tabBtn("threaded", "Threaded Record")}
-          {tabBtn("transcript", "Transcript")}
+        <div className="flex items-center gap-2 mr-1">
+          <div className="flex items-center gap-1">
+            {tabBtn("threaded", "Threaded Record")}
+            {tabBtn("transcript", "Transcript")}
+          </div>
+          <PerformanceInsightsToggle />
         </div>
       }
     >

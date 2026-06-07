@@ -20,9 +20,10 @@ import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
-import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
-import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
+import { InsightsProvider } from "@/contexts/InsightsContext";
+import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
+import InsightText from "@/components/insights/InsightText";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
@@ -581,6 +582,16 @@ const DebateRoomPage = () => {
   const isLive = debate?.status === "live";
   const canSpeak = isSpeaker && isMyTurn && isLive && !prepPhaseRole;
   const micEnabled = canSpeak;
+
+  // §21 Performance Intelligence — fire deep-pass on first mount of a
+  // completed debate (idempotent server-side via delete-then-insert).
+  useEffect(() => {
+    if (!isCompleted || !debate?.id || !user?.id) return;
+    const kind = (debate as any).format === "change_my_mind" ? "cmm" : "debate";
+    supabase.functions
+      .invoke("trigger-deep-perf", { body: { session_id: debate.id, session_kind: kind } })
+      .catch(() => {});
+  }, [isCompleted, debate?.id, user?.id]);
 
   // Wave 6 §2 — Host failover. If owner heartbeat lapses >60s, any speaker /
   // facilitator / creator can reclaim the host role so the room never stalls.
@@ -1700,6 +1711,7 @@ const DebateRoomPage = () => {
 
         {/* Completed view */}
         {isCompleted && (
+          <InsightsProvider sessionId={debate.id} sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"} participantId={user?.id}>
           <div className="flex-1 flex flex-col relative">
             {/* Completion overlay */}
             {showCompletionOverlay && (
@@ -1769,13 +1781,7 @@ const DebateRoomPage = () => {
                     isOwner={isCreator}
                     isCompleted={isCompleted}
                   />
-                  {isCompleted && (
-                    <PerformanceInsightsToggle
-                      sessionId={debate.id}
-                      sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
-                      participantId={user?.id}
-                    />
-                  )}
+                  {isCompleted && <PerformanceInsightsToggle />}
                 </div>
 
                 {showTranscript && (
@@ -1836,7 +1842,7 @@ const DebateRoomPage = () => {
                                 {entry.speaker_side}
                               </p>
                               <p className="text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap" data-annotatable>
-                                {entry.text}
+                                <InsightText entryId={entry.id} text={entry.text} />
                               </p>
                             </div>
                           ))}
@@ -1852,7 +1858,7 @@ const DebateRoomPage = () => {
                                   {label}
                                 </p>
                                 <p className="text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap" data-annotatable>
-                                  {arg.content}
+                                  <InsightText entryId={arg.id} text={arg.content} />
                                 </p>
                               </div>
                             );
@@ -1874,6 +1880,7 @@ const DebateRoomPage = () => {
               </div>
             </div>
           </div>
+          </InsightsProvider>
         )}
 
         {/* Sidebar is now integrated into ParticipantSharedView */}

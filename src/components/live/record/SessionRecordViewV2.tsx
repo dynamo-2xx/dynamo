@@ -29,8 +29,8 @@ import { useSessionCitations } from "@/hooks/useSessionCitations";
 import { useSessionCrossRefs } from "@/hooks/useSessionCrossRefs";
 import { useAuth } from "@/contexts/AuthContext";
 import ContinueButton from "@/components/record/ContinueButton";
+import { InsightsProvider } from "@/contexts/InsightsContext";
 import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
-import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 
 interface Props {
   sessionId: string;
@@ -510,6 +510,7 @@ const SessionRecordViewV2 = ({
   );
 
   return (
+    <InsightsProvider sessionId={sessionId} sessionKind="live" participantId={user?.id}>
     <div className="max-w-7xl mx-auto px-4 py-6 md:py-10" ref={recordRootRef} data-record-root>
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         {/* Header — Main Topic */}
@@ -542,7 +543,7 @@ const SessionRecordViewV2 = ({
           )}
           {!readOnly && (
             <div className="ml-auto flex items-center gap-2">
-              <PerformanceInsightsToggle sessionId={sessionId} sessionKind="live" />
+              <PerformanceInsightsToggle />
               {canContinue && (
                 <ContinueButton kind="live_session" sourceId={sessionId} isOwner isCompleted />
               )}
@@ -843,6 +844,7 @@ const SessionRecordViewV2 = ({
         />
       )}
     </div>
+    </InsightsProvider>
   );
 };
 

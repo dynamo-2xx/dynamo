@@ -20,7 +20,6 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import ContinueButton from "@/components/record/ContinueButton";
 import PauseButton from "@/components/sharing/PauseButton";
-import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 
 interface DebateRow {
   id: string;
@@ -327,9 +326,6 @@ const ChangeMyMindRoomPage = () => {
               isCompleted={debate.status === "completed"}
             />
           </div>
-          {debate.status === "completed" && (
-            <FloatingIntelligence sessionId={debate.id} sessionKind="cmm" />
-          )}
           {ownerSide && (
             <div className="rounded-xl border border-foreground/30 bg-foreground/[0.02] p-3">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Owner's position</div>

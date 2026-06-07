@@ -13,7 +13,6 @@ import RoundSummaryCard from "./RoundSummaryCard";
 import DLogoButton from "./DLogoButton";
 import IconCircleButton from "./IconCircleButton";
 import ArgumentMapOverlay from "./ArgumentMapOverlay";
-import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";
@@ -508,12 +507,6 @@ const ParticipantSharedView = ({
             })}
           />
 
-          {/* §21 Premium Performance Intelligence — floating bubble */}
-          <FloatingIntelligence
-            sessionId={debate.id}
-            sessionKind="debate"
-            subtopicId={currentSubtopic?.id ?? null}
-          />
         </div>
       </div>
 
