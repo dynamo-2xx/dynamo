@@ -3,7 +3,7 @@ import { usePerformanceAnnotations, type PerfAnnotation } from "@/hooks/usePerfo
 import { useSubscription } from "@/hooks/useSubscription";
 import type { Polarity } from "@/lib/perf-tags";
 
-type SessionKind = "debate" | "cmm" | "live";
+type SessionKind = "debate" | "cmm" | "live" | "imported";
 
 interface InsightsState {
   isPremium: boolean;

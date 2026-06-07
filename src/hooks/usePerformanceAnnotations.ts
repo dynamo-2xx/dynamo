@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type PerfAnnotation = {
   id: string;
   session_id: string;
-  session_kind: "debate" | "cmm" | "live";
+  session_kind: "debate" | "cmm" | "live" | "imported";
   participant_id: string | null;
   subtopic_id: string | null;
   transcript_entry_id: string | null;
@@ -29,7 +29,7 @@ export type PerfAnnotation = {
  */
 export function usePerformanceAnnotations(
   sessionId: string | null | undefined,
-  sessionKind: "debate" | "cmm" | "live",
+  sessionKind: "debate" | "cmm" | "live" | "imported",
   participantId?: string | null,
 ) {
   const [data, setData] = useState<PerfAnnotation[]>([]);

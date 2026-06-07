@@ -27,7 +27,7 @@ type Passage = {
 };
 type Body = {
   session_id: string;
-  session_kind: "debate" | "cmm" | "live";
+  session_kind: "debate" | "cmm" | "live" | "imported";
   participant_id: string;
   pass: "live" | "deep";
   passages: Passage[];
