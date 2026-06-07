@@ -583,6 +583,16 @@ const DebateRoomPage = () => {
   const canSpeak = isSpeaker && isMyTurn && isLive && !prepPhaseRole;
   const micEnabled = canSpeak;
 
+  // §21 Performance Intelligence — fire deep-pass on first mount of a
+  // completed debate (idempotent server-side via delete-then-insert).
+  useEffect(() => {
+    if (!isCompleted || !debate?.id || !user?.id) return;
+    const kind = (debate as any).format === "change_my_mind" ? "cmm" : "debate";
+    supabase.functions
+      .invoke("trigger-deep-perf", { body: { session_id: debate.id, session_kind: kind } })
+      .catch(() => {});
+  }, [isCompleted, debate?.id, user?.id]);
+
   // Wave 6 §2 — Host failover. If owner heartbeat lapses >60s, any speaker /
   // facilitator / creator can reclaim the host role so the room never stalls.
   const hostFailover = useDebateHostFailover({
