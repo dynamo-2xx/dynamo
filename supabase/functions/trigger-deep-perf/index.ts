@@ -11,7 +11,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-type Body = { session_id: string; session_kind: "debate" | "live" | "cmm" };
+type Body = { session_id: string; session_kind: "debate" | "live" | "cmm" | "imported" };
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -45,6 +45,22 @@ serve(async (req) => {
       const entries: any[] = Array.isArray((tr as any)?.transcript_entries) ? (tr as any).transcript_entries : [];
       passages = entries
         .filter((e) => e?.user_id === user.id && typeof e?.text === "string" && e.text.trim().length > 30)
+        .map((e) => ({ transcript_entry_id: e?.id, text: String(e.text).slice(0, 2000), subtopic_id: e?.subtopic_id ?? null }));
+    } else if (session_kind === "imported") {
+      // imported_records own one transcript_entries jsonb array. Treat every
+      // entry as belonging to the importing user (deep pass runs on the whole
+      // imported transcript, regardless of detected speakers).
+      const { data: rec } = await supa
+        .from("imported_records")
+        .select("user_id, transcript_entries")
+        .eq("id", session_id)
+        .maybeSingle();
+      if (!rec || (rec as any).user_id !== user.id) {
+        return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: corsHeaders });
+      }
+      const entries: any[] = Array.isArray((rec as any)?.transcript_entries) ? (rec as any).transcript_entries : [];
+      passages = entries
+        .filter((e) => typeof e?.text === "string" && e.text.trim().length > 30)
         .map((e) => ({ transcript_entry_id: e?.id, text: String(e.text).slice(0, 2000), subtopic_id: e?.subtopic_id ?? null }));
     } else {
       // live: read entries table (column is `user_id`, no subtopic_id)

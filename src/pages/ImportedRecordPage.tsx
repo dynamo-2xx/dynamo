@@ -8,6 +8,9 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import { toast } from "sonner";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
+import { InsightsProvider } from "@/contexts/InsightsContext";
+import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ImportedRecord {
   id: string;
@@ -30,6 +33,7 @@ const SOURCE_ICON: Record<string, typeof Link2> = {
 export default function ImportedRecordPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [rec, setRec] = useState<ImportedRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"transcript" | "threaded">("transcript");
@@ -57,6 +61,15 @@ export default function ImportedRecordPage() {
     return () => { cancelled = true; };
   }, [id, navigate]);
 
+  // §21 Performance Intelligence — fire deep pass once the record is loaded
+  // and the viewer is the owner. Idempotent server-side.
+  useEffect(() => {
+    if (!rec || !user?.id || rec.user_id !== user.id) return;
+    supabase.functions
+      .invoke("trigger-deep-perf", { body: { session_id: rec.id, session_kind: "imported" } })
+      .catch(() => {});
+  }, [rec?.id, rec?.user_id, user?.id]);
+
   const subtopics = useMemo(
     () => (rec?.subtopics ?? []).map((s: any) => ({ id: s.id ?? s.title, title: s.title })),
     [rec],
@@ -74,6 +87,7 @@ export default function ImportedRecordPage() {
 
   return (
     <AppLayout>
+      <InsightsProvider sessionId={rec.id} sessionKind="imported" participantId={user?.id}>
       <div className="max-w-3xl mx-auto px-4 py-6" data-record-root>
         <button
           onClick={() => navigate(-1)}
@@ -103,17 +117,22 @@ export default function ImportedRecordPage() {
         </div>
 
         <div className="flex gap-1 mb-3 border-b border-foreground/10">
-          {(["transcript", "threaded"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-3 py-2 text-xs uppercase tracking-widest font-body border-b-2 -mb-px transition-colors ${
-                tab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t === "transcript" ? "Transcript" : "Argument map"}
-            </button>
-          ))}
+          <div className="flex flex-1 gap-1">
+            {(["transcript", "threaded"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-3 py-2 text-xs uppercase tracking-widest font-body border-b-2 -mb-px transition-colors ${
+                  tab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t === "transcript" ? "Transcript" : "Argument map"}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center pb-2">
+            <PerformanceInsightsToggle />
+          </div>
         </div>
 
         <ArgumentMapContent
@@ -137,6 +156,7 @@ export default function ImportedRecordPage() {
         transcriptEntries={rec.transcript_entries as any}
         subtopics={subtopics.map((s) => s.title)}
       />
+      </InsightsProvider>
     </AppLayout>
   );
 }

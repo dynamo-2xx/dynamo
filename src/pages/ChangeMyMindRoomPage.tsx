@@ -20,6 +20,7 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import ContinueButton from "@/components/record/ContinueButton";
 import PauseButton from "@/components/sharing/PauseButton";
+import { useLivePerfStreamer } from "@/hooks/useLivePerfStreamer";
 
 interface DebateRow {
   id: string;
@@ -122,6 +123,16 @@ const ChangeMyMindRoomPage = () => {
   // entries themselves come from the shared store and are identical across
   // both hook instances (they merge via realtime).
   const liveEntries = challengerCaptureActive ? challenger.entries : owner.entries;
+
+  // §21 Live-pass: dispatch per-turn analysis for the speaker that is
+  // currently capturing on this device.
+  useLivePerfStreamer({
+    sessionId: debate?.id ?? null,
+    sessionKind: "cmm",
+    participantId: user?.id ?? null,
+    entries: liveEntries.map((e: any) => ({ id: e.id, text: e.text, is_final: e.is_final })),
+    active: !!(ownerCaptureActive || challengerCaptureActive),
+  });
   const interimText = challengerCaptureActive
     ? challenger.interimText
     : ownerCaptureActive

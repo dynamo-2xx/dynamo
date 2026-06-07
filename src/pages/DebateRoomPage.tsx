@@ -22,6 +22,7 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { InsightsProvider } from "@/contexts/InsightsContext";
+import { useLivePerfStreamer } from "@/hooks/useLivePerfStreamer";
 import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import InsightText from "@/components/insights/InsightText";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
@@ -592,6 +593,15 @@ const DebateRoomPage = () => {
       .invoke("trigger-deep-perf", { body: { session_id: debate.id, session_kind: kind } })
       .catch(() => {});
   }, [isCompleted, debate?.id, user?.id]);
+
+  // §21 Live-pass: dispatch per-turn analysis for the current speaker.
+  useLivePerfStreamer({
+    sessionId: debate?.id ?? null,
+    sessionKind: (debate as any)?.format === "change_my_mind" ? "cmm" : "debate",
+    participantId: user?.id ?? null,
+    entries: transcriptEntries.map((e: any) => ({ id: e.id, text: e.text, is_final: e.is_final })),
+    active: !!canSpeak,
+  });
 
   // Wave 6 §2 — Host failover. If owner heartbeat lapses >60s, any speaker /
   // facilitator / creator can reclaim the host role so the room never stalls.
