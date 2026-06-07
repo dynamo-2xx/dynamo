@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Scissors, Merge, AlertTriangle, Pencil } from "lucide-react";
 import { LiveTranscriptEntry } from "@/hooks/useLiveTranscription";
+import InsightText from "@/components/insights/InsightText";
 
 interface SpeakerBubbleProps {
   entry: LiveTranscriptEntry;
@@ -87,7 +88,7 @@ const SpeakerBubble = ({
             ))}
           </div>
         ) : (
-          <span>{entry.text}</span>
+          <InsightText entryId={entry.id} text={entry.text} />
         )}
 
         {/* Tool buttons */}
