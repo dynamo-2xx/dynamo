@@ -22,6 +22,7 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { InsightsProvider } from "@/contexts/InsightsContext";
+import { useLivePerfStreamer } from "@/hooks/useLivePerfStreamer";
 import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import InsightText from "@/components/insights/InsightText";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
