@@ -594,6 +594,15 @@ const DebateRoomPage = () => {
       .catch(() => {});
   }, [isCompleted, debate?.id, user?.id]);
 
+  // §21 Live-pass: dispatch per-turn analysis for the current speaker.
+  useLivePerfStreamer({
+    sessionId: debate?.id ?? null,
+    sessionKind: (debate as any)?.format === "change_my_mind" ? "cmm" : "debate",
+    participantId: user?.id ?? null,
+    entries: transcriptEntries.map((e: any) => ({ id: e.id, text: e.text, is_final: e.is_final })),
+    active: !!canSpeak,
+  });
+
   // Wave 6 §2 — Host failover. If owner heartbeat lapses >60s, any speaker /
   // facilitator / creator can reclaim the host role so the room never stalls.
   const hostFailover = useDebateHostFailover({
