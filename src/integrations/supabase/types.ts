@@ -2038,54 +2038,66 @@ export type Database = {
       }
       performance_annotations: {
         Row: {
-          attribute_group: Database["public"]["Enums"]["perf_group"]
+          attribute_group: Database["public"]["Enums"]["perf_group"] | null
           char_end: number | null
           char_start: number | null
+          cited_entry_ids: string[] | null
           created_at: string
           explanation: string
           id: string
           participant_id: string | null
           pass_kind: Database["public"]["Enums"]["perf_pass"]
+          polarity: string | null
           recommendation: string | null
           session_id: string
           session_kind: string
-          severity: Database["public"]["Enums"]["perf_severity"]
+          severity: Database["public"]["Enums"]["perf_severity"] | null
+          span_text: string | null
           sub_attribute: string | null
           subtopic_id: string | null
+          tag_label: string | null
           transcript_entry_id: string | null
         }
         Insert: {
-          attribute_group: Database["public"]["Enums"]["perf_group"]
+          attribute_group?: Database["public"]["Enums"]["perf_group"] | null
           char_end?: number | null
           char_start?: number | null
+          cited_entry_ids?: string[] | null
           created_at?: string
           explanation: string
           id?: string
           participant_id?: string | null
           pass_kind: Database["public"]["Enums"]["perf_pass"]
+          polarity?: string | null
           recommendation?: string | null
           session_id: string
           session_kind: string
-          severity: Database["public"]["Enums"]["perf_severity"]
+          severity?: Database["public"]["Enums"]["perf_severity"] | null
+          span_text?: string | null
           sub_attribute?: string | null
           subtopic_id?: string | null
+          tag_label?: string | null
           transcript_entry_id?: string | null
         }
         Update: {
-          attribute_group?: Database["public"]["Enums"]["perf_group"]
+          attribute_group?: Database["public"]["Enums"]["perf_group"] | null
           char_end?: number | null
           char_start?: number | null
+          cited_entry_ids?: string[] | null
           created_at?: string
           explanation?: string
           id?: string
           participant_id?: string | null
           pass_kind?: Database["public"]["Enums"]["perf_pass"]
+          polarity?: string | null
           recommendation?: string | null
           session_id?: string
           session_kind?: string
-          severity?: Database["public"]["Enums"]["perf_severity"]
+          severity?: Database["public"]["Enums"]["perf_severity"] | null
+          span_text?: string | null
           sub_attribute?: string | null
           subtopic_id?: string | null
+          tag_label?: string | null
           transcript_entry_id?: string | null
         }
         Relationships: []
