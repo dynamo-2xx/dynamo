@@ -30,6 +30,7 @@ import { useSessionCrossRefs } from "@/hooks/useSessionCrossRefs";
 import { useAuth } from "@/contexts/AuthContext";
 import ContinueButton from "@/components/record/ContinueButton";
 import { InsightsProvider } from "@/contexts/InsightsContext";
+import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 
 interface Props {
   sessionId: string;
@@ -542,6 +543,7 @@ const SessionRecordViewV2 = ({
           )}
           {!readOnly && (
             <div className="ml-auto flex items-center gap-2">
+              <PerformanceInsightsToggle />
               {canContinue && (
                 <ContinueButton kind="live_session" sourceId={sessionId} isOwner isCompleted />
               )}
