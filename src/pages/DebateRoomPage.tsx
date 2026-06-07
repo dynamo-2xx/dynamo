@@ -21,6 +21,9 @@ import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
+import { InsightsProvider } from "@/contexts/InsightsContext";
+import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
+import InsightText from "@/components/insights/InsightText";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
@@ -1698,6 +1701,7 @@ const DebateRoomPage = () => {
 
         {/* Completed view */}
         {isCompleted && (
+          <InsightsProvider sessionId={debate.id} sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"} participantId={user?.id}>
           <div className="flex-1 flex flex-col relative">
             {/* Completion overlay */}
             {showCompletionOverlay && (
@@ -1767,7 +1771,7 @@ const DebateRoomPage = () => {
                     isOwner={isCreator}
                     isCompleted={isCompleted}
                   />
-                  {/* §21 — Insights toggle now lives in the Argument Map overlay header. */}
+                  {isCompleted && <PerformanceInsightsToggle />}
                 </div>
 
                 {showTranscript && (
@@ -1828,7 +1832,7 @@ const DebateRoomPage = () => {
                                 {entry.speaker_side}
                               </p>
                               <p className="text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap" data-annotatable>
-                                {entry.text}
+                                <InsightText entryId={entry.id} text={entry.text} />
                               </p>
                             </div>
                           ))}
@@ -1844,7 +1848,7 @@ const DebateRoomPage = () => {
                                   {label}
                                 </p>
                                 <p className="text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap" data-annotatable>
-                                  {arg.content}
+                                  <InsightText entryId={arg.id} text={arg.content} />
                                 </p>
                               </div>
                             );
@@ -1866,6 +1870,7 @@ const DebateRoomPage = () => {
               </div>
             </div>
           </div>
+          </InsightsProvider>
         )}
 
         {/* Sidebar is now integrated into ParticipantSharedView */}
