@@ -59,15 +59,15 @@ serve(async (req) => {
         .filter((e) => e?.user_id === user.id && typeof e?.text === "string" && e.text.trim().length > 30)
         .map((e) => ({ transcript_entry_id: e?.id, text: String(e.text).slice(0, 2000), subtopic_id: e?.subtopic_id ?? null }));
     } else {
-      // live: read entries table
+      // live: read entries table (column is `user_id`, no subtopic_id)
       const { data: rows } = await supa
         .from("live_session_entries")
-        .select("id, text, speaker_user_id, subtopic_id")
+        .select("id, text, user_id")
         .eq("session_id", session_id)
-        .eq("speaker_user_id", user.id);
+        .eq("user_id", user.id);
       passages = (rows ?? [])
         .filter((r: any) => typeof r?.text === "string" && r.text.trim().length > 30)
-        .map((r: any) => ({ transcript_entry_id: r.id, text: String(r.text).slice(0, 2000), subtopic_id: r.subtopic_id ?? null }));
+        .map((r: any) => ({ transcript_entry_id: r.id, text: String(r.text).slice(0, 2000), subtopic_id: null }));
     }
 
     if (passages.length === 0) {
