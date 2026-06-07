@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { TIER_CAPS, type Tier, type UsageMetric } from "@/lib/tiers";
+import { isFounder } from "@/lib/founder";
 
 interface UsageRow {
   sessions_created: number;
@@ -46,6 +47,8 @@ export function useSubscription() {
       setSub(subRes.data as SubscriptionState);
       setTier((subRes.data.tier as Tier) || "free");
     }
+    // Founder bypass — always treated as the highest paid tier client-side.
+    if (isFounder(user.id)) setTier("pro");
     if (usageRes.data) setUsage(usageRes.data as UsageRow);
     else setUsage({ sessions_created: 0, notebooks_created: 0, ai_calls: 0, import_minutes: 0, period_start: period.toISOString().slice(0, 10) });
     setLoading(false);
