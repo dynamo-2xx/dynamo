@@ -20,8 +20,7 @@ import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
-import FloatingIntelligence from "@/components/insights/FloatingIntelligence";
-import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
+import { InsightsProvider } from "@/contexts/InsightsContext";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
@@ -1769,13 +1768,7 @@ const DebateRoomPage = () => {
                     isOwner={isCreator}
                     isCompleted={isCompleted}
                   />
-                  {isCompleted && (
-                    <PerformanceInsightsToggle
-                      sessionId={debate.id}
-                      sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
-                      participantId={user?.id}
-                    />
-                  )}
+                  {/* §21 — Insights toggle now lives in the Argument Map overlay header. */}
                 </div>
 
                 {showTranscript && (
