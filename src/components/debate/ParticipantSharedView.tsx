@@ -13,7 +13,6 @@ import RoundSummaryCard from "./RoundSummaryCard";
 import DLogoButton from "./DLogoButton";
 import IconCircleButton from "./IconCircleButton";
 import ArgumentMapOverlay from "./ArgumentMapOverlay";
-import { InsightsProvider } from "@/contexts/InsightsContext";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RefObject } from "react";
 import type { TranscriptEntry } from "@/hooks/useDeepgramTranscription";

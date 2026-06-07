@@ -20,7 +20,6 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import ContinueButton from "@/components/record/ContinueButton";
 import PauseButton from "@/components/sharing/PauseButton";
-import { InsightsProvider } from "@/contexts/InsightsContext";
 
 interface DebateRow {
   id: string;

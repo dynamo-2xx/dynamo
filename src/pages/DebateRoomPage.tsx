@@ -20,7 +20,6 @@ import AudienceView from "@/components/debate/AudienceView";
 import DebateRecordPreview from "@/components/debate/DebateRecordPreview";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import AppLayout from "@/components/AppLayout";
-import { InsightsProvider } from "@/contexts/InsightsContext";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
