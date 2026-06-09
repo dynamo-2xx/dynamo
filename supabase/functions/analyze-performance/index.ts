@@ -67,7 +67,11 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) return new Response(JSON.stringify({ error: "ai_unavailable" }), { status: 500, headers: corsHeaders });
 
     const isDeep = body.pass === "deep";
-    const model = isDeep ? "google/gemini-2.5-pro" : "google/gemini-3-flash-preview";
+    // Note: gemini-2.5-pro on 30 passages routinely exceeds the 150s edge
+    // timeout, leaving zero rows inserted. Flash is fast enough to complete
+    // the post-session pass within budget while still handling cross-turn
+    // citations encoded as [turn N] markers.
+    const model = isDeep ? "google/gemini-2.5-flash" : "google/gemini-3-flash-preview";
     const systemPrompt = isDeep ? POST_SESSION_SYSTEM_PROMPT : LIVE_SYSTEM_PROMPT;
 
     // Number each passage with its turn_index so the model can cite cross-turn context.
