@@ -63,20 +63,10 @@ async function transcribeWithDeepgram(mediaUrl: string): Promise<string> {
 
 function structurePrompt(text: string, titleHint?: string) {
   return `You are restructuring source material into a neutral imported record (no sides, no debate framing).
-Return STRICT JSON:
-{
-  "topic": string (max 12 words),
-  "subtopics": string[] (2-4 angles, ordered),
-  "transcript": Array<{ "subtopic_index": number, "speaker": string, "text": string }>,
-  "argument_map": Array<{
-    "subtopic_index": number,
-    "speaker": string,
-    "type": "claim"|"counter"|"stake"|"quote"|"evidence",
-    "content": string,
-    "quote": string|null,
-    "parent_index": number|null
-  }>
-}
+Call the structure_imported_record tool exactly once.
+Keep transcript entries concise: 12-28 entries, each <= 700 characters.
+Keep argument_map concise: 8-20 items, each <= 500 characters.
+Preserve direct quotes only when they are short and important.
 Title hint: ${titleHint ?? ""}
 SOURCE:
 ${text.slice(0, 20000)}`;
@@ -92,15 +82,68 @@ async function structure(text: string, titleHint?: string) {
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: "Return ONLY valid JSON, no markdown fences." },
+        { role: "system", content: "You convert source material into structured records. Use only the required tool call; do not write prose." },
         { role: "user", content: structurePrompt(text, titleHint) },
       ],
-      response_format: { type: "json_object" },
+      tools: [{
+        type: "function",
+        function: {
+          name: "structure_imported_record",
+          description: "Create a neutral imported record from source material.",
+          parameters: {
+            type: "object",
+            properties: {
+              topic: { type: "string", description: "Max 12 words" },
+              subtopics: {
+                type: "array",
+                minItems: 1,
+                maxItems: 4,
+                items: { type: "string" },
+              },
+              transcript: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    subtopic_index: { type: "integer", minimum: 0, maximum: 3 },
+                    speaker: { type: "string" },
+                    text: { type: "string" },
+                  },
+                  required: ["subtopic_index", "speaker", "text"],
+                  additionalProperties: false,
+                },
+              },
+              argument_map: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    subtopic_index: { type: "integer", minimum: 0, maximum: 3 },
+                    speaker: { type: "string" },
+                    type: { type: "string", enum: ["claim", "counter", "stake", "quote", "evidence"] },
+                    content: { type: "string" },
+                    quote: { type: ["string", "null"] },
+                    parent_index: { type: ["integer", "null"] },
+                  },
+                  required: ["subtopic_index", "speaker", "type", "content", "quote", "parent_index"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["topic", "subtopics", "transcript", "argument_map"],
+            additionalProperties: false,
+          },
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "structure_imported_record" } },
     }),
   });
   if (!res.ok) throw new Error(`AI gateway ${res.status}: ${await res.text()}`);
   const json = await res.json();
-  const content: string = json.choices?.[0]?.message?.content ?? "";
+  const message = json.choices?.[0]?.message ?? {};
+  const args = message.tool_calls?.[0]?.function?.arguments;
+  if (args && typeof args !== "string") return { parsed: args, usage: json.usage };
+  const content: string = args || message.content || "";
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
   return { parsed: repairAndParse(cleaned), usage: json.usage };
 }
