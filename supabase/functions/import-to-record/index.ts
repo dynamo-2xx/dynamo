@@ -95,6 +95,7 @@ async function structure(text: string, titleHint?: string) {
         { role: "system", content: "Return ONLY valid JSON, no markdown fences." },
         { role: "user", content: structurePrompt(text, titleHint) },
       ],
+      response_format: { type: "json_object" },
     }),
   });
   if (!res.ok) throw new Error(`AI gateway ${res.status}: ${await res.text()}`);
@@ -114,6 +115,23 @@ function repairAndParse(raw: string): any {
   s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
   // Remove trailing commas
   s = s.replace(/,(\s*[}\]])/g, "$1");
+  try { return JSON.parse(s); } catch (_) {}
+  // Escape raw newlines/tabs/CR that appear inside string literals
+  // (invalid in JSON; common LLM mistake that produces
+  // "Expected ',' or '}' after property value").
+  {
+    let out = "", inStr = false, esc = false;
+    for (const ch of s) {
+      if (esc) { out += ch; esc = false; continue; }
+      if (ch === "\\") { out += ch; esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; out += ch; continue; }
+      if (inStr && ch === "\n") { out += "\\n"; continue; }
+      if (inStr && ch === "\r") { out += "\\r"; continue; }
+      if (inStr && ch === "\t") { out += "\\t"; continue; }
+      out += ch;
+    }
+    s = out;
+  }
   try { return JSON.parse(s); } catch (_) {}
   // Balance brackets/braces inside strings-awareness
   let braces = 0, brackets = 0, inStr = false, esc = false;
