@@ -83,16 +83,22 @@ serve(async (req) => {
     // Cap to first 30 passages to control cost.
     passages = passages.slice(0, 30);
 
-    const res = await fetch(`${SUPA_URL}/functions/v1/analyze-performance`, {
+    // Fire-and-forget: Gemini Pro deep pass can exceed the 150s idle timeout.
+    // Kick analyze-performance in the background and return 202 immediately.
+    // The client subscribes to realtime annotation inserts to render results.
+    const bgTask = fetch(`${SUPA_URL}/functions/v1/analyze-performance`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: auth },
       body: JSON.stringify({
         session_id, session_kind, participant_id: user.id, pass: "deep", passages,
       }),
-    });
-    const text = await res.text();
-    return new Response(JSON.stringify({ ok: res.ok, status: res.status, body: text.slice(0, 500) }), {
-      status: res.ok ? 200 : 500,
+    })
+      .then(async (r) => { try { await r.text(); } catch (_) {} })
+      .catch((e) => { console.error("deep-pass bg error", e); });
+    // @ts-ignore EdgeRuntime is provided by Supabase edge runtime
+    try { (globalThis as any).EdgeRuntime?.waitUntil?.(bgTask); } catch (_) {}
+    return new Response(JSON.stringify({ ok: true, queued: passages.length }), {
+      status: 202,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
