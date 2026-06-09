@@ -95,6 +95,7 @@ async function structure(text: string, titleHint?: string) {
         { role: "system", content: "Return ONLY valid JSON, no markdown fences." },
         { role: "user", content: structurePrompt(text, titleHint) },
       ],
+      response_format: { type: "json_object" },
     }),
   });
   if (!res.ok) throw new Error(`AI gateway ${res.status}: ${await res.text()}`);
