@@ -80,8 +80,12 @@ serve(async (req) => {
       });
     }
 
-    // Cap to first 30 passages to control cost.
-    passages = passages.slice(0, 30);
+    // Cap passage count + per-passage length so the deep pass fits inside
+    // the 150s edge timeout. Imported transcripts can be 150+ entries long.
+    passages = passages.slice(0, 20).map((p) => ({
+      ...p,
+      text: p.text.slice(0, 1200),
+    }));
 
     // Fire-and-forget: Gemini Pro deep pass can exceed the 150s idle timeout.
     // Kick analyze-performance in the background and return 202 immediately.
