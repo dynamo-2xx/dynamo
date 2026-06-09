@@ -145,7 +145,51 @@ async function structure(text: string, titleHint?: string) {
   if (args && typeof args !== "string") return { parsed: args, usage: json.usage };
   const content: string = args || message.content || "";
   const cleaned = content.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-  return { parsed: repairAndParse(cleaned), usage: json.usage };
+  try {
+    return { parsed: repairAndParse(cleaned), usage: json.usage };
+  } catch (e) {
+    console.error("import-to-record structure parse fallback:", (e as Error)?.message ?? e);
+    return { parsed: fallbackImportedRecord(text, titleHint), usage: json.usage };
+  }
+}
+
+function fallbackImportedRecord(text: string, titleHint?: string) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const sentenceMatches = normalized.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [normalized];
+  const sentences = sentenceMatches.map((s) => s.trim()).filter((s) => s.length > 20);
+  const title = titleHint?.trim()
+    || sentences[0]?.split(/\s+/).slice(0, 12).join(" ")
+    || "Imported record";
+  const chunks: string[] = [];
+  let current = "";
+  for (const sentence of sentences.slice(0, 80)) {
+    if (current && current.length + sentence.length > 700) {
+      chunks.push(current.trim());
+      current = sentence;
+    } else {
+      current = `${current} ${sentence}`.trim();
+    }
+    if (chunks.length >= 28) break;
+  }
+  if (current && chunks.length < 28) chunks.push(current.trim());
+  const safeChunks = chunks.length ? chunks : [normalized.slice(0, 700)];
+  return {
+    topic: title.slice(0, 240),
+    subtopics: ["Main thread"],
+    transcript: safeChunks.map((chunk) => ({
+      subtopic_index: 0,
+      speaker: "Source",
+      text: chunk,
+    })),
+    argument_map: safeChunks.slice(0, 12).map((chunk, i) => ({
+      subtopic_index: 0,
+      speaker: "Source",
+      type: i === 0 ? "claim" : "evidence",
+      content: chunk.slice(0, 500),
+      quote: null,
+      parent_index: i === 0 ? null : 0,
+    })),
+  };
 }
 
 function repairAndParse(raw: string): any {
