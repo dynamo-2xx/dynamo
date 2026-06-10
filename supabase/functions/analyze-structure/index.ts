@@ -88,9 +88,12 @@ serve(async (req) => {
         .map((e) => {
           const subIdx = Number.isInteger(e?.subtopic_index) ? e.subtopic_index : null;
           const subTitle = subIdx !== null && subList[subIdx] ? String(subList[subIdx]) : (e?.subtopic ?? null);
+          const rawSide = safeStr(e?.speaker_side ?? "", 40);
+          const speakerLabel = safeStr(e?.speaker ?? rawSide ?? "Source", 60) || "Source";
+          const sideLower = rawSide ? rawSide.toLowerCase() : "unknown";
           return {
-            speaker: safeStr(e?.speaker ?? "Source", 60),
-            side: "neutral",
+            speaker: speakerLabel,
+            side: sideLower,
             subtopic_title: subTitle,
             text: safeStr(e.text, 1500),
           };
@@ -193,6 +196,9 @@ serve(async (req) => {
     // Group threads + track which thread_ids exist so each gets exactly one anchor.
     const threadIdMap = new Map<string, string>();
     const threadAnchorSeen = new Set<string>();
+    // Remember the last assigned uuid per thread so we can fall back to "previous
+    // unit in the same thread" when the model hallucinates a relates_to ref.
+    const lastUuidByThread = new Map<string, string>();
 
     const rows: any[] = [];
     for (const u of rawUnits) {
@@ -219,9 +225,15 @@ serve(async (req) => {
       }
 
       const relatesRef = u?.relates_to;
-      const relates_to = tag === "ANCHOR"
-        ? null
-        : (typeof relatesRef === "string" && idMap.has(relatesRef) ? idMap.get(relatesRef)! : null);
+      let relates_to: string | null;
+      if (tag === "ANCHOR") {
+        relates_to = null;
+      } else if (typeof relatesRef === "string" && idMap.has(relatesRef)) {
+        relates_to = idMap.get(relatesRef)!;
+      } else {
+        // Hallucinated or missing ref → fall back to the previous unit in this thread.
+        relates_to = lastUuidByThread.get(threadKey) ?? null;
+      }
 
       const anatomy = Array.isArray(u?.anatomy)
         ? u.anatomy
@@ -251,6 +263,7 @@ serve(async (req) => {
         is_standalone_concession: !!u?.is_standalone_concession,
         pass_kind,
       });
+      lastUuidByThread.set(threadKey, id);
     }
 
     // Idempotent replace: clear all prior units for this (session, session_kind).
