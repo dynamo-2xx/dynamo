@@ -10,8 +10,15 @@ const corsHeaders = {
 };
 
 /**
- * Import-to-record (rewritten): standalone imported_records table.
- * Output: { topic, subtopics[], transcript[], argument_map[] } — no sides/queues.
+ * Import-to-record: insert a placeholder row immediately, return its id,
+ * then process in the background while the page subscribes to row updates.
+ *
+ * Stages (progress jsonb):
+ *   fetching   → 5..25   (download / pdf / deepgram)
+ *   outlining  → 25..40  (model produces topic + nested subtopics)
+ *   structuring→ 40..85  (chunked transcript + argument map assembly)
+ *   threading  → 85..95  (analyze-structure → argument_units)
+ *   done       → 100     (status flips to "ready")
  */
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
@@ -61,96 +68,114 @@ async function transcribeWithDeepgram(mediaUrl: string): Promise<string> {
   ).trim();
 }
 
-function structurePrompt(text: string, titleHint?: string) {
-  return `You are restructuring source material into a neutral imported record (no sides, no debate framing).
-Call the structure_imported_record tool exactly once.
-Keep transcript entries concise: 12-28 entries, each <= 700 characters.
-Keep argument_map concise: 8-20 items, each <= 500 characters.
-Preserve direct quotes only when they are short and important.
-Title hint: ${titleHint ?? ""}
-SOURCE:
-${text.slice(0, 20000)}`;
+/* ---------- helpers: chunking + AI calls ---------- */
+
+/** Split text into ~targetChars windows at sentence boundaries. */
+function chunkText(text: string, target = 12000): string[] {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= target) return [clean];
+  const sentences = clean.match(/[^.!?]+[.!?]+\s*|[^.!?]+$/g) ?? [clean];
+  const chunks: string[] = [];
+  let cur = "";
+  for (const s of sentences) {
+    if (cur.length + s.length > target && cur) {
+      chunks.push(cur.trim());
+      cur = s;
+    } else {
+      cur += s;
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim());
+  return chunks;
 }
 
-async function structure(text: string, titleHint?: string) {
+async function callGateway(body: any, label: string) {
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: "You convert source material into structured records. Use only the required tool call; do not write prose." },
-        { role: "user", content: structurePrompt(text, titleHint) },
-      ],
-      tools: [{
-        type: "function",
-        function: {
-          name: "structure_imported_record",
-          description: "Create a neutral imported record from source material.",
-          parameters: {
-            type: "object",
-            properties: {
-              topic: { type: "string", description: "Max 12 words" },
-              subtopics: {
-                type: "array",
-                minItems: 1,
-                maxItems: 4,
-                items: { type: "string" },
-              },
-              transcript: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    subtopic_index: { type: "integer", minimum: 0, maximum: 3 },
-                    speaker: { type: "string" },
-                    text: { type: "string" },
-                  },
-                  required: ["subtopic_index", "speaker", "text"],
-                  additionalProperties: false,
-                },
-              },
-              argument_map: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    subtopic_index: { type: "integer", minimum: 0, maximum: 3 },
-                    speaker: { type: "string" },
-                    type: { type: "string", enum: ["claim", "counter", "stake", "quote", "evidence"] },
-                    content: { type: "string" },
-                    quote: { type: ["string", "null"] },
-                    parent_index: { type: ["integer", "null"] },
-                  },
-                  required: ["subtopic_index", "speaker", "type", "content", "quote", "parent_index"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["topic", "subtopics", "transcript", "argument_map"],
-            additionalProperties: false,
-          },
-        },
-      }],
-      tool_choice: { type: "function", function: { name: "structure_imported_record" } },
-    }),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`AI gateway ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  const message = json.choices?.[0]?.message ?? {};
-  const args = message.tool_calls?.[0]?.function?.arguments;
-  if (args && typeof args !== "string") return { parsed: args, usage: json.usage };
-  const content: string = args || message.content || "";
-  const cleaned = content.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-  try {
-    return { parsed: repairAndParse(cleaned), usage: json.usage };
-  } catch (e) {
-    console.error("import-to-record structure parse fallback:", (e as Error)?.message ?? e);
-    return { parsed: fallbackImportedRecord(text, titleHint), usage: json.usage };
-  }
+  if (!res.ok) throw new Error(`ai_gateway_${res.status}_${label}: ${(await res.text()).slice(0, 300)}`);
+  return await res.json();
+}
+
+/** Phase A — produce nested outline (topic + 2 levels of subtopics). */
+async function outlineSource(text: string, titleHint?: string) {
+  const sample = text.length > 14000
+    ? text.slice(0, 7000) + "\n…[middle elided]…\n" + text.slice(-7000)
+    : text;
+  const json = await callGateway({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: "You read source material and produce a neutral outline. Reply ONLY with valid JSON matching the schema described in the user message." },
+      { role: "user", content: `Source title hint: ${titleHint ?? "(none)"}
+
+Produce a JSON object:
+{
+  "topic": "≤ 12 word neutral title",
+  "subtopics": [
+    { "title": "Top-level subtopic title (≤ 8 words)",
+      "subtopics": [ { "title": "Optional sub-subtopic (≤ 8 words)" }, ... up to 4 ]
+    }, ... 1 to 4 top-level
+  ]
+}
+
+Rules:
+- 1 to 4 top-level subtopics.
+- Break a top-level subtopic into nested sub-subtopics ONLY when the source clearly covers multiple distinct angles inside it. If not, omit "subtopics" or leave it empty.
+- Maximum 2 levels of nesting (no sub-sub-sub).
+- Subtopic titles must be neutral and source-faithful (no debate framing).
+
+SOURCE:
+${sample}` },
+    ],
+    response_format: { type: "json_object" },
+  }, "outline");
+  const content = json.choices?.[0]?.message?.content ?? "{}";
+  return { parsed: repairAndParse(content), usage: json.usage };
+}
+
+/** Phase B — for one chunk, assign turns + argument units to a given flat outline. */
+async function structureChunk(
+  chunk: string,
+  flatSubtopics: Array<{ index: number; title: string; parent_title?: string }>,
+  partIdx: number,
+  partCount: number,
+) {
+  const outlineText = flatSubtopics
+    .map((s) => s.parent_title
+      ? `${s.index}. ${s.parent_title} › ${s.title}`
+      : `${s.index}. ${s.title}`)
+    .join("\n");
+  const json = await callGateway({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: "You restructure source material into a neutral transcript and argument map. Reply ONLY with valid JSON matching the user-provided schema. Preserve every substantive turn; do not abridge speakers." },
+      { role: "user", content: `This is part ${partIdx + 1} of ${partCount} of a longer source. Preserve the full content of THIS part — do not summarize away substantive turns. Each "text" entry may be up to 1500 characters. Quotes should remain verbatim.
+
+OUTLINE (use these indices exactly):
+${outlineText}
+
+Return JSON:
+{
+  "transcript": [
+    { "subtopic_index": <int from outline>, "speaker": "<name or role>", "text": "<verbatim or near-verbatim utterance, ≤ 1500 chars>" }
+  ],
+  "argument_map": [
+    { "subtopic_index": <int from outline>, "speaker": "<name>", "type": "claim|counter|stake|quote|evidence",
+      "content": "<≤ 500 chars>", "quote": "<short verbatim quote or null>", "parent_index": <int index into THIS array, or null> }
+  ]
+}
+
+Aim for fidelity. For this part, emit as many transcript entries as the content requires (typically 8–40 for a ~12k char chunk).
+
+SOURCE PART ${partIdx + 1}/${partCount}:
+${chunk}` },
+    ],
+    response_format: { type: "json_object" },
+  }, `chunk_${partIdx}`);
+  const content = json.choices?.[0]?.message?.content ?? "{}";
+  return { parsed: repairAndParse(content), usage: json.usage };
 }
 
 function fallbackImportedRecord(text: string, titleHint?: string) {
