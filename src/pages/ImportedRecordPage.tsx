@@ -126,7 +126,15 @@ export default function ImportedRecordPage() {
   }, [rec?.id, rec?.user_id, rec?.status, user?.id]);
 
   const subtopics = useMemo(
-    () => (rec?.subtopics ?? []).map((s: any) => ({ id: s.id ?? s.title, title: s.title })),
+    () => {
+      const arr = (rec?.subtopics ?? []).slice();
+      arr.sort((a: any, b: any) => (a?.sort_order ?? 0) - (b?.sort_order ?? 0));
+      return arr.map((s: any) => ({
+        id: s.id ?? s.title,
+        title: s.title,
+        parent_id: s.parent_id ?? null,
+      }));
+    },
     [rec],
   );
 
