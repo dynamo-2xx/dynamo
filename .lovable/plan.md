@@ -1,120 +1,155 @@
-# Performance Analysis v2 — Plan
+# Argument Map Redesign — Two Analyses, Two Displays
 
-Scope: replace the current 4-group / 3-severity annotation system with the new **50-tag polarity** system, wire up the in-session **Insights overlay** per image 1, and delete the now-unused `FloatingIntelligence` bubble. The post-session dashboard is the **next** task and is out of scope here.
+## The mental model
 
-CMM is excluded for v1. Applies to Debate, Live, and Imported records.
+"Argument map" = a dual surface with two tabs that share nothing analytically:
+
+
+| Tab                 | Source                                               | Analysis pass                                  | Purpose                                 |
+| ------------------- | ---------------------------------------------------- | ---------------------------------------------- | --------------------------------------- |
+| **Transcript**      | Pure speaker turns, grouped only by subtopic         | Rhetorical/logical (existing perf annotations) | "How well did I speak?"                 |
+| **Threaded Record** | AI-assembled argument units, threaded by proposition | Structural (new: anatomy + relationship tags)  | "How did the discussion actually move?" |
+
+
+Today the threaded record and transcript are tangled — transcript is fragmented into "threads" and the threaded record uses a thin claim/counter/support/quote/stake type system that doesn't represent real argumentation. This redesign separates them and makes the threaded record honest about the structure of a conversation.
+
+Applies everywhere "argument map" appears: imported records, debate room overlay, debate archive, live session record.
 
 ---
 
-## 1. Tag taxonomy (single source of truth)
+## Part A — Transcript tab (simplify)
 
-New file `src/lib/perf-tags.ts` (also imported by the edge function via a symlinked `supabase/functions/_shared/perf-tags.ts` re-export) containing the 50 tags from the guidelines:
+Strip threading. Render the transcript exactly as spoken, grouped only by subtopic.
 
-```ts
-export type Polarity = "positive" | "negative";
-export type PerfTag = {
-  label: string;          // e.g. "Strong evidence"
-  polarity: Polarity;
-  description: string;    // shown in tooltip
-  guidance: string;       // used in AI prompt + tooltip detail
-  contextual: boolean;    // true = post-session only (needs cross-turn context)
-};
-export const PERF_TAGS: Record<string, PerfTag> = { ... };
+- One collapsible per subtopic, in order.
+- Inside each subtopic: chronological speaker turns. Each turn shows speaker/side, optional timestamp, and the unedited text.
+- Rhetorical/logical analysis (existing `performance_annotations`, `pass_kind = 'rhetoric'`-ish) overlays as inline insight pills on the text — same `<InsightText>` mechanism already wired.
+- No claim/support/counter chips. No parent/child indenting. No round summary.
+
+This is what `tab === "transcript"` becomes — a clean reading view.
+
+---
+
+## Part B — Threaded Record tab (rebuild)
+
+A two-layer structural product:
+
+### B1. Argument unit anatomy (per card)
+
+Each argument unit card renders its internal parts as labeled inline spans:
+
+```
+ARGUMENT
+├ CLAIM          — required, exactly one
+├ GROUNDS        — evidence/data; quotes nested with left-border indent
+├ WARRANT        — logical bridge; if absent → subtle gray "warrant: absent" note
+├ QUALIFIER      — hedge; if absent on a strong claim → subtle gray note
+├ CONCESSION     — speaker's own acknowledgment of limits
+└ REBUTTAL       — pushback on opposing argument
 ```
 
-The exact 50 labels/descriptions/guidance come verbatim from the pasted guidelines.
+A standalone CONCESSION turn (no attached claim) renders as a peer card with a slightly inset style (yield, not advance).
 
-## 2. Database migration
+### B2. Relationship tags (between cards)
 
-Additive — keep existing columns nullable for back-compat, deprecate later.
+Neutral gray connector label between consecutive cards in a thread, taxonomy:
 
-`performance_annotations` new columns:
-- `tag_label text` — one of the 50 tag keys
-- `polarity text` — `'positive' | 'negative'` (CHECK constraint)
-- `cited_entry_ids uuid[]` — other transcript entries this tag cites (context tags)
-- `span_text text` — the exact substring underlined (so we can re-anchor if offsets drift)
+`ANCHOR · SUPPORT · CHALLENGE · COUNTER · EXTENSION · CONCESSION · REFRAME · QUALIFICATION · SYNTHESIS · PIVOT · UNRESOLVED`
 
-Existing `attribute_group`, `sub_attribute`, `severity` become nullable. `pass_kind` stays. Backfill not needed (premium-only, low volume so far).
+Rules:
 
-Index: `(session_id, session_kind, participant_id, pass_kind)`.
+- First unit of every thread = `ANCHOR`.
+- Exactly one tag per non-anchor unit.
+- Connectors are **neutral gray, never color-coded** (color is reserved for the rhetorical analysis).
+- Hover/tap a connector → expands to show the one-sentence `note`.
+- `UNRESOLVED` is post-session only.
 
-RLS: unchanged (still gated via `can_view_debate` / equivalent).
+### B3. Hierarchy
 
-## 3. Edge function rewrite
-
-`supabase/functions/analyze-performance/index.ts` becomes a **dispatcher** on `pass`:
-
-**Live pass** (model: `google/gemini-3-flash-preview`)
-- Input: one argument unit = one transcript entry (skip live segmentation in v1)
-- Single AI call, prompted with the subset of NON-contextual tags
-- Output schema: `{ annotations: [{ tag_label, polarity, span_text, explanation }] }`
-- Writes rows with `pass_kind='live'`, `contextual=false` tags only
-
-**Deep pass** (model: `google/gemini-2.5-pro`) — runs once on session end (already chained off `consolidate-session` via `trigger-deep-perf`)
-- Pass 1 (Segmentation): full transcript → argument units grouped under existing subtopics
-- Pass 2 (Tagging): each unit → tags from the FULL 50 (including contextual, which may produce `cited_entry_ids`)
-- Pass 3 (Threaded summaries): each subtopic → re-generates the existing threaded-record summary with embedded tag references (writes back via existing `analyze-transcript` storage, not a new table)
-- Deletes prior `pass_kind='deep'` rows for the session, inserts fresh ones
-
-Both passes share the tag taxonomy and prompt scaffolding from `_shared/perf-tags.ts`.
-
-## 4. Frontend — toggle relocation
-
-- **Delete** `src/components/insights/FloatingIntelligence.tsx` and remove its mount from `RecordToolsMount` / debate room.
-- Move the toggle into `ArgumentMapOverlay` header next to the "Threaded Record / Transcript" tabs.
-- Toggle state lives in a new `useInsightsOverlay()` hook (session-scoped, default OFF for free, hidden for free).
-- When ON: render the 2 polarity chips (🟢 positive / 🔴 negative) — disabled state if count = 0.
-- When OFF: chips collapse, no underlines, no pills.
-
-## 5. Frontend — overlay rendering
-
-New component `src/components/insights/InsightSpan.tsx`:
-- Wraps a substring of an entry's text
-- Renders `<span>` with underline color = polarity (green / red)
-- After the span: small pill `<TagPill label polarity isPostSession />` with tooltip on hover
-- Post-session deep-pass tags get an amber dot/badge on the pill
-- Tooltip uses Radix Tooltip (already installed), inline in document flow — no fixed positioning
-- Tooltip content: tag label, description, AI explanation, and "Discuss in Dynamo" button (injects quoted block as first user message in DynamoChatPane)
-
-New helper `src/lib/applyInsightSpans.ts` — takes raw entry text + array of annotations (with `span_text`) → returns React fragment array with `InsightSpan` wrappers around matched substrings. Handles overlapping spans by nesting.
-
-Integration points (3 surfaces, identical rendering):
-1. **Live transcript bubble** (`SpeakerBubble.tsx` / `TranscriptPane.tsx`) — streams in via existing `usePerformanceAnnotations` realtime
-2. **Threaded record view** (`ArgumentMapOverlay` threaded tab) — applies to each thread's key-argument summary
-3. **Record archive transcript pane** — same wrapping
-
-Streaming: `usePerformanceAnnotations` already subscribes to inserts; new pills/underlines appear as soon as each row lands (~2-5s after turn ends).
-
-## 6. Speaker name on every entry
-
-Add a subtle speaker name label above (or beside, small + muted) the content of:
-- Every transcript entry bubble (`SpeakerBubble.tsx`) — already shows it, verify styling matches: 0.75rem, `text-muted-foreground`, DM Sans
-- Every threaded-record summary card — currently doesn't show it; add the resolved name via `resolveSpeakerName()` in the threaded card component
-
-Format: small DM Sans text, `text-xs text-muted-foreground/70`, placed directly above the content block, no avatar.
-
-## 7. Cleanup
-
-- Delete `FloatingIntelligence.tsx` and its routes/mounts
-- `PerformanceInsightsToggle.tsx` becomes the new in-overlay toggle (rewritten, kept name)
-- `IntelligencePage.tsx` stays for now (will be replaced when we build the post-session dashboard next)
-- Update `hooks/usePerformanceAnnotations.ts` return type to include new fields
-
-## 8. Out of scope (next task)
-
-- The post-session **Performance Dashboard** at `/intelligence/:kind/:id` — full redesign comes after this lands.
-- CMM integration.
-- Cross-session trends.
+`Topic → Subtopic → Threads → Argument Units (anatomy spans)` — all levels collapsible. Thread summary stays at the bottom of each thread.
 
 ---
 
-## Technical sequence
+## Part C — Backend: two new analysis passes
 
-1. Migration (additive columns + check constraint)
-2. `src/lib/perf-tags.ts` + shared edge function copy
-3. Rewrite `analyze-performance/index.ts` (live + deep dispatch)
-4. New `InsightSpan` + `applyInsightSpans` + `TagPill`
-5. Rewrite `PerformanceInsightsToggle` for in-overlay placement; delete `FloatingIntelligence`
-6. Wire into `ArgumentMapOverlay`, `SpeakerBubble`, threaded-record cards, record-archive transcript
-7. Add speaker name to threaded-record summary cards
-8. Verify streaming on a live session and post-session deep pass overwrite
+### Tables (one new, one columns added)
+
+`**argument_units**` (new) — replaces the role currently played by `arguments` rows on the threaded tab. Keep `arguments` table untouched for now (live-debate authoring still uses it); the post-session structural pass writes into `argument_units`.
+
+```
+session_id, session_kind ('debate'|'cmm'|'live'|'imported')
+subtopic_id (nullable), subtopic_title
+thread_id (uuid, groups units within a thread)
+speaker_label, speaker_side, turn_index
+source_text (the raw passage this unit was assembled from)
+anatomy jsonb           -- [{part, text, note}]
+relationship_tag text   -- enum
+relates_to uuid         -- argument_unit id, null for ANCHOR
+relationship_note text
+is_standalone_concession bool
+created_at
+```
+
+RLS: SELECT gated via `can_view_debate` / `can_view_imported_record` mirroring `performance_annotations`. INSERT denied to clients (edge functions only). GRANTs to authenticated + service_role.
+
+### Edge functions
+
+1. `**analyze-structure**` (new) — given a session's transcript:
+  - Step 1: chunk transcript into argument units (one per coherent move).
+  - Step 2: run **anatomy parsing prompt** per unit (Toulmin parse → `anatomy` jsonb).
+  - Step 3: assign threads by shared proposition (lightweight clustering by anchor claim).
+  - Step 4: run **relationship tagging prompt** per non-anchor unit within its thread.
+  - Delete-then-insert into `argument_units` scoped by `(session_id, session_kind)`.
+2. `**trigger-structure-pass**` (new, mirrors `trigger-deep-perf`) — invoked on record mount and on session completion. Live mode = incremental (no `UNRESOLVED`); post-session = full re-run with `UNRESOLVED` enabled.
+
+Model: `google/gemini-3-flash-preview` via Lovable AI gateway. Same 150s edge-timeout discipline (chunked passages, no Pro model).
+
+Prompts live verbatim from the user's spec in `supabase/functions/_shared/structure-prompts.ts`.
+
+---
+
+## Part D — Frontend changes
+
+- `**ArgumentMapContent.tsx**` — split into two children:
+  - `TranscriptPane.tsx` — subtopic-grouped pure transcript + rhetorical insight overlay.
+  - `ThreadedRecordPane.tsx` — new threaded view consuming `argument_units` (anatomy spans + relationship connectors).
+- `**AnatomyCard.tsx**` (new) — renders one argument unit with labeled part spans and absence diagnostics.
+- `**RelationshipConnector.tsx**` (new) — gray connector between cards with tag label + hover note.
+- `**useArgumentUnits(sessionId, sessionKind)**` (new hook) — fetch + realtime subscribe to `argument_units`.
+- Wire into: `ImportedRecordPage`, `DebateRoomPage` (argument map overlay), `ExploreDebateDetailPage` (archive), `SessionRecordViewV2` (live).
+- Trigger `trigger-structure-pass` on mount (debounced) for any session lacking units, and on session completion.
+
+---
+
+## Part E — Mode switching
+
+Track `{ isLive, sessionComplete }` per session:
+
+- `isLive` → incremental structural pass, `UNRESOLVED` suppressed.
+- `sessionComplete` → full re-pass, `UNRESOLVED` enabled, re-render adds "unresolved — this point was not addressed" badge on flagged cards.
+
+---
+
+## Memory updates
+
+- Update `mem://index.md` Core: definition of "argument map" = dual feature (transcript + threaded record), two analyses (rhetorical vs structural).
+- New `mem://features/argument-map-structure` — taxonomy of anatomy parts + relationship tags + display rules (neutral gray connectors, standalone concession styling, UNRESOLVED is post-session only).
+
+---
+
+## Build order
+
+1. Memory + schema (migration: `argument_units` table, RLS, GRANTs).
+2. `_shared/structure-prompts.ts` + `analyze-structure` + `trigger-structure-pass` edge functions.
+3. `TranscriptPane` (simplify — fastest visible win).
+4. `AnatomyCard` + `RelationshipConnector` + `ThreadedRecordPane` + `useArgumentUnits`.
+5. Wire into all four surfaces (imported, debate overlay, archive, live).
+6. Test on the imported record currently open, then on a completed debate.
+
+## Open questions before I start
+
+1. Should `argument_units` fully replace the `arguments` table for post-session display, or live alongside it (live authoring writes `arguments`, structural pass writes `argument_units`)? My default is the latter — safer.  
+What is the difference? Draw it up for me in html in the chat.
+2. For the imported pass, should structure run automatically on import (alongside rhetorical), or only when the user opens the threaded record tab? Default: auto on import for parity with `trigger-deep-perf`.  
+Auto on import. The argument mpa needs both. That is the full product. Users will be able to view the rhetorical/logical quality of the actual trasncript and view the anatomy of what went down.  
+Also, just for the record: the insights button will trigger the overlay (highlight + tag) above the transcript. there are no insights for the threaded record because it is just a display of the anatomy of the conversation that was had, which is assembled by the criteria that was recently transmitted with its corresponding tags. the tags determine the structure.
