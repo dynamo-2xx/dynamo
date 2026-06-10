@@ -370,6 +370,21 @@ serve(async (req) => {
       });
     }
 
+    // Renumber turn_index within each thread so positions are unique & monotonic.
+    // Sort by the model's original turn_index (stable), then reassign 0..N-1.
+    {
+      const byThread = new Map<string, any[]>();
+      for (const r of rows) {
+        const k = r.thread_id as string;
+        if (!byThread.has(k)) byThread.set(k, []);
+        byThread.get(k)!.push(r);
+      }
+      for (const list of byThread.values()) {
+        list.sort((a, b) => (a.turn_index ?? 0) - (b.turn_index ?? 0));
+        list.forEach((r, i) => { r.turn_index = i; });
+      }
+    }
+
     const { error: insErr } = await supa.from("argument_units").insert(rows);
     if (insErr) {
       console.error("argument_units insert error", insErr);
