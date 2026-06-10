@@ -29,6 +29,8 @@ export interface ArgumentMapEntryInput {
 export interface SubtopicInput {
   id: string;
   title: string;
+  /** When set, this subtopic is nested beneath another subtopic with this id. */
+  parent_id?: string | null;
 }
 
 interface AnalysisEntry {
