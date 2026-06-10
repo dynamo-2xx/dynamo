@@ -8,7 +8,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   buildStructurePrompt,
-  buildStructureTool,
   RELATIONSHIP_TAGS,
 } from "../_shared/structure-prompts.ts";
 
@@ -131,19 +130,20 @@ serve(async (req) => {
 
     const allowUnresolved = pass_kind === "structure_final";
     const systemPrompt = buildStructurePrompt({ allowUnresolved });
-    const tool = buildStructureTool(allowUnresolved);
 
+    // Use plain JSON output instead of strict tool calling — gemini-3-flash-preview
+    // rejects the deeply-nested tool schema with upstream_error. Reliable parse via
+    // response_format: json_object and tolerant extraction below.
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: systemPrompt + `\n\nReply with ONLY a single JSON object: { "units": [ ... ] }. No prose, no code fences.` },
           { role: "user", content: userMsg },
         ],
-        tools: [tool],
-        tool_choice: { type: "function", function: { name: "emit_argument_structure" } },
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -160,24 +160,19 @@ serve(async (req) => {
       const { logAiUsage } = await import("../_shared/usage.ts");
       logAiUsage({
         function_name: "analyze-structure",
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         usage: aiJson.usage,
         session_id,
       } as any);
     } catch (_) {}
 
-    // Tool-call result first; fallback to message content parse.
+    // Tolerant parse of message content.
     let parsed: any = null;
-    const toolCalls = aiJson?.choices?.[0]?.message?.tool_calls;
-    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
-      try { parsed = JSON.parse(toolCalls[0]?.function?.arguments ?? "{}"); } catch (_) {}
-    }
-    if (!parsed) {
-      const content = aiJson?.choices?.[0]?.message?.content ?? "{}";
-      try { parsed = JSON.parse(content); } catch (_) {
-        const m = content.match(/\{[\s\S]*\}/);
-        if (m) { try { parsed = JSON.parse(m[0]); } catch (_) {} }
-      }
+    const content: string = aiJson?.choices?.[0]?.message?.content ?? "{}";
+    const cleaned = content.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+    try { parsed = JSON.parse(cleaned); } catch (_) {
+      const m = cleaned.match(/\{[\s\S]*\}/);
+      if (m) { try { parsed = JSON.parse(m[0]); } catch (_) {} }
     }
 
     const rawUnits: any[] = Array.isArray(parsed?.units) ? parsed.units : [];

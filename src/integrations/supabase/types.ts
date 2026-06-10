@@ -1652,9 +1652,11 @@ export type Database = {
           description: string | null
           id: string
           is_public: boolean
+          progress: Json
           share_token: string | null
           source_kind: string
           source_url: string | null
+          status: string
           subtopics: Json
           title: string
           transcript_entries: Json
@@ -1668,9 +1670,11 @@ export type Database = {
           description?: string | null
           id?: string
           is_public?: boolean
+          progress?: Json
           share_token?: string | null
           source_kind: string
           source_url?: string | null
+          status?: string
           subtopics?: Json
           title: string
           transcript_entries?: Json
@@ -1684,9 +1688,11 @@ export type Database = {
           description?: string | null
           id?: string
           is_public?: boolean
+          progress?: Json
           share_token?: string | null
           source_kind?: string
           source_url?: string | null
+          status?: string
           subtopics?: Json
           title?: string
           transcript_entries?: Json

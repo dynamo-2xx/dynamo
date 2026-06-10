@@ -10,8 +10,15 @@ const corsHeaders = {
 };
 
 /**
- * Import-to-record (rewritten): standalone imported_records table.
- * Output: { topic, subtopics[], transcript[], argument_map[] } — no sides/queues.
+ * Import-to-record: insert a placeholder row immediately, return its id,
+ * then process in the background while the page subscribes to row updates.
+ *
+ * Stages (progress jsonb):
+ *   fetching   → 5..25   (download / pdf / deepgram)
+ *   outlining  → 25..40  (model produces topic + nested subtopics)
+ *   structuring→ 40..85  (chunked transcript + argument map assembly)
+ *   threading  → 85..95  (analyze-structure → argument_units)
+ *   done       → 100     (status flips to "ready")
  */
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
@@ -61,96 +68,114 @@ async function transcribeWithDeepgram(mediaUrl: string): Promise<string> {
   ).trim();
 }
 
-function structurePrompt(text: string, titleHint?: string) {
-  return `You are restructuring source material into a neutral imported record (no sides, no debate framing).
-Call the structure_imported_record tool exactly once.
-Keep transcript entries concise: 12-28 entries, each <= 700 characters.
-Keep argument_map concise: 8-20 items, each <= 500 characters.
-Preserve direct quotes only when they are short and important.
-Title hint: ${titleHint ?? ""}
-SOURCE:
-${text.slice(0, 20000)}`;
+/* ---------- helpers: chunking + AI calls ---------- */
+
+/** Split text into ~targetChars windows at sentence boundaries. */
+function chunkText(text: string, target = 12000): string[] {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= target) return [clean];
+  const sentences = clean.match(/[^.!?]+[.!?]+\s*|[^.!?]+$/g) ?? [clean];
+  const chunks: string[] = [];
+  let cur = "";
+  for (const s of sentences) {
+    if (cur.length + s.length > target && cur) {
+      chunks.push(cur.trim());
+      cur = s;
+    } else {
+      cur += s;
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim());
+  return chunks;
 }
 
-async function structure(text: string, titleHint?: string) {
+async function callGateway(body: any, label: string) {
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: "You convert source material into structured records. Use only the required tool call; do not write prose." },
-        { role: "user", content: structurePrompt(text, titleHint) },
-      ],
-      tools: [{
-        type: "function",
-        function: {
-          name: "structure_imported_record",
-          description: "Create a neutral imported record from source material.",
-          parameters: {
-            type: "object",
-            properties: {
-              topic: { type: "string", description: "Max 12 words" },
-              subtopics: {
-                type: "array",
-                minItems: 1,
-                maxItems: 4,
-                items: { type: "string" },
-              },
-              transcript: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    subtopic_index: { type: "integer", minimum: 0, maximum: 3 },
-                    speaker: { type: "string" },
-                    text: { type: "string" },
-                  },
-                  required: ["subtopic_index", "speaker", "text"],
-                  additionalProperties: false,
-                },
-              },
-              argument_map: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    subtopic_index: { type: "integer", minimum: 0, maximum: 3 },
-                    speaker: { type: "string" },
-                    type: { type: "string", enum: ["claim", "counter", "stake", "quote", "evidence"] },
-                    content: { type: "string" },
-                    quote: { type: ["string", "null"] },
-                    parent_index: { type: ["integer", "null"] },
-                  },
-                  required: ["subtopic_index", "speaker", "type", "content", "quote", "parent_index"],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ["topic", "subtopics", "transcript", "argument_map"],
-            additionalProperties: false,
-          },
-        },
-      }],
-      tool_choice: { type: "function", function: { name: "structure_imported_record" } },
-    }),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`AI gateway ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  const message = json.choices?.[0]?.message ?? {};
-  const args = message.tool_calls?.[0]?.function?.arguments;
-  if (args && typeof args !== "string") return { parsed: args, usage: json.usage };
-  const content: string = args || message.content || "";
-  const cleaned = content.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-  try {
-    return { parsed: repairAndParse(cleaned), usage: json.usage };
-  } catch (e) {
-    console.error("import-to-record structure parse fallback:", (e as Error)?.message ?? e);
-    return { parsed: fallbackImportedRecord(text, titleHint), usage: json.usage };
-  }
+  if (!res.ok) throw new Error(`ai_gateway_${res.status}_${label}: ${(await res.text()).slice(0, 300)}`);
+  return await res.json();
+}
+
+/** Phase A — produce nested outline (topic + 2 levels of subtopics). */
+async function outlineSource(text: string, titleHint?: string) {
+  const sample = text.length > 14000
+    ? text.slice(0, 7000) + "\n…[middle elided]…\n" + text.slice(-7000)
+    : text;
+  const json = await callGateway({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: "You read source material and produce a neutral outline. Reply ONLY with valid JSON matching the schema described in the user message." },
+      { role: "user", content: `Source title hint: ${titleHint ?? "(none)"}
+
+Produce a JSON object:
+{
+  "topic": "≤ 12 word neutral title",
+  "subtopics": [
+    { "title": "Top-level subtopic title (≤ 8 words)",
+      "subtopics": [ { "title": "Optional sub-subtopic (≤ 8 words)" }, ... up to 4 ]
+    }, ... 1 to 4 top-level
+  ]
+}
+
+Rules:
+- 1 to 4 top-level subtopics.
+- Break a top-level subtopic into nested sub-subtopics ONLY when the source clearly covers multiple distinct angles inside it. If not, omit "subtopics" or leave it empty.
+- Maximum 2 levels of nesting (no sub-sub-sub).
+- Subtopic titles must be neutral and source-faithful (no debate framing).
+
+SOURCE:
+${sample}` },
+    ],
+    response_format: { type: "json_object" },
+  }, "outline");
+  const content = json.choices?.[0]?.message?.content ?? "{}";
+  return { parsed: repairAndParse(content), usage: json.usage };
+}
+
+/** Phase B — for one chunk, assign turns + argument units to a given flat outline. */
+async function structureChunk(
+  chunk: string,
+  flatSubtopics: Array<{ index: number; title: string; parent_title?: string }>,
+  partIdx: number,
+  partCount: number,
+) {
+  const outlineText = flatSubtopics
+    .map((s) => s.parent_title
+      ? `${s.index}. ${s.parent_title} › ${s.title}`
+      : `${s.index}. ${s.title}`)
+    .join("\n");
+  const json = await callGateway({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: "You restructure source material into a neutral transcript and argument map. Reply ONLY with valid JSON matching the user-provided schema. Preserve every substantive turn; do not abridge speakers." },
+      { role: "user", content: `This is part ${partIdx + 1} of ${partCount} of a longer source. Preserve the full content of THIS part — do not summarize away substantive turns. Each "text" entry may be up to 1500 characters. Quotes should remain verbatim.
+
+OUTLINE (use these indices exactly):
+${outlineText}
+
+Return JSON:
+{
+  "transcript": [
+    { "subtopic_index": <int from outline>, "speaker": "<name or role>", "text": "<verbatim or near-verbatim utterance, ≤ 1500 chars>" }
+  ],
+  "argument_map": [
+    { "subtopic_index": <int from outline>, "speaker": "<name>", "type": "claim|counter|stake|quote|evidence",
+      "content": "<≤ 500 chars>", "quote": "<short verbatim quote or null>", "parent_index": <int index into THIS array, or null> }
+  ]
+}
+
+Aim for fidelity. For this part, emit as many transcript entries as the content requires (typically 8–40 for a ~12k char chunk).
+
+SOURCE PART ${partIdx + 1}/${partCount}:
+${chunk}` },
+    ],
+    response_format: { type: "json_object" },
+  }, `chunk_${partIdx}`);
+  const content = json.choices?.[0]?.message?.content ?? "{}";
+  return { parsed: repairAndParse(content), usage: json.usage };
 }
 
 function fallbackImportedRecord(text: string, titleHint?: string) {
@@ -238,6 +263,221 @@ function repairAndParse(raw: string): any {
   return JSON.parse(s);
 }
 
+/* ---------- progress helper ---------- */
+
+function progressBody(stage: string, percent: number, message?: string) {
+  return { stage, percent: Math.max(0, Math.min(100, Math.round(percent))), ...(message ? { message } : {}) };
+}
+
+async function setProgress(admin: any, id: string, stage: string, percent: number, message?: string) {
+  try {
+    await admin.from("imported_records").update({
+      progress: progressBody(stage, percent, message),
+    }).eq("id", id);
+  } catch (e) {
+    console.error("setProgress failed", e);
+  }
+}
+
+/* ---------- background pipeline ---------- */
+
+async function runPipeline(
+  admin: any,
+  authHeader: string,
+  recordId: string,
+  userId: string,
+  body: Body,
+) {
+  try {
+    // ----- 1) Acquire text -----
+    await setProgress(admin, recordId, "fetching", 8);
+    let text = "";
+    let sourceUrl: string | null = null;
+    let sourceKind: "url" | "text" | "pdf" | "media" | "article" = "text";
+
+    if (body.kind === "url" && body.source_url) {
+      sourceUrl = body.source_url;
+      const r = await fetch(body.source_url, { headers: { "User-Agent": "DynamoBot/1.0" } });
+      if (!r.ok) throw new Error(`fetch_failed_${r.status}`);
+      const ct = r.headers.get("content-type") ?? "";
+      const isPdf = /\.pdf($|\?)/i.test(body.source_url) || ct.includes("application/pdf");
+      const isMedia = /audio\/|video\//i.test(ct) || /\.(mp3|mp4|m4a|wav|webm|ogg|mov)($|\?)/i.test(body.source_url);
+      if (isPdf) {
+        sourceKind = "pdf";
+        const buf = new Uint8Array(await r.arrayBuffer());
+        const pdf = await getDocumentProxy(buf);
+        const { text: pdfText } = await extractText(pdf, { mergePages: true });
+        text = (Array.isArray(pdfText) ? pdfText.join("\n") : pdfText).replace(/\s+/g, " ").trim();
+      } else if (isMedia) {
+        sourceKind = "media";
+        await setProgress(admin, recordId, "transcribing", 15, "Transcribing audio");
+        text = await transcribeWithDeepgram(body.source_url);
+      } else {
+        sourceKind = "article";
+        text = stripHtml(await r.text());
+      }
+    } else if (body.kind === "text" && body.raw_text) {
+      sourceKind = "text";
+      text = body.raw_text;
+    } else if (body.kind === "pdf_upload" && body.storage_path) {
+      sourceKind = "pdf";
+      const { data: dl, error: dlErr } = await admin.storage.from("imports").download(body.storage_path);
+      if (dlErr || !dl) throw new Error(`pdf_download_failed: ${dlErr?.message ?? "no data"}`);
+      const buf = new Uint8Array(await dl.arrayBuffer());
+      const pdf = await getDocumentProxy(buf);
+      const { text: pdfText } = await extractText(pdf, { mergePages: true });
+      text = (Array.isArray(pdfText) ? pdfText.join("\n") : pdfText).replace(/\s+/g, " ").trim();
+    } else if (body.kind === "media_upload" && body.storage_path) {
+      sourceKind = "media";
+      await setProgress(admin, recordId, "transcribing", 15, "Transcribing audio");
+      const { data: signed, error: signErr } = await admin.storage
+        .from("imports").createSignedUrl(body.storage_path, 60 * 30);
+      if (signErr || !signed?.signedUrl) throw new Error(`sign_url_failed: ${signErr?.message ?? "no url"}`);
+      text = await transcribeWithDeepgram(signed.signedUrl);
+    }
+
+    if (text.length < 200) throw new Error("source_too_short");
+
+    // Persist source kind / url early
+    await admin.from("imported_records").update({
+      source_kind: sourceKind,
+      source_url: sourceUrl,
+    }).eq("id", recordId);
+
+    // ----- 2) Outline (topic + nested subtopics) -----
+    await setProgress(admin, recordId, "outlining", 28, "Identifying topic and subtopics");
+    const outline = await outlineSource(text, body.title_hint);
+    logAiUsage({ function_name: "import-to-record:outline", model: "google/gemini-2.5-flash", usage: outline.usage, user_id: userId });
+
+    const topic = String(outline.parsed?.topic ?? body.title_hint ?? "Imported record").slice(0, 240);
+    type OutlineNode = { title: string; subtopics?: OutlineNode[] };
+    const rawTops: OutlineNode[] = Array.isArray(outline.parsed?.subtopics) ? outline.parsed.subtopics : [];
+    // Flatten DFS with parent linkage. Cap 4 tops × 4 children.
+    const flat: Array<{ id: string; title: string; parent_id: string | null; sort_order: number }> = [];
+    const flatForModel: Array<{ index: number; title: string; parent_title?: string }> = [];
+    let order = 0;
+    const safeTops = (rawTops.length ? rawTops : [{ title: "Main thread" }]).slice(0, 4);
+    for (const top of safeTops) {
+      const topTitle = String(top?.title ?? "Section").slice(0, 200) || "Section";
+      const topId = crypto.randomUUID();
+      flat.push({ id: topId, title: topTitle, parent_id: null, sort_order: order });
+      flatForModel.push({ index: order, title: topTitle });
+      order++;
+      const children = Array.isArray(top?.subtopics) ? top.subtopics.slice(0, 4) : [];
+      for (const ch of children) {
+        const chTitle = String(ch?.title ?? "").slice(0, 200);
+        if (!chTitle) continue;
+        const chId = crypto.randomUUID();
+        flat.push({ id: chId, title: chTitle, parent_id: topId, sort_order: order });
+        flatForModel.push({ index: order, title: chTitle, parent_title: topTitle });
+        order++;
+      }
+    }
+    const subtopicsObj = flat;
+    const titleByIndex = (i: number) => {
+      const idx = Math.max(0, Math.min(flatForModel.length - 1, Number(i) || 0));
+      return flatForModel[idx]?.title ?? flatForModel[0].title;
+    };
+
+    await admin.from("imported_records").update({
+      title: topic,
+      subtopics: subtopicsObj,
+    }).eq("id", recordId);
+
+    // ----- 3) Chunked structuring -----
+    const chunks = chunkText(text, 12000);
+    const allTranscript: any[] = [];
+    const allMap: any[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const pct = 40 + Math.round(((i) / chunks.length) * 45); // 40..85
+      await setProgress(admin, recordId, "structuring", pct,
+        `Building transcript (part ${i + 1} of ${chunks.length})`);
+      let parsed: any = null;
+      try {
+        const r = await structureChunk(chunks[i], flatForModel, i, chunks.length);
+        logAiUsage({ function_name: "import-to-record:chunk", model: "google/gemini-2.5-flash", usage: r.usage, user_id: userId });
+        parsed = r.parsed;
+      } catch (e) {
+        console.error(`chunk ${i} failed, skipping:`, (e as any)?.message ?? e);
+        continue;
+      }
+      const offset = allMap.length;
+      const rawTr: any[] = Array.isArray(parsed?.transcript) ? parsed.transcript : [];
+      const rawMap: any[] = Array.isArray(parsed?.argument_map) ? parsed.argument_map : [];
+      for (const t of rawTr) {
+        allTranscript.push({
+          id: crypto.randomUUID(),
+          speaker_side: String(t?.speaker ?? "Speaker").slice(0, 120),
+          text: String(t?.text ?? "").slice(0, 4000),
+          subtopic: titleByIndex(t?.subtopic_index),
+          timestamp: allTranscript.length,
+        });
+      }
+      for (const a of rawMap) {
+        const parent = a?.parent_index === null || a?.parent_index === undefined
+          ? undefined
+          : Number(a.parent_index) + offset;
+        allMap.push({
+          id: crypto.randomUUID(),
+          type: ["claim", "counter", "stake", "quote", "evidence"].includes(a?.type) ? a.type : "claim",
+          speaker_side: String(a?.speaker ?? "Speaker").slice(0, 120),
+          content: String(a?.content ?? "").slice(0, 2000),
+          quote: a?.quote ? String(a.quote).slice(0, 1000) : undefined,
+          parent_index: parent,
+          subtopic: titleByIndex(a?.subtopic_index),
+          created_at: allMap.length,
+        });
+      }
+      // Persist incrementally so the user can read the transcript as it grows.
+      await admin.from("imported_records").update({
+        transcript_entries: allTranscript,
+        argument_map: allMap,
+      }).eq("id", recordId);
+    }
+
+    if (allTranscript.length === 0) {
+      // Fall back to coarse chunks so the page is not empty.
+      const fb = fallbackImportedRecord(text, body.title_hint);
+      await admin.from("imported_records").update({
+        transcript_entries: fb.transcript.map((t: any, idx: number) => ({
+          id: crypto.randomUUID(),
+          speaker_side: t.speaker, text: t.text,
+          subtopic: flat[0].title, timestamp: idx,
+        })),
+      }).eq("id", recordId);
+    }
+
+    // ----- 4) Threaded record (argument_units) -----
+    await setProgress(admin, recordId, "threading", 88, "Mapping argument threads");
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/analyze-structure`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader },
+        body: JSON.stringify({ session_id: recordId, session_kind: "imported", pass_kind: "structure_final" }),
+      }).then((r) => r.text());
+    } catch (e) { console.error("analyze-structure call failed", e); }
+
+    // ----- 5) Done. Insights (annotations) populate live via realtime. -----
+    await admin.from("imported_records").update({
+      status: "ready",
+      progress: progressBody("done", 100),
+    }).eq("id", recordId);
+
+    // Kick deep-perf for the owner (fire-and-forget).
+    fetch(`${SUPABASE_URL}/functions/v1/trigger-deep-perf`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      body: JSON.stringify({ session_id: recordId, session_kind: "imported" }),
+    }).catch(() => {});
+  } catch (e) {
+    console.error("import pipeline failed", e);
+    await admin.from("imported_records").update({
+      status: "failed",
+      progress: progressBody("failed", 100, String((e as any)?.message ?? e).slice(0, 300)),
+    }).eq("id", recordId);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -256,12 +496,16 @@ serve(async (req) => {
 
     const body = (await req.json()) as Body;
 
+    if (body.kind === "url" && body.source_url && /(youtube\.com|youtu\.be)/i.test(body.source_url)) {
+      return new Response(JSON.stringify({
+        error: "source_kind_unsupported",
+        message: "YouTube URLs aren't supported yet. Upload the audio file instead.",
+      }), { status: 501, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Tier preflight
     const { data: sub } = await supabase
-      .from("subscriptions")
-      .select("tier,status")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      .from("subscriptions").select("tier,status").eq("user_id", user.id).maybeSingle();
     const tier = (sub as { tier?: string } | null)?.tier ?? "free";
     if (tier === "free") {
       return new Response(JSON.stringify({
@@ -270,14 +514,12 @@ serve(async (req) => {
       }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Daily soft cap — 20 imports/24h, counted off imported_records
+    // Daily cap
     {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { count } = await supabase
-        .from("imported_records")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .gte("created_at", since);
+        .from("imported_records").select("id", { count: "exact", head: true })
+        .eq("user_id", user.id).gte("created_at", since);
       if ((count ?? 0) >= 20) {
         return new Response(JSON.stringify({
           error: "daily_cap_reached",
@@ -286,132 +528,42 @@ serve(async (req) => {
       }
     }
 
-    // ----- Acquire text -----
-    let text = "";
-    let sourceUrl: string | null = null;
-    let sourceKind: "url" | "text" | "pdf" | "media" | "article" = "text";
-
-    if (body.kind === "url" && body.source_url) {
-      sourceUrl = body.source_url;
-      if (/(youtube\.com|youtu\.be)/i.test(body.source_url)) {
-        return new Response(JSON.stringify({
-          error: "source_kind_unsupported",
-          message: "YouTube URLs aren't supported yet. Download the audio and upload it instead, or paste a direct .mp3/.mp4 link.",
-        }), { status: 501, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      const r = await fetch(body.source_url, { headers: { "User-Agent": "DynamoBot/1.0" } });
-      if (!r.ok) throw new Error(`fetch_failed_${r.status}`);
-      const contentType = r.headers.get("content-type") ?? "";
-      const isPdf = /\.pdf($|\?)/i.test(body.source_url) || contentType.includes("application/pdf");
-      const isMedia = /audio\/|video\//i.test(contentType) || /\.(mp3|mp4|m4a|wav|webm|ogg|mov)($|\?)/i.test(body.source_url);
-      if (isPdf) {
-        sourceKind = "pdf";
-        const buf = new Uint8Array(await r.arrayBuffer());
-        const pdf = await getDocumentProxy(buf);
-        const { text: pdfText } = await extractText(pdf, { mergePages: true });
-        text = (Array.isArray(pdfText) ? pdfText.join("\n") : pdfText).replace(/\s+/g, " ").trim();
-      } else if (isMedia) {
-        sourceKind = "media";
-        text = await transcribeWithDeepgram(body.source_url);
-      } else {
-        sourceKind = "article";
-        text = stripHtml(await r.text());
-      }
-    } else if (body.kind === "text" && body.raw_text) {
-      text = body.raw_text;
-      sourceKind = "text";
-    } else if (body.kind === "pdf_upload" && body.storage_path) {
-      sourceKind = "pdf";
-      const { data: dl, error: dlErr } = await admin.storage.from("imports").download(body.storage_path);
-      if (dlErr || !dl) throw new Error(`pdf_download_failed: ${dlErr?.message ?? "no data"}`);
-      const buf = new Uint8Array(await dl.arrayBuffer());
-      const pdf = await getDocumentProxy(buf);
-      const { text: pdfText } = await extractText(pdf, { mergePages: true });
-      text = (Array.isArray(pdfText) ? pdfText.join("\n") : pdfText).replace(/\s+/g, " ").trim();
-    } else if (body.kind === "media_upload" && body.storage_path) {
-      sourceKind = "media";
-      const { data: signed, error: signErr } = await admin.storage
-        .from("imports")
-        .createSignedUrl(body.storage_path, 60 * 30);
-      if (signErr || !signed?.signedUrl) throw new Error(`sign_url_failed: ${signErr?.message ?? "no url"}`);
-      text = await transcribeWithDeepgram(signed.signedUrl);
-    } else {
-      return new Response(JSON.stringify({ error: "bad_input" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (text.length < 200) {
-      return new Response(JSON.stringify({
-        error: "source_too_short",
-        message: "Source produced too little text to structure (need ~200+ chars).",
-      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const { parsed, usage } = await structure(text, body.title_hint);
-    logAiUsage({
-      function_name: "import-to-record",
-      model: "google/gemini-2.5-flash",
-      usage,
-      user_id: user.id,
-    });
-
-    const title = String(parsed.topic ?? body.title_hint ?? "Imported record").slice(0, 240);
-    const subtopicTitles: string[] = Array.isArray(parsed.subtopics) && parsed.subtopics.length
-      ? parsed.subtopics.slice(0, 4).map((s: any) => String(s).slice(0, 200))
-      : ["Main thread"];
-    const subtopicsObj = subtopicTitles.map((t: string, i: number) => ({
-      id: crypto.randomUUID(),
-      title: t,
-      sort_order: i,
-    }));
-    const titleByIndex = (i: number) =>
-      subtopicsObj[Math.min(Math.max(Number(i) || 0, 0), subtopicsObj.length - 1)].title;
-
-    const rawTranscript: any[] = Array.isArray(parsed.transcript) ? parsed.transcript : [];
-    const transcript_entries = rawTranscript.map((t: any, i: number) => ({
-      id: crypto.randomUUID(),
-      speaker_side: String(t.speaker ?? "Speaker").slice(0, 120),
-      text: String(t.text ?? "").slice(0, 4000),
-      subtopic: titleByIndex(t.subtopic_index),
-      timestamp: i,
-    }));
-
-    const rawMap: any[] = Array.isArray(parsed.argument_map) ? parsed.argument_map : [];
-    const argument_map = rawMap.map((a: any, i: number) => ({
-      id: crypto.randomUUID(),
-      type: ["claim", "counter", "stake", "quote", "evidence"].includes(a.type) ? a.type : "claim",
-      speaker_side: String(a.speaker ?? "Speaker").slice(0, 120),
-      content: String(a.content ?? "").slice(0, 2000),
-      quote: a.quote ? String(a.quote).slice(0, 1000) : undefined,
-      parent_index: a.parent_index === null || a.parent_index === undefined ? undefined : Number(a.parent_index),
-      subtopic: titleByIndex(a.subtopic_index),
-      created_at: i,
-    }));
-
+    // Insert placeholder row immediately so the user can navigate to it.
+    const placeholderKind: "url" | "text" | "pdf" | "media" | "article" =
+      body.kind === "url" ? "url"
+      : body.kind === "pdf_upload" ? "pdf"
+      : body.kind === "media_upload" ? "media"
+      : "text";
+    const placeholderTitle = (body.title_hint ?? "Importing…").slice(0, 240);
     const { data: row, error: insErr } = await admin
       .from("imported_records")
       .insert({
         user_id: user.id,
-        title,
+        title: placeholderTitle,
         description: body.title_hint ?? null,
-        source_kind: sourceKind,
-        source_url: sourceUrl,
-        subtopics: subtopicsObj,
-        transcript_entries,
-        argument_map,
+        source_kind: placeholderKind,
+        source_url: body.kind === "url" ? body.source_url ?? null : null,
+        subtopics: [],
+        transcript_entries: [],
+        argument_map: [],
         is_public: false,
+        status: "processing",
+        progress: progressBody("fetching", 3, "Starting…"),
       })
       .select("id")
       .single();
     if (insErr) throw insErr;
 
     admin.rpc("increment_usage", { _user_id: user.id, _metric: "sessions_created" })
-      .then(({ error }: { error: { message: string } | null }) => {
-        if (error) console.error("import quota inc failed", error.message);
-      });
+      .then(({ error }: { error: any }) => { if (error) console.error("import quota inc failed", error.message); });
 
-    return new Response(JSON.stringify({ imported_record_id: row.id }), {
+    // Kick the pipeline in the background; respond immediately.
+    const bg = runPipeline(admin, authHeader, row.id, user.id, body);
+    // @ts-ignore EdgeRuntime is provided by Supabase edge runtime
+    try { (globalThis as any).EdgeRuntime?.waitUntil?.(bg); } catch (_) {}
+
+    return new Response(JSON.stringify({ imported_record_id: row.id, status: "processing" }), {
+      status: 202,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

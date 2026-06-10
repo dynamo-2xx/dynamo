@@ -12,6 +12,43 @@ import { InsightsProvider } from "@/contexts/InsightsContext";
 import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import { useAuth } from "@/contexts/AuthContext";
 
+function ImportProgressBar({ progress }: { progress?: { stage?: string; percent?: number; message?: string } | null }) {
+  const pct = Math.max(3, Math.min(100, Math.round(progress?.percent ?? 5)));
+  const stage = progress?.stage ?? "starting";
+  const label = progress?.message ?? stageLabel(stage);
+  return (
+    <div className="mb-4 rounded-lg border border-foreground/10 bg-background/60 px-3 py-2.5">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground font-body mb-1.5">
+        <span>Preparing your record</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="h-1.5 bg-foreground/10 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-foreground transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-1.5 text-xs text-foreground/70 font-body">{label}</p>
+      <p className="mt-0.5 text-[10px] text-muted-foreground font-body">
+        You can stay on this page — the transcript and argument map fill in as they're ready.
+      </p>
+    </div>
+  );
+}
+
+function stageLabel(stage: string): string {
+  switch (stage) {
+    case "fetching":    return "Fetching the source…";
+    case "transcribing":return "Transcribing the audio…";
+    case "outlining":   return "Identifying the topic and subtopics…";
+    case "structuring": return "Building the transcript…";
+    case "threading":   return "Mapping the argument threads…";
+    case "done":        return "Done.";
+    case "failed":      return "Something went wrong.";
+    default:            return "Starting…";
+  }
+}
+
 interface ImportedRecord {
   id: string;
   user_id: string;
@@ -24,6 +61,8 @@ interface ImportedRecord {
   argument_map: any[];
   is_public: boolean;
   created_at: string;
+  status?: "processing" | "ready" | "failed";
+  progress?: { stage?: string; percent?: number; message?: string } | null;
 }
 
 const SOURCE_ICON: Record<string, typeof Link2> = {
@@ -58,23 +97,33 @@ export default function ImportedRecordPage() {
       setRec(data as unknown as ImportedRecord);
       setLoading(false);
     })();
-    return () => { cancelled = true; };
+    // Subscribe to live updates so the progress bar reflects the pipeline.
+    const ch = supabase
+      .channel(`imported_records:${id}`)
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "imported_records", filter: `id=eq.${id}` },
+        (payload) => {
+          if (cancelled) return;
+          setRec((prev) => ({ ...(prev as any), ...(payload.new as any) }) as ImportedRecord);
+        })
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(ch); };
   }, [id, navigate]);
 
-  // §21 Performance Intelligence — fire deep pass once the record is loaded
-  // and the viewer is the owner. Idempotent server-side.
+  // §21 Performance Intelligence — fire deep pass once processing is complete
+  // (the importer also kicks it; this covers older records). Idempotent.
   useEffect(() => {
     if (!rec || !user?.id || rec.user_id !== user.id) return;
+    if (rec.status && rec.status !== "ready") return;
     supabase.functions
       .invoke("trigger-deep-perf", { body: { session_id: rec.id, session_kind: "imported" } })
       .catch(() => {});
-    // Structural pass for the Threaded Record tab. Final pass (UNRESOLVED enabled).
     supabase.functions
       .invoke("trigger-structure-pass", {
         body: { session_id: rec.id, session_kind: "imported", pass_kind: "structure_final" },
       })
       .catch(() => {});
-  }, [rec?.id, rec?.user_id, user?.id]);
+  }, [rec?.id, rec?.user_id, rec?.status, user?.id]);
 
   const subtopics = useMemo(
     () => (rec?.subtopics ?? []).map((s: any) => ({ id: s.id ?? s.title, title: s.title })),
@@ -107,6 +156,14 @@ export default function ImportedRecordPage() {
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-body">Imported record</span>
         </div>
         <h1 className="text-3xl font-serif text-foreground leading-tight mb-2">{rec.title}</h1>
+        {rec.status === "processing" && (
+          <ImportProgressBar progress={rec.progress} />
+        )}
+        {rec.status === "failed" && (
+          <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs font-body text-rose-700 dark:text-rose-300">
+            Import failed{rec.progress?.message ? `: ${rec.progress.message}` : "."} Try a different source.
+          </div>
+        )}
         <div className="flex items-center gap-3 text-xs text-muted-foreground font-body mb-6">
           <span className="inline-flex items-center gap-1">
             <SourceIcon className="w-3.5 h-3.5" /> {rec.source_kind}
