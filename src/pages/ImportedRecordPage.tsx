@@ -140,6 +140,9 @@ export default function ImportedRecordPage() {
           subtopics={subtopics}
           transcriptEntries={rec.transcript_entries as any}
           argumentMap={rec.argument_map as any}
+          sessionId={rec.id}
+          sessionKind="imported"
+          sessionComplete
         />
 
         <div className="mt-8 pt-6 border-t border-foreground/10">
