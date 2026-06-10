@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInsights } from "@/contexts/InsightsContext";
 import { getPerfTag, POLARITY_STYLES, type Polarity } from "@/lib/perf-tags";
@@ -87,14 +87,26 @@ const InsightMark = ({ ann, children }: { ann: PerfAnnotation; children: React.R
   const styles = POLARITY_STYLES[polarity];
   const isDeep = ann.pass_kind === "deep";
   const tag = getPerfTag(ann.tag_label);
+  const [pinned, setPinned] = useState(false);
 
   return (
-    <Tooltip>
+    <Tooltip open={pinned ? true : undefined}>
       <TooltipTrigger asChild>
-        <span className="inline">
+        <span
+          className="inline"
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); setPinned((p) => !p); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setPinned((p) => !p);
+            }
+          }}
+        >
           <span className={`${styles.underline} cursor-help`}>{children}</span>
           <span
-            className={`mx-1 inline-flex items-center gap-1 align-baseline rounded-full border px-1.5 py-0 text-[10px] font-medium leading-tight ${styles.pillBg} ${styles.pillText} cursor-help`}
+            className={`mx-1 inline-flex items-center gap-1 align-baseline rounded-full border px-1.5 py-0 text-[10px] font-medium leading-tight ${styles.pillBg} ${styles.pillText} cursor-help ${pinned ? "ring-1 ring-foreground/25" : ""}`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${styles.dot}`} />
             {ann.tag_label}
@@ -112,6 +124,9 @@ const InsightMark = ({ ann, children }: { ann: PerfAnnotation; children: React.R
           <div className="mt-1.5 pt-1.5 border-t border-border/40 text-[11px] opacity-80">{tag.guidance}</div>
         )}
         {isDeep && <div className="mt-1 text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">Post-session</div>}
+        {pinned && (
+          <div className="mt-1 text-[10px] uppercase tracking-wide opacity-60">Click to unpin</div>
+        )}
       </TooltipContent>
     </Tooltip>
   );
