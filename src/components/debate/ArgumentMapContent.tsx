@@ -234,6 +234,30 @@ const ArgumentMapContent = ({
           .filter(Boolean)
           .map((title) => ({ id: title, title }));
 
+  // Order subtopics depth-first so children render directly under their parents,
+  // and compute a depth (0 = top-level, 1 = nested) for indentation.
+  const orderedSubtopics: Array<SubtopicInput & { depth: number; displayIndex: string }> = (() => {
+    const byParent = new Map<string | null, SubtopicInput[]>();
+    for (const s of subtopicList) {
+      const p = (s.parent_id ?? null) as string | null;
+      // Treat any parent_id that doesn't resolve to a known id as a root.
+      const known = p && subtopicList.some((x) => x.id === p) ? p : null;
+      if (!byParent.has(known)) byParent.set(known, []);
+      byParent.get(known)!.push(s);
+    }
+    const out: Array<SubtopicInput & { depth: number; displayIndex: string }> = [];
+    const walk = (parent: string | null, depth: number, prefix: string) => {
+      const kids = byParent.get(parent) ?? [];
+      kids.forEach((s, i) => {
+        const idx = prefix ? `${prefix}.${i + 1}` : `${i + 1}`;
+        out.push({ ...s, depth, displayIndex: idx });
+        walk(s.id, depth + 1, idx);
+      });
+    };
+    walk(null, 0, "");
+    return out.length > 0 ? out : subtopicList.map((s, i) => ({ ...s, depth: 0, displayIndex: `${i + 1}` }));
+  })();
+
   if (tab === "threaded") {
     // New structural pane: anatomy + relationship tags from argument_units.
     if (sessionId && sessionKind) {
@@ -384,20 +408,21 @@ const ArgumentMapContent = ({
   // Transcript tab — collapsible per subtopic.
   return (
     <div className={`${padding} space-y-2`} data-annotatable>
-      {subtopicList.length === 0 ? (
+      {orderedSubtopics.length === 0 ? (
         <p className="text-xs italic text-muted-foreground py-4 text-center">
           No transcript yet. Entries appear here as the debate progresses.
         </p>
       ) : (
-        subtopicList.map((st, idx) => {
+        orderedSubtopics.map((st, idx) => {
           const stEntries = transcriptEntries
             .filter((e) => e.subtopic === st.title)
             .sort((a, b) => a.timestamp - b.timestamp);
+          const indentClass = st.depth > 0 ? "ml-4" : "";
           return (
-            <Collapsible key={st.id} defaultOpen={idx === 0}>
+            <Collapsible key={st.id} defaultOpen={idx === 0} className={indentClass}>
               <CollapsibleTrigger className="w-full flex items-center justify-between border border-foreground/10 rounded-lg px-3 py-2 bg-background/40 hover:bg-background/60 transition-colors">
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-body">
-                  {idx + 1}. {st.title}
+                  {st.depth > 0 ? "↳ " : ""}{st.displayIndex}. {st.title}
                 </p>
                 <span className="flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground">{stEntries.length}</span>
