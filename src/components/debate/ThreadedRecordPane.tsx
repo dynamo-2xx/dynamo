@@ -15,38 +15,50 @@ interface ThreadedRecordPaneProps {
   inline?: boolean;
 }
 
-const PART_LABEL_CLASS: Record<string, string> = {
-  CLAIM: "bg-foreground/8 text-foreground/80",
-  GROUNDS: "bg-foreground/5 text-foreground/70",
-  WARRANT: "bg-foreground/5 text-foreground/70",
-  QUALIFIER: "bg-foreground/5 text-foreground/60",
-  CONCESSION: "bg-foreground/5 text-foreground/60",
-  REBUTTAL: "bg-foreground/5 text-foreground/70",
-};
+/** Order parts in a reading-friendly flow regardless of model emission order. */
+const PART_ORDER = ["CLAIM", "GROUNDS", "WARRANT", "QUALIFIER", "CONCESSION", "REBUTTAL"] as const;
 
-function AnatomyPart({ part, text, note }: { part: string; text: string; note?: string }) {
-  const absent = !text || !text.trim();
-  if (absent && note) {
-    return (
-      <div className="text-[10px] italic text-muted-foreground/70 font-body py-0.5">
-        {note}
-      </div>
-    );
-  }
-  if (absent) return null;
-  const isQuote = (text.startsWith("\"") && text.endsWith("\"")) || part === "GROUNDS" && /^["“'][\s\S]*["”']$/.test(text.trim());
+function InlineAnatomyParagraph({
+  anatomy,
+}: {
+  anatomy: Array<{ part: string; text: string; note?: string }>;
+}) {
+  // Split present (has text) vs. absent (note-only diagnostic).
+  const present = anatomy.filter((p) => p.text && p.text.trim().length > 0);
+  const absent = anatomy.filter((p) => (!p.text || !p.text.trim()) && p.note);
+
+  // Sort present parts by canonical reading order, keeping unknown parts at the end.
+  const sorted = [...present].sort((a, b) => {
+    const ai = PART_ORDER.indexOf(a.part as any);
+    const bi = PART_ORDER.indexOf(b.part as any);
+    return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+  });
+
   return (
-    <div className="flex items-start gap-2 py-0.5">
-      <span className={`shrink-0 text-[9px] uppercase tracking-widest font-semibold px-1.5 py-0.5 rounded ${PART_LABEL_CLASS[part] ?? "bg-foreground/5 text-foreground/60"}`}>
-        {part}
-      </span>
-      <p
-        className={`text-xs text-foreground font-body leading-relaxed flex-1 ${
-          isQuote ? "border-l-2 border-foreground/15 pl-2 italic text-foreground/85" : ""
-        }`}
-      >
-        {text}
+    <div className="space-y-1.5">
+      <p className="text-xs text-foreground font-body leading-relaxed">
+        {sorted.map((p, i) => (
+          <span key={i} className="inline">
+            {i > 0 ? " " : null}
+            <span className="inline">{p.text}</span>
+            <span
+              className="mx-1 inline-flex items-center align-baseline rounded-full border border-foreground/10 bg-foreground/[0.04] px-1.5 py-0 text-[10px] font-medium leading-tight text-foreground/55 cursor-help"
+              title={p.note ?? p.part}
+            >
+              {p.part.toLowerCase()}
+            </span>
+          </span>
+        ))}
       </p>
+      {absent.length > 0 && (
+        <div className="space-y-0.5">
+          {absent.map((p, i) => (
+            <p key={i} className="text-[10px] italic text-muted-foreground/70 font-body">
+              {p.note}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -71,17 +83,13 @@ function AnatomyCard({ unit }: { unit: ArgumentUnit }) {
           </span>
         )}
       </div>
-      <div className="space-y-0.5">
-        {unit.anatomy.length === 0 ? (
-          <p className="text-xs text-foreground/80 font-body leading-relaxed whitespace-pre-wrap">
-            {unit.source_text}
-          </p>
-        ) : (
-          unit.anatomy.map((p, i) => (
-            <AnatomyPart key={i} part={p.part} text={p.text} note={p.note} />
-          ))
-        )}
-      </div>
+      {unit.anatomy.length === 0 ? (
+        <p className="text-xs text-foreground/80 font-body leading-relaxed whitespace-pre-wrap">
+          {unit.source_text}
+        </p>
+      ) : (
+        <InlineAnatomyParagraph anatomy={unit.anatomy} />
+      )}
       {unit.relationship_tag === "UNRESOLVED" && (
         <p className="mt-1.5 text-[10px] italic text-muted-foreground/80 font-body">
           unresolved — this point was not addressed.

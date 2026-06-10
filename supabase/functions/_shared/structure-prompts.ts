@@ -59,6 +59,13 @@ A thread is the set of units that all engage with the same proposition. The firs
 - thread_id is a stable string label you invent ("t1", "t2", ...). Use the same label for every unit in the same thread.
 - turn_index is the position of the unit within its thread, starting at 0 for the anchor.
 
+THREADING DISCIPLINE — read carefully:
+- Threads should be LONG, not short. A typical debate has 2–6 threads total, each containing many back-and-forth units. Do NOT default to "one unit per thread."
+- ANCHORs should be RARE. Only the very first unit of a genuinely new proposition is ANCHOR. If a unit engages, contests, qualifies, or extends an existing proposition in any way, it belongs in that thread with a non-ANCHOR tag.
+- Target: roughly 70%+ of all units should be non-ANCHOR. If you find yourself emitting many ANCHORs, you are over-fragmenting — merge into existing threads.
+- Coverage matters: aim to convert most substantive transcript turns into units. Skip only pure pleasantries, procedural housekeeping, or pure restatement.
+- speaker_side is provided in the input (e.g. "for", "against", "kennedy", "nixon"). Use it to detect who is replying to whom: when speakers alternate inside one subtopic, that is almost always one continuing thread, not two parallel threads.
+
 ## RELATIONSHIP TAGS (exactly one per unit)
 The first unit of each thread is ANCHOR (relates_to = null).
 Every other unit gets exactly one of the tags below. Read the FULL thread before choosing — earlier context changes what a later unit is doing.
