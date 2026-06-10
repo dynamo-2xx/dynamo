@@ -78,6 +78,10 @@ Every other unit gets exactly one of the tags below. Read the FULL thread before
 - CONCESSION: speaker openly yields a point to the opposing side ("you're right that..."). Distinct from QUALIFICATION (which refines speaker's OWN prior claim).
 - REFRAME: repositions the terms/scope/focus. Says "this isn't an X problem, it's a Y problem" without conceding or directly countering.
 - QUALIFICATION: same speaker narrows their OWN prior claim under pressure. No ground yielded to the opponent.
+
+TAG-SELECTION DISCIPLINE:
+- SUPPORT requires the current speaker to be reinforcing a DIFFERENT speaker's prior unit on the same side. If the current speaker (or the same side) is defending or narrowing their OWN earlier position after a CHALLENGE/COUNTER, prefer QUALIFICATION over SUPPORT — even if the language sounds affirmative. SUPPORT is for cross-speaker reinforcement; QUALIFICATION is for same-side self-defense under pressure.
+- A unit is QUALIFICATION when the speaker_side matches the side of the unit being qualified AND that unit is being narrowed, scoped, or defended in response to opposing pressure earlier in the thread.
 - SYNTHESIS: draws together two or more prior positions (often opposing) into a new claim that incorporates both.
 - PIVOT: shifts to a different aspect of the topic without explicitly engaging the prior unit.${opts.allowUnresolved ? `
 - UNRESOLVED: post-session only. The unit raised a claim/question/challenge that subsequent units never addressed.` : ""}
@@ -102,6 +106,11 @@ Return a JSON object with one field "units" — an array. Each element:
   "relationship_note": "one sentence",
   "is_standalone_concession": false
 }
+
+## FILLER vs SUBSTANCE
+Filler is welcome to be skipped, but anything substantive must be captured. A turn is FILLER only if it is one of: pure pleasantry, procedural housekeeping ("we'll come back to that", "next question"), pure restatement with no new framing, or content-free agreement ("right", "exactly"). Everything else — qualifications, examples, redirections, even short rebuttals — is SUBSTANCE and must become a unit (extending an existing thread when possible).
+
+COVERAGE TARGET: At least 70% of non-filler turns must become units. Under-coverage is a worse failure than over-merging — when in doubt, attach the turn to the nearest live thread with the closest-fitting tag rather than drop it.
 
 Cap the output at 60 units total. Prefer fidelity over completeness — if the transcript is huge, prioritize the most substantive units.`;
 }
