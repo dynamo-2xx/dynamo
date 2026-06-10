@@ -24,6 +24,8 @@ interface ImportedRecord {
   argument_map: any[];
   is_public: boolean;
   created_at: string;
+  status?: "processing" | "ready" | "failed";
+  progress?: { stage?: string; percent?: number; message?: string } | null;
 }
 
 const SOURCE_ICON: Record<string, typeof Link2> = {
@@ -58,23 +60,33 @@ export default function ImportedRecordPage() {
       setRec(data as unknown as ImportedRecord);
       setLoading(false);
     })();
-    return () => { cancelled = true; };
+    // Subscribe to live updates so the progress bar reflects the pipeline.
+    const ch = supabase
+      .channel(`imported_records:${id}`)
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "imported_records", filter: `id=eq.${id}` },
+        (payload) => {
+          if (cancelled) return;
+          setRec((prev) => ({ ...(prev as any), ...(payload.new as any) }) as ImportedRecord);
+        })
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(ch); };
   }, [id, navigate]);
 
-  // §21 Performance Intelligence — fire deep pass once the record is loaded
-  // and the viewer is the owner. Idempotent server-side.
+  // §21 Performance Intelligence — fire deep pass once processing is complete
+  // (the importer also kicks it; this covers older records). Idempotent.
   useEffect(() => {
     if (!rec || !user?.id || rec.user_id !== user.id) return;
+    if (rec.status && rec.status !== "ready") return;
     supabase.functions
       .invoke("trigger-deep-perf", { body: { session_id: rec.id, session_kind: "imported" } })
       .catch(() => {});
-    // Structural pass for the Threaded Record tab. Final pass (UNRESOLVED enabled).
     supabase.functions
       .invoke("trigger-structure-pass", {
         body: { session_id: rec.id, session_kind: "imported", pass_kind: "structure_final" },
       })
       .catch(() => {});
-  }, [rec?.id, rec?.user_id, user?.id]);
+  }, [rec?.id, rec?.user_id, rec?.status, user?.id]);
 
   const subtopics = useMemo(
     () => (rec?.subtopics ?? []).map((s: any) => ({ id: s.id ?? s.title, title: s.title })),
@@ -107,6 +119,14 @@ export default function ImportedRecordPage() {
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-body">Imported record</span>
         </div>
         <h1 className="text-3xl font-serif text-foreground leading-tight mb-2">{rec.title}</h1>
+        {rec.status === "processing" && (
+          <ImportProgressBar progress={rec.progress} />
+        )}
+        {rec.status === "failed" && (
+          <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs font-body text-rose-700 dark:text-rose-300">
+            Import failed{rec.progress?.message ? `: ${rec.progress.message}` : "."} Try a different source.
+          </div>
+        )}
         <div className="flex items-center gap-3 text-xs text-muted-foreground font-body mb-6">
           <span className="inline-flex items-center gap-1">
             <SourceIcon className="w-3.5 h-3.5" /> {rec.source_kind}
