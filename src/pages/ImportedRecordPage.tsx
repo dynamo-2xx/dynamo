@@ -12,6 +12,43 @@ import { InsightsProvider } from "@/contexts/InsightsContext";
 import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import { useAuth } from "@/contexts/AuthContext";
 
+function ImportProgressBar({ progress }: { progress?: { stage?: string; percent?: number; message?: string } | null }) {
+  const pct = Math.max(3, Math.min(100, Math.round(progress?.percent ?? 5)));
+  const stage = progress?.stage ?? "starting";
+  const label = progress?.message ?? stageLabel(stage);
+  return (
+    <div className="mb-4 rounded-lg border border-foreground/10 bg-background/60 px-3 py-2.5">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground font-body mb-1.5">
+        <span>Preparing your record</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="h-1.5 bg-foreground/10 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-foreground transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-1.5 text-xs text-foreground/70 font-body">{label}</p>
+      <p className="mt-0.5 text-[10px] text-muted-foreground font-body">
+        You can stay on this page — the transcript and argument map fill in as they're ready.
+      </p>
+    </div>
+  );
+}
+
+function stageLabel(stage: string): string {
+  switch (stage) {
+    case "fetching":    return "Fetching the source…";
+    case "transcribing":return "Transcribing the audio…";
+    case "outlining":   return "Identifying the topic and subtopics…";
+    case "structuring": return "Building the transcript…";
+    case "threading":   return "Mapping the argument threads…";
+    case "done":        return "Done.";
+    case "failed":      return "Something went wrong.";
+    default:            return "Starting…";
+  }
+}
+
 interface ImportedRecord {
   id: string;
   user_id: string;
