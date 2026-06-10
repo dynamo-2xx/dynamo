@@ -50,6 +50,77 @@ export type Database = {
         }
         Relationships: []
       }
+      argument_units: {
+        Row: {
+          anatomy: Json
+          created_at: string
+          id: string
+          is_standalone_concession: boolean
+          pass_kind: string
+          relates_to: string | null
+          relationship_note: string | null
+          relationship_tag: string
+          session_id: string
+          session_kind: string
+          source_text: string
+          speaker_label: string | null
+          speaker_side: string | null
+          subtopic_id: string | null
+          subtopic_title: string | null
+          thread_id: string
+          turn_index: number
+          updated_at: string
+        }
+        Insert: {
+          anatomy?: Json
+          created_at?: string
+          id?: string
+          is_standalone_concession?: boolean
+          pass_kind?: string
+          relates_to?: string | null
+          relationship_note?: string | null
+          relationship_tag: string
+          session_id: string
+          session_kind: string
+          source_text: string
+          speaker_label?: string | null
+          speaker_side?: string | null
+          subtopic_id?: string | null
+          subtopic_title?: string | null
+          thread_id: string
+          turn_index?: number
+          updated_at?: string
+        }
+        Update: {
+          anatomy?: Json
+          created_at?: string
+          id?: string
+          is_standalone_concession?: boolean
+          pass_kind?: string
+          relates_to?: string | null
+          relationship_note?: string | null
+          relationship_tag?: string
+          session_id?: string
+          session_kind?: string
+          source_text?: string
+          speaker_label?: string | null
+          speaker_side?: string | null
+          subtopic_id?: string | null
+          subtopic_title?: string | null
+          thread_id?: string
+          turn_index?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "argument_units_relates_to_fkey"
+            columns: ["relates_to"]
+            isOneToOne: false
+            referencedRelation: "argument_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       arguments: {
         Row: {
           argument_type: string

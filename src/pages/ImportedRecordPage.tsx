@@ -68,6 +68,12 @@ export default function ImportedRecordPage() {
     supabase.functions
       .invoke("trigger-deep-perf", { body: { session_id: rec.id, session_kind: "imported" } })
       .catch(() => {});
+    // Structural pass for the Threaded Record tab. Final pass (UNRESOLVED enabled).
+    supabase.functions
+      .invoke("trigger-structure-pass", {
+        body: { session_id: rec.id, session_kind: "imported", pass_kind: "structure_final" },
+      })
+      .catch(() => {});
   }, [rec?.id, rec?.user_id, user?.id]);
 
   const subtopics = useMemo(
@@ -140,6 +146,9 @@ export default function ImportedRecordPage() {
           subtopics={subtopics}
           transcriptEntries={rec.transcript_entries as any}
           argumentMap={rec.argument_map as any}
+          sessionId={rec.id}
+          sessionKind="imported"
+          sessionComplete
         />
 
         <div className="mt-8 pt-6 border-t border-foreground/10">

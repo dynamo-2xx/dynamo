@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronDown, Pencil, Check, X, RotateCcw } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import InsightText from "@/components/insights/InsightText";
+import ThreadedRecordPane from "@/components/debate/ThreadedRecordPane";
 
 export interface TranscriptEntryInput {
   id: string;
@@ -49,6 +50,12 @@ interface ArgumentMapContentProps {
   editable?: boolean;
   onEditEntry?: (id: string, newContent: string) => void | Promise<void>;
   onRevertEntry?: (id: string) => void | Promise<void>;
+  /** When provided, the threaded tab renders the new structural pane backed
+   *  by `argument_units` instead of the legacy claim/counter buckets. */
+  sessionId?: string;
+  sessionKind?: "debate" | "cmm" | "live" | "imported";
+  /** Force the post-session structural pass (enables UNRESOLVED). */
+  sessionComplete?: boolean;
 }
 
 const typeChipColor = (t: string) => {
@@ -206,6 +213,9 @@ const ArgumentMapContent = ({
   editable = false,
   onEditEntry,
   onRevertEntry,
+  sessionId,
+  sessionKind,
+  sessionComplete = false,
 }: ArgumentMapContentProps) => {
   const padding = inline ? "" : "px-3 py-3";
 
@@ -223,6 +233,20 @@ const ArgumentMapContent = ({
           .map((title) => ({ id: title, title }));
 
   if (tab === "threaded") {
+    // New structural pane: anatomy + relationship tags from argument_units.
+    if (sessionId && sessionKind) {
+      return (
+        <ThreadedRecordPane
+          sessionId={sessionId}
+          sessionKind={sessionKind}
+          autoTrigger
+          triggerFinal={sessionComplete}
+          inline={inline}
+        />
+      );
+    }
+    // Legacy fallback (no session context) — kept for prep window callsites
+    // that still use the editable claim/counter view.
     const analysisByTitle = new Map(analysis.map((a) => [a.subtopicTitle, a]));
 
     return (

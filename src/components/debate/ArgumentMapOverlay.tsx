@@ -40,6 +40,10 @@ interface ArgumentMapOverlayProps {
   transcriptEntries?: TranscriptEntryInput[];
   argumentMap?: ArgumentMapEntryInput[];
   subtopics?: SubtopicInput[];
+  /** When provided, the threaded tab renders the structural pane. */
+  sessionId?: string;
+  sessionKind?: "debate" | "cmm" | "live" | "imported";
+  sessionComplete?: boolean;
 }
 
 /**
@@ -55,6 +59,9 @@ const ArgumentMapOverlay = ({
   transcriptEntries,
   argumentMap,
   subtopics,
+  sessionId,
+  sessionKind,
+  sessionComplete,
 }: ArgumentMapOverlayProps) => {
   const [tab, setTab] = useState<"threaded" | "transcript">("threaded");
 
@@ -116,6 +123,9 @@ const ArgumentMapOverlay = ({
         transcriptEntries={derivedTranscripts}
         argumentMap={argumentMap ?? []}
         analysis={analysis}
+        sessionId={sessionId}
+        sessionKind={sessionKind}
+        sessionComplete={sessionComplete}
       />
     </FloatingOverlay>
   );
