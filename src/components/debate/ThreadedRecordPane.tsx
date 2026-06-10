@@ -1,7 +1,10 @@
 import { useEffect, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArgumentUnits, triggerStructurePass, type ArgumentUnit } from "@/hooks/useArgumentUnits";
+import { getAnatomyInfo, getRelationshipInfo } from "@/lib/structure-tags";
+import { useState } from "react";
 
 type SessionKind = "debate" | "cmm" | "live" | "imported";
 
@@ -17,6 +20,54 @@ interface ThreadedRecordPaneProps {
 
 /** Order parts in a reading-friendly flow regardless of model emission order. */
 const PART_ORDER = ["CLAIM", "GROUNDS", "WARRANT", "QUALIFIER", "CONCESSION", "REBUTTAL"] as const;
+
+/**
+ * A neutral-gray tag pill with hover description + click-to-pin behavior.
+ * Mirrors the InsightText overlay pattern used for rhetorical analysis so the
+ * structural analysis pills behave identically: hover shows the brief, clicking
+ * keeps it open until clicked again.
+ */
+function TagPill({
+  label,
+  title,
+  description,
+  modelNote,
+  size = "sm",
+}: {
+  label: string;
+  title: string;
+  description: string | null;
+  modelNote?: string | null;
+  size?: "sm" | "xs";
+}) {
+  const [pinned, setPinned] = useState(false);
+  const px = size === "xs" ? "px-1.5 py-0 text-[10px]" : "px-1.5 py-0.5 text-[10px]";
+  return (
+    <Tooltip open={pinned ? true : undefined}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setPinned((p) => !p); }}
+          className={`mx-1 inline-flex items-center align-baseline rounded-full border border-foreground/10 bg-foreground/[0.04] ${px} font-medium leading-tight text-foreground/55 cursor-help hover:bg-foreground/[0.08] ${pinned ? "ring-1 ring-foreground/20" : ""}`}
+        >
+          {label}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-xs leading-snug">
+        <div className="font-semibold mb-0.5">{title}</div>
+        {description && <div className="text-[11px] opacity-80">{description}</div>}
+        {modelNote && (
+          <div className="mt-1.5 pt-1.5 border-t border-border/40 text-[11px] opacity-80">
+            {modelNote}
+          </div>
+        )}
+        {pinned && (
+          <div className="mt-1 text-[10px] uppercase tracking-wide opacity-60">Click pill to unpin</div>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 function InlineAnatomyParagraph({
   anatomy,
@@ -37,18 +88,22 @@ function InlineAnatomyParagraph({
   return (
     <div className="space-y-1.5">
       <p className="text-xs text-foreground font-body leading-relaxed">
-        {sorted.map((p, i) => (
-          <span key={i} className="inline">
-            {i > 0 ? " " : null}
-            <span className="inline">{p.text}</span>
-            <span
-              className="mx-1 inline-flex items-center align-baseline rounded-full border border-foreground/10 bg-foreground/[0.04] px-1.5 py-0 text-[10px] font-medium leading-tight text-foreground/55 cursor-help"
-              title={p.note ?? p.part}
-            >
-              {p.part.toLowerCase()}
+        {sorted.map((p, i) => {
+          const info = getAnatomyInfo(p.part);
+          return (
+            <span key={i} className="inline">
+              {i > 0 ? " " : null}
+              <span className="inline">{p.text}</span>
+              <TagPill
+                label={p.part.toLowerCase()}
+                title={info?.label ?? p.part}
+                description={info?.description ?? null}
+                modelNote={p.note ?? null}
+                size="xs"
+              />
             </span>
-          </span>
-        ))}
+          );
+        })}
       </p>
       {absent.length > 0 && (
         <div className="space-y-0.5">
@@ -100,15 +155,16 @@ function AnatomyCard({ unit }: { unit: ArgumentUnit }) {
 }
 
 function RelationshipConnector({ tag, note }: { tag: string; note?: string | null }) {
+  const info = getRelationshipInfo(tag);
   return (
     <div className="flex items-center gap-2 pl-2 my-1 group/conn">
       <span className="block w-px h-3 bg-foreground/15" />
-      <span
-        className="text-[9px] uppercase tracking-widest font-semibold text-foreground/55 px-1.5 py-0.5 rounded bg-foreground/[0.04] cursor-help"
-        title={note ?? undefined}
-      >
-        {tag.toLowerCase()}
-      </span>
+      <TagPill
+        label={tag.toLowerCase()}
+        title={info?.label ?? tag}
+        description={info?.description ?? null}
+        modelNote={note ?? null}
+      />
       {note && (
         <span className="text-[10px] text-muted-foreground/80 font-body opacity-0 group-hover/conn:opacity-100 transition-opacity truncate max-w-[260px]">
           {note}
@@ -173,6 +229,7 @@ const ThreadedRecordPane = ({
   }
 
   return (
+    <TooltipProvider delayDuration={120}>
     <div className={`${padding} space-y-2`}>
       {groups.map((g, gi) => (
         <Collapsible key={`${g.subtopic_title}-${gi}`} defaultOpen={gi === 0}>
@@ -221,6 +278,7 @@ const ThreadedRecordPane = ({
         </Collapsible>
       ))}
     </div>
+    </TooltipProvider>
   );
 };
 

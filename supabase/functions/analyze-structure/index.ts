@@ -185,9 +185,99 @@ serve(async (req) => {
       });
     }
 
+    // ---- Second-sweep coverage pass --------------------------------------
+    // If the first pass dropped too many substantive turns, ask the model to
+    // place the missing turns onto existing threads. Pure filler is allowed to
+    // stay dropped; the model returns { skipped: "filler", reason } for those.
+    const FILLER_RE = /^(?:right|exactly|yeah|ok(?:ay)?|sure|thanks?|thank you|mm-?hmm|uh huh|next question|moving on|we'?ll come back to that)[\s.!,?]*$/i;
+    const substantiveIdx = new Set<number>(
+      passages
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.text.trim().length > 40 && !FILLER_RE.test(p.text.trim()))
+        .map(({ i }) => i),
+    );
+    const coveredIdx = new Set<number>(
+      rawUnits
+        .map((u) => (Number.isInteger(u?.turn_index) ? u.turn_index : -1))
+        .filter((i) => i >= 0),
+    );
+    const dropped = [...substantiveIdx].filter((i) => !coveredIdx.has(i));
+    const coverage = substantiveIdx.size > 0 ? (substantiveIdx.size - dropped.length) / substantiveIdx.size : 1;
+
+    let mergedUnits = rawUnits;
+    if (coverage < 0.7 && dropped.length > 0) {
+      // Build a compact anchor map so the model can extend the right thread.
+      const anchors = rawUnits
+        .filter((u) => String(u?.relationship_tag ?? "").toUpperCase() === "ANCHOR")
+        .map((u) => `thread ${u.thread_id}: ${(u.relationship_note ?? u.source_text ?? "").toString().slice(0, 160)}`)
+        .join("\n");
+      const missingTurns = dropped
+        .map((i) => {
+          const p = passages[i];
+          const sub = p.subtopic_title ? ` (subtopic: ${p.subtopic_title})` : "";
+          return `[turn ${i}] ${p.speaker} [${p.side}]${sub}\n${p.text}`;
+        })
+        .join("\n\n");
+
+      const sweepPrompt = systemPrompt +
+        `\n\nSECOND-SWEEP MODE: The first pass dropped the turns below. For each, either (a) emit a unit that attaches to an EXISTING thread_id (do not invent new threads unless absolutely necessary), or (b) skip it if it is true filler. Reuse the thread_id labels from the anchor list. Reply with ONLY { "units": [...] }.`;
+      const sweepUser = `EXISTING THREADS:\n${anchors}\n\nMISSING TURNS:\n${missingTurns}`;
+
+      try {
+        const sweepRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: sweepPrompt },
+              { role: "user", content: sweepUser },
+            ],
+            response_format: { type: "json_object" },
+          }),
+        });
+        if (sweepRes.ok) {
+          const sweepJson = await sweepRes.json();
+          try {
+            const { logAiUsage } = await import("../_shared/usage.ts");
+            logAiUsage({
+              function_name: "analyze-structure",
+              model: "google/gemini-2.5-flash",
+              usage: sweepJson.usage,
+              session_id,
+              metadata: { pass: "second_sweep" },
+            } as any);
+          } catch (_) {}
+          const sweepContent: string = sweepJson?.choices?.[0]?.message?.content ?? "{}";
+          const sweepCleaned = sweepContent.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+          let sweepParsed: any = null;
+          try { sweepParsed = JSON.parse(sweepCleaned); } catch (_) {
+            const m = sweepCleaned.match(/\{[\s\S]*\}/);
+            if (m) { try { sweepParsed = JSON.parse(m[0]); } catch (_) {} }
+          }
+          const sweepUnits: any[] = Array.isArray(sweepParsed?.units) ? sweepParsed.units : [];
+          if (sweepUnits.length > 0) {
+            // Give second-sweep units unique unit_ids so the idMap doesn't collide.
+            let counter = rawUnits.length + 1;
+            for (const u of sweepUnits) {
+              if (!u.unit_id || typeof u.unit_id !== "string") {
+                u.unit_id = `s${counter++}`;
+              } else if (rawUnits.some((r) => r.unit_id === u.unit_id)) {
+                u.unit_id = `s${counter++}`;
+              }
+            }
+            mergedUnits = [...rawUnits, ...sweepUnits];
+          }
+        }
+      } catch (e) {
+        console.warn("second-sweep failed (non-fatal)", e);
+      }
+    }
+    // ----------------------------------------------------------------------
+
     // First pass: assign a stable uuid per unit_id so we can resolve relates_to refs.
     const idMap = new Map<string, string>();
-    for (const u of rawUnits) {
+    for (const u of mergedUnits) {
       const uid = String(u?.unit_id ?? "").trim();
       if (!uid) continue;
       if (!idMap.has(uid)) idMap.set(uid, crypto.randomUUID());
@@ -201,7 +291,7 @@ serve(async (req) => {
     const lastUuidByThread = new Map<string, string>();
 
     const rows: any[] = [];
-    for (const u of rawUnits) {
+    for (const u of mergedUnits) {
       const uid = String(u?.unit_id ?? "").trim();
       const id = idMap.get(uid);
       if (!id) continue;
