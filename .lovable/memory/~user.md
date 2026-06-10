@@ -18,6 +18,9 @@ Use the task tracker for any sprint with more than 2 distinct deliverables.
 # Explanation style
 Prefer user-story explanations ("As a [role] I want [action] so that [outcome]") when clarifying product rules or trigger conditions.
 
+# Plain-English questions — ALWAYS
+Every question I ask the user must be in plain, non-technical English. No jargon (no "chunk", "single-shot cap", "schema", "tool call", "gating", "progressive reveal", "RLS", "GRANT", "edge function", "realtime", "nested JSON", etc.). If a technical concept is unavoidable, translate it into what the user *sees* or *waits for*. Frame choices as trade-offs the user feels (speed vs. completeness, see-it-now vs. see-it-all-at-once), never as implementation choices.
+
 # Spec & memory writing — ask before deciding
 Before writing any release-criteria, product-spec, or "definition" memory, ask me the open decisions first (via ask_questions, max 4 at a time).
 Never assume defaults silently. If you guess, label it "GUESS — confirm?" inline and stop.
