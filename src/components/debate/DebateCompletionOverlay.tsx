@@ -36,6 +36,12 @@ const DebateCompletionOverlay = ({
     (supabase as any).functions
       .invoke("trigger-deep-perf", { body: { session_id: debateId, session_kind: "debate" } })
       .catch(() => {});
+    // Structural pass for the Threaded Record (final, enables UNRESOLVED).
+    (supabase as any).functions
+      .invoke("trigger-structure-pass", {
+        body: { session_id: debateId, session_kind: "debate", pass_kind: "structure_final" },
+      })
+      .catch(() => {});
   }, [debateId]);
 
   const editHoursLeft = editWindowEndsAt

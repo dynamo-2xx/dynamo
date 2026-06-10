@@ -312,6 +312,12 @@ const ChangeMyMindRoomPage = () => {
     supabase.functions
       .invoke("trigger-deep-perf", { body: { session_id: debate.id, session_kind: "cmm" } })
       .catch(() => {});
+    // Structural pass for the Threaded Record (final).
+    supabase.functions
+      .invoke("trigger-structure-pass", {
+        body: { session_id: debate.id, session_kind: "cmm", pass_kind: "structure_final" },
+      })
+      .catch(() => {});
     load();
     refresh();
   };

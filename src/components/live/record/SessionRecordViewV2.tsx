@@ -92,6 +92,12 @@ const SessionRecordViewV2 = ({
         body: { session_id: sessionId, session_kind: "live" },
       })
       .catch(() => {});
+    // Structural pass for the Threaded Record (final).
+    supabase.functions
+      .invoke("trigger-structure-pass", {
+        body: { session_id: sessionId, session_kind: "live", pass_kind: "structure_final" },
+      })
+      .catch(() => {});
   }, [user, sessionId, endedAt]);
 
   // Desktop record/transcript split state — persisted per session

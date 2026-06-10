@@ -592,6 +592,12 @@ const DebateRoomPage = () => {
     supabase.functions
       .invoke("trigger-deep-perf", { body: { session_id: debate.id, session_kind: kind } })
       .catch(() => {});
+    // Structural pass for the Threaded Record (final).
+    supabase.functions
+      .invoke("trigger-structure-pass", {
+        body: { session_id: debate.id, session_kind: kind, pass_kind: "structure_final" },
+      })
+      .catch(() => {});
   }, [isCompleted, debate?.id, user?.id]);
 
   // §21 Live-pass: dispatch per-turn analysis for the current speaker.
