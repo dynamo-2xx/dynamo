@@ -1131,11 +1131,8 @@ const DebateRoomPage = () => {
       paused_at: null, speaker_paused_at: null, speaker_pause_owner_id: null,
     }).eq("id", id);
 
-    // Fan out Web Push to queued participants + INTERESTED followers.
-    // Fire and forget — push delivery shouldn't block the host's start flow.
-    supabase.functions
-      .invoke("dispatch-debate-start-push", { body: { debate_id: id } })
-      .catch((e) => console.warn("debate-start push dispatch failed", e));
+    // Web Push fan-out is handled by the `trg_notify_debate_started`
+    // trigger on debates.status — no client call needed.
 
     try {
       await streamAI("opening_statement", {
