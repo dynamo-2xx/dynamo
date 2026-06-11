@@ -3325,7 +3325,10 @@ export type Database = {
       get_shared_live_session: {
         Args: { _token: string }
         Returns: {
+          cover_image_url: string
           created_at: string
+          created_by: string
+          description: string
           ended_at: string
           id: string
           mode: string
