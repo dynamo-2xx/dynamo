@@ -14,11 +14,12 @@ import QueuedSessionStrip from "@/components/QueuedSessionStrip";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
-  { to: "/clubs", icon: Users, label: "Clubs" },
   { to: "/explore", icon: Compass, label: "Explore" },
   { to: "/profile", icon: User, label: "Profile" },
   { to: "/messages", icon: MessageCircle, label: "Messages" },
 ];
+
+const comingSoonItem = { icon: Users, label: "Clubs" };
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
