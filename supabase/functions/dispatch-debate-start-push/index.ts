@@ -176,6 +176,19 @@ Deno.serve(async (req) => {
       .eq("debate_id", debate_id);
     for (const s of subs ?? []) recipientSet.add(s.user_id as string);
 
+    // P3: also push to accepted invitees / queued speakers, so people who
+    // tapped Join from the in-app strip get a Web Push when the host starts.
+    const { data: invitees } = await admin
+      .from("debate_invitations")
+      .select("invited_user_id")
+      .eq("debate_id", debate_id)
+      .eq("status", "accepted");
+    for (const s of invitees ?? []) {
+      if (s.invited_user_id) recipientSet.add(s.invited_user_id as string);
+    }
+    // Don't push the host their own start notification.
+    if (debate.created_by) recipientSet.delete(debate.created_by as string);
+
     if (recipientSet.size === 0) {
       return new Response(JSON.stringify({ ok: true, sent: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
