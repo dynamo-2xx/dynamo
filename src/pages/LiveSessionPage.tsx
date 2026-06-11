@@ -32,6 +32,7 @@ import { useMicPolicy } from "@/hooks/useMicPolicy";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
 import FloatingTranscript from "@/components/live/FloatingTranscript";
+import SessionClockButton from "@/components/live/SessionClockButton";
 import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import PauseButton from "@/components/sharing/PauseButton";
