@@ -9,6 +9,7 @@ import ArgumentMapContent, {
   type ArgumentMapEntryInput,
   type SubtopicInput,
   type TranscriptEntryInput,
+  type SpeakerMetaMap,
 } from "@/components/debate/ArgumentMapContent";
 
 export type RecordStatus = "completed" | "live" | "scheduled" | "processing" | "failed" | string;
@@ -44,6 +45,10 @@ interface RecordShellProps {
   sessionId?: string;
   sessionKind?: "debate" | "cmm" | "live" | "imported";
   sessionComplete?: boolean;
+  /** Anchor (epoch ms) for the transcript mm:ss left rail. */
+  sessionStartMs?: number | null;
+  /** Avatar + display-name lookup keyed by `speaker_side`. */
+  speakerMeta?: SpeakerMetaMap;
 
   /** Optional children rendered below the body (e.g. comments). */
   children?: ReactNode;
@@ -101,6 +106,8 @@ const RecordShell = ({
   sessionId,
   sessionKind,
   sessionComplete,
+  sessionStartMs,
+  speakerMeta,
   children,
 }: RecordShellProps) => {
   const navigate = useNavigate();
@@ -270,6 +277,8 @@ const RecordShell = ({
               sessionId={sessionId}
               sessionKind={sessionKind}
               sessionComplete={sessionComplete}
+              sessionStartMs={sessionStartMs}
+              speakerMeta={speakerMeta}
             />
           </>
         )}
