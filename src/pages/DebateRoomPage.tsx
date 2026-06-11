@@ -391,6 +391,35 @@ const DebateRoomPage = () => {
     requestPermissions();
   }, [userRole, loading, mediaRequested, debate?.status]);
 
+  useEffect(() => {
+    if (!isPreLiveDebate || !user) return;
+    let active = true;
+    let stream: MediaStream | null = null;
+    navigator.mediaDevices
+      ?.getUserMedia({ audio: true })
+      .then((s) => {
+        if (!active) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        stream = s;
+        if (isDebateCreator) setPreLiveHostStream(s);
+        else setPreLiveWaitStream(s);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      setPreLiveHostStream(null);
+      setPreLiveWaitStream(null);
+    };
+  }, [isPreLiveDebate, isDebateCreator, user]);
+
+  useEffect(() => {
+    if (debate?.status !== "live") return;
+    if (preLiveWaitStream) setHandoffStream(preLiveWaitStream);
+  }, [debate?.status, preLiveWaitStream]);
+
   // Load data
   useEffect(() => {
     if (!id) return;
