@@ -75,6 +75,14 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
               </RouterNavLink>
             );
           })}
+          {/* Clubs — Coming Soon */}
+          <div className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] whitespace-nowrap font-body text-muted-foreground cursor-not-allowed select-none">
+            <comingSoonItem.icon className="w-5 h-5 opacity-50" />
+            <span className="flex-1 opacity-50">{comingSoonItem.label}</span>
+            <span className="absolute left-full ml-2 px-2 py-1 rounded-md bg-foreground text-background text-[11px] font-medium opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+              Coming soon
+            </span>
+          </div>
         </nav>
         <div className="mt-auto space-y-3">
           <div className="flex items-center justify-between">
