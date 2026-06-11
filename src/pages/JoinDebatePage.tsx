@@ -317,13 +317,13 @@ const JoinDebatePage = () => {
                   className="w-full"
                 >
                   <Users className="w-4 h-4 mr-1" />
-                  Join as Audience
+                  Enter as Audience
                 </Button>
               </div>
             </>
           ) : (
             <MicTestStep
-              continueLabel={joining ? "Joining…" : "Join debate"}
+              continueLabel={joining ? "Entering…" : "ENTER debate"}
               onReady={(stream) => finalizeJoin(stream)}
               onSkipToAudience={handleJoinAsAudience}
             />

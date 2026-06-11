@@ -26,15 +26,21 @@ import { useLivePerfStreamer } from "@/hooks/useLivePerfStreamer";
 import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import InsightText from "@/components/insights/InsightText";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
-import { takeHandoffStream } from "@/lib/micHandoff";
+import { setHandoffStream, takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
 import InterestedComposer from "@/components/debate/InterestedComposer";
+import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
+import LobbyInvitePanel from "@/components/lobby/LobbyInvitePanel";
+import MicLobby from "@/components/lobby/MicLobby";
+import QueuedSpeakerBubbles from "@/components/lobby/QueuedSpeakerBubbles";
+import WaitingForHost from "@/components/lobby/WaitingForHost";
 import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay";
 import RoundSummaryCard from "@/components/debate/RoundSummaryCard";
 import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import { useGrading } from "@/hooks/useGrading";
 import { useMicPolicy } from "@/hooks/useMicPolicy";
+import { useMicLobbyAttachment } from "@/hooks/useMicLobbyAttachment";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
@@ -46,6 +52,15 @@ import AnalysisProgress from "@/components/record/AnalysisProgress";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
 import { useDebateHostFailover } from "@/hooks/useDebateHostFailover";
 import { Lock, Globe } from "lucide-react";
+
+const getDeviceId = () => {
+  let deviceId = localStorage.getItem("dyn_device_id");
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem("dyn_device_id", deviceId);
+  }
+  return deviceId;
+};
 
 
 type UserRole = "facilitator" | "speaker" | "spectator";
@@ -150,6 +165,12 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
    const turnEndTriggeredRef = useRef(false);
+  const [queuedSideId, setQueuedSideId] = useState<string | null>(null);
+  const [preLiveWaitStream, setPreLiveWaitStream] = useState<MediaStream | null>(null);
+  const [preLiveHostStream, setPreLiveHostStream] = useState<MediaStream | null>(null);
+  const [maxPerSide, setMaxPerSide] = useState(2);
+  const preservePreLiveWaitStreamRef = useRef(false);
+  const deviceId = useState(() => getDeviceId())[0];
   // In-person joiner: pick up the live MediaStream the pre-flight mic test
   // handed off so we can show the persistent mic bar without re-prompting.
   const [handoffStream] = useState<MediaStream | null>(() => takeHandoffStream());
@@ -162,6 +183,28 @@ const DebateRoomPage = () => {
     userId: user?.id ?? null,
     isOwner: !!user && !!debate && user.id === debate.created_by,
     stream: handoffStream,
+  });
+  const isPreLiveDebate = debate?.status === "draft" || debate?.status === "scheduled";
+  const isDebateCreator = !!user && !!debate && user.id === debate.created_by;
+  useMicLobbyAttachment({
+    kind: "debate",
+    sessionId: isPreLiveDebate && isDebateCreator && id ? id : null,
+    slotKey: isPreLiveDebate && isDebateCreator && user ? `host:${user.id}` : null,
+    userId: user?.id ?? null,
+    deviceId,
+    displayName: user?.email?.split("@")[0] || "Host",
+    mode: "own_mic",
+    stream: preLiveHostStream,
+  });
+  useMicLobbyAttachment({
+    kind: "debate",
+    sessionId: isPreLiveDebate && !isDebateCreator && user && id ? id : null,
+    slotKey: isPreLiveDebate && !isDebateCreator && user ? `queued:${user.id}` : null,
+    userId: user?.id ?? null,
+    deviceId,
+    displayName: user?.email?.split("@")[0] || "Queued",
+    mode: "own_mic",
+    stream: preLiveWaitStream,
   });
      const timerWasActiveRef = useRef(false);
    const prepExitRef = useRef(false);
@@ -349,6 +392,38 @@ const DebateRoomPage = () => {
     requestPermissions();
   }, [userRole, loading, mediaRequested, debate?.status]);
 
+  useEffect(() => {
+    if (!isPreLiveDebate || !user) return;
+    let active = true;
+    let stream: MediaStream | null = null;
+    navigator.mediaDevices
+      ?.getUserMedia({ audio: true })
+      .then((s) => {
+        if (!active) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        stream = s;
+        if (isDebateCreator) setPreLiveHostStream(s);
+        else setPreLiveWaitStream(s);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (stream && !preservePreLiveWaitStreamRef.current) stream.getTracks().forEach((t) => t.stop());
+      setPreLiveHostStream(null);
+      setPreLiveWaitStream(null);
+    };
+  }, [isPreLiveDebate, isDebateCreator, user]);
+
+  useEffect(() => {
+    if (debate?.status !== "live") return;
+    if (preLiveWaitStream) {
+      preservePreLiveWaitStreamRef.current = true;
+      setHandoffStream(preLiveWaitStream);
+    }
+  }, [debate?.status, preLiveWaitStream]);
+
   // Load data
   useEffect(() => {
     if (!id) return;
@@ -370,16 +445,8 @@ const DebateRoomPage = () => {
       const d = debateRes.data as unknown as DebateData;
       const parts = (participantsRes.data || []) as unknown as Participant[];
 
-      // If the debate hasn't started yet, send EVERYONE (creator + invitees +
-      // queued speakers) to the mic-prep lobby. Previously non-creator
-      // invitees landed in an empty room because the lobby route was only
-      // reached via the create flow.
-      if (d.status === "draft" || d.status === "scheduled") {
-        navigate(`/debate/${id}/lobby`, { replace: true });
-        return;
-      }
-
       setDebate(d);
+      setMaxPerSide((d as any).max_speakers_per_side ?? 2);
       setSides(sidesRes.data || []);
       setSubtopics(subtopicsRes.data || []);
       setArguments(argsRes.data || []);
@@ -432,6 +499,16 @@ const DebateRoomPage = () => {
         const endedAgo = Date.now() - new Date(d.ended_at).getTime();
         if (endedAgo < 30000) setShowCompletionOverlay(true);
       }
+
+      if (user && d.created_by !== user.id) {
+        const { data: interest } = await supabase
+          .from("debate_interests")
+          .select("side_id, role")
+          .eq("debate_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if ((interest as any)?.role === "queued_speaker") setQueuedSideId((interest as any).side_id ?? null);
+      }
     };
     loadDebate();
   }, [id, user, navigate]);
@@ -450,6 +527,16 @@ const DebateRoomPage = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "debates", filter: `id=eq.${id}` }, (payload) => {
         const updated = payload.new as unknown as DebateData;
         setDebate(updated);
+
+        if (updated.status === "live") {
+          supabase
+            .from("debate_participants")
+            .select("*")
+            .eq("debate_id", id)
+            .then(({ data }) => {
+              if (data) setParticipants(data as unknown as Participant[]);
+            });
+        }
 
         if (updated.prep_phase_active) {
           setTimerRunning(false);
@@ -1031,6 +1118,12 @@ const DebateRoomPage = () => {
   const startDebate = async () => {
     if (!debate || !id) return;
     setAiLoading(true);
+    try {
+      const { error: promoteErr } = await supabase.rpc("promote_lobby_to_participants" as any, { _debate_id: id });
+      if (promoteErr) console.warn("Failed to promote queued speakers", promoteErr);
+    } catch (e) {
+      console.warn("Failed to promote queued speakers", e);
+    }
     const now = new Date().toISOString();
     await supabase.from("debates").update({
       status: "live", started_at: now, turn_started_at: now,
@@ -1049,6 +1142,19 @@ const DebateRoomPage = () => {
     }
     setTimerRunning(true);
     setAiLoading(false);
+  };
+
+  const handleCancelDebate = async () => {
+    if (!id) return;
+    const ok = window.confirm("Cancel this debate? Invitees will be notified.");
+    if (!ok) return;
+    const { error } = await supabase
+      .from("debates")
+      .update({ status: "archived", ended_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Debate cancelled");
+    navigate("/", { replace: true });
   };
 
   const advanceTurn = async () => {
@@ -1383,6 +1489,65 @@ const DebateRoomPage = () => {
 
   if (!debate) return null;
 
+  if (isPreLiveDebate) {
+    return (
+      <AppLayout>
+        <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Waiting room</p>
+            <h1 className="font-display text-2xl text-foreground">{debate.topic}</h1>
+          </div>
+          {isDebateCreator ? (
+            <>
+              <InPersonJoinPanel
+                debateId={id ?? null}
+                joinCode={debate.join_code}
+                maxSpeakersPerSide={maxPerSide}
+                onMaxSpeakersChange={async (n) => {
+                  setMaxPerSide(n);
+                  if (id) await supabase.from("debates").update({ max_speakers_per_side: n } as any).eq("id", id);
+                }}
+                onCodeRegenerated={(c) => setDebate((prev) => prev ? { ...prev, join_code: c } : prev)}
+              />
+              <LobbyInvitePanel debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} />
+              <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} hostUserId={debate.created_by} />
+              <MicLobby
+                kind="debate"
+                sessionId={id ?? null}
+                slots={[]}
+                hideEmptySlots
+                sides={sides.map((s) => ({ id: s.id, label: s.label }))}
+                minConnected={0}
+                onStart={startDebate}
+                starting={aiLoading}
+                startLabel="Start debate"
+              />
+              <button
+                type="button"
+                onClick={handleCancelDebate}
+                className="w-full text-xs font-body text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Cancel debate
+              </button>
+            </>
+          ) : (
+            <>
+              <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} hostUserId={debate.created_by} />
+              <WaitingForHost
+                sessionTitle={debate.topic}
+                stream={preLiveWaitStream}
+                mode="own_mic"
+                lockReason={queuedSideId ? `Queued for ${sides.find((s) => s.id === queuedSideId)?.label ?? "a side"}` : "Waiting for the host"}
+                onLeave={() => navigate(`/debate/${id}/preview`, { replace: true })}
+                leaveLabel="Leave room"
+              />
+            </>
+          )}
+        </div>
+      </AppLayout>
+    );
+  }
+
   // Spectator preview: non-participant viewers on scheduled or live debates
   // see a record-style shell (with live threads-so-far for live debates,
   // or ghost cards for scheduled). Owners and speakers keep the full room UI.
@@ -1403,6 +1568,9 @@ const DebateRoomPage = () => {
         <InPersonMicBar
           initialStream={handoffStream}
           displayName={user?.email ?? null}
+          sessionKind={(debate as any)?.format === "change_my_mind" ? "cmm" : "debate"}
+          sessionId={id ?? null}
+          userId={user?.id ?? null}
         />
       )}
       {/* Header */}

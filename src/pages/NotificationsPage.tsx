@@ -43,6 +43,10 @@ const NotificationsPage = () => {
 
   const handleNotificationClick = async (n: AppNotification) => {
     if (!n.is_read) await markRead(n.id);
+    if (n.type === "session_started") {
+      navigate((n.metadata as any)?.route || (n.debate_id ? `/debate/${n.debate_id}` : "/notifications"));
+      return;
+    }
     if (n.type === "interest_received" && n.debate_id) {
       // Publisher engages → send back to debate room/template to update time
       navigate(`/debate/${n.debate_id}`);
@@ -207,6 +211,7 @@ const NotificationsPage = () => {
 
   const pending = invitations.filter((i) => i.status === "pending");
   const past = invitations.filter((i) => i.status !== "pending");
+  const appAlerts = notifications.filter((n) => n.type === "session_started" || n.type === "generic");
 
   return (
     <AppLayout>
@@ -220,7 +225,7 @@ const NotificationsPage = () => {
 
         {loading ? (
           <p className="text-muted-foreground text-sm font-body">Loading…</p>
-        ) : invitations.length === 0 ? (
+        ) : invitations.length === 0 && appAlerts.length === 0 ? (
           <div className="border border-dashed border-border rounded-xl px-6 py-12 text-center">
             <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm font-body text-foreground mb-1">No notifications yet</p>
@@ -236,6 +241,36 @@ const NotificationsPage = () => {
           </div>
         ) : (
           <div className="space-y-6">
+            {appAlerts.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Alerts
+                  </h2>
+                  {unreadCount > 0 && (
+                    <button type="button" onClick={markAllRead} className="text-xs text-muted-foreground hover:text-foreground">
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {appAlerts.map((n) => (
+                  <Card key={n.id} className={n.is_read ? "opacity-70" : ""}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-display font-semibold text-foreground truncate">{n.title}</p>
+                          {n.body && <p className="text-xs text-muted-foreground font-body mt-0.5 truncate">{n.body}</p>}
+                        </div>
+                        <Button size="sm" onClick={() => handleNotificationClick(n)}>
+                          {n.type === "session_started" ? "ENTER" : "Open"}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
             {pending.length > 0 && (
               <div className="space-y-3">
                 <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -284,7 +319,7 @@ const NotificationsPage = () => {
                                 disabled={!selectedSide || processing === inv.id}
                               >
                                 <Check className="w-3.5 h-3.5 mr-1" />
-                                Join
+                                ENTER
                               </Button>
                               <Button
                                 size="sm"

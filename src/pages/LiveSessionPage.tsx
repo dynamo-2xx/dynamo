@@ -230,9 +230,6 @@ const LiveSessionPage = () => {
         setJoinCode(d.join_code || null);
         if (d.status === "ended") {
           setPhase("ended");
-        } else if (d.mode === "multi_device" && d.status !== "recording" && user?.id === d.created_by) {
-          navigate(`/live/${id}/lobby`, { replace: true });
-          return;
         } else {
           setPhase("recording");
         }
@@ -312,7 +309,7 @@ const LiveSessionPage = () => {
         .from("live_sessions")
         .update({ speaker_names: seeded })
         .eq("id", d.id);
-      navigate(`/live/${d.id}/lobby`, { replace: true });
+      navigate(`/live/${d.id}`, { replace: true });
       return;
     }
 
@@ -512,6 +509,36 @@ const LiveSessionPage = () => {
               </button>
             </div>
           </motion.div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (isMulti && phase === "recording" && sessionStatus !== "recording") {
+    return (
+      <AppLayout>
+        <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Waiting room</p>
+            <h1 className="font-display text-2xl text-foreground">{title || "Live session"}</h1>
+          </div>
+          {joinCode && <JoinCodeCard code={joinCode} sessionTitle={title} />}
+          <div className="border border-border rounded-lg bg-background p-3 space-y-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">In the room</p>
+            <PresenceList participants={presenceParticipants} isHost sessionId={sessionId} />
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!sessionId) return;
+              const { error } = await (supabase as any).from("live_sessions").update({ status: "recording" }).eq("id", sessionId);
+              if (error) { toast.error(error.message); return; }
+              setSessionStatus("recording");
+            }}
+            className="w-full min-h-[48px] bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity"
+          >
+            Start recording
+          </button>
         </div>
       </AppLayout>
     );

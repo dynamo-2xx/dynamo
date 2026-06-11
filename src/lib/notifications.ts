@@ -6,6 +6,7 @@ export type NotificationType =
   | "interest_confirmed"
   | "time_counter_proposed"
   | "invitation"
+  | "session_started"
   | "direct_message"
   | "generic";
 

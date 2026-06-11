@@ -207,9 +207,9 @@ const LiveJoinPage = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <LogIn className="w-5 h-5 text-primary" />
           </div>
-          <h1 className="font-display text-2xl font-bold mb-2">Sign in to join</h1>
+          <h1 className="font-display text-2xl font-bold mb-2">Sign in to enter</h1>
           <p className="text-sm text-muted-foreground mb-2">
-            You need an account to join this live session.
+            You need an account to enter this live session.
           </p>
           <p className="text-xs text-muted-foreground mb-6">
             Joining code{" "}
@@ -345,7 +345,7 @@ const LiveJoinPage = () => {
         </Link>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl font-display font-bold">Joining session</h1>
+          <h1 className="text-2xl font-display font-bold">Entering session</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Code <span className="font-mono tracking-widest font-semibold text-foreground">{code}</span>
           </p>
@@ -396,7 +396,7 @@ const LiveJoinPage = () => {
               ) : (
                 <Mic className="w-4 h-4" />
               )}
-              Tap to join &amp; start mic
+              Tap to ENTER &amp; start mic
             </button>
 
             <p className="text-[11px] text-muted-foreground text-center leading-relaxed">

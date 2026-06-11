@@ -8,9 +8,10 @@ interface Props {
   mode: "own_mic" | "voice_detect_only";
   lockReason?: string | null;
   onLeave?: () => void;
+  leaveLabel?: string;
 }
 
-export default function WaitingForHost({ sessionTitle, stream, mode, lockReason, onLeave }: Props) {
+export default function WaitingForHost({ sessionTitle, stream, mode, lockReason, onLeave, leaveLabel = "Leave" }: Props) {
   const [level, setLevel] = useState(0);
   const rafRef = useRef<number | null>(null);
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function WaitingForHost({ sessionTitle, stream, mode, lockReason,
           <Lock className="w-3 h-3" />{lockReason}
         </div>
       )}
-      {onLeave && <Button variant="outline" onClick={onLeave} className="mt-2">Leave</Button>}
+      {onLeave && <Button variant="outline" onClick={onLeave} className="mt-2">{leaveLabel}</Button>}
     </div>
   );
 }
