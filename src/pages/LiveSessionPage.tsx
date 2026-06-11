@@ -101,6 +101,11 @@ const LiveSessionPage = () => {
   // we also stop the Deepgram socket so we're not transcribing silence.
   const [singleMicOn, setSingleMicOn] = useState(true);
 
+  // Single-device camera preview. Hoisted above the phase early-returns
+  // because hook order must be stable; the hook itself no-ops when the
+  // `active` flag is false (multi-device or non-recording phases).
+  const localPreview = useLocalCameraPreview(!isMulti && isRecordingActive);
+
   // Load host's display name from profile
   useEffect(() => {
     if (!user) return;
