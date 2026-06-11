@@ -71,7 +71,22 @@ export function usePauseControl(opts: {
       const { error } = await supabase.rpc("resume_debate" as any, { _debate_id: id });
       if (error) { toast.error(error.message); return; }
     } else {
-      const { error } = await supabase.from(table).update({ paused_at: null }).eq("id", id);
+      // Roll the just-ended pause window into accumulated_paused_ms so the
+      // session timer correctly excludes paused time across reloads / cycles.
+      const { data: row } = await supabase
+        .from(table)
+        .select("paused_at, accumulated_paused_ms")
+        .eq("id", id)
+        .maybeSingle();
+      const prevAcc = Number((row as any)?.accumulated_paused_ms ?? 0) || 0;
+      const pausedAtIso = (row as any)?.paused_at as string | null;
+      const addMs = pausedAtIso
+        ? Math.max(0, Date.now() - new Date(pausedAtIso).getTime())
+        : 0;
+      const { error } = await supabase
+        .from(table)
+        .update({ paused_at: null, accumulated_paused_ms: prevAcc + addMs } as any)
+        .eq("id", id);
       if (error) { toast.error(error.message); return; }
     }
     toast.success("Session resumed");
