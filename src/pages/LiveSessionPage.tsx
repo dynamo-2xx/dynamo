@@ -4,8 +4,14 @@ import { Mic, Square, Radio, Loader2, ChevronDown, ArrowLeft, UserPlus } from "l
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
-import SessionRecordView from "@/components/live/record/SessionRecordViewV2";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
+import RecordShell from "@/components/record/RecordShell";
+import ParticipantsRow from "@/components/record/ParticipantsRow";
+import RecordToolsMount from "@/components/record/RecordToolsMount";
+import ContinueButton from "@/components/record/ContinueButton";
+import ShareDialog from "@/components/sharing/ShareDialog";
+import { useLiveParticipants } from "@/hooks/useLiveParticipants";
+import { InsightsProvider } from "@/contexts/InsightsContext";
 import LiveThreadView from "@/components/live/LiveThreadView";
 import TagPicker from "@/components/tags/TagPicker";
 import CoverImageUploader from "@/components/upload/CoverImageUploader";
@@ -365,29 +371,34 @@ const LiveSessionPage = () => {
   // ── ENDED → Full record page ──
   if (phase === "ended") {
     const sd = sessionData || {};
+    const endedEntries =
+      transcriptEntries.length > 0 ? transcriptEntries : (sd.transcript_entries || []);
+    const endedSubs = subtopics.length > 0 ? subtopics : (sd.subtopics || []);
+    const subtopicInputs = (endedSubs as string[]).map((t) => ({ id: t, title: t }));
+    const transcriptInputs = (endedEntries as any[]).map((e) => ({
+      id: e.id,
+      speaker_side: speakerNames[String(e.speaker_id)] || `Speaker ${e.speaker_id + 1}`,
+      text: e.text,
+      subtopic: e.subtopic || (endedSubs[0] as string) || "",
+      timestamp: e.timestamp,
+      ai_summary: e.ai_summary,
+    }));
     return (
       <AppLayout>
-        <SessionRecordView
+        <LiveEndedRecord
           sessionId={sessionId || ""}
           title={sd.title || title || "Live Session"}
           createdAt={sd.created_at || new Date().toISOString()}
-          endedAt={sd.ended_at}
-          transcriptEntries={transcriptEntries.length > 0 ? transcriptEntries : (sd.transcript_entries || [])}
-          summaries={summaries.length > 0 ? summaries : (sd.summaries || [])}
-          subtopics={subtopics.length > 0 ? subtopics : (sd.subtopics || [])}
-          speakerNames={speakerNames}
+          createdBy={sd.created_by ?? null}
+          coverImageUrl={sd.cover_image_url || coverImageUrl}
           shareToken={sd.share_token || null}
-          threadTitles={threads}
           canContinue={!!user?.id && user.id === sd.created_by}
-          continuationIndex={(sd as any).continuation_index ?? null}
-          onEntriesUpdate={() => {}}
-          onSpeakerNamesUpdate={setSpeakerNames}
+          speakerNames={speakerNames}
+          subtopics={subtopicInputs}
+          transcriptEntries={transcriptInputs}
+          rawTranscriptEntries={endedEntries as any}
+          rawSubtopicTitles={endedSubs as string[]}
         />
-        {sessionId && (
-          <div className="max-w-5xl mx-auto px-4 pb-12">
-            <RecordCommentsSection recordType="live_session" recordId={sessionId} />
-          </div>
-        )}
       </AppLayout>
     );
   }
@@ -711,3 +722,75 @@ const LiveSessionPage = () => {
 };
 
 export default LiveSessionPage;
+
+/**
+ * Render the post-session record using the shared RecordShell.
+ * Lives inline here to keep the page's existing state plumbing intact.
+ */
+function LiveEndedRecord(props: {
+  sessionId: string;
+  title: string;
+  createdAt: string;
+  createdBy: string | null;
+  coverImageUrl: string | null;
+  shareToken: string | null;
+  canContinue: boolean;
+  speakerNames: Record<string, string>;
+  subtopics: { id: string; title: string }[];
+  transcriptEntries: any[];
+  rawTranscriptEntries: any[];
+  rawSubtopicTitles: string[];
+}) {
+  const pills = useLiveParticipants({
+    sessionId: props.sessionId,
+    speakerNames: props.speakerNames,
+    createdBy: props.createdBy,
+  });
+  const sidePillProps = pills.map((p) => ({
+    kind: "user" as const,
+    name: p.name,
+    avatarUrl: p.avatarUrl,
+    userId: p.userId,
+  }));
+  return (
+    <InsightsProvider sessionId={props.sessionId} sessionKind="live">
+      <RecordShell
+        kind="live"
+        topic={props.title}
+        status="completed"
+        coverImageUrl={props.coverImageUrl}
+        createdAt={props.createdAt}
+        pillsRow={pills.length > 0 ? <ParticipantsRow pills={sidePillProps} /> : null}
+        actionsRow={
+          <>
+            {props.canContinue && (
+              <ContinueButton kind="live_session" sourceId={props.sessionId} isOwner isCompleted />
+            )}
+            {props.sessionId && (
+              <ShareDialog type="live_session" recordId={props.sessionId} isCreator={props.canContinue} />
+            )}
+          </>
+        }
+        subtopics={props.subtopics}
+        transcriptEntries={props.transcriptEntries}
+        argumentMap={[]}
+        sessionId={props.sessionId}
+        sessionKind="live"
+        sessionComplete
+      >
+        {props.sessionId && (
+          <RecordCommentsSection recordType="live_session" recordId={props.sessionId} />
+        )}
+      </RecordShell>
+      {props.sessionId && (
+        <RecordToolsMount
+          recordType="live_session"
+          recordId={props.sessionId}
+          transcriptEntries={props.rawTranscriptEntries}
+          subtopics={props.rawSubtopicTitles}
+          speakerNames={props.speakerNames}
+        />
+      )}
+    </InsightsProvider>
+  );
+}
