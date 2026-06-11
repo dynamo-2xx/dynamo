@@ -1,90 +1,148 @@
-## Goal
+# Finish Live for Launch + Retire the Mic Lobby
 
-Make `/debate/:id`, `/import/:id`, and the completed `/live/:id` (+ `/live/shared/:token`) render with the exact same shell:
+Ordered by your rule: integration bugs first, then the live polish you already approved, then the lobby retirement (live → debate/CMM last). Voice-confirmation replaces the lobby's only real job.
+
+---
+
+## P0 — Integration bugs (unchanged from prior plan)
+
+### 1. Viewing a live record triggers mic/camera prompt
+
+**Cause.** `LiveSessionPage` mounts with `phase = id ? "recording" : "setup"` (line 56), so `useLiveTranscription` / `useLiveSessionRTC` start with `isActive = true` and call `getUserMedia` before the row fetch decides the session is actually `ended`.
+**Fix.** Add `phaseResolved` gate; render a loading shell until the row loads, then derive phase from `status`. Pass `isActive={phaseResolved && phase === "recording" && !liveIsPaused}` to all three hooks. Add a defensive `if (!isActive) return;` at the top of each hook's `getUserMedia` effect.
+
+### 2. Host user-pill missing on live records
+
+`useLiveParticipants` builds pills only from `speaker_names`. Single-device legacy sessions have none → empty row.
+**Fix.** Fallback: when no pills resolved and `createdBy` is set, push one pill `{ slot: 0, name: profile.display_name, userId: createdBy, avatarUrl }`.
+
+### 3. Description missing + no owner Edit affordance
+
+`RecordShell` already accepts `description` but no page passes it; no Edit anywhere.
+**Fix.** Wire description through all three pages (`live_sessions.description` new column; `imported_records.description` + `debates.description` already exist). Add a `RecordEditButton` slot top-right of `RecordShell`, owner-only, opens a modal with `CoverImageUploader` + description textarea. Per-page save handler hits the right table.
+
+---
+
+## P1 — Live polish (unchanged from prior plan)
+
+### 4. Session length cap + analysis progress bar
+
+- Soft warn at 60 min, hard cap at 120 min with banner + auto-end.
+- New `<AnalysisProgress />` with two segments: "Live insights" (last `analyze-transcript` tick) and "Deep analysis" (`analyze-structure` + `analyze-performance` via `trigger-structure-pass` / `trigger-deep-perf`). Polls every 5s while pending; hides when both done.
+
+### 5. Time-anchored transcript bubbles
+
+Two-column transcript: left rail `mm:ss` (or `hh:mm:ss` ≥1h) top-aligned with each bubble, computed from `entry.timestamp − session.started_at`. Mode toggled on by `RecordShell` for all three record types.
+
+### 6. Avatar + display name on every bubble
+
+Pipe the `useLiveParticipants` slot→user map into the transcript renderer; bubbles show `<Avatar>` + display name. Fallback: initials avatar + "Speaker N".
+
+---
+
+## P2 — Retire Mic Lobby, replace with in-room voice-confirm (NEW)
+
+Scope order you set: ship live first, then debate/CMM. Same UX everywhere.
+
+### What gets deleted
+
+- `src/components/lobby/MicLobby.tsx`, `LobbySlotRow.tsx`, `EchoGuardToggle.tsx` (Echo Guard moves to in-room overflow menu).
+- `src/pages/LiveLobbyPage.tsx`, `CmmLobbyPage.tsx`, `DebateLobbyPage.tsx`.
+- Routes for `/live/:id/lobby`, `/cmm/:id/lobby`, `/debate/:id/lobby` are removed; `<Navigate>` redirects to the room.
+- Hook `useMicLobby` stays usable for owner presence/debugging but is no longer a launch gate. `useMicLobbyAttachment` becomes a no-op shim → delete after consumers are gone.
+- `MicPrep` spec in `mem://features/mic-prep` is rewritten to reflect "no lobby, in-room mic-button voice-tag" instead.
+
+### Replacement: Mic button states
+
+A single shared `<MicToggleButton />` used by Debate / Live / CMM rooms. State machine driven by `voiceTaggedAt` on the current `mic_connections` row (or local profile flag for solo single-device live):
 
 ```text
-[ Hero card (cover, title, status, meta) ]
-[ Row of pills — Side 1 / Side 2  OR  user pills ]
-[ Tabs: Transcript | Threaded record ]
-[ Pane content + comments ]
+ ┌─────────────┐ enable mic  ┌──────────────┐ confirm voice  ┌──────────┐
+ │  OFF (gray) │────────────▶│  ON · orange │───────────────▶│ ON · plain│
+ └─────────────┘             │   ring       │                └──────────┘
+                             └──────────────┘
+                              long-press / right-click → open ConfirmVoice bubble
+                              (also openable later from button menu to re-tag)
 ```
 
-Live's pills replace the two side pills with **identically-shaped** pills (same height, padding, border, font sizing as `Side 1 / Side 2`) — one per speaker, avatar + username inside. Arrangement: 1 row when ≤2 pills, 2×2 grid when 3–4, horizontal slider (Explore-style snap row with arrows) when ≥5. Pills that resolve to a real `user_id` are `<Link>`s to `/profile/:username`; unresolved ones render as the same pill without a link.
+- **Orange ring** = mic is on but `voiceTaggedAt IS NULL`. Aria-label: "Voice not confirmed — long-press to set up".
+- **Plain** = `voiceTaggedAt` set.
+- **Re-open**: right-click (desktop) or long-press (mobile, ≥500ms) at any time, even after confirmation. Quick-tap still toggles mic on/off.
 
-## New / reused components
+### ConfirmVoice bubble
 
-`src/components/record/RecordShell.tsx` — presentational wrapper used by all three record pages.
-Props:
+Popover anchored to the mic button.
 
-- `topic`, `description`, `status` (`completed | live | scheduled | processing | failed`)
-- `coverImageUrl`, `publisherName`, `participantCount`, `createdAt`, `endedAt`
-- `kind`: `"debate" | "live" | "imported"` (controls back-link label + imported badge)
-- `sidesRow`: ReactNode (the pills row, computed by the page)
-- `headerActions`: ReactNode (Share, Continue, PerformanceInsightsToggle, etc.)
-- `children`: tab body
+1. Prompt: "Hold and read aloud for 5–10 seconds so we can match your voice."
+2. Record button → captures via `getUserMedia` (reuses existing stream when possible). Live waveform.
+3. On stop: upload sample to `voice-samples` private bucket, write `profiles.voice_sample_path` + `profiles.voice_tagged_at`, and write the current `mic_connections.voice_tagged_at`. Show ✓ for ~700ms, auto-close.
+4. Failure / cancel: orange ring stays, no toast spam.
+5. Re-open at any time to redo (overwrites previous sample).
 
-Internally reuses the hero markup currently in `DebateRecordPreview` (gradient/cover, status pill, title, meta) so the look matches the screenshot exactly. Strip the rest of `DebateRecordPreview` (sides cards, threaded record section).
+Diarization is **not** done here. The sample is stored for the future Deepgram speaker-ID work (already flagged as v2 in the previous plan). What ships now: the UX, persistence, and the slot→user mapping benefits downstream (pills + bubbles).  
+Question: what does it mean that diarization is not done here? Isn't that how the voice is confirmed to the user identity?
 
-`src/components/record/SidePill.tsx` — the single canonical pill component. Variants:
+### Pin behavior
 
-- `kind="side"`: shows `SIDE N` eyebrow + colored label (current look).
-- `kind="user"`: shows avatar (8px circle) + `@username` in the same outer pill (same border, padding, radius, height as `kind="side"`).
-Both render at the same min-height so a side row and a user row are visually interchangeable.
+- Desktop right-click = `pinned = true`; bubble stays open until user closes or confirms.
+- Mobile long-press = `pinned = true` for the duration of the press; release before threshold cancels.
+- Quick tap = mic on/off only, no bubble.
 
-`src/components/record/ParticipantsRow.tsx` — layout-only:
+### Where the lobby's other jobs go
 
-- 1–2 pills → `grid grid-cols-2 gap-3` (same as today's sides).
-- 3–4 pills → `grid grid-cols-2 gap-3` (auto wraps to 2×2).
-- ≥5 → horizontal scroll-snap row with left/right arrows (mirroring `src/components/explore/*` shelf arrows, using `useEdgeScroll`). Each pill fixed width so they line up.
+- **Force start** → no longer needed; live recording starts the moment owner hits Start on the setup screen (already true for single-device).
+- **Multi-device "wait for joiners"** → join-code card moves into the in-room invite popover (already exists in `LiveSessionPage`). Joiners landing via `/live/join/:code` go straight to the room; their `mic_connections` row is created from inside the room.
+- **Echo Guard** → moved into `DisplayOptionsMenu` (already in-room).
 
-`src/components/record/RecordTabs.tsx` — the simple Transcript / Threaded record tabbed body lifted from `ImportedRecordPage` lines 190-217, including the `PerformanceInsightsToggle` slot. Wraps `<ArgumentMapContent tab={tab} … />`.
+---
 
-## Page-by-page changes
+## P3 — Debate-only: replace lobby with "Join when it starts" (AFTER P2)
 
-`**src/pages/ImportedRecordPage.tsx**`
+### Behavior
 
-- Replace hand-rolled header + tabs with `<RecordShell kind="imported" sidesRow={null} … >` and `<RecordTabs … />`. (No pills row for imports.)
-- Keep `RecordCommentsSection`, `RecordToolsMount`, `InsightsProvider`, `useDocumentMeta`, status/progress banner unchanged.
+- Tapping a debate's **Join** / queue button **does not** route to a lobby. It writes a `debate_participants` row (or `debate_interests` for spectators), keeps the user on whatever page they were on, and shows a toast: "You're in. We'll notify you when it starts."
+- A small persistent strip appears in `AppLayout`: `🟠 In queue for {topic} — view details`. Tap → debate preview page.
+- When the owner flips status to `live`, an `inserts` trigger on `debates` (or a fan-out in the existing `dispatch-debate-start-push` path) sends:
+  - Web Push notification: `"{topic} has started!"` with a `JOIN` action.
+  - In-app `notifications` row of type `debate_started` with deep link `/debate/:id`.
+  - If the user has the app open, a toast with a JOIN button (uses the existing `Sonner` toast action API).
 
-`**src/pages/DebateRoomPage.tsx**` (completed branch around line 1987) and `**src/pages/DebateScheduledPreviewPage.tsx**` (line 322)
+### Edge cases
 
-- Replace `<DebateRecordPreview … />` with the new shell:
-  - `sidesRow` = `<ParticipantsRow><SidePill kind="side" … /></ParticipantsRow>` driven by `sides` / `fallbackSideLabels`, identical look to today.
-  - Body = `<RecordTabs … />` instead of the threaded-only record + bottom transcript button.
-- Delete `DebateRecordPreview.tsx` once both call-sites migrate; move its hero markup into `RecordShell` and its "preview/ghost" rendering into `RecordTabs`' threaded pane (only active when `status !== "completed"` and no live data — `useDebatePreviewThreads` stays).
-- The "About this debate" `<details>` block stays, rendered by the shell when `description` is provided.
+- Owner is the exception — they go straight from create flow into the room (no self-notify).
+- If user is already inside another debate/live/cmm when their queued debate starts, the toast still appears but the JOIN button warns "End current session to switch."
+- Notifications respect existing per-user Web Push opt-in. If unsubscribed, only in-app notification + toast (when foregrounded).
 
-`**src/pages/LiveSessionPage.tsx**` (ended phase) and `**src/pages/SharedLiveSessionPage.tsx**`
+### Files touched
 
-- Stop using `SessionRecordViewV2`. Render the same `<RecordShell kind="live" … >` + `<RecordTabs … />`.
-- Build pills from `speakerNames`:
-  1. Resolve user_ids: query `live_session_participants` (multi-device) for `(speaker_slot, user_id)` and join `profiles` for `username` + `avatar_url`. For single-device sessions, treat `created_by` as speaker 0.
-  2. For each pill: if a `user_id` is resolved, link to `/p/:username` with avatar; otherwise render the same pill shape with initials + name, not clickable.
-- `headerActions` keeps Share, Continue, and the existing PerformanceInsightsToggle.
-- **Drop** the split-pane, notebook, highlight-annotate, citations, cross-refs, mobile threads/transcript toggle. `RecordToolsMount` is added for Q&A so live records keep the floating Q&A chat (already present on imported and debate). Comments section stays.
-- `SessionRecordViewV2.tsx`, `SessionRecordView.tsx`, and the now-unused notebook/annotation/citation hooks called only from V2 become dead code. Delete `SessionRecordViewV2.tsx` + `SessionRecordView.tsx`; leave the hooks alone (cheap, may be reused later) unless they reference deleted props.
+- `src/components/DebateCard.tsx` and the queue buttons → remove navigate-to-lobby.
+- `src/App.tsx` → remove `/debate/:id/lobby` route, redirect to `/debate/:id`.
+- New `src/components/QueuedDebateStrip.tsx` in `AppLayout`.
+- `supabase/functions/dispatch-debate-start-push/index.ts` → already exists; extend to also write in-app notifications for queued participants.
+- Migration: add `notifications.kind = 'debate_started'` if not present; no schema change needed beyond that.
 
-## Data: resolving live participants to users
+---
 
-For multi-device sessions:
+## Data (single migration, runs with P0/P1)
 
-```sql
-select speaker_slot, user_id from live_session_participants where session_id = :id
-```
-
-Join with `profiles` to get `username` + `avatar_url`. For single-device sessions, fall back to `live_sessions.created_by → profiles`.
-
-If a speaker_slot has no row, render the pill without a link. Result is a `participants: { slot, name, userId?, username?, avatarUrl? }[]` array, ordered by `slot`, that feeds `ParticipantsRow`.
-
-No schema changes. No edge function changes.
-
-## Styling parity
-
-`SidePill` is the single source of truth. The side variant keeps the current `SIDE 1` eyebrow + colored label; the user variant uses the same outer container (same `rounded-xl border border-border bg-card`, same vertical padding) with avatar+username inside, so a row of two user pills and a row of two side pills are pixel-equivalent in height/border/spacing. Slider arrows reuse the styles already used by Explore shelves.
+- `alter table live_sessions add column description text;`
+- `alter table live_sessions add column deep_perf_done_at timestamptz;`
+- `alter table profiles add column voice_sample_path text;`
+- `alter table profiles add column voice_tagged_at timestamptz;`
+- `alter table mic_connections add column voice_tagged_at timestamptz;`
+- New private storage bucket `voice-samples` with RLS: owner-only read/write.
 
 ## Out of scope
 
-- Renaming/restructuring the threaded record itself (`ArgumentMapContent`, `ThreadedRecordPane`).
-- Backend changes to `analyze-structure` / structure prompts.
-- Editing transcripts (split/merge UI) — that lived in `SessionRecordView`; live records become read-only in the new shell. If we want to keep that, it can be re-added in a follow-up.   
-MY COMMENT ON THIS LAST BULLET-POINT: USERS CAN HIGHLIGHT TO ANNOTATE ANY TEXT FROM THE TRANSCRIPT/THREADED RECORD WHICH SAID CONTENT CAN CREATE/WILL BE STORED IN THE CORRESPONDING NOTEBOOK AND STORED IN MYSTUDY. 
+- Real voice diarization / Deepgram speaker-ID matching (v2; sample is stored, not yet used). Question: WHY NOT?
+- Backfilling old sessions.
+- Re-imagining the in-room mic UI beyond the ring + bubble.
+
+---
+
+## Ship order
+
+1. P0 fixes (mic-prompt, host pill, description+Edit).
+2. P1 polish (length cap, analysis bar, time-rail, avatar bubbles).
+3. P2 mic-button voice-confirm + retire lobby for Live and CMM.
+4. P3 debate "Join when it starts" + retire debate lobby.
