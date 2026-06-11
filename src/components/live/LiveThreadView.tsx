@@ -5,7 +5,10 @@ import { LiveTranscriptEntry, LiveThreadMeta } from "@/hooks/useLiveTranscriptio
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import LiveTranscriptBubble from "@/components/live/LiveTranscriptBubble";
 import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
-import type { TranscriptDensity } from "@/hooks/useLiveDisplayPrefs";
+/** Density preset for transcript layout. Defined here now that the live
+ * display-prefs hook is gone — kept as a public type because shared
+ * components still parameterize on it (e.g. FloatingTranscript). */
+export type TranscriptDensity = "comfortable" | "compact" | "cinema";
 
 interface LiveThreadViewProps {
   entries: LiveTranscriptEntry[];
