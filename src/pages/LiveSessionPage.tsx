@@ -54,6 +54,10 @@ const LiveSessionPage = () => {
   const { id } = useParams<{ id: string }>();
 
   const [phase, setPhase] = useState<SessionPhase>(id ? "recording" : "setup");
+  // P0: when arriving at /live/:id we must not start mic/RTC hooks until the
+  // session row has loaded and we know whether status is "ended". Otherwise
+  // viewing a finished record triggers a mic+camera permission prompt.
+  const [phaseResolved, setPhaseResolved] = useState<boolean>(!id);
   const [sessionId, setSessionId] = useState<string | null>(id || null);
   const [title, setTitle] = useState("");
   const [mode, setMode] = useState<"single_device" | "multi_device">("single_device");
@@ -83,7 +87,8 @@ const LiveSessionPage = () => {
 
   const deviceId = useMemo(() => getDeviceId(), []);
   const isMulti = mode === "multi_device";
-  const rawIsRecordingActive = phase === "recording" && sessionStatus === "recording";
+  const rawIsRecordingActive =
+    phaseResolved && phase === "recording" && sessionStatus === "recording";
   const { isPaused: liveIsPaused } = usePauseControl({ kind: "live", id: sessionId, isHost: true });
   // Halt transcription + analysis whenever the host pauses the session.
   const isRecordingActive = rawIsRecordingActive && !liveIsPaused;
@@ -239,6 +244,11 @@ const LiveSessionPage = () => {
             .maybeSingle();
           if (part?.speaker_slot) setHostSpeakerSlot(part.speaker_slot);
         }
+        setPhaseResolved(true);
+      } else {
+        // Row missing — don't activate the mic; show the loading state and
+        // let the user navigate away.
+        setPhaseResolved(true);
       }
     };
     load();
