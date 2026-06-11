@@ -677,6 +677,13 @@ const LiveSessionPage = () => {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <SessionClockButton
+              startedAt={sessionData?.created_at ?? null}
+              paused={liveIsPaused}
+              isOwner={!!user?.id && user.id === sessionData?.created_by}
+              onTimeUp={handleCapReached}
+              onEndEarly={handleEndSession}
+            />
             <DisplayOptionsMenu prefs={prefs} update={updatePrefs} />
             {sessionId && user && (
               <>
