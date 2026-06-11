@@ -271,8 +271,8 @@ const DebateScheduledPreviewPage = () => {
       if (error) throw error;
       setQueuedSideId(sideId);
       setQueueSideOpen(false);
-      toast({ description: "Queued — taking you to the lobby." });
-      navigate(`/debate/${id}/lobby`);
+      toast({ description: "Queued — taking you to the waiting room." });
+      navigate(`/debate/${id}`);
     } catch (e: any) {
       toast({ title: "Couldn't queue", description: e?.message ?? "Try again." });
     } finally {
@@ -418,7 +418,7 @@ const DebateScheduledPreviewPage = () => {
                     <Eye className="w-4 h-4 mt-0.5 text-muted-foreground" />
                     <div className="flex-1">
                       <div className="text-sm font-body font-medium flex items-center gap-1.5">
-                        {spectatorQueued ? "Watch live" : "Join as spectator"}
+                        {spectatorQueued ? "Watch live" : "Enter as spectator"}
                         {spectatorQueued && <Check className="w-3.5 h-3.5 text-foreground" />}
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -431,7 +431,7 @@ const DebateScheduledPreviewPage = () => {
                   type="button"
                   onClick={() => {
                     if (queuedSideId) {
-                      navigate(`/debate/${id}/lobby`);
+                      navigate(`/debate/${id}`);
                     } else {
                       setQueueSideOpen(true);
                     }
@@ -441,13 +441,13 @@ const DebateScheduledPreviewPage = () => {
                   <LogIn className="w-4 h-4 mt-0.5 text-muted-foreground" />
                   <div className="flex-1">
                     <div className="text-sm font-body font-medium flex items-center gap-1.5">
-                      {queuedSideId ? "Go to lobby" : "Queue to join as speaker"}
+                      {queuedSideId ? "Enter waiting room" : "Queue to enter as speaker"}
                       {queuedSideId && <Check className="w-3.5 h-3.5 text-foreground" />}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {queuedSideId
                         ? "You're queued — wait for the host to start."
-                        : "Wait in the lobby; host can accept you."}
+                        : "Wait in the room; host can accept you."}
                     </div>
                   </div>
                 </button>
