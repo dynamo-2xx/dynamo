@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import RecordShell from "@/components/record/RecordShell";
+import RecordEditDialog from "@/components/record/RecordEditDialog";
 import { toast } from "sonner";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { InsightsProvider } from "@/contexts/InsightsContext";
@@ -54,6 +55,7 @@ interface ImportedRecord {
   description: string | null;
   source_kind: string;
   source_url: string | null;
+  cover_image_url?: string | null;
   subtopics: any[];
   transcript_entries: any[];
   argument_map: any[];
@@ -147,9 +149,37 @@ export default function ImportedRecordPage() {
         topic={rec.title}
         description={rec.description}
         status={rec.status === "ready" ? "completed" : (rec.status ?? "completed")}
+        coverImageUrl={rec.cover_image_url ?? null}
         createdAt={rec.created_at}
         importedSourceUrl={rec.source_url}
         importedSourceKind={rec.source_kind}
+        editSlot={
+          user?.id && user.id === rec.user_id ? (
+            <RecordEditDialog
+              initial={{
+                title: rec.title,
+                description: rec.description,
+                coverImageUrl: rec.cover_image_url ?? null,
+              }}
+              coverSeed={rec.title}
+              onSave={async (next) => {
+                const patch: Record<string, any> = {
+                  description: next.description,
+                  cover_image_url: next.coverImageUrl,
+                };
+                if (typeof next.title === "string" && next.title.length > 0) {
+                  patch.title = next.title;
+                }
+                const { error } = await supabase
+                  .from("imported_records" as any)
+                  .update(patch)
+                  .eq("id", rec.id);
+                if (error) throw error;
+                setRec({ ...rec, ...patch } as ImportedRecord);
+              }}
+            />
+          ) : null
+        }
         belowBack={
           <>
             {rec.status === "processing" && (
