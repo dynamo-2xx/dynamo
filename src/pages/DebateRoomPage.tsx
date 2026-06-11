@@ -1568,6 +1568,9 @@ const DebateRoomPage = () => {
         <InPersonMicBar
           initialStream={handoffStream}
           displayName={user?.email ?? null}
+          sessionKind={(debate as any)?.format === "change_my_mind" ? "cmm" : "debate"}
+          sessionId={id ?? null}
+          userId={user?.id ?? null}
         />
       )}
       {/* Header */}
