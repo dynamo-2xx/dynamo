@@ -1,4 +1,36 @@
-# P2 — Retire the mic lobby, move voice-confirm in-room
+# P3 — Debate "Join when it starts" (replace remaining lobby UX)
+
+P0, P1, P2 shipped. P3 finishes the lobby retirement by removing the *navigate-into-a-waiting-room* step for invitees.
+
+## What changes for the user
+
+**Today (post-P2):** Tapping a Join link drops the user into the room while it's still in `draft`/`scheduled` — they see the thin in-room lobby and have to sit on that tab until the host hits Start. If they close the tab they miss it.
+
+**After P3:** Tapping Join writes them onto the queue and returns them to wherever they were, with a toast: *"You're queued for [topic]. We'll notify you when it starts."* A small persistent strip in the global layout reminds them they're queued and offers Leave. When the host flips the debate to `live`, the existing in-app `session_started` notification + a Web Push notification fire, both with an **ENTER** button that drops them into the room.
+
+## Scope
+
+1. **`JoinDebatePage` / `JoinCmmPage` / `LiveJoinPage`** — on successful queue/claim, do NOT navigate to the room while status≠`live`. Toast + `navigate(-1)` (or `/`). If status is already `live`, navigate straight in.
+2. **New** `src/components/QueuedSessionStrip.tsx` — mounted in `AppLayout`. Subscribes to the user's open queue rows across `debate_participants` (where status is draft/scheduled). Renders a slim bottom strip per active queue: topic + "Leave" + auto-disappears on status→live (which triggers the existing toast/notification).
+3. **`DebateRoomPage` start handler** — after the `promote_lobby_to_participants` RPC, invoke `dispatch-debate-start-push` edge function so Web Push fires alongside the in-app notification. Same for CMM/Live start handlers if they have queued users.
+4. **Owner guard** — when the host clicks Start on a different live session than where they currently are, no-op; we don't navigate them mid-session. (Already implicitly true; just make sure we don't double-fire.)
+
+## Out of scope
+
+- Re-architecting `dispatch-debate-start-push` itself; it already exists and is wired to `debate_interests`/invitations. We just call it.
+- Adding a queue strip for live/CMM separately — same component handles all three kinds.
+- Per-device push opt-in flow (already covered by existing push subscription onboarding).
+
+## Files
+
+- **New** `src/components/QueuedSessionStrip.tsx`
+- **Edit** `src/components/AppLayout.tsx` — mount the strip above the bottom nav.
+- **Edit** `src/pages/JoinDebatePage.tsx`, `JoinCmmPage.tsx`, `LiveJoinPage.tsx` — on queue success, toast + go back instead of pushing into the room.
+- **Edit** `src/pages/DebateRoomPage.tsx` — after start, call `supabase.functions.invoke("dispatch-debate-start-push", { body: { debate_id } })`.
+
+---
+
+## Done — P2: Retire the mic lobby, move voice-confirm in-room
 
 ## What changes for the user
 
