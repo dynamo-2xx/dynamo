@@ -31,14 +31,13 @@ import VideoGrid from "@/components/live/VideoGrid";
 import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
 import { useMicPolicy } from "@/hooks/useMicPolicy";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
-import FloatingTranscript from "@/components/live/FloatingTranscript";
 import SessionClockButton from "@/components/live/SessionClockButton";
-import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import PauseButton from "@/components/sharing/PauseButton";
 import { usePauseControl } from "@/hooks/usePauseControl";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
+import { useLocalCameraPreview } from "@/hooks/useLocalCameraPreview";
+import { useTheme } from "next-themes";
 
 const getDeviceId = () => {
   let id = localStorage.getItem("dyn_device_id");
