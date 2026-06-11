@@ -555,8 +555,6 @@ const LiveSessionPage = () => {
   }
 
   // ── RECORDING SCREEN ──
-  // Single-device camera preview (multi-device gets its camera via RTC).
-  const localPreview = useLocalCameraPreview(!isMulti && isRecordingActive);
   const localStream = isMulti ? rtc.localStream : localPreview.stream;
   const cameraOn = isMulti ? rtc.cameraOn : localPreview.cameraOn;
   const micOn = isMulti ? rtc.micOn : singleMicOn;
