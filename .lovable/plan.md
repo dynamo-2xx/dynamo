@@ -1,94 +1,69 @@
-## Why it looks glitchy today
+## Goal
 
-Two root causes are stacking on top of each other:
+Make the in-progress live session look like the debate room: a right-side **Argument Map** with two tabs — `Transcript` (avatar + name + mm:ss inline) and `Threaded Record` (anatomy + relationship tags driven by the structural AI pass). Fix the "Speaker 0" label when the host is alone, and add the green-check voice-confirmation to the live mic toggle.
 
-1. **The room isn't actually a "video meeting".** In single-device mode the whole `videoBlock` is gated off, so there's no camera tile, no mic toggle, no cam toggle — just a transcript pane over the page background, which reads as a giant empty grey slab when the transcript is short.
-2. **The "grey blob" + "inverted look" is a theme bug.** `themeWrapperClass` adds a scoped `.dark` wrapper around just the live panel. The transcript scroller (`bg-background/70 backdrop-blur-xl`) and collapsibles (`bg-background/60 backdrop-blur-xl`) flip token values inside that wrapper, so white@70 over dark becomes mid-grey, while the header sits outside the wrapper and stays light — that's the half-and-half "inverted" effect.
+Everything else in the live room (Zoom layout, themes, header, pause, end) is unchanged.
 
-On top of that, the dark theme in `index.css` is the light tokens flipped on the lightness axis — same hues, no distinct dark identity.
+## Changes
 
-The `DisplayOptionsMenu` (Layout / Tile style / Density / Show-hide toggles / Theme) compounds the problem: 4 layout presets × 3 tile styles × 3 densities × 4 themes = combinations we can't QA, and it overwhelms users before the basic room even works.
+### 1. Right pane → real Argument Map (Transcript / Threaded Record tabs)
 
-## What we'll build
+In `src/pages/LiveSessionPage.tsx`, replace the current `transcriptBlock` (collapsible subtopic list with `LiveThreadView`) with the same component the debate room uses: `ArgumentMapContent`, wrapped in a small tab switcher.
 
-### A. Live room becomes a Zoom-like meeting
+- Add local state `mapTab: "transcript" | "threaded"` (default `transcript`).
+- Render a sticky header with two tab buttons, the entry count, and the existing "Analyzing…" spinner.
+- Build the inputs `ArgumentMapContent` expects from the live data we already have:
+  - `subtopics` → `{ id: title, title }[]` from `subtopics`.
+  - `transcriptEntries` → map each `LiveTranscriptEntry` to
+    `{ id, speaker_side: getSpeakerName(speaker_id), text, subtopic: e.subtopic ?? subtopics[0] ?? "", timestamp, ai_summary }`.
+  - `argumentMap` → `[]` (legacy pane only; we use the new structural pane).
+  - `sessionId` + `sessionKind="live"` so it renders `ThreadedRecordPane` (backed by `argument_units`, realtime).
+  - `sessionComplete={false}` while recording.
+  - `sessionStartMs` = `new Date(sessionData.created_at).getTime()` so the mm:ss rail matches the debate room.
+  - `speakerMeta` keyed by the same display string we pass as `speaker_side` (host name and "Speaker N" fallbacks), with `avatarUrl` / `userId` from current presence + the host's own profile.
+- Keep the interim-text shimmer line below the tab content so the user still sees live partials.
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│ ← Recording · test!!!!   ⏱ 56:40   ⏸  Share  End         │  header (compact, overflow-safe)
-├──────────────────────────────────────┬───────────────────┤
-│                                      │  ▼ General Disc.. │
-│           [ video stage ]            │  ▼ Sound check    │
-│   ┌────────┐  ┌────────┐             │  ─────────────    │
-│   │ You    │  │ Speaker│             │  • argument map   │
-│   │ 🎤 📹  │  │ 2      │             │    (transcript /  │
-│   └────────┘  └────────┘             │    threaded       │
-│                                      │    record)        │
-│  [🎤 Mute]  [📹 Camera]              │                   │
-└──────────────────────────────────────┴───────────────────┘
-```
+### 2. Run the structural pass during live recording
 
-- **Always-on local camera tile.** `getUserMedia({ video: true })` for a local preview regardless of `mode`. In multi-device the same `MediaStream` is published via `useLiveSessionRTC` as today; in single-device it stays local-only.
-- **Mic + camera toggle buttons always visible** in a Zoom-style control bar pinned to the bottom of the video stage. Driven by a single `useLocalMedia()` hook so the controls behave identically in single- and multi-device.
-- **Argument map docked to the right** on tablet/desktop (≥ 768px), collapsing to a bottom sheet on phone. The "argument map" surface = the existing transcript / threaded record view (same `transcriptBlock` content), retitled and tucked into the side panel.
-- **One fixed layout.** Side-by-side video + argument map on ≥ 768px; stacked (video on top, argument map below) on phones. No layout picker, no tile-style picker, no density picker.
-- **Header overflow fix.** Group `⏸ Share End` into one trailing cluster with consistent 32px buttons; "Resume (3:20)" pill collapses to `▶ 3:20` under 900px so the title never collides with controls.
-- **Kill the translucent stack.** Replace `bg-background/70 backdrop-blur-xl` on the transcript scroller and `bg-background/60 backdrop-blur-xl` on collapsibles with solid `bg-card` + `border-border`. No more half-lit grey slab.
+`ThreadedRecordPane` already has `autoTrigger`, but it only fires on mount. To keep the threaded record filling in as the session grows, kick `triggerStructurePass(sessionId, "live", "structure_live")` from `LiveSessionPage` whenever transcript count grows past thresholds (every 5 new finalized entries, debounced 15s; first call after the 3rd entry). Realtime in `useArgumentUnits` propagates new rows to the pane automatically.
 
-### B. Delete the Display Options menu entirely
+### 3. Fix "Speaker 0" → host display name
 
-- Remove `DisplayOptionsMenu` from the live room header.
-- Remove the prefs it owns: `layout`, `tileStyle`, `density`, `showTimestamps`, `showTileLabels`, `showInterim`, `groupBySubtopic`, `theme`. Hard-code the single good defaults in the new layout: timestamps on, tile labels on, interim text on, group by subtopic on, side-by-side layout, grid tiles, comfortable density.
-- Delete `src/hooks/useLiveDisplayPrefs.ts` and the `DisplayOptionsMenu` component.
-- Theme is no longer user-selectable per session — the live room follows the app's global light/dark theme.
+Today single-device transcripts are stored with `speaker_id: 0`, and `getSpeakerName` falls back to `"Speaker 0"`. Two fixes:
 
-### C. Distinct light & dark themes (not inversions)
+- In `LiveSessionPage`, when single-device recording starts (and `hostDisplayName` is known), seed `speakerNames["0"] = hostDisplayName` in state and persist it to `live_sessions.speaker_names` (idempotent — only if not already set).
+- Update the fallback in `getSpeakerName` to return `hostDisplayName` when `speakerNames[id]` is missing **and** `isMulti === false` (single-device → only the host can be speaker). For multi-device, keep the existing `Speaker N` fallback because remote slots may not have presence yet.
 
-Introduce **two purpose-built palettes** for the live room, scoped under `[data-live-theme="light"]` and `[data-live-theme="dark"]`. The attribute is set from the app's global theme (`light` or `dark`), not from a per-session picker.
+### 4. Voice confirmation on the live mic button
 
-| Token | Light theme (`Studio`) | Dark theme (`Atrium`) |
-|-------|------------------------|------------------------|
-| Stage background | Warm paper `#F7F5F0` | Deep slate `#0E1116` |
-| Video tile bg (cam off) | Cool stone `#1E2024` | Onyx `#1A1D22` (same family as stage, not flipped) |
-| Side panel bg | Pure white `#FFFFFF` | Graphite `#15181D` with 1px inner highlight `rgba(255,255,255,0.04)` |
-| Card / collapsible | `#FFFFFF` + `0.5px rgba(0,0,0,0.08)` | `#1B1F25` + `0.5px rgba(255,255,255,0.06)` |
-| Primary text | `#0A0A0A` | `#ECEEF1` (warm white, not pure) |
-| Muted text | `#5B6066` | `#8A9099` |
-| Accent (Recording) | Coral `#E04E3A` | Coral-warm `#F26A55` (lifted for contrast on dark) |
-| Resume / pause CTA | Amber `#E89B12` on white | Amber `#F0B748` on dark |
-| Tile border / dividers | `rgba(0,0,0,0.06)` | `rgba(255,255,255,0.05)` |
-| Shadow language | Soft drop, 0 2px 8px rgba(0,0,0,0.04) | No shadows; rely on contrast + 0.5px borders |
+Single-device live doesn't use `mic_connections`, so the existing `MicConfirmButton` (which UPDATEs that table) isn't a fit. Add a small local-only confirmation:
 
-Key differences (so they don't read as inversions):
-- **Light = paper.** Warm off-white stage, white cards, no glow.
-- **Dark = studio control room.** Cool slate stage, graphite panels, no pure black, no `invert`. Borders replace shadows. Coral and amber accents are tuned per theme.
+- New hook `src/hooks/useLocalVoiceConfirm.ts`: takes `(stream, active)`, runs an `AnalyserNode` RMS loop (same threshold as `MicConfirmButton`: rms ≥ 0.08 sustained ≥ 500 ms), returns `confirmed: boolean`. Resets when `stream` changes or `active` flips off.
+- In `LiveSessionPage`, call it with `localStream` (single OR multi). When `confirmed`, render the same green check badge `MicConfirmButton` uses, positioned over the mic toggle inside the `VideoGrid` controls.
+  - Cheapest path: pass an optional `voiceConfirmed?: boolean` prop down to `VideoGrid` and render the badge over the local mic button. No DB writes.
+- For multi-device, this is purely a UX cue; the lobby's existing `MicConfirmButton` path is unchanged.
 
-The global app `--background` / `--foreground` tokens stay untouched. The live room reads its own tokens from a small scoped CSS block, so theme decisions can never bleed into the rest of the app and the half-lit slab can't recur.
+## Stress tests to run before shipping
 
-## Files touched
+1. **Speaker label** — fresh single-device session as a user whose `display_name` is set: transcript and threaded record show the display name, never "Speaker 0". Then rename the speaker via the ended-record view — name persists.
+2. **Tab switching mid-recording** — switch Transcript ↔ Threaded Record while new entries stream in. Scroll position resets per tab is acceptable; no white-flash, no remount of the Deepgram socket (it lives on the page, not in the pane).
+3. **Structural pass cadence** — confirm `trigger-structure-pass` is called at most ~once per 15 s and only when entry count grew. Watch network panel for no thundering herd. New `argument_units` rows appear in the Threaded Record tab via realtime without a reload.
+4. **mm:ss rail** — first entry shows `0:00`-ish, later entries increase monotonically. Pause + resume does not break offsets (we anchor on `created_at`, not on pause math, matching the debate room).
+5. **Voice confirm** — start session muted → no check. Unmute and speak → green check appears within ~1 s. Mute again → check stays (one-shot confirm, mirrors `MicConfirmButton`). Stays across tab switches.
+6. **Multi-device** — host + one remote joiner: both names show in Transcript tab (presence → `speaker_names`), threaded record groups by speaker_side correctly, no "Speaker 0" regressions for the host.
+7. **Ended session** — end recording mid-stream: the ended view (`LiveEndedRecord` → `RecordShell` → `ArgumentMapContent` with `sessionComplete`) renders the same Threaded Record content (it reads from `argument_units` too), so live and post views stay consistent.
+8. **No structural pass on viewer** — a non-host viewing `/live/:id` after end: page is in `phase === "ended"`, the live trigger loop is gated by `phase === "recording"`, so no extra calls fire.
 
-- `src/pages/LiveSessionPage.tsx` — header restructure, always-on video stage, side panel layout, drop `videoBlock` `isMulti` gate, remove translucent backgrounds, remove `DisplayOptionsMenu` mount and all `prefs.*` reads.
-- `src/components/live/VideoGrid.tsx` — render local tile even with no peers; ensure tile fills container; Zoom-style control bar.
-- `src/components/live/SessionControls.tsx` *(new)* — mic / camera buttons; binds to `useLocalMedia`.
-- `src/hooks/useLocalMedia.ts` *(new)* — wraps `getUserMedia`, exposes `{ stream, micOn, camOn, toggleMic, toggleCam }`; multi-device passes the stream into `useLiveSessionRTC`.
-- `src/components/live/DisplayOptionsMenu.tsx` — **deleted**.
-- `src/hooks/useLiveDisplayPrefs.ts` — **deleted**. Anything that still imports `themeWrapperClass` switches to reading the global theme.
-- `src/components/live/FloatingTranscript.tsx` — solid surface, no backdrop-blur.
-- `src/index.css` — add `[data-live-theme="light"]` and `[data-live-theme="dark"]` blocks with the new token set above; no changes to global `:root` / `.dark`.
-- `src/components/live/PresenceList.tsx`, `JoinCodeCard.tsx` — restyle to read the new live-scoped tokens.
+## Files
+
+- Edit `src/pages/LiveSessionPage.tsx` — swap right pane to `ArgumentMapContent`, seed host name into `speaker_names`, kick periodic `triggerStructurePass`, wire voice-confirm badge.
+- Edit `src/components/live/VideoGrid.tsx` — accept optional `voiceConfirmed` prop and overlay the green check on the local mic button.
+- Add `src/hooks/useLocalVoiceConfirm.ts`.
+- No DB changes. No edge-function changes. `analyze-structure` already supports `session_kind="live"` (used by the completion overlay today).
 
 ## Out of scope
 
-- WebRTC topology / signaling changes — single-device stays local-only, multi-device stays mesh.
-- Transcript pipeline, Deepgram config, AI facilitation, summaries.
-- The global app light/dark theme (only the live room gets the new dual palette).
-- The "Pause pauses the timer" change you already shipped.
-
-## Acceptance check
-
-1. Open `/live/:id` in single-device mode → see your own camera tile (or a "Camera off" placeholder), mic + cam toggle buttons, argument map docked right.
-2. No Display Options gear in the header.
-3. Pause → header doesn't overflow at 877px viewport.
-4. Switch the app to dark mode → live room renders the `Atrium` palette: graphite cards, deep slate stage, warm coral/amber accents. No section reads as half-lit.
-5. Switch the app to light mode → warm paper stage, white cards with hairline borders, no shadows on dark elements.
-6. Resize to 375px wide → video stage is full-width on top, argument map stacks below.
+- Rewriting Deepgram/transcription pipeline.
+- Changing the structural AI prompts or anatomy/relationship taxonomy.
+- Multi-device WebRTC topology.
+- Post-session record view (`LiveEndedRecord`) — already uses the same pane.

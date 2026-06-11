@@ -38,6 +38,9 @@ import { usePauseControl } from "@/hooks/usePauseControl";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { useLocalCameraPreview } from "@/hooks/useLocalCameraPreview";
 import { useTheme } from "@/contexts/ThemeContext";
+import ArgumentMapContent from "@/components/debate/ArgumentMapContent";
+import { triggerStructurePass } from "@/hooks/useArgumentUnits";
+import { useLocalVoiceConfirm } from "@/hooks/useLocalVoiceConfirm";
 
 const getDeviceId = () => {
   let id = localStorage.getItem("dyn_device_id");
@@ -100,6 +103,8 @@ const LiveSessionPage = () => {
   // Zoom-style mic toggle for the single-device path. When the user mutes,
   // we also stop the Deepgram socket so we're not transcribing silence.
   const [singleMicOn, setSingleMicOn] = useState(true);
+  // Right pane tab. Mirrors the debate room's argument map.
+  const [mapTab, setMapTab] = useState<"transcript" | "threaded">("transcript");
 
   // Single-device camera preview. Hoisted above the phase early-returns
   // because hook order must be stable; the hook itself no-ops when the
@@ -107,16 +112,18 @@ const LiveSessionPage = () => {
   const localPreview = useLocalCameraPreview(!isMulti && isRecordingActive);
 
   // Load host's display name from profile
+  const [hostAvatarUrl, setHostAvatarUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!user) return;
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("display_name")
+        .select("display_name, avatar_url")
         .eq("user_id", user.id)
         .maybeSingle();
       const name = data?.display_name || user.email?.split("@")[0] || "Host";
       setHostDisplayName(name);
+      setHostAvatarUrl((data as any)?.avatar_url ?? null);
     })();
   }, [user]);
 
@@ -220,6 +227,21 @@ const LiveSessionPage = () => {
   const connectionError = isMulti ? null : single.connectionError;
   const isSummarizing = isMulti ? false : single.isSummarizing;
   const endSession = single.endSession;
+
+  // Single-device: seed speaker_names["0"] with the host's display name so
+  // the transcript and threaded record show the real name, not "Speaker 0".
+  useEffect(() => {
+    if (isMulti || !sessionId || !hostDisplayName) return;
+    if (speakerNames["0"] === hostDisplayName) return;
+    const next = { ...speakerNames, ["0"]: hostDisplayName };
+    setSpeakerNames(next);
+    (supabase as any)
+      .from("live_sessions")
+      .update({ speaker_names: next })
+      .eq("id", sessionId)
+      .then(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMulti, sessionId, hostDisplayName]);
 
   // Load existing session if navigating to /live/:id
   useEffect(() => {
@@ -381,7 +403,11 @@ const LiveSessionPage = () => {
   }, [transcriptEntries, subtopics]);
 
   const getSpeakerName = (speakerId: number) => {
-    return speakerNames[String(speakerId)] || `Speaker ${speakerId}`;
+    const named = speakerNames[String(speakerId)];
+    if (named) return named;
+    // Single-device only ever has speaker 0 (the host).
+    if (!isMulti && hostDisplayName) return hostDisplayName;
+    return `Speaker ${speakerId + 1}`;
   };
 
   // Avatar lookup by speaker_slot, derived from current presence rows.
@@ -393,6 +419,82 @@ const LiveSessionPage = () => {
     return m;
   }, [presenceParticipants]);
   const getSpeakerAvatar = (speakerId: number) => avatarBySlot[speakerId] ?? null;
+
+  // ── Periodic structural pass during recording ──
+  // Kicks `analyze-structure` (via trigger) when transcript count grows so the
+  // Threaded Record tab fills in mid-session. Debounced so we don't spam.
+  const lastStructuralAtRef = useRef<number>(0);
+  const lastStructuralCountRef = useRef<number>(0);
+  useEffect(() => {
+    if (!sessionId || !isRecordingActive) return;
+    const finalCount = transcriptEntries.filter((e) => e.is_final !== false).length;
+    if (finalCount < 3) return;
+    const grew = finalCount - lastStructuralCountRef.current;
+    if (grew < 5 && lastStructuralCountRef.current > 0) return;
+    const now = Date.now();
+    if (now - lastStructuralAtRef.current < 15_000) return;
+    lastStructuralAtRef.current = now;
+    lastStructuralCountRef.current = finalCount;
+    void triggerStructurePass(sessionId, "live", "structure_live");
+  }, [sessionId, isRecordingActive, transcriptEntries]);
+
+  // Local stream (for the voice-confirm RMS gate). Hoisted above the phase
+  // early-returns so the hook order stays stable. The actual local media
+  // objects (camera preview / RTC) are gated internally by `active`.
+  const localStreamForConfirm = isMulti ? rtc.localStream : localPreview.stream;
+  const micOnForConfirm = isMulti ? rtc.micOn : singleMicOn;
+  const voiceConfirmed = useLocalVoiceConfirm(
+    localStreamForConfirm,
+    isRecordingActive && micOnForConfirm,
+  );
+
+  // ArgumentMapContent inputs — also hoisted to keep hook order stable.
+  const subtopicInputs = useMemo(
+    () => groupedEntries.ordered.map((t) => ({ id: t, title: t })),
+    [groupedEntries.ordered],
+  );
+  const transcriptInputs = useMemo(
+    () =>
+      transcriptEntries
+        .filter((e) => e.is_final !== false)
+        .map((e) => {
+          const named = speakerNames[String(e.speaker_id)];
+          const speakerSide =
+            named ||
+            (!isMulti && hostDisplayName) ||
+            `Speaker ${e.speaker_id + 1}`;
+          return {
+            id: e.id,
+            speaker_side: speakerSide,
+            text: e.text,
+            subtopic: e.subtopic || groupedEntries.ordered[0] || "",
+            timestamp: e.timestamp,
+            ai_summary: e.ai_summary,
+          };
+        }),
+    [transcriptEntries, groupedEntries.ordered, speakerNames, hostDisplayName, isMulti],
+  );
+  const speakerMeta = useMemo(() => {
+    const m: Record<string, { name: string; avatarUrl: string | null; userId: string | null }> = {};
+    if (hostDisplayName) {
+      m[hostDisplayName] = {
+        name: hostDisplayName,
+        avatarUrl: hostAvatarUrl,
+        userId: user?.id ?? null,
+      };
+    }
+    presenceParticipants.forEach((p) => {
+      const name = p.display_name || `Speaker ${p.speaker_slot}`;
+      m[name] = {
+        name,
+        avatarUrl: p.avatar_url ?? null,
+        userId: (p as any).user_id ?? null,
+      };
+      m[`Speaker ${p.speaker_slot}`] = m[name];
+      m[`Speaker ${p.speaker_slot + 1}`] = m[name];
+    });
+    return m;
+  }, [hostDisplayName, hostAvatarUrl, user?.id, presenceParticipants]);
 
   // ── ENDED → Full record page ──
   if (phase === "ended") {
@@ -562,96 +664,89 @@ const LiveSessionPage = () => {
   const onToggleMic = isMulti ? rtc.toggleMic : (() => setSingleMicOn((v) => !v));
   const localDisplayName = isMulti ? hostName : (hostDisplayName || "You");
   const mediaError = isMulti ? rtc.error : localPreview.error;
+  const sessionStartMs = sessionData?.created_at
+    ? new Date(sessionData.created_at).getTime()
+    : null;
+
+  const tabBtn = (key: "transcript" | "threaded", label: string) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => setMapTab(key)}
+      className={`text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md transition-colors ${
+        mapTab === key
+          ? "bg-foreground/10 text-foreground"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {label}
+    </button>
+  );
 
   const transcriptBlock = (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-card">
-      <div className="flex items-center justify-between sticky top-0 z-10 -mx-4 -mt-4 px-4 py-2 bg-card border-b border-border">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Argument map
-        </h2>
-        <span className="text-[10px] text-muted-foreground">
-          {transcriptEntries.length} {transcriptEntries.length === 1 ? "entry" : "entries"}
-        </span>
+    <div ref={scrollRef} className="flex-1 overflow-y-auto bg-card">
+      <div className="flex items-center justify-between sticky top-0 z-10 px-3 py-2 bg-card border-b border-border">
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-body mr-1.5">
+            Argument map
+          </span>
+          {tabBtn("transcript", "Transcript")}
+          {tabBtn("threaded", "Threaded")}
+        </div>
+        <div className="flex items-center gap-2">
+          {isSummarizing && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-primary font-semibold">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Analyzing…
+            </span>
+          )}
+          <span className="text-[10px] text-muted-foreground">
+            {transcriptInputs.length}{" "}
+            {transcriptInputs.length === 1 ? "entry" : "entries"}
+          </span>
+        </div>
       </div>
 
-      {micError && (
-        <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3 border border-destructive/20">
-          {micError}
-        </div>
-      )}
-      {connectionError && (
-        <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3 border border-destructive/20">
-          {connectionError}
-        </div>
-      )}
+      <div className="px-1 py-2 space-y-2">
+        {micError && (
+          <div className="mx-2 bg-destructive/10 text-destructive text-sm rounded-lg p-3 border border-destructive/20">
+            {micError}
+          </div>
+        )}
+        {connectionError && (
+          <div className="mx-2 bg-destructive/10 text-destructive text-sm rounded-lg p-3 border border-destructive/20">
+            {connectionError}
+          </div>
+        )}
 
-      {transcriptEntries.length === 0 && !interimText && (
-        <div className="text-center text-muted-foreground text-sm py-12">
-          {isConnected
-            ? "Listening — start speaking and the argument map fills in."
-            : singleMicOn || isMulti
-            ? "Connecting to microphone…"
-            : "Microphone is muted. Tap the mic button to start."}
-        </div>
-      )}
-
-      {groupedEntries.ordered.map((topic) => {
-        const topicEntries = groupedEntries.groups[topic] || [];
-        if (topicEntries.length === 0) return null;
-        return (
-          <Collapsible key={topic} defaultOpen>
-            <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-secondary transition-colors">
-              <ChevronDown className="w-4 h-4 text-foreground shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
-              <h3 className="text-sm font-display font-semibold text-foreground flex-1 truncate">
-                {topic}
-              </h3>
-              <span className="text-[10px] rounded-full px-2 py-0.5 text-muted-foreground border border-border">
-                {topicEntries.length} {topicEntries.length === 1 ? "statement" : "statements"}
-              </span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="pt-2 pl-2">
-                <LiveThreadView
-                  entries={topicEntries}
-                  threadTitles={threads}
-                  getSpeakerName={getSpeakerName}
-                  getSpeakerAvatar={getSpeakerAvatar}
-                  bubble={isMulti}
-                  compact
-                  density="comfortable"
-                  showTimestamps
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      })}
-
-      {groupedEntries.uncategorized.length > 0 && (
-        <div className="space-y-2">
-          {groupedEntries.ordered.length > 0 && (
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Uncategorized
-            </h3>
-          )}
-          <LiveThreadView
-            entries={groupedEntries.uncategorized}
-            threadTitles={threads}
-            getSpeakerName={getSpeakerName}
-            getSpeakerAvatar={getSpeakerAvatar}
-            bubble={isMulti}
-            compact
-            density="comfortable"
-            showTimestamps
+        {transcriptInputs.length === 0 && !interimText ? (
+          <div className="text-center text-muted-foreground text-sm py-12">
+            {isConnected
+              ? "Listening — start speaking and the argument map fills in."
+              : singleMicOn || isMulti
+              ? "Connecting to microphone…"
+              : "Microphone is muted. Tap the mic button to start."}
+          </div>
+        ) : (
+          <ArgumentMapContent
+            tab={mapTab}
+            subtopics={subtopicInputs}
+            transcriptEntries={transcriptInputs}
+            argumentMap={[]}
+            sessionId={sessionId ?? undefined}
+            sessionKind="live"
+            sessionComplete={false}
+            sessionStartMs={sessionStartMs}
+            speakerMeta={speakerMeta}
           />
-        </div>
-      )}
+        )}
 
-      {interimText && (
-        <div className="text-sm text-foreground/80 italic px-3 py-2 rounded-lg bg-secondary border border-border">
-          {interimText}…
-        </div>
-      )}
+        {interimText && (
+          <div className="mx-2 text-sm text-foreground/80 italic px-3 py-2 rounded-lg bg-secondary border border-border">
+            {interimText}…
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -670,6 +765,7 @@ const LiveSessionPage = () => {
         onToggleMic={onToggleMic}
         tileStyle="grid"
         showLabels
+        voiceConfirmed={voiceConfirmed}
       />
       {mediaError && (
         <div className="mt-2 bg-destructive/10 text-destructive text-xs rounded-lg p-2">
