@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { ChevronDown, Pencil, Check, X, RotateCcw } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import InsightText from "@/components/insights/InsightText";
 import ThreadedRecordPane from "@/components/debate/ThreadedRecordPane";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export interface TranscriptEntryInput {
   id: string;
@@ -33,6 +35,14 @@ export interface SubtopicInput {
   parent_id?: string | null;
 }
 
+/** Optional rich speaker info keyed by the same string used as `speaker_side`. */
+export interface SpeakerMeta {
+  name?: string;
+  avatarUrl?: string | null;
+  userId?: string | null;
+}
+export type SpeakerMetaMap = Record<string, SpeakerMeta>;
+
 interface AnalysisEntry {
   subtopicId: string;
   subtopicTitle: string;
@@ -58,6 +68,11 @@ interface ArgumentMapContentProps {
   sessionKind?: "debate" | "cmm" | "live" | "imported";
   /** Force the post-session structural pass (enables UNRESOLVED). */
   sessionComplete?: boolean;
+  /** Optional anchor for the mm:ss left rail (epoch ms). When omitted, the rail
+   *  is computed from the first entry's timestamp. */
+  sessionStartMs?: number | null;
+  /** Optional avatar + display name lookup keyed by `speaker_side`. */
+  speakerMeta?: SpeakerMetaMap;
 }
 
 const typeChipColor = (t: string) => {
