@@ -1958,6 +1958,7 @@ export type Database = {
           slot_key: string
           status: string
           user_id: string | null
+          voice_confirmed_at: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1973,6 +1974,7 @@ export type Database = {
           slot_key: string
           status?: string
           user_id?: string | null
+          voice_confirmed_at?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -1988,6 +1990,7 @@ export type Database = {
           slot_key?: string
           status?: string
           user_id?: string | null
+          voice_confirmed_at?: string | null
         }
         Relationships: []
       }
