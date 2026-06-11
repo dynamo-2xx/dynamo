@@ -13,6 +13,7 @@ interface Args {
   mode: MicMode;
   /** Live mic stream (only when mode === 'own_mic'). */
   stream?: MediaStream | null;
+  releaseOnUnmount?: boolean;
 }
 
 /**
@@ -30,6 +31,7 @@ export function useMicLobbyAttachment({
   avatarUrl,
   mode,
   stream,
+  releaseOnUnmount = true,
 }: Args) {
   const rowIdRef = useRef<string | null>(null);
   const rmsRef = useRef<number>(0);
@@ -60,6 +62,7 @@ export function useMicLobbyAttachment({
             display_name: displayName,
             avatar_url: avatarUrl ?? null,
             mode,
+            status: "connected",
             last_seen_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
@@ -82,6 +85,7 @@ export function useMicLobbyAttachment({
       }
 
       if (cancelled && rowIdRef.current) {
+        if (!releaseOnUnmount) return;
         await (supabase as any)
           .from("mic_connections")
           .update({ status: "released" })
@@ -92,7 +96,7 @@ export function useMicLobbyAttachment({
     return () => {
       cancelled = true;
       const id = rowIdRef.current;
-      if (id) {
+      if (id && releaseOnUnmount) {
         (supabase as any)
           .from("mic_connections")
           .update({ status: "released" })
@@ -100,7 +104,7 @@ export function useMicLobbyAttachment({
       }
       rowIdRef.current = null;
     };
-  }, [kind, sessionId, slotKey, userId, deviceId, displayName, avatarUrl, mode]);
+  }, [kind, sessionId, slotKey, userId, deviceId, displayName, avatarUrl, mode, releaseOnUnmount]);
 
   // Audio analyser + RMS heartbeat (every 2s) — only when we have a stream
   useEffect(() => {
