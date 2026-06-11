@@ -27,6 +27,7 @@ export default function InPersonMicBar({ initialStream, displayName, avatarUrl, 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceMenuOpen, setDeviceMenuOpen] = useState(false);
   const [activeDeviceId, setActiveDeviceId] = useState<string | undefined>(undefined);
+  const [currentStream, setCurrentStream] = useState<MediaStream | null>(initialStream ?? null);
 
   const streamRef = useRef<MediaStream | null>(initialStream ?? null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -105,6 +106,7 @@ export default function InPersonMicBar({ initialStream, displayName, avatarUrl, 
         return;
       }
       streamRef.current = stream;
+      setCurrentStream(stream);
       setActiveDeviceId(stream.getAudioTracks()[0]?.getSettings().deviceId);
       attachAnalyser(stream);
 
@@ -120,6 +122,7 @@ export default function InPersonMicBar({ initialStream, displayName, avatarUrl, 
       teardownAnalyser();
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+      setCurrentStream(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -136,6 +139,7 @@ export default function InPersonMicBar({ initialStream, displayName, avatarUrl, 
       });
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = newStream;
+      setCurrentStream(newStream);
       setActiveDeviceId(id);
       setDeviceMenuOpen(false);
       attachAnalyser(newStream);
@@ -176,7 +180,7 @@ export default function InPersonMicBar({ initialStream, displayName, avatarUrl, 
         </div>
 
         {/* Mute toggle */}
-        <MicConfirmButton kind={sessionKind} sessionId={sessionId} userId={userId} stream={streamRef.current}>
+        <MicConfirmButton kind={sessionKind} sessionId={sessionId} userId={userId} stream={currentStream}>
           <button
             onClick={() => setMuted((m) => !m)}
             aria-label={muted ? "Unmute" : "Mute"}
