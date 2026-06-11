@@ -53,7 +53,7 @@ export function useLiveParticipants({ sessionId, speakerNames, createdBy }: Opti
       // Single-device sessions: no participants rows; treat created_by as slot 0 identity.
       let creatorProfile: { username: string | null; avatar_url: string | null } | null = null;
       const needsCreatorFallback =
-        bySlot.size === 0 && !!createdBy && Object.keys(speakerNames).length > 0;
+        bySlot.size === 0 && !!createdBy;
       if (needsCreatorFallback) {
         const { data: prof } = await supabase
           .from("profiles")
@@ -93,6 +93,18 @@ export function useLiveParticipants({ sessionId, speakerNames, createdBy }: Opti
         }
         return { slot, name: fallbackName, userId: null, avatarUrl: null };
       });
+
+      // Fallback: if no speaker_names were ever recorded (older single-device
+      // sessions, or empty multi-device joins), still show at least the host
+      // pill so the record never renders with zero participants.
+      if (out.length === 0 && createdBy && creatorProfile) {
+        out.push({
+          slot: 0,
+          name: creatorProfile.username || "Host",
+          userId: createdBy,
+          avatarUrl: creatorProfile.avatar_url,
+        });
+      }
 
       if (!cancelled) setPills(out);
     })();
