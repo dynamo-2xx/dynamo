@@ -26,7 +26,7 @@ import { useLivePerfStreamer } from "@/hooks/useLivePerfStreamer";
 import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import InsightText from "@/components/insights/InsightText";
 import InPersonMicBar from "@/components/debate/InPersonMicBar";
-import { takeHandoffStream } from "@/lib/micHandoff";
+import { setHandoffStream, takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
 import InterestedComposer from "@/components/debate/InterestedComposer";
 import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
@@ -413,16 +413,8 @@ const DebateRoomPage = () => {
       const d = debateRes.data as unknown as DebateData;
       const parts = (participantsRes.data || []) as unknown as Participant[];
 
-      // If the debate hasn't started yet, send EVERYONE (creator + invitees +
-      // queued speakers) to the mic-prep lobby. Previously non-creator
-      // invitees landed in an empty room because the lobby route was only
-      // reached via the create flow.
-      if (d.status === "draft" || d.status === "scheduled") {
-        navigate(`/debate/${id}/lobby`, { replace: true });
-        return;
-      }
-
       setDebate(d);
+      setMaxPerSide((d as any).max_speakers_per_side ?? 2);
       setSides(sidesRes.data || []);
       setSubtopics(subtopicsRes.data || []);
       setArguments(argsRes.data || []);
@@ -474,6 +466,16 @@ const DebateRoomPage = () => {
       if (d.status === "completed" && d.ended_at) {
         const endedAgo = Date.now() - new Date(d.ended_at).getTime();
         if (endedAgo < 30000) setShowCompletionOverlay(true);
+      }
+
+      if (user && d.created_by !== user.id) {
+        const { data: interest } = await supabase
+          .from("debate_interests")
+          .select("side_id, role")
+          .eq("debate_id", id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if ((interest as any)?.role === "queued_speaker") setQueuedSideId((interest as any).side_id ?? null);
       }
     };
     loadDebate();
