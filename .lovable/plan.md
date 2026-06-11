@@ -1,4 +1,11 @@
-# Finish P1 Polish — #5 Analysis bar, #6 Time rail, #7 Avatar bubbles
+# P1 Polish — Complete ✅
+
+- #4 1hr cap + clock button — done
+- #5 Analysis progress bar — done (`AnalysisProgress.tsx` mounted in all 4 record pages via `belowBack`)
+- #6 Time-anchored mm:ss left rail with iOS liquid-glass chip — done in `ArgumentMapContent` transcript tab
+- #7 Avatar + display name on every transcript bubble — done (speakerMeta map piped from each page; live uses `useLiveParticipants`)
+
+Next: P2 — retire mic lobby, replace with in-room mic-button voice-confirm (see prior plan body).
 
 All three land in the shared `ArgumentMapContent` transcript renderer so debate / live / imported records get them for free.
 
