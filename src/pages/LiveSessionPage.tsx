@@ -85,7 +85,8 @@ const LiveSessionPage = () => {
   const [hostDisplayName, setHostDisplayName] = useState<string>("");
   const [hostSpeakerSlot, setHostSpeakerSlot] = useState<number>(1);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { prefs, update: updatePrefs } = useLiveDisplayPrefs();
+  const { theme } = useTheme();
+  const liveThemeAttr = theme === "dark" ? "dark" : "light";
 
   const deviceId = useMemo(() => getDeviceId(), []);
   const isMulti = mode === "multi_device";
