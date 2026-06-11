@@ -214,10 +214,12 @@ const JoinDebatePage = () => {
         if (stream) setHandoffStream(stream);
         navigate(`/debate/${debateId}`, { replace: true });
       } else {
-        setWaitStream(stream);
-        setWaitMode(stream ? "own_mic" : "voice_detect_only");
-        setPhase("waiting");
-        setJoining(false);
+        // P3: don't park the user on a waiting page. They're queued — free
+        // them up. A persistent QueuedSessionStrip + push/in-app
+        // notification will bring them back when the host starts.
+        stream?.getTracks().forEach((t) => t.stop());
+        toast.success(`You're queued for "${debateTopic}". We'll notify you when it starts.`, { duration: 5000 });
+        navigate("/", { replace: true });
       }
     } catch (err: any) {
       console.error(err);
