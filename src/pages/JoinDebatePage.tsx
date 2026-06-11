@@ -153,6 +153,7 @@ const JoinDebatePage = () => {
       setSides(debateSides);
       setParticipants(debateParticipants);
       setMaxPerSide(cap);
+      setDebateStatus((debate as any)?.status ?? "scheduled");
 
       // Auto-select the only open side, if exactly one has room
       const openSides = debateSides.filter((s) => {
@@ -182,6 +183,13 @@ const JoinDebatePage = () => {
 
   const handleProceedToMic = () => {
     if (!selectedSide || !debateId || joining) return;
+    // If the debate isn't live yet, skip the mic test — the user gets
+    // queued and freed up; voice-confirm happens in-room (P2) when the
+    // host actually starts.
+    if (debateStatus !== "live") {
+      finalizeJoin(null);
+      return;
+    }
     setPhase("mic");
   };
 
