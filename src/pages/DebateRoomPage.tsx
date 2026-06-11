@@ -39,6 +39,8 @@ import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ContinueButton from "@/components/record/ContinueButton";
+import RecordShell from "@/components/record/RecordShell";
+import ParticipantsRow from "@/components/record/ParticipantsRow";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
 import { useDebateHostFailover } from "@/hooks/useDebateHostFailover";
 import { Lock, Globe } from "lucide-react";
