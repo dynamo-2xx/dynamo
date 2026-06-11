@@ -18,6 +18,7 @@ export interface MicConnection {
   status: MicStatus;
   last_audio_rms: number;
   last_seen_at: string;
+  voice_confirmed_at: string | null;
   created_at: string;
 }
 
@@ -73,3 +74,5 @@ export function useMicLobby(kind: SessionKind, sessionId: string | null) {
 
   return { rows, release };
 }
+
+export const useMicPresence = useMicLobby;
