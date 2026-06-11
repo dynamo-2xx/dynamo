@@ -29,12 +29,18 @@ import InPersonMicBar from "@/components/debate/InPersonMicBar";
 import { takeHandoffStream } from "@/lib/micHandoff";
 import { ArrowLeft, HandHeart } from "lucide-react";
 import InterestedComposer from "@/components/debate/InterestedComposer";
+import InPersonJoinPanel from "@/components/create/InPersonJoinPanel";
+import LobbyInvitePanel from "@/components/lobby/LobbyInvitePanel";
+import MicLobby from "@/components/lobby/MicLobby";
+import QueuedSpeakerBubbles from "@/components/lobby/QueuedSpeakerBubbles";
+import WaitingForHost from "@/components/lobby/WaitingForHost";
 import DebateCompletionOverlay from "@/components/debate/DebateCompletionOverlay";
 import RoundSummaryCard from "@/components/debate/RoundSummaryCard";
 import PrepPhaseOverlay from "@/components/debate/PrepPhaseOverlay";
 import { useDeepgramTranscription } from "@/hooks/useDeepgramTranscription";
 import { useGrading } from "@/hooks/useGrading";
 import { useMicPolicy } from "@/hooks/useMicPolicy";
+import { useMicLobbyAttachment } from "@/hooks/useMicLobbyAttachment";
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
@@ -46,6 +52,15 @@ import AnalysisProgress from "@/components/record/AnalysisProgress";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
 import { useDebateHostFailover } from "@/hooks/useDebateHostFailover";
 import { Lock, Globe } from "lucide-react";
+
+const getDeviceId = () => {
+  let deviceId = localStorage.getItem("dyn_device_id");
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem("dyn_device_id", deviceId);
+  }
+  return deviceId;
+};
 
 
 type UserRole = "facilitator" | "speaker" | "spectator";
