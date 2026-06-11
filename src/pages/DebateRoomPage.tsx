@@ -165,6 +165,11 @@ const DebateRoomPage = () => {
   const [copied, setCopied] = useState(false);
   const [mediaRequested, setMediaRequested] = useState(false);
    const turnEndTriggeredRef = useRef(false);
+  const [queuedSideId, setQueuedSideId] = useState<string | null>(null);
+  const [preLiveWaitStream, setPreLiveWaitStream] = useState<MediaStream | null>(null);
+  const [preLiveHostStream, setPreLiveHostStream] = useState<MediaStream | null>(null);
+  const [maxPerSide, setMaxPerSide] = useState(2);
+  const deviceId = useState(() => getDeviceId())[0];
   // In-person joiner: pick up the live MediaStream the pre-flight mic test
   // handed off so we can show the persistent mic bar without re-prompting.
   const [handoffStream] = useState<MediaStream | null>(() => takeHandoffStream());
@@ -177,6 +182,29 @@ const DebateRoomPage = () => {
     userId: user?.id ?? null,
     isOwner: !!user && !!debate && user.id === debate.created_by,
     stream: handoffStream,
+  });
+  const isPreLiveDebate = debate?.status === "draft" || debate?.status === "scheduled";
+  const isDebateCreator = !!user && !!debate && user.id === debate.created_by;
+  useMicLobbyAttachment({
+    kind: "debate",
+    sessionId: isPreLiveDebate && isDebateCreator && id ? id : null,
+    slotKey: isPreLiveDebate && isDebateCreator && user ? `host:${user.id}` : null,
+    userId: user?.id ?? null,
+    deviceId,
+    displayName: user?.email?.split("@")[0] || "Host",
+    mode: "own_mic",
+    stream: preLiveHostStream,
+  });
+  useMicLobbyAttachment({
+    kind: "debate",
+    sessionId: isPreLiveDebate && !isDebateCreator && user && id ? id : null,
+    slotKey: isPreLiveDebate && !isDebateCreator && user ? `queued:${user.id}` : null,
+    userId: user?.id ?? null,
+    deviceId,
+    displayName: user?.email?.split("@")[0] || "Queued",
+    mode: "own_mic",
+    stream: preLiveWaitStream,
+    releaseOnUnmount: false,
   });
      const timerWasActiveRef = useRef(false);
    const prepExitRef = useRef(false);
