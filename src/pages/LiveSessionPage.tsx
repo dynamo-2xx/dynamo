@@ -37,7 +37,7 @@ import PauseButton from "@/components/sharing/PauseButton";
 import { usePauseControl } from "@/hooks/usePauseControl";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { useLocalCameraPreview } from "@/hooks/useLocalCameraPreview";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const getDeviceId = () => {
   let id = localStorage.getItem("dyn_device_id");
