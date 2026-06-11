@@ -1076,6 +1076,12 @@ const DebateRoomPage = () => {
   const startDebate = async () => {
     if (!debate || !id) return;
     setAiLoading(true);
+    try {
+      const { error: promoteErr } = await supabase.rpc("promote_lobby_to_participants" as any, { _debate_id: id });
+      if (promoteErr) console.warn("Failed to promote queued speakers", promoteErr);
+    } catch (e) {
+      console.warn("Failed to promote queued speakers", e);
+    }
     const now = new Date().toISOString();
     await supabase.from("debates").update({
       status: "live", started_at: now, turn_started_at: now,
@@ -1094,6 +1100,19 @@ const DebateRoomPage = () => {
     }
     setTimerRunning(true);
     setAiLoading(false);
+  };
+
+  const handleCancelDebate = async () => {
+    if (!id) return;
+    const ok = window.confirm("Cancel this debate? Invitees will be notified.");
+    if (!ok) return;
+    const { error } = await supabase
+      .from("debates")
+      .update({ status: "archived", ended_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Debate cancelled");
+    navigate("/", { replace: true });
   };
 
   const advanceTurn = async () => {
