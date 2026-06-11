@@ -92,7 +92,8 @@ const LiveSessionPage = () => {
   const isMulti = mode === "multi_device";
   const rawIsRecordingActive =
     phaseResolved && phase === "recording" && sessionStatus === "recording";
-  const { isPaused: liveIsPaused } = usePauseControl({ kind: "live", id: sessionId, isHost: true });
+  const { isPaused: liveIsPaused, pausedAt: livePausedAt, accumulatedPausedMs: liveAccumulatedPausedMs } =
+    usePauseControl({ kind: "live", id: sessionId, isHost: true });
   // Halt transcription + analysis whenever the host pauses the session.
   const isRecordingActive = rawIsRecordingActive && !liveIsPaused;
 
@@ -707,8 +708,8 @@ const LiveSessionPage = () => {
           <div className="flex items-center gap-2">
             <SessionClockButton
               startedAt={sessionData?.created_at ?? null}
-              pausedAt={sessionData?.paused_at ?? null}
-              accumulatedPausedMs={Number(sessionData?.accumulated_paused_ms ?? 0) || 0}
+              pausedAt={livePausedAt}
+              accumulatedPausedMs={liveAccumulatedPausedMs}
               isOwner={!!user?.id && user.id === sessionData?.created_by}
               onTimeUp={handleCapReached}
               onEndEarly={handleEndSession}
