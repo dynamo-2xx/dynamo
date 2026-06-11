@@ -1,77 +1,64 @@
-# P1 Polish — Complete ✅
+# P2 — Retire the mic lobby, move voice-confirm in-room
 
-- #4 1hr cap + clock button — done
-- #5 Analysis progress bar — done (`AnalysisProgress.tsx` mounted in all 4 record pages via `belowBack`)
-- #6 Time-anchored mm:ss left rail with iOS liquid-glass chip — done in `ArgumentMapContent` transcript tab
-- #7 Avatar + display name on every transcript bubble — done (speakerMeta map piped from each page; live uses `useLiveParticipants`)
+## What changes for the user
 
-Next: P2 — retire mic lobby, replace with in-room mic-button voice-confirm (see prior plan body).
+**Today:** Before a debate/live/CMM starts, every participant lands on a *lobby page* that asks them to claim a slot and confirm their mic is working. Once everyone in the lobby is "ready", the session begins.
 
-All three land in the shared `ArgumentMapContent` transcript renderer so debate / live / imported records get them for free.
+**After P2:** No lobby page. Participants go straight into the room (debate / live / CMM). The mic button in the top bar gains a small green "✓ voice confirmed" dot once their voice has been picked up. The host sees who's confirmed in the participant list; they can start the session whenever they want (auto-start when everyone confirms is optional, off by default for now).
 
----
+## Why
 
-## #5 — Analysis progress bar
+The lobby is the #1 drop-off point — people land on it, get confused, close the tab. Voice-confirm belongs *with* the mic UI, not on a separate page.
 
-New `<AnalysisProgress />` rendered in `RecordShell`'s `belowBack` slot on every ended record. Two segments:
+## Scope
 
-- **Live insights** — green when any `transcriptEntries[].ai_summary` is populated. (Live's `analyze-transcript` writes these inline; for debate/imported, segment shows green immediately if entries already carry summaries, otherwise indeterminate while pending.)
-- **Deep analysis** — green when `useArgumentUnits(sessionId, sessionKind)` returns any row with `pass_kind === "structure_final"`. Indeterminate (animated shimmer) while empty.
+### Delete (or stop rendering)
 
-Polls / re-subscribes every 5s via the existing `useArgumentUnits` realtime channel; hides itself once both segments are green. Uses the shadcn `Progress` primitive split into two halves with a thin gap, monochrome (black fills, neutral track) per branding.
+- `src/pages/DebateLobbyPage.tsx`, `LiveLobbyPage.tsx`, `CmmLobbyPage.tsx` — replace with direct redirect to the room.
+- `src/components/lobby/MicLobby.tsx`, `LobbySlotRow.tsx` — remove imports; component file kept for one release in case we need to roll back, then deleted.
+- `src/hooks/useMicLobbyAttachment.ts` — replaced by an in-room hook (see below).
 
-New file: `src/components/record/AnalysisProgress.tsx`. Each of the three pages (`LiveEndedRecord`, `SharedLiveBody`, `ImportedRecordPage`, `DebateRoomPage`) passes it via `belowBack`.
+### Keep (and reuse)
 
----
+- `src/hooks/useMicLobby.ts` — the underlying `mic_connections` table tracking + realtime channel is reused; only renamed to `useMicPresence` and surfaced inside the room.
+- `src/hooks/useMicPolicy.ts` — per-format mic enforcement is unchanged.
 
-## #6 — Time-anchored transcript bubbles (iOS liquid glass)
+### New
 
-Edit `src/components/debate/ArgumentMapContent.tsx` transcript render block (lines 436–445):
+- `src/components/live/MicConfirmButton.tsx` — wraps the existing mic toggle in the top bar; adds:
+  - a 6px green dot in the bottom-right when `voice_confirmed_at` is set on the user's `mic_connections` row;
+  - first time the user's RMS crosses the existing speech threshold for ≥500ms, write `voice_confirmed_at = now()` (single round trip, idempotent).
+- `src/components/live/ParticipantConfirmList.tsx` — small sidebar list for the host: pill per participant with name + check / spinner. Mounted only for `role = publisher`.
 
-- Convert each entry row into a two-column flex: left rail (fixed `w-12`, top-aligned `mm:ss` chip) + right column (existing bubble).
-- mm:ss derived from `entry.timestamp - sessionStartMs`. New optional `sessionStartMs` prop on `ArgumentMapContent` / `RecordShell`; each page passes it (`new Date(createdAt).getTime()` for live/imported, debate's existing `started_at`).
-- Chip styling = iOS liquid glass: `backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/40 ring-1 ring-black/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] rounded-full px-1.5 py-0.5 text-[10px] tabular-nums font-body text-foreground/80`. Sticks to top of its row, top-aligned with the speaker label.
-- Format: `m:ss` under 1h, `h:mm:ss` ≥ 1h. Negative / NaN diffs render blank (handles edge cases gracefully).
+### Routing
 
----
+- `/debate/:id/lobby` → redirect to `/debate/:id` (server-side via `<Navigate replace>`).
+- `/live/:id/lobby` → `/live/:id`. Same for CMM.
+- Join links (`JoinDebatePage`, `JoinCmmPage`, `LiveJoinPage`) drop the `useMicLobbyAttachment` call; attachment moves to the room mount.
 
-## #7 — Avatar + display name on every bubble
+## Migration
 
-Approach: pass a single optional `speakerMeta` map down to `ArgumentMapContent`, keyed by the same string used as `speaker_side`. Each page builds it from what it knows:
-
-```ts
-type SpeakerMeta = {
-  name?: string;
-  avatarUrl?: string | null;
-  userId?: string | null;
-};
-type SpeakerMetaMap = Record<string, SpeakerMeta>;
+```sql
+ALTER TABLE public.mic_connections
+  ADD COLUMN IF NOT EXISTS voice_confirmed_at timestamptz;
 ```
 
-- **Live / Shared-live** — build from `useLiveParticipants`: `{ [pill.name]: { name, avatarUrl, userId } }`. Since `speaker_side` is already resolved to `pill.name` in the transcript inputs, lookup is direct.
-- **Debate** — build from `participants[]`: `{ [side_label]: { name: displayName, avatarUrl, userId } }`.
-- **Imported** — leave empty; falls through to existing initials behavior.
+No new table, no new RLS — existing `mic_connections` policies already gate to the participant.
 
-Renderer change in `ArgumentMapContent.tsx:436–445`:
+## Out of scope (P3 / later)
 
-- Replace the `<p>{e.speaker_side}</p>` uppercase label with a row: small avatar (20px) + display name. If `speakerMeta[e.speaker_side]?.avatarUrl` present → `<Avatar>` with image; otherwise fallback to initials avatar built from `speaker_side`. Wrap in `<Link to={/u/${userId}}>` when `userId` is present, else plain span.
-- Keep `data-annotatable` on text body unchanged so notes still work.
-
----
+- Auto-start when everyone confirmed. This is a trait of the mic-lobby. Voice-confirmation will no longer have any effect or influence on how a session starts. It's simply something that the user will manage independently and naturally. Force-start is retired along with it.
+- Diarization beyond the single-speaker confirm signal.
+- Reworking host "start session" button — still manual.
 
 ## Files
 
-- New: `src/components/record/AnalysisProgress.tsx`
-- Edit: `src/components/debate/ArgumentMapContent.tsx` (transcript render block, add `sessionStartMs` + `speakerMeta` props)
-- Edit: `src/components/record/RecordShell.tsx` (forward new props, expose `belowBack` already exists)
-- Edit: `src/pages/LiveSessionPage.tsx` (`LiveEndedRecord` — build `speakerMeta` from pills, pass `sessionStartMs`, mount `AnalysisProgress`)
-- Edit: `src/pages/SharedLiveSessionPage.tsx` (same)
-- Edit: `src/pages/ImportedRecordPage.tsx` (pass `sessionStartMs = created_at`, mount `AnalysisProgress`)
-- Edit: `src/pages/DebateRoomPage.tsx` (build `speakerMeta` from participants, pass `started_at`, mount `AnalysisProgress`)
-- Update `.lovable/plan.md` to mark P1 complete.
+- **Delete imports of** `MicLobby` from `DebateLobbyPage`, `LiveLobbyPage`, `CmmLobbyPage`; replace each page body with `<Navigate to="/<kind>/:id" replace />`.
+- **Edit** `JoinDebatePage`, `JoinCmmPage`, `LiveJoinPage`: remove `useMicLobbyAttachment`; on success, navigate straight to the room.
+- **Edit** `DebateRoomPage`, `LiveSessionPage`, `CmmRoomPage` (if exists): mount `<MicConfirmButton>` in the top bar slot where mic toggle lives today; mount `<ParticipantConfirmList>` in the host sidebar.
+- **New** `src/components/live/MicConfirmButton.tsx`, `src/components/live/ParticipantConfirmList.tsx`.
+- **Rename** `useMicLobby` → `useMicPresence` (keep export alias for one release).
+- **Migration** adding `voice_confirmed_at` to `mic_connections`.
+- **Update** `.lovable/plan.md`.
 
-## Out of scope
-
-- New columns (no `deep_perf_done_at` needed — argument_units row presence is the signal). Why not include this in plan? If you can, do so. I don't understand why this is out of scope.
-- Reworking the in-session live SpeakerBubble path (`TranscriptPane`); this is record-tab only. Why not include this in plan? If you can, do so. I don't understand why this is out of scope.
-- Voice-confirm / diarization (P2).
+Approve and I'll ship it in this order: migration → new components → wire rooms → strip lobby pages → delete dead code.
