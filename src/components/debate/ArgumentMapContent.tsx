@@ -423,6 +423,33 @@ const ArgumentMapContent = ({
   }
 
   // Transcript tab — collapsible per subtopic.
+  // Compute the baseline epoch for the mm:ss left rail. Prefer the explicit
+  // sessionStartMs prop; fall back to the earliest entry timestamp so live /
+  // imported records without a known start still produce sensible offsets.
+  const baselineMs = (() => {
+    if (typeof sessionStartMs === "number" && Number.isFinite(sessionStartMs)) return sessionStartMs;
+    let min = Infinity;
+    for (const e of transcriptEntries) {
+      if (typeof e.timestamp === "number" && e.timestamp < min) min = e.timestamp;
+    }
+    return Number.isFinite(min) ? min : 0;
+  })();
+  const formatOffset = (ts: number): string | null => {
+    const diffSec = Math.floor((ts - baselineMs) / 1000);
+    if (!Number.isFinite(diffSec) || diffSec < 0) return null;
+    const h = Math.floor(diffSec / 3600);
+    const m = Math.floor((diffSec % 3600) / 60);
+    const s = diffSec % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+  const initialsFor = (label: string) =>
+    label
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?";
   return (
     <div className={`${padding} space-y-2`} data-annotatable>
       {orderedSubtopics.length === 0 ? (
@@ -450,16 +477,56 @@ const ArgumentMapContent = ({
                 {stEntries.length === 0 ? (
                   <p className="text-[11px] italic text-muted-foreground py-1">No entries yet.</p>
                 ) : (
-                  stEntries.map((e) => (
-                    <div key={e.id} className="border-l-2 border-foreground/15 pl-3 py-1">
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-body mb-0.5">
-                        {e.speaker_side}
-                      </p>
-                      <p className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap" data-annotatable>
-                        <InsightText entryId={e.id} text={e.text} />
-                      </p>
-                    </div>
-                  ))
+                  stEntries.map((e) => {
+                    const offset = formatOffset(e.timestamp);
+                    const meta = speakerMeta?.[e.speaker_side];
+                    const displayName = meta?.name ?? e.speaker_side;
+                    const nameNode = meta?.userId ? (
+                      <Link
+                        to={`/u/${meta.userId}`}
+                        className="text-xs font-body font-semibold text-foreground hover:underline"
+                      >
+                        {displayName}
+                      </Link>
+                    ) : (
+                      <span className="text-xs font-body font-semibold text-foreground">
+                        {displayName}
+                      </span>
+                    );
+                    return (
+                      <div key={e.id} className="flex items-start gap-2 py-1">
+                        {/* Left rail: iOS liquid-glass mm:ss chip */}
+                        <div className="w-12 shrink-0 pt-0.5 flex justify-end">
+                          {offset ? (
+                            <span
+                              className="inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] tabular-nums font-body text-foreground/80 backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/40 dark:border-white/10 ring-1 ring-black/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+                              title={`+${offset}`}
+                            >
+                              {offset}
+                            </span>
+                          ) : null}
+                        </div>
+                        {/* Right column: avatar + name + text */}
+                        <div className="flex-1 min-w-0 border-l-2 border-foreground/15 pl-3">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <Avatar className="w-5 h-5">
+                              {meta?.avatarUrl ? <AvatarImage src={meta.avatarUrl} alt={displayName} /> : null}
+                              <AvatarFallback className="text-[9px] font-body bg-foreground/10 text-foreground">
+                                {initialsFor(displayName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            {nameNode}
+                          </div>
+                          <p
+                            className="text-xs text-foreground font-body leading-relaxed whitespace-pre-wrap"
+                            data-annotatable
+                          >
+                            <InsightText entryId={e.id} text={e.text} />
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </CollapsibleContent>
             </Collapsible>
