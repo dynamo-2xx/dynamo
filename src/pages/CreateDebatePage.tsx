@@ -1224,7 +1224,7 @@ const CreateDebatePage = () => {
       if (startNow) {
         // Publisher passes through mic-prep just like every other speaker.
         toast.success(editId ? "Starting debate — test your mic." : "Published! Test your mic to start.");
-        navigate(`/debate/${dbDebate.id}/lobby`);
+        navigate(`/debate/${dbDebate.id}`);
       } else if (editId) {
         toast.success(publishMode ? "Debate published" : "Debate updated");
         navigate(`/debate/${editId}/preview`);
