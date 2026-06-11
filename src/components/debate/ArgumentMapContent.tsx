@@ -233,6 +233,8 @@ const ArgumentMapContent = ({
   sessionId,
   sessionKind,
   sessionComplete = false,
+  sessionStartMs,
+  speakerMeta,
 }: ArgumentMapContentProps) => {
   const padding = inline ? "" : "px-3 py-3";
 
