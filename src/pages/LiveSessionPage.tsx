@@ -321,11 +321,6 @@ const LiveSessionPage = () => {
   }, [user, title, mode, navigate, setupTags, deviceId, hostDisplayName, coverImageUrl]);
 
   const handleEndSession = useCallback(async () => {
-    return endSessionImpl();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endSession, sessionId, isMulti]);
-
-  const endSessionImpl = useCallback(async () => {
     if (!isMulti) {
       await endSession();
     } else if (sessionId) {
@@ -351,8 +346,8 @@ const LiveSessionPage = () => {
   // owns the countdown and pause-pausing; we just react to onTimeUp.
   const handleCapReached = useCallback(() => {
     toast("Session ended — 1 hour limit reached.");
-    void endSessionImpl();
-  }, [endSessionImpl]);
+    void handleEndSession();
+  }, [handleEndSession]);
 
   // Group entries by subtopic for the recording view
   const groupedEntries = useMemo(() => {
