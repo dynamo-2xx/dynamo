@@ -116,7 +116,7 @@ export default function JoinCmmPage() {
         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
           <LogIn className="w-5 h-5 text-primary" />
         </div>
-        <h1 className="font-display text-2xl mb-2">Sign in to join</h1>
+        <h1 className="font-display text-2xl mb-2">Sign in to enter</h1>
         <Link
           to={`/auth?redirect=${encodeURIComponent(returnPath)}`}
           className="px-6 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-semibold"
@@ -143,7 +143,7 @@ export default function JoinCmmPage() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full space-y-5">
           <div className="text-center">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Join Change My Mind</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Enter Change My Mind</p>
             <h1 className="font-display text-2xl text-foreground mt-1">{topic}</h1>
           </div>
           <button
