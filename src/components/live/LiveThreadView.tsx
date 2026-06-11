@@ -5,7 +5,8 @@ import { LiveTranscriptEntry, LiveThreadMeta } from "@/hooks/useLiveTranscriptio
 import TranscriptCard from "@/components/debate/TranscriptCard";
 import LiveTranscriptBubble from "@/components/live/LiveTranscriptBubble";
 import { groupConsecutiveEntries } from "@/utils/groupTranscriptEntries";
-import type { TranscriptDensity } from "@/hooks/useLiveDisplayPrefs";
+/** Density preset for transcript layout. */
+export type TranscriptDensity = "comfortable" | "compact" | "cinema";
 
 interface LiveThreadViewProps {
   entries: LiveTranscriptEntry[];

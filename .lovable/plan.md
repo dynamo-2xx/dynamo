@@ -1,96 +1,94 @@
-# P3 — Debate "Join when it starts" (replace remaining lobby UX)
+## Why it looks glitchy today
 
-P0, P1, P2 shipped. P3 finishes the lobby retirement by removing the *navigate-into-a-waiting-room* step for invitees.
+Two root causes are stacking on top of each other:
 
-## What changes for the user
+1. **The room isn't actually a "video meeting".** In single-device mode the whole `videoBlock` is gated off, so there's no camera tile, no mic toggle, no cam toggle — just a transcript pane over the page background, which reads as a giant empty grey slab when the transcript is short.
+2. **The "grey blob" + "inverted look" is a theme bug.** `themeWrapperClass` adds a scoped `.dark` wrapper around just the live panel. The transcript scroller (`bg-background/70 backdrop-blur-xl`) and collapsibles (`bg-background/60 backdrop-blur-xl`) flip token values inside that wrapper, so white@70 over dark becomes mid-grey, while the header sits outside the wrapper and stays light — that's the half-and-half "inverted" effect.
 
-**Today (post-P2):** Tapping a Join link drops the user into the room while it's still in `draft`/`scheduled` — they see the thin in-room lobby and have to sit on that tab until the host hits Start. If they close the tab they miss it.
+On top of that, the dark theme in `index.css` is the light tokens flipped on the lightness axis — same hues, no distinct dark identity.
 
-**After P3:** Tapping Join writes them onto the queue and returns them to wherever they were, with a toast: *"You're queued for [topic]. We'll notify you when it starts."* A small persistent strip in the global layout reminds them they're queued and offers Leave. When the host flips the debate to `live`, the existing in-app `session_started` notification + a Web Push notification fire, both with an **ENTER** button that drops them into the room.
+The `DisplayOptionsMenu` (Layout / Tile style / Density / Show-hide toggles / Theme) compounds the problem: 4 layout presets × 3 tile styles × 3 densities × 4 themes = combinations we can't QA, and it overwhelms users before the basic room even works.
 
-## Scope
+## What we'll build
 
-1. **`JoinDebatePage` / `JoinCmmPage` / `LiveJoinPage`** — on successful queue/claim, do NOT navigate to the room while status≠`live`. Toast + `navigate(-1)` (or `/`). If status is already `live`, navigate straight in.
-2. **New** `src/components/QueuedSessionStrip.tsx` — mounted in `AppLayout`. Subscribes to the user's open queue rows across `debate_participants` (where status is draft/scheduled). Renders a slim bottom strip per active queue: topic + "Leave" + auto-disappears on status→live (which triggers the existing toast/notification).
-3. **`DebateRoomPage` start handler** — after the `promote_lobby_to_participants` RPC, invoke `dispatch-debate-start-push` edge function so Web Push fires alongside the in-app notification. Same for CMM/Live start handlers if they have queued users.
-4. **Owner guard** — when the host clicks Start on a different live session than where they currently are, no-op; we don't navigate them mid-session. (Already implicitly true; just make sure we don't double-fire.)
+### A. Live room becomes a Zoom-like meeting
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│ ← Recording · test!!!!   ⏱ 56:40   ⏸  Share  End         │  header (compact, overflow-safe)
+├──────────────────────────────────────┬───────────────────┤
+│                                      │  ▼ General Disc.. │
+│           [ video stage ]            │  ▼ Sound check    │
+│   ┌────────┐  ┌────────┐             │  ─────────────    │
+│   │ You    │  │ Speaker│             │  • argument map   │
+│   │ 🎤 📹  │  │ 2      │             │    (transcript /  │
+│   └────────┘  └────────┘             │    threaded       │
+│                                      │    record)        │
+│  [🎤 Mute]  [📹 Camera]              │                   │
+└──────────────────────────────────────┴───────────────────┘
+```
+
+- **Always-on local camera tile.** `getUserMedia({ video: true })` for a local preview regardless of `mode`. In multi-device the same `MediaStream` is published via `useLiveSessionRTC` as today; in single-device it stays local-only.
+- **Mic + camera toggle buttons always visible** in a Zoom-style control bar pinned to the bottom of the video stage. Driven by a single `useLocalMedia()` hook so the controls behave identically in single- and multi-device.
+- **Argument map docked to the right** on tablet/desktop (≥ 768px), collapsing to a bottom sheet on phone. The "argument map" surface = the existing transcript / threaded record view (same `transcriptBlock` content), retitled and tucked into the side panel.
+- **One fixed layout.** Side-by-side video + argument map on ≥ 768px; stacked (video on top, argument map below) on phones. No layout picker, no tile-style picker, no density picker.
+- **Header overflow fix.** Group `⏸ Share End` into one trailing cluster with consistent 32px buttons; "Resume (3:20)" pill collapses to `▶ 3:20` under 900px so the title never collides with controls.
+- **Kill the translucent stack.** Replace `bg-background/70 backdrop-blur-xl` on the transcript scroller and `bg-background/60 backdrop-blur-xl` on collapsibles with solid `bg-card` + `border-border`. No more half-lit grey slab.
+
+### B. Delete the Display Options menu entirely
+
+- Remove `DisplayOptionsMenu` from the live room header.
+- Remove the prefs it owns: `layout`, `tileStyle`, `density`, `showTimestamps`, `showTileLabels`, `showInterim`, `groupBySubtopic`, `theme`. Hard-code the single good defaults in the new layout: timestamps on, tile labels on, interim text on, group by subtopic on, side-by-side layout, grid tiles, comfortable density.
+- Delete `src/hooks/useLiveDisplayPrefs.ts` and the `DisplayOptionsMenu` component.
+- Theme is no longer user-selectable per session — the live room follows the app's global light/dark theme.
+
+### C. Distinct light & dark themes (not inversions)
+
+Introduce **two purpose-built palettes** for the live room, scoped under `[data-live-theme="light"]` and `[data-live-theme="dark"]`. The attribute is set from the app's global theme (`light` or `dark`), not from a per-session picker.
+
+| Token | Light theme (`Studio`) | Dark theme (`Atrium`) |
+|-------|------------------------|------------------------|
+| Stage background | Warm paper `#F7F5F0` | Deep slate `#0E1116` |
+| Video tile bg (cam off) | Cool stone `#1E2024` | Onyx `#1A1D22` (same family as stage, not flipped) |
+| Side panel bg | Pure white `#FFFFFF` | Graphite `#15181D` with 1px inner highlight `rgba(255,255,255,0.04)` |
+| Card / collapsible | `#FFFFFF` + `0.5px rgba(0,0,0,0.08)` | `#1B1F25` + `0.5px rgba(255,255,255,0.06)` |
+| Primary text | `#0A0A0A` | `#ECEEF1` (warm white, not pure) |
+| Muted text | `#5B6066` | `#8A9099` |
+| Accent (Recording) | Coral `#E04E3A` | Coral-warm `#F26A55` (lifted for contrast on dark) |
+| Resume / pause CTA | Amber `#E89B12` on white | Amber `#F0B748` on dark |
+| Tile border / dividers | `rgba(0,0,0,0.06)` | `rgba(255,255,255,0.05)` |
+| Shadow language | Soft drop, 0 2px 8px rgba(0,0,0,0.04) | No shadows; rely on contrast + 0.5px borders |
+
+Key differences (so they don't read as inversions):
+- **Light = paper.** Warm off-white stage, white cards, no glow.
+- **Dark = studio control room.** Cool slate stage, graphite panels, no pure black, no `invert`. Borders replace shadows. Coral and amber accents are tuned per theme.
+
+The global app `--background` / `--foreground` tokens stay untouched. The live room reads its own tokens from a small scoped CSS block, so theme decisions can never bleed into the rest of the app and the half-lit slab can't recur.
+
+## Files touched
+
+- `src/pages/LiveSessionPage.tsx` — header restructure, always-on video stage, side panel layout, drop `videoBlock` `isMulti` gate, remove translucent backgrounds, remove `DisplayOptionsMenu` mount and all `prefs.*` reads.
+- `src/components/live/VideoGrid.tsx` — render local tile even with no peers; ensure tile fills container; Zoom-style control bar.
+- `src/components/live/SessionControls.tsx` *(new)* — mic / camera buttons; binds to `useLocalMedia`.
+- `src/hooks/useLocalMedia.ts` *(new)* — wraps `getUserMedia`, exposes `{ stream, micOn, camOn, toggleMic, toggleCam }`; multi-device passes the stream into `useLiveSessionRTC`.
+- `src/components/live/DisplayOptionsMenu.tsx` — **deleted**.
+- `src/hooks/useLiveDisplayPrefs.ts` — **deleted**. Anything that still imports `themeWrapperClass` switches to reading the global theme.
+- `src/components/live/FloatingTranscript.tsx` — solid surface, no backdrop-blur.
+- `src/index.css` — add `[data-live-theme="light"]` and `[data-live-theme="dark"]` blocks with the new token set above; no changes to global `:root` / `.dark`.
+- `src/components/live/PresenceList.tsx`, `JoinCodeCard.tsx` — restyle to read the new live-scoped tokens.
 
 ## Out of scope
 
-- Re-architecting `dispatch-debate-start-push` itself; it already exists and is wired to `debate_interests`/invitations. We just call it.
-- Adding a queue strip for live/CMM separately — same component handles all three kinds.
-- Per-device push opt-in flow (already covered by existing push subscription onboarding).
+- WebRTC topology / signaling changes — single-device stays local-only, multi-device stays mesh.
+- Transcript pipeline, Deepgram config, AI facilitation, summaries.
+- The global app light/dark theme (only the live room gets the new dual palette).
+- The "Pause pauses the timer" change you already shipped.
 
-## Files
+## Acceptance check
 
-- **New** `src/components/QueuedSessionStrip.tsx`
-- **Edit** `src/components/AppLayout.tsx` — mount the strip above the bottom nav.
-- **Edit** `src/pages/JoinDebatePage.tsx`, `JoinCmmPage.tsx`, `LiveJoinPage.tsx` — on queue success, toast + go back instead of pushing into the room.
-- **Edit** `src/pages/DebateRoomPage.tsx` — after start, call `supabase.functions.invoke("dispatch-debate-start-push", { body: { debate_id } })`.
-
----
-
-## Done — P2: Retire the mic lobby, move voice-confirm in-room
-
-## What changes for the user
-
-**Today:** Before a debate/live/CMM starts, every participant lands on a *lobby page* that asks them to claim a slot and confirm their mic is working. Once everyone in the lobby is "ready", the session begins.
-
-**After P2:** No lobby page. Participants go straight into the room (debate / live / CMM). The mic button in the top bar gains a small green "✓ voice confirmed" dot once their voice has been picked up. The host sees who's confirmed in the participant list; they can start the session whenever they want (auto-start when everyone confirms is optional, off by default for now).
-
-## Why
-
-The lobby is the #1 drop-off point — people land on it, get confused, close the tab. Voice-confirm belongs *with* the mic UI, not on a separate page.
-
-## Scope
-
-### Delete (or stop rendering)
-
-- `src/pages/DebateLobbyPage.tsx`, `LiveLobbyPage.tsx`, `CmmLobbyPage.tsx` — replace with direct redirect to the room.
-- `src/components/lobby/MicLobby.tsx`, `LobbySlotRow.tsx` — remove imports; component file kept for one release in case we need to roll back, then deleted.
-- `src/hooks/useMicLobbyAttachment.ts` — replaced by an in-room hook (see below).
-
-### Keep (and reuse)
-
-- `src/hooks/useMicLobby.ts` — the underlying `mic_connections` table tracking + realtime channel is reused; only renamed to `useMicPresence` and surfaced inside the room.
-- `src/hooks/useMicPolicy.ts` — per-format mic enforcement is unchanged.
-
-### New
-
-- `src/components/live/MicConfirmButton.tsx` — wraps the existing mic toggle in the top bar; adds:
-  - a 6px green dot in the bottom-right when `voice_confirmed_at` is set on the user's `mic_connections` row;
-  - first time the user's RMS crosses the existing speech threshold for ≥500ms, write `voice_confirmed_at = now()` (single round trip, idempotent).
-- `src/components/live/ParticipantConfirmList.tsx` — small sidebar list for the host: pill per participant with name + check / spinner. Mounted only for `role = publisher`.
-
-### Routing
-
-- `/debate/:id/lobby` → redirect to `/debate/:id` (server-side via `<Navigate replace>`).
-- `/live/:id/lobby` → `/live/:id`. Same for CMM.
-- Join links (`JoinDebatePage`, `JoinCmmPage`, `LiveJoinPage`) drop the `useMicLobbyAttachment` call; attachment moves to the room mount.
-
-## Migration
-
-```sql
-ALTER TABLE public.mic_connections
-  ADD COLUMN IF NOT EXISTS voice_confirmed_at timestamptz;
-```
-
-No new table, no new RLS — existing `mic_connections` policies already gate to the participant.
-
-## Out of scope (P3 / later)
-
-- Auto-start when everyone confirmed. This is a trait of the mic-lobby. Voice-confirmation will no longer have any effect or influence on how a session starts. It's simply something that the user will manage independently and naturally. Force-start is retired along with it.
-- Diarization beyond the single-speaker confirm signal.
-- Reworking host "start session" button — still manual.
-
-## Files
-
-- **Delete imports of** `MicLobby` from `DebateLobbyPage`, `LiveLobbyPage`, `CmmLobbyPage`; replace each page body with `<Navigate to="/<kind>/:id" replace />`.
-- **Edit** `JoinDebatePage`, `JoinCmmPage`, `LiveJoinPage`: remove `useMicLobbyAttachment`; on success, navigate straight to the room.
-- **Edit** `DebateRoomPage`, `LiveSessionPage`, `CmmRoomPage` (if exists): mount `<MicConfirmButton>` in the top bar slot where mic toggle lives today; mount `<ParticipantConfirmList>` in the host sidebar.
-- **New** `src/components/live/MicConfirmButton.tsx`, `src/components/live/ParticipantConfirmList.tsx`.
-- **Rename** `useMicLobby` → `useMicPresence` (keep export alias for one release).
-- **Migration** adding `voice_confirmed_at` to `mic_connections`.
-- **Update** `.lovable/plan.md`.
-
-Approve and I'll ship it in this order: migration → new components → wire rooms → strip lobby pages → delete dead code.
+1. Open `/live/:id` in single-device mode → see your own camera tile (or a "Camera off" placeholder), mic + cam toggle buttons, argument map docked right.
+2. No Display Options gear in the header.
+3. Pause → header doesn't overflow at 877px viewport.
+4. Switch the app to dark mode → live room renders the `Atrium` palette: graphite cards, deep slate stage, warm coral/amber accents. No section reads as half-lit.
+5. Switch the app to light mode → warm paper stage, white cards with hairline borders, no shadows on dark elements.
+6. Resize to 375px wide → video stage is full-width on top, argument map stacks below.

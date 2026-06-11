@@ -127,6 +127,54 @@
   .font-body {
     font-family: var(--font-body);
   }
+
+  /* ──────────────────────────────────────────────────────────────────────
+   * Live room — purpose-built palettes scoped via `data-live-theme`.
+   *
+   * The live surface used to share the global tokens, which made dark mode
+   * read as a pure inverse and produced half-lit "grey blob" backgrounds
+   * when translucent panels were stacked. These two scoped palettes give
+   * the room its own visual identity:
+   *
+   *   • Studio (light) — warm paper stage, white side panel, hairline
+   *     borders, no shadows on dark elements.
+   *   • Atrium (dark) — cool slate stage, graphite side panel, warm-white
+   *     text, no pure black, no inversion of light tokens.
+   *
+   * Only tokens that actually differ from the global theme are overridden,
+   * so general components inside the room still inherit consistent
+   * primary / destructive / etc. styling.
+   * ──────────────────────────────────────────────────────────────────── */
+  [data-live-theme="light"] {
+    --background: 40 22% 97%;      /* warm paper #F7F5F0 */
+    --foreground: 0 0% 4%;
+    --card: 0 0% 100%;             /* pure white panels */
+    --card-foreground: 0 0% 4%;
+    --muted: 40 16% 94%;
+    --muted-foreground: 215 8% 38%;
+    --border: 0 0% 0% / 0.08;      /* hairline */
+    --accent: 12 78% 55%;          /* coral */
+    --accent-foreground: 0 0% 100%;
+  }
+  [data-live-theme="dark"] {
+    --background: 215 18% 7%;      /* deep slate #0E1116 */
+    --foreground: 220 12% 92%;     /* warm white #ECEEF1 */
+    --card: 218 13% 11%;           /* graphite #15181D */
+    --card-foreground: 220 12% 92%;
+    --popover: 218 13% 11%;
+    --popover-foreground: 220 12% 92%;
+    --secondary: 218 12% 14%;
+    --secondary-foreground: 220 12% 92%;
+    --muted: 218 12% 14%;
+    --muted-foreground: 218 8% 60%;
+    --accent: 12 86% 64%;          /* coral-warm #F26A55 */
+    --accent-foreground: 0 0% 4%;
+    --border: 0 0% 100% / 0.06;    /* hairline highlight */
+    --input: 0 0% 100% / 0.08;
+    --destructive: 8 78% 62%;
+    --destructive-foreground: 0 0% 100%;
+  }
+
   /* Brief yellow flash used by the post-session record's "View transcript" jump. */
   .transcript-flash {
     animation: transcript-flash 900ms ease-out;

@@ -31,14 +31,13 @@ import VideoGrid from "@/components/live/VideoGrid";
 import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
 import { useMicPolicy } from "@/hooks/useMicPolicy";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
-import FloatingTranscript from "@/components/live/FloatingTranscript";
 import SessionClockButton from "@/components/live/SessionClockButton";
-import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import PauseButton from "@/components/sharing/PauseButton";
 import { usePauseControl } from "@/hooks/usePauseControl";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
+import { useLocalCameraPreview } from "@/hooks/useLocalCameraPreview";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const getDeviceId = () => {
   let id = localStorage.getItem("dyn_device_id");
@@ -86,7 +85,8 @@ const LiveSessionPage = () => {
   const [hostDisplayName, setHostDisplayName] = useState<string>("");
   const [hostSpeakerSlot, setHostSpeakerSlot] = useState<number>(1);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { prefs, update: updatePrefs } = useLiveDisplayPrefs();
+  const { theme } = useTheme();
+  const liveThemeAttr = theme === "dark" ? "dark" : "light";
 
   const deviceId = useMemo(() => getDeviceId(), []);
   const isMulti = mode === "multi_device";
@@ -96,6 +96,15 @@ const LiveSessionPage = () => {
     usePauseControl({ kind: "live", id: sessionId, isHost: true });
   // Halt transcription + analysis whenever the host pauses the session.
   const isRecordingActive = rawIsRecordingActive && !liveIsPaused;
+
+  // Zoom-style mic toggle for the single-device path. When the user mutes,
+  // we also stop the Deepgram socket so we're not transcribing silence.
+  const [singleMicOn, setSingleMicOn] = useState(true);
+
+  // Single-device camera preview. Hoisted above the phase early-returns
+  // because hook order must be stable; the hook itself no-ops when the
+  // `active` flag is false (multi-device or non-recording phases).
+  const localPreview = useLocalCameraPreview(!isMulti && isRecordingActive);
 
   // Load host's display name from profile
   useEffect(() => {
@@ -114,7 +123,7 @@ const LiveSessionPage = () => {
   // Single-device path
   const single = useLiveTranscription({
     sessionId,
-    isActive: isRecordingActive && !isMulti,
+    isActive: isRecordingActive && !isMulti && singleMicOn,
   });
 
   // Multi-device path: host runs its own mic AND merges all device entries
@@ -546,166 +555,161 @@ const LiveSessionPage = () => {
   }
 
   // ── RECORDING SCREEN ──
-  const layout = prefs.layout;
-  const isVideoOnly = isMulti && layout === "video-only";
-  const isSideBySide = isMulti && layout === "side-by-side";
-  const isTranscriptFirst = isMulti && layout === "transcript-first";
+  const localStream = isMulti ? rtc.localStream : localPreview.stream;
+  const cameraOn = isMulti ? rtc.cameraOn : localPreview.cameraOn;
+  const micOn = isMulti ? rtc.micOn : singleMicOn;
+  const onToggleCamera = isMulti ? rtc.toggleCamera : localPreview.toggleCamera;
+  const onToggleMic = isMulti ? rtc.toggleMic : (() => setSingleMicOn((v) => !v));
+  const localDisplayName = isMulti ? hostName : (hostDisplayName || "You");
+  const mediaError = isMulti ? rtc.error : localPreview.error;
 
   const transcriptBlock = (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-background/70 backdrop-blur-xl">
+    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-card">
+      <div className="flex items-center justify-between sticky top-0 z-10 -mx-4 -mt-4 px-4 py-2 bg-card border-b border-border">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Argument map
+        </h2>
+        <span className="text-[10px] text-muted-foreground">
+          {transcriptEntries.length} {transcriptEntries.length === 1 ? "entry" : "entries"}
+        </span>
+      </div>
+
       {micError && (
-        <div className="bg-destructive/10 backdrop-blur-sm text-destructive text-sm rounded-lg p-3 border border-destructive/20">
+        <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3 border border-destructive/20">
           {micError}
         </div>
       )}
       {connectionError && (
-        <div className="bg-destructive/10 backdrop-blur-sm text-destructive text-sm rounded-lg p-3 border border-destructive/20">
+        <div className="bg-destructive/10 text-destructive text-sm rounded-lg p-3 border border-destructive/20">
           {connectionError}
         </div>
       )}
 
       {transcriptEntries.length === 0 && !interimText && (
         <div className="text-center text-muted-foreground text-sm py-12">
-          {isConnected ? "Listening... Start speaking." : "Connecting to microphone..."}
+          {isConnected
+            ? "Listening — start speaking and the argument map fills in."
+            : singleMicOn || isMulti
+            ? "Connecting to microphone…"
+            : "Microphone is muted. Tap the mic button to start."}
         </div>
       )}
 
-      {prefs.groupBySubtopic ? (
-        <>
-          {groupedEntries.ordered.map((topic) => {
-            const topicEntries = groupedEntries.groups[topic] || [];
-            if (topicEntries.length === 0) return null;
-            return (
-              <Collapsible key={topic} defaultOpen>
-                <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-foreground/10 bg-background/60 backdrop-blur-xl px-4 py-3 text-left hover:bg-background/80 transition-colors">
-                  <ChevronDown className="w-4 h-4 text-primary shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
-                  <h3 className="text-sm font-display font-semibold text-foreground flex-1 truncate">
-                    {topic}
-                  </h3>
-                  <span className="text-[10px] bg-background/70 backdrop-blur-sm rounded-full px-2 py-0.5 text-muted-foreground border border-foreground/10">
-                    {topicEntries.length} {topicEntries.length === 1 ? "statement" : "statements"}
-                  </span>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="pt-2 pl-2">
-                    <LiveThreadView
-                      entries={topicEntries}
-                      threadTitles={threads}
-                      getSpeakerName={getSpeakerName}
-                      getSpeakerAvatar={getSpeakerAvatar}
-                      bubble={isMulti}
-                      compact
-                      density={prefs.density}
-                      showTimestamps={prefs.showTimestamps}
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
+      {groupedEntries.ordered.map((topic) => {
+        const topicEntries = groupedEntries.groups[topic] || [];
+        if (topicEntries.length === 0) return null;
+        return (
+          <Collapsible key={topic} defaultOpen>
+            <CollapsibleTrigger className="flex items-center gap-2 w-full rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-secondary transition-colors">
+              <ChevronDown className="w-4 h-4 text-foreground shrink-0 transition-transform [[data-state=closed]_&]:-rotate-90" />
+              <h3 className="text-sm font-display font-semibold text-foreground flex-1 truncate">
+                {topic}
+              </h3>
+              <span className="text-[10px] rounded-full px-2 py-0.5 text-muted-foreground border border-border">
+                {topicEntries.length} {topicEntries.length === 1 ? "statement" : "statements"}
+              </span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="pt-2 pl-2">
+                <LiveThreadView
+                  entries={topicEntries}
+                  threadTitles={threads}
+                  getSpeakerName={getSpeakerName}
+                  getSpeakerAvatar={getSpeakerAvatar}
+                  bubble={isMulti}
+                  compact
+                  density="comfortable"
+                  showTimestamps
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      })}
 
-          {groupedEntries.uncategorized.length > 0 && (
-            <div className="space-y-2">
-              {groupedEntries.ordered.length > 0 && (
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Uncategorized
-                </h3>
-              )}
-              <LiveThreadView
-                entries={groupedEntries.uncategorized}
-                threadTitles={threads}
-                getSpeakerName={getSpeakerName}
-                getSpeakerAvatar={getSpeakerAvatar}
-                bubble={isMulti}
-                compact
-                density={prefs.density}
-                showTimestamps={prefs.showTimestamps}
-              />
-            </div>
+      {groupedEntries.uncategorized.length > 0 && (
+        <div className="space-y-2">
+          {groupedEntries.ordered.length > 0 && (
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Uncategorized
+            </h3>
           )}
-        </>
-      ) : (
-        <LiveThreadView
-          entries={transcriptEntries}
-          threadTitles={threads}
-          getSpeakerName={getSpeakerName}
-          getSpeakerAvatar={getSpeakerAvatar}
-          bubble={isMulti}
-          compact
-          density={prefs.density}
-          showTimestamps={prefs.showTimestamps}
-        />
+          <LiveThreadView
+            entries={groupedEntries.uncategorized}
+            threadTitles={threads}
+            getSpeakerName={getSpeakerName}
+            getSpeakerAvatar={getSpeakerAvatar}
+            bubble={isMulti}
+            compact
+            density="comfortable"
+            showTimestamps
+          />
+        </div>
       )}
 
-      {prefs.showInterim && interimText && (
-        <div className="text-sm text-foreground/80 italic px-3 py-2 rounded-lg bg-background/70 backdrop-blur-sm border border-foreground/10">
-          {interimText}...
+      {interimText && (
+        <div className="text-sm text-foreground/80 italic px-3 py-2 rounded-lg bg-secondary border border-border">
+          {interimText}…
         </div>
       )}
     </div>
   );
 
-  const videoBlock = isMulti && (
-    <div className={`shrink-0 px-4 pt-3 pb-2 ${isVideoOnly ? "flex-1 flex flex-col" : "border-b border-border/60 max-h-[40vh] overflow-hidden"} relative`}>
+  const videoBlock = (
+    <div className="flex-1 flex flex-col min-h-0 bg-background relative px-4 pt-3 pb-3">
       <VideoGrid
-        localStream={rtc.localStream}
-        localName={hostName}
-        cameraOn={rtc.cameraOn}
-        micOn={rtc.micOn}
-        remotePeers={rtc.remotePeers}
-        participants={presenceParticipants}
-        activeRtcDeviceIds={rtc.activeRtcDeviceIds}
+        localStream={localStream}
+        localName={localDisplayName}
+        cameraOn={cameraOn}
+        micOn={micOn}
+        remotePeers={isMulti ? rtc.remotePeers : []}
+        participants={isMulti ? presenceParticipants : []}
+        activeRtcDeviceIds={isMulti ? rtc.activeRtcDeviceIds : new Set()}
         deviceId={deviceId}
-        onToggleCamera={rtc.toggleCamera}
-        onToggleMic={rtc.toggleMic}
-        tileStyle={prefs.tileStyle}
-        showLabels={prefs.showTileLabels}
+        onToggleCamera={onToggleCamera}
+        onToggleMic={onToggleMic}
+        tileStyle="grid"
+        showLabels
       />
-      {rtc.error && (
+      {mediaError && (
         <div className="mt-2 bg-destructive/10 text-destructive text-xs rounded-lg p-2">
-          {rtc.error}
+          {mediaError}
         </div>
-      )}
-      {isVideoOnly && (
-        <FloatingTranscript
-          entries={transcriptEntries}
-          threadTitles={threads}
-          getSpeakerName={getSpeakerName}
-          getSpeakerAvatar={getSpeakerAvatar}
-          showTimestamps={prefs.showTimestamps}
-        />
       )}
     </div>
   );
 
   return (
     <AppLayout>
-      <div className={`flex flex-col h-[calc(100vh-4rem)] max-w-3xl mx-auto w-full ${themeWrapperClass(prefs.theme)}`}>
+      <div
+        data-live-theme={liveThemeAttr}
+        className="flex flex-col h-[calc(100vh-4rem)] w-full bg-background text-foreground"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0 bg-card gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
             <Link
               to="/"
               aria-label="Home"
-              className="rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground min-h-[36px] min-w-[36px] inline-flex items-center justify-center -ml-1 shrink-0"
+              className="rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground min-h-[32px] min-w-[32px] inline-flex items-center justify-center -ml-1 shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-destructive shrink-0">
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-destructive shrink-0">
               <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-              Recording
+              <span className="hidden sm:inline">Recording</span>
             </span>
-            <h1 className="font-display font-bold text-lg truncate">
+            <h1 className="font-display font-bold text-base sm:text-lg truncate min-w-0">
               {title || "Live Session"}
             </h1>
             {isSummarizing && (
-              <span className="flex items-center gap-1 text-[10px] text-primary font-semibold shrink-0">
+              <span className="hidden md:flex items-center gap-1 text-[10px] text-primary font-semibold shrink-0">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Analyzing…
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <SessionClockButton
               startedAt={sessionData?.created_at ?? null}
               pausedAt={livePausedAt}
@@ -714,7 +718,6 @@ const LiveSessionPage = () => {
               onTimeUp={handleCapReached}
               onEndEarly={handleEndSession}
             />
-            <DisplayOptionsMenu prefs={prefs} update={updatePrefs} />
             {sessionId && user && (
               <>
                 <PauseButton kind="live" id={sessionId} isHost={true} />
@@ -723,21 +726,21 @@ const LiveSessionPage = () => {
             )}
             <button
               onClick={handleEndSession}
-              className="flex items-center gap-1.5 bg-destructive text-destructive-foreground px-3 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
+              className="flex items-center gap-1.5 bg-destructive text-destructive-foreground px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity"
             >
               <Square className="w-3.5 h-3.5" />
-              End
+              <span className="hidden sm:inline">End</span>
             </button>
           </div>
         </div>
 
         {/* Multi-device: Invite + presence strip */}
         {isMulti && (
-          <div className="px-4 pt-3 pb-2 shrink-0 border-b border-border/60 flex items-center gap-2">
+          <div className="px-4 pt-2.5 pb-2 shrink-0 border-b border-border flex items-center gap-2 bg-card">
             {joinCode && (
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className="shrink-0 inline-flex items-center gap-1.5 px-3 h-9 rounded-full border border-border bg-card hover:bg-secondary transition-colors text-xs font-semibold">
+                  <button className="shrink-0 inline-flex items-center gap-1.5 px-3 h-9 rounded-full border border-border bg-background hover:bg-secondary transition-colors text-xs font-semibold">
                     <UserPlus className="w-3.5 h-3.5" />
                     Invite
                   </button>
@@ -753,26 +756,15 @@ const LiveSessionPage = () => {
           </div>
         )}
 
-        {/* Body — layout-driven */}
-        {isVideoOnly ? (
-          videoBlock
-        ) : isSideBySide ? (
-          <div className="flex-1 flex min-h-0">
-            <div className="w-1/2 border-r border-border/60 flex flex-col min-h-0">{videoBlock}</div>
-            <div className="w-1/2 flex flex-col min-h-0">{transcriptBlock}</div>
+        {/* Body — fixed Zoom-style layout: video left, argument map right (md+); stacked on mobile */}
+        <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          <div className="md:flex-1 md:min-w-0 flex flex-col min-h-0 max-h-[45vh] md:max-h-none">
+            {videoBlock}
           </div>
-        ) : isTranscriptFirst ? (
-          <>
-            {videoBlock}
+          <div className="md:w-[420px] md:shrink-0 flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-border bg-card">
             {transcriptBlock}
-          </>
-        ) : (
-          <>
-            {videoBlock}
-            {transcriptBlock}
-          </>
-        )}
-
+          </div>
+        </div>
       </div>
     </AppLayout>
   );
