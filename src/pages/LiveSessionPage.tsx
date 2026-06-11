@@ -118,7 +118,7 @@ const LiveSessionPage = () => {
   // Single-device path
   const single = useLiveTranscription({
     sessionId,
-    isActive: isRecordingActive && !isMulti,
+    isActive: isRecordingActive && !isMulti && singleMicOn,
   });
 
   // Multi-device path: host runs its own mic AND merges all device entries
