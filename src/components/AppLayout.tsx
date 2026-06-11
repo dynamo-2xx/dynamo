@@ -140,6 +140,14 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             </RouterNavLink>
           );
         })}
+        {/* Clubs — Coming Soon */}
+        <div className="group relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-body text-muted-foreground flex-1 min-h-[44px] cursor-not-allowed select-none">
+          <comingSoonItem.icon className="w-5 h-5 opacity-50" />
+          <span className="opacity-50">{comingSoonItem.label}</span>
+          <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md bg-foreground text-background text-[10px] font-medium opacity-0 group-active:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Coming soon
+          </span>
+        </div>
       </nav>
       <FloatingDMWindow />
       <QueuedSessionStrip />
