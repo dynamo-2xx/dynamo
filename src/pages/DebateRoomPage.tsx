@@ -1744,156 +1744,96 @@ const DebateRoomPage = () => {
             )}
 
             <div className="flex-1 overflow-y-auto" data-annotatable>
-              <div className="max-w-2xl mx-auto px-4 py-6 sm:py-10">
-                {debate.feedback_enabled && !!myParticipant && (
-                  <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mb-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Award className="w-4 h-4 text-foreground shrink-0" />
-                      <p className="text-xs font-body text-foreground truncate">
-                        Your private performance report is ready.
-                      </p>
+              <RecordShell
+                kind="debate"
+                topic={debate.topic}
+                description={(debate as any).description}
+                status={debate.status}
+                scheduledAt={(debate as any).scheduled_at}
+                coverImageUrl={(debate as any).cover_image_url}
+                participantCount={participants.length}
+                importedSourceUrl={(debate as any).imported_source_url}
+                importedSourceKind={(debate as any).imported_source_kind}
+                belowBack={
+                  debate.feedback_enabled && !!myParticipant ? (
+                    <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Award className="w-4 h-4 text-foreground shrink-0" />
+                        <p className="text-xs font-body text-foreground truncate">
+                          Your private performance report is ready.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/debate/${id}/grade`)}
+                        className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
+                      >
+                        View Your Performance
+                      </button>
                     </div>
-                    <button
-                      onClick={() => navigate(`/debate/${id}/grade`)}
-                      className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
-                    >
-                      View Your Performance
-                    </button>
-                  </div>
-                )}
-
-                <DebateRecordPreview
-                  debateId={debate.id}
-                  topic={debate.topic}
-                  description={(debate as any).description}
-                  status={debate.status}
-                  scheduledAt={(debate as any).scheduled_at}
-                  coverImageUrl={(debate as any).cover_image_url}
-                  participantCount={participants.length}
-                  fallbackSubtopics={subtopics.map((s) => ({ id: s.id, title: s.title }))}
-                  fallbackSideLabels={sides.map((s) => s.label)}
-                  importedSourceUrl={(debate as any).imported_source_url}
-                  importedSourceKind={(debate as any).imported_source_kind}
-                />
-
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowTranscript((v) => !v)}
-                    className="text-xs font-body font-medium px-3 py-1.5 rounded-full border border-border bg-background hover:bg-accent/40 transition-colors"
-                  >
-                    {showTranscript ? "Hide full transcript" : "Show full transcript"}
-                  </button>
-                  {debate.edit_window_ends_at && (
-                    <EditWindowInline
-                      editWindowEndsAt={debate.edit_window_ends_at}
-                      canEdit={!!myParticipant}
-                      onEdit={() => navigate(`/debate/${id}/edit`)}
+                  ) : null
+                }
+                pillsRow={
+                  sides.length > 0 ? (
+                    <ParticipantsRow
+                      pills={sides.map((s, i) => ({
+                        kind: "side" as const,
+                        label: s.label,
+                        index: i,
+                      }))}
                     />
-                  )}
-                  <ContinueButton
-                    kind="debate"
-                    sourceId={debate.id}
-                    isOwner={isCreator}
-                    isCompleted={isCompleted}
-                  />
-                  {isCompleted && <PerformanceInsightsToggle />}
-                </div>
-
-                {showTranscript && (
-                  <div className="mt-4 space-y-3">
-                    {subtopics.map((st, stIdx) => {
-                      const stTranscripts = transcriptEntries.filter(
-                        (e) => e.is_final && e.subtopic === st.title,
-                      );
-                      const stArgs = arguments_.filter((a) => a.subtopic_id === st.id);
-                      const transcriptTexts = new Set(
-                        stTranscripts.map((t) => t.text.trim().toLowerCase()),
-                      );
-                      const orphanArgs = stArgs.filter(
-                        (arg) => !transcriptTexts.has(arg.content.trim().toLowerCase()),
-                      );
-                      const sideColor = (sideLabel: string): string => {
-                        const idx = sides.findIndex(
-                          (s) => s.label.toLowerCase() === sideLabel.toLowerCase(),
-                        );
-                        const palette = [
-                          "text-blue-600 dark:text-blue-400",
-                          "text-rose-600 dark:text-rose-400",
-                          "text-emerald-600 dark:text-emerald-400",
-                          "text-amber-600 dark:text-amber-400",
-                        ];
-                        return palette[(idx >= 0 ? idx : 0) % palette.length];
-                      };
-                      const isEmpty = stTranscripts.length === 0 && orphanArgs.length === 0;
-                      if (isEmpty) {
-                        return (
-                          <div
-                            key={st.id}
-                            title="No discussion happened on this subtopic"
-                            className="rounded-xl border border-border bg-card p-4 opacity-40 cursor-not-allowed select-none"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <h4 className="text-sm font-display font-semibold text-foreground">
-                                {stIdx + 1}. {st.title}
-                              </h4>
-                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">
-                                Not engaged
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div
-                          key={st.id}
-                          className="rounded-xl border border-border bg-card p-4 space-y-3"
-                        >
-                          <h4 className="text-sm font-display font-semibold text-foreground">
-                            {stIdx + 1}. {st.title}
-                          </h4>
-                          {stTranscripts.map((entry) => (
-                            <div key={entry.id} className="border-l-2 border-border pl-3 py-1">
-                              <p className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${sideColor(entry.speaker_side)}`}>
-                                {entry.speaker_side}
-                              </p>
-                              <p className="text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap" data-annotatable>
-                                <InsightText entryId={entry.id} text={entry.text} />
-                              </p>
-                            </div>
-                          ))}
-                          {orphanArgs.map((arg) => {
-                            const participant = participants.find(
-                              (p) => p.id === arg.participant_id,
-                            );
-                            const side = sides.find((s) => s.id === participant?.side_id);
-                            const label = side?.label || "Unknown";
-                            return (
-                              <div key={arg.id} className="border-l-2 border-border pl-3 py-1">
-                                <p className={`text-[10px] uppercase tracking-wider font-semibold mb-1 ${sideColor(label)}`}>
-                                  {label}
-                                </p>
-                                <p className="text-sm font-body text-foreground leading-relaxed whitespace-pre-wrap" data-annotatable>
-                                  <InsightText entryId={arg.id} text={arg.content} />
-                                </p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="mt-8">
-                  <RecordCommentsSection
-                    recordType={
-                      (debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"
-                    }
-                    recordId={debate.id}
-                  />
-                </div>
-              </div>
+                  ) : null
+                }
+                actionsRow={
+                  <>
+                    {debate.edit_window_ends_at && (
+                      <EditWindowInline
+                        editWindowEndsAt={debate.edit_window_ends_at}
+                        canEdit={!!myParticipant}
+                        onEdit={() => navigate(`/debate/${id}/edit`)}
+                      />
+                    )}
+                    <ContinueButton
+                      kind="debate"
+                      sourceId={debate.id}
+                      isOwner={isCreator}
+                      isCompleted={isCompleted}
+                    />
+                  </>
+                }
+                subtopics={subtopics.map((s) => ({ id: s.id, title: s.title }))}
+                transcriptEntries={transcriptEntries
+                  .filter((e: any) => e.is_final)
+                  .map((e: any) => ({
+                    id: e.id,
+                    speaker_side: e.speaker_side,
+                    text: e.text,
+                    subtopic: e.subtopic,
+                    timestamp: e.timestamp,
+                    ai_summary: e.ai_summary,
+                  }))}
+                argumentMap={arguments_.map((arg: any) => {
+                  const participant = participants.find((p) => p.id === arg.participant_id);
+                  const side = sides.find((s) => s.id === participant?.side_id);
+                  return {
+                    id: arg.id,
+                    type: arg.type || "argument",
+                    speaker_side: side?.label || "Unknown",
+                    content: arg.content,
+                    subtopic: subtopics.find((s) => s.id === arg.subtopic_id)?.title || "",
+                    created_at: arg.created_at ?? 0,
+                  };
+                })}
+                sessionId={debate.id}
+                sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
+                sessionComplete
+              >
+                <RecordCommentsSection
+                  recordType={
+                    (debate as any).format === "change_my_mind" ? "change_my_mind" : "debate"
+                  }
+                  recordId={debate.id}
+                />
+              </RecordShell>
             </div>
           </div>
           </InsightsProvider>
