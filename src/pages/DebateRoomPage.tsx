@@ -1475,6 +1475,65 @@ const DebateRoomPage = () => {
 
   if (!debate) return null;
 
+  if (isPreLiveDebate) {
+    return (
+      <AppLayout>
+        <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-body">Waiting room</p>
+            <h1 className="font-display text-2xl text-foreground">{debate.topic}</h1>
+          </div>
+          {isDebateCreator ? (
+            <>
+              <InPersonJoinPanel
+                debateId={id ?? null}
+                joinCode={debate.join_code}
+                maxSpeakersPerSide={maxPerSide}
+                onMaxSpeakersChange={async (n) => {
+                  setMaxPerSide(n);
+                  if (id) await supabase.from("debates").update({ max_speakers_per_side: n } as any).eq("id", id);
+                }}
+                onCodeRegenerated={(c) => setDebate((prev) => prev ? { ...prev, join_code: c } : prev)}
+              />
+              <LobbyInvitePanel debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} />
+              <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} hostUserId={debate.created_by} />
+              <MicLobby
+                kind="debate"
+                sessionId={id ?? null}
+                slots={[]}
+                hideEmptySlots
+                sides={sides.map((s) => ({ id: s.id, label: s.label }))}
+                minConnected={0}
+                onStart={startDebate}
+                starting={aiLoading}
+                startLabel="Start debate"
+              />
+              <button
+                type="button"
+                onClick={handleCancelDebate}
+                className="w-full text-xs font-body text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Cancel debate
+              </button>
+            </>
+          ) : (
+            <>
+              <QueuedSpeakerBubbles debateId={id ?? null} sides={sides.map((s) => ({ id: s.id, label: s.label }))} hostUserId={debate.created_by} />
+              <WaitingForHost
+                sessionTitle={debate.topic}
+                stream={preLiveWaitStream}
+                mode="own_mic"
+                lockReason={queuedSideId ? `Queued for ${sides.find((s) => s.id === queuedSideId)?.label ?? "a side"}` : "Waiting for the host"}
+                onLeave={() => navigate(`/debate/${id}/preview`, { replace: true })}
+                leaveLabel="Leave room"
+              />
+            </>
+          )}
+        </div>
+      </AppLayout>
+    );
+  }
+
   // Spectator preview: non-participant viewers on scheduled or live debates
   // see a record-style shell (with live threads-so-far for live debates,
   // or ghost cards for scheduled). Owners and speakers keep the full room UI.
