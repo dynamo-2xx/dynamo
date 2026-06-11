@@ -1851,6 +1851,7 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           created_by: string
+          description: string | null
           echo_guard: boolean
           ended_at: string | null
           forked_at: string | null
@@ -1875,6 +1876,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by: string
+          description?: string | null
           echo_guard?: boolean
           ended_at?: string | null
           forked_at?: string | null
@@ -1899,6 +1901,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           created_by?: string
+          description?: string | null
           echo_guard?: boolean
           ended_at?: string | null
           forked_at?: string | null
@@ -3322,7 +3325,10 @@ export type Database = {
       get_shared_live_session: {
         Args: { _token: string }
         Returns: {
+          cover_image_url: string
           created_at: string
+          created_by: string
+          description: string
           ended_at: string
           id: string
           mode: string

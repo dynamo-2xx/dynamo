@@ -32,6 +32,8 @@ interface RecordShellProps {
   actionsRow?: ReactNode;
   /** Extra content rendered below the back button (e.g. progress / failure banners). */
   belowBack?: ReactNode;
+  /** Owner-only edit affordance rendered in the top-right of the hero. */
+  editSlot?: ReactNode;
   /** Optional override: if provided, replaces the default tab body (Transcript / Threaded record). */
   bodyOverride?: ReactNode;
 
@@ -91,6 +93,7 @@ const RecordShell = ({
   pillsRow,
   actionsRow,
   belowBack,
+  editSlot,
   bodyOverride,
   subtopics = [],
   transcriptEntries = [],
@@ -149,6 +152,9 @@ const RecordShell = ({
         style={heroStyle}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        {editSlot && (
+          <div className="absolute top-3 right-3 z-10">{editSlot}</div>
+        )}
         <div className="absolute bottom-5 left-5 right-5">
           <div className="flex items-center gap-2 mb-3">
             <StatusPill status={status} />
