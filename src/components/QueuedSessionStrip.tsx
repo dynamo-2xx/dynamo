@@ -10,6 +10,7 @@ interface QueuedRow {
   debate_id: string;
   topic: string;
   status: string;
+  created_by: string;
 }
 
 /**
