@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+import MicConfirmButton from "@/components/live/MicConfirmButton";
+import type { SessionKind } from "@/hooks/useMicLobby";
 
 interface InPersonMicBarProps {
   /** Existing live stream from the pre-flight mic test, if available. */
   initialStream?: MediaStream | null;
   displayName?: string | null;
   avatarUrl?: string | null;
+  sessionKind?: SessionKind;
+  sessionId?: string | null;
+  userId?: string | null;
 }
 
 /**
@@ -16,7 +21,7 @@ interface InPersonMicBarProps {
  *
  * If their stream goes silent for >10 s while unmuted, fires a toast.
  */
-export default function InPersonMicBar({ initialStream, displayName, avatarUrl }: InPersonMicBarProps) {
+export default function InPersonMicBar({ initialStream, displayName, avatarUrl, sessionKind = "debate", sessionId = null, userId = null }: InPersonMicBarProps) {
   const [muted, setMuted] = useState(false);
   const [level, setLevel] = useState(0);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -171,15 +176,17 @@ export default function InPersonMicBar({ initialStream, displayName, avatarUrl }
         </div>
 
         {/* Mute toggle */}
-        <button
-          onClick={() => setMuted((m) => !m)}
-          aria-label={muted ? "Unmute" : "Mute"}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-            muted ? "bg-destructive/15 text-destructive" : "bg-accent text-foreground hover:bg-accent/80"
-          }`}
-        >
-          {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-        </button>
+        <MicConfirmButton kind={sessionKind} sessionId={sessionId} userId={userId} stream={streamRef.current}>
+          <button
+            onClick={() => setMuted((m) => !m)}
+            aria-label={muted ? "Unmute" : "Mute"}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+              muted ? "bg-destructive/15 text-destructive" : "bg-accent text-foreground hover:bg-accent/80"
+            }`}
+          >
+            {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+        </MicConfirmButton>
 
         {/* Device switch */}
         {devices.length > 1 && (
