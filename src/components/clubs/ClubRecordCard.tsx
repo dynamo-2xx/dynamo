@@ -16,9 +16,7 @@ function hrefFor(r: ClubRecord): string {
     case "cmm":
       return `/cmm/${r.id}`;
     case "live":
-      return r.status === "live" || r.status === "completed"
-        ? `/live/${r.id}`
-        : `/live/${r.id}/lobby`;
+      return `/live/${r.id}`;
     case "imported_record":
       return `/import/${r.id}`;
     default:
