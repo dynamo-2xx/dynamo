@@ -270,8 +270,8 @@ const LiveJoinPage = () => {
       );
     }
     return (
-      <div className={`min-h-screen bg-background flex flex-col ${themeWrapperClass(prefs.theme)}`}>
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+      <div data-live-theme={liveThemeAttr} className="min-h-screen bg-background text-foreground flex flex-col">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
           <div className="flex items-center gap-2 min-w-0">
             <span className="flex items-center gap-1.5 text-[11px] font-semibold text-destructive shrink-0">
               <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
@@ -280,7 +280,6 @@ const LiveJoinPage = () => {
             <p className="font-display font-bold text-base truncate">{sessionTitle}</p>
           </div>
           <div className="flex items-center gap-2">
-            <DisplayOptionsMenu prefs={prefs} update={updatePrefs} />
             <button
               onClick={() => navigate("/")}
               className="text-xs text-muted-foreground hover:text-foreground min-h-[36px] px-2"
@@ -291,7 +290,7 @@ const LiveJoinPage = () => {
         </div>
 
         {/* Video block */}
-        <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border/60 relative">
+        <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border relative bg-background">
           <VideoGrid
             localStream={rtc.localStream}
             localName={displayName}
@@ -304,25 +303,25 @@ const LiveJoinPage = () => {
             deviceId={deviceId}
             onToggleCamera={rtc.toggleCamera}
             onToggleMic={rtc.toggleMic}
-            tileStyle={prefs.tileStyle}
-            showLabels={prefs.showTileLabels}
+            tileStyle="grid"
+            showLabels
           />
         </div>
 
         {/* Status / interim block */}
-        <div className="flex-1 flex flex-col items-center text-center gap-2 px-4 py-6 overflow-y-auto bg-background/70 backdrop-blur-xl">
-          <div className="inline-flex flex-col items-center gap-1 px-4 py-2 rounded-xl bg-background/70 backdrop-blur-sm border border-foreground/10">
+        <div className="flex-1 flex flex-col items-center text-center gap-2 px-4 py-6 overflow-y-auto bg-card">
+          <div className="inline-flex flex-col items-center gap-1 px-4 py-2 rounded-xl bg-background border border-border">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">
               You are {displayName || `Speaker ${speakerSlot}`}
             </p>
           </div>
           {(micError || rtc.error) && (
-            <p className="mt-2 text-xs text-destructive max-w-xs px-3 py-2 rounded-lg bg-destructive/10 backdrop-blur-sm border border-destructive/20">
+            <p className="mt-2 text-xs text-destructive max-w-xs px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
               {micError || rtc.error}
             </p>
           )}
-          {prefs.showInterim && interimText && (
-            <p className="mt-3 text-sm text-foreground/80 italic max-w-sm leading-relaxed px-3 py-2 rounded-lg bg-background/70 backdrop-blur-sm border border-foreground/10">
+          {interimText && (
+            <p className="mt-3 text-sm text-foreground/80 italic max-w-sm leading-relaxed px-3 py-2 rounded-lg bg-background border border-border">
               "{interimText}"
             </p>
           )}
