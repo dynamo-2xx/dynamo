@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { SessionKind } from "@/hooks/useMicLobby";
@@ -8,7 +9,7 @@ interface Props {
   sessionId: string | null;
   userId: string | null;
   stream: MediaStream | null;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export default function MicConfirmButton({ kind, sessionId, userId, stream, children }: Props) {
