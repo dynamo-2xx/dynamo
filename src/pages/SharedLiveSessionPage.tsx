@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/AppLayout";
-import SessionRecordView from "@/components/live/record/SessionRecordViewV2";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
+import RecordShell from "@/components/record/RecordShell";
+import ParticipantsRow from "@/components/record/ParticipantsRow";
+import { useLiveParticipants } from "@/hooks/useLiveParticipants";
+import { InsightsProvider } from "@/contexts/InsightsContext";
 
 const SharedLiveSessionPage = () => {
   const { token } = useParams<{ token: string }>();
@@ -50,23 +53,59 @@ const SharedLiveSessionPage = () => {
 
   return (
     <AppLayout>
-      <SessionRecordView
-        sessionId={session.id}
-        title={session.title || "Live Session"}
-        createdAt={session.created_at}
-        endedAt={session.ended_at}
-        transcriptEntries={session.transcript_entries || []}
-        summaries={session.summaries || []}
-        subtopics={session.subtopics || []}
-        speakerNames={session.speaker_names || {}}
-        shareToken={session.share_token}
-        readOnly
-      />
-      <div className="max-w-5xl mx-auto px-4 pb-12">
-        <RecordCommentsSection recordType="live_session" recordId={session.id} />
-      </div>
+      <SharedLiveBody session={session} />
     </AppLayout>
   );
 };
 
 export default SharedLiveSessionPage;
+
+function SharedLiveBody({ session }: { session: any }) {
+  const speakerNames: Record<string, string> = session.speaker_names || {};
+  const entries: any[] = session.transcript_entries || [];
+  const subtopicTitles: string[] = session.subtopics || [];
+  const pills = useLiveParticipants({
+    sessionId: session.id,
+    speakerNames,
+    createdBy: session.created_by ?? null,
+  });
+  const transcriptInputs = entries.map((e: any) => ({
+    id: e.id,
+    speaker_side: speakerNames[String(e.speaker_id)] || `Speaker ${e.speaker_id + 1}`,
+    text: e.text,
+    subtopic: e.subtopic || subtopicTitles[0] || "",
+    timestamp: e.timestamp,
+    ai_summary: e.ai_summary,
+  }));
+  return (
+    <InsightsProvider sessionId={session.id} sessionKind="live">
+      <RecordShell
+        kind="live"
+        topic={session.title || "Live Session"}
+        status="completed"
+        coverImageUrl={session.cover_image_url ?? null}
+        createdAt={session.created_at}
+        pillsRow={
+          pills.length > 0 ? (
+            <ParticipantsRow
+              pills={pills.map((p) => ({
+                kind: "user" as const,
+                name: p.name,
+                avatarUrl: p.avatarUrl,
+                userId: p.userId,
+              }))}
+            />
+          ) : null
+        }
+        subtopics={subtopicTitles.map((t) => ({ id: t, title: t }))}
+        transcriptEntries={transcriptInputs}
+        argumentMap={[]}
+        sessionId={session.id}
+        sessionKind="live"
+        sessionComplete
+      >
+        <RecordCommentsSection recordType="live_session" recordId={session.id} />
+      </RecordShell>
+    </InsightsProvider>
+  );
+}
