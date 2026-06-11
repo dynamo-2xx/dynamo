@@ -535,6 +535,17 @@ const LiveSessionPage = () => {
 
   // ── SETUP SCREEN ──
   if (phase === "setup") {
+    // Avoid flashing the setup/recording UI for a deep link while the
+    // session row is still loading — we don't yet know if it has ended.
+    if (id && !phaseResolved) {
+      return (
+        <AppLayout>
+          <div className="flex items-center justify-center h-[60vh]">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        </AppLayout>
+      );
+    }
     return (
       <AppLayout>
         <div className="max-w-lg mx-auto px-4 py-6 sm:py-12">
