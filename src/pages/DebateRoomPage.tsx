@@ -528,6 +528,16 @@ const DebateRoomPage = () => {
         const updated = payload.new as unknown as DebateData;
         setDebate(updated);
 
+        if (updated.status === "live") {
+          supabase
+            .from("debate_participants")
+            .select("*")
+            .eq("debate_id", id)
+            .then(({ data }) => {
+              if (data) setParticipants(data as unknown as Participant[]);
+            });
+        }
+
         if (updated.prep_phase_active) {
           setTimerRunning(false);
           setTimeLeft(0);
