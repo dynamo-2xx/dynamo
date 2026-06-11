@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -55,9 +55,6 @@ import SharedNotebookPage from "./pages/SharedNotebookPage";
 import CreateChangeMyMindPage from "./pages/CreateChangeMyMindPage";
 import ChangeMyMindRoomPage from "./pages/ChangeMyMindRoomPage";
 import JoinCodeProjectorPage from "./pages/JoinCodeProjectorPage";
-import DebateLobbyPage from "./pages/DebateLobbyPage";
-import LiveLobbyPage from "./pages/LiveLobbyPage";
-import CmmLobbyPage from "./pages/CmmLobbyPage";
 import JoinCmmPage from "./pages/JoinCmmPage";
 import ClubsPage from "./pages/ClubsPage";
 import CreateClubPage from "./pages/CreateClubPage";
@@ -78,6 +75,11 @@ import WaitlistPage from "./pages/WaitlistPage";
 import LaunchGate from "@/components/LaunchGate";
 
 const queryClient = new QueryClient();
+
+const LegacyLobbyRedirect = ({ kind }: { kind: "debate" | "live" | "cmm" }) => {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/${kind}/${id ?? ""}`} replace />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -116,11 +118,11 @@ const App = () => (
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><PaywallGate metric="sessions_created"><CreateDebatePage /></PaywallGate></ProtectedRoute>} />
               <Route path="/cmm/new" element={<ProtectedRoute><PaywallGate metric="sessions_created"><CreateChangeMyMindPage /></PaywallGate></ProtectedRoute>} />
-              <Route path="/cmm/:id/lobby" element={<ProtectedRoute><CmmLobbyPage /></ProtectedRoute>} />
+              <Route path="/cmm/:id/lobby" element={<ProtectedRoute><LegacyLobbyRedirect kind="cmm" /></ProtectedRoute>} />
               <Route path="/cmm/join/:code" element={<JoinCmmPage />} />
               <Route path="/cmm/:id" element={<ChangeMyMindRoomPage />} />
               <Route path="/debate/:id" element={<ProtectedRoute><DebateRoomPage /></ProtectedRoute>} />
-              <Route path="/debate/:id/lobby" element={<ProtectedRoute><DebateLobbyPage /></ProtectedRoute>} />
+              <Route path="/debate/:id/lobby" element={<ProtectedRoute><LegacyLobbyRedirect kind="debate" /></ProtectedRoute>} />
               <Route path="/debate/:id/preview" element={<ProtectedRoute><DebateScheduledPreviewPage /></ProtectedRoute>} />
               <Route path="/debate/:id/grade" element={<ProtectedRoute><DebateGradeReportPage /></ProtectedRoute>} />
               <Route path="/debate/:id/projector" element={<ProjectorPage />} />
@@ -129,7 +131,7 @@ const App = () => (
               <Route path="/join/:code" element={<JoinDebatePage />} />
               <Route path="/preview/:token" element={<DebatePreviewPage />} />
               <Route path="/live/new" element={<ProtectedRoute><PaywallGate metric="sessions_created"><LiveSessionPage /></PaywallGate></ProtectedRoute>} />
-              <Route path="/live/:id/lobby" element={<ProtectedRoute><LiveLobbyPage /></ProtectedRoute>} />
+              <Route path="/live/:id/lobby" element={<ProtectedRoute><LegacyLobbyRedirect kind="live" /></ProtectedRoute>} />
               <Route path="/live/shared/:token" element={<SharedLiveSessionPage />} />
               <Route path="/live/join/:code" element={<LiveJoinPage />} />
               <Route path="/live/:id" element={<ProtectedRoute><LiveSessionPage /></ProtectedRoute>} />
