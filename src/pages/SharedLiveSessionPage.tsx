@@ -82,6 +82,7 @@ function SharedLiveBody({ session }: { session: any }) {
       <RecordShell
         kind="live"
         topic={session.title || "Live Session"}
+        description={session.description ?? null}
         status="completed"
         coverImageUrl={session.cover_image_url ?? null}
         createdAt={session.created_at}
