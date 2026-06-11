@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, forwardRef } from "react";
-import { Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Check } from "lucide-react";
 import type { RemotePeer } from "@/hooks/useLiveSessionRTC";
 import type { LiveParticipant } from "@/hooks/useLiveSessionPresence";
 
@@ -187,6 +187,8 @@ interface VideoGridProps {
   onToggleMic: () => void;
   tileStyle?: "grid" | "speaker-focus" | "compact";
   showLabels?: boolean;
+  /** When true, render a green-check badge over the local mic button. */
+  voiceConfirmed?: boolean;
 }
 
 const VideoGrid = ({
@@ -203,6 +205,7 @@ const VideoGrid = ({
   onToggleMic,
   tileStyle = "grid",
   showLabels = true,
+  voiceConfirmed = false,
 }: VideoGridProps) => {
   const peerById = new Map(remotePeers.map((p) => [p.deviceId, p]));
 
@@ -276,6 +279,7 @@ const VideoGrid = ({
           cameraOn={cameraOn}
           onToggleMic={onToggleMic}
           onToggleCamera={onToggleCamera}
+          voiceConfirmed={voiceConfirmed}
         />
       </div>
     );
@@ -318,6 +322,7 @@ const VideoGrid = ({
         cameraOn={cameraOn}
         onToggleMic={onToggleMic}
         onToggleCamera={onToggleCamera}
+        voiceConfirmed={voiceConfirmed}
       />
     </div>
   );
@@ -328,24 +333,36 @@ const Controls = ({
   cameraOn,
   onToggleMic,
   onToggleCamera,
+  voiceConfirmed = false,
 }: {
   micOn: boolean;
   cameraOn: boolean;
   onToggleMic: () => void;
   onToggleCamera: () => void;
+  voiceConfirmed?: boolean;
 }) => (
   <div className="flex items-center justify-center gap-2">
-    <button
-      onClick={onToggleMic}
-      aria-label={micOn ? "Mute call audio" : "Unmute call audio"}
-      className={`min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-full border transition-colors ${
-        micOn
-          ? "bg-secondary border-border text-foreground hover:bg-accent"
-          : "bg-destructive border-destructive text-destructive-foreground"
-      }`}
-    >
-      {micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-    </button>
+    <span className="relative inline-flex">
+      <button
+        onClick={onToggleMic}
+        aria-label={micOn ? "Mute call audio" : "Unmute call audio"}
+        className={`min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-full border transition-colors ${
+          micOn
+            ? "bg-secondary border-border text-foreground hover:bg-accent"
+            : "bg-destructive border-destructive text-destructive-foreground"
+        }`}
+      >
+        {micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+      </button>
+      {voiceConfirmed && (
+        <span
+          className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-background inline-flex items-center justify-center shadow-sm"
+          title="Voice confirmed"
+        >
+          <Check className="w-2.5 h-2.5 text-white" />
+        </span>
+      )}
+    </span>
     <button
       onClick={onToggleCamera}
       aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}
