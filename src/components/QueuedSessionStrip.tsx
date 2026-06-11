@@ -10,6 +10,7 @@ interface QueuedRow {
   debate_id: string;
   topic: string;
   status: string;
+  created_by: string;
 }
 
 /**
@@ -32,7 +33,7 @@ export default function QueuedSessionStrip() {
     const load = async () => {
       const { data } = await supabase
         .from("debate_participants")
-        .select("id, debate_id, debates!inner(id, topic, status)")
+        .select("id, debate_id, debates!inner(id, topic, status, created_by)")
         .eq("user_id", user.id);
       if (cancelled) return;
       const next: QueuedRow[] = (data ?? [])
@@ -41,8 +42,13 @@ export default function QueuedSessionStrip() {
           debate_id: r.debate_id,
           topic: r.debates?.topic ?? "Debate",
           status: r.debates?.status ?? "",
+          created_by: r.debates?.created_by ?? "",
         }))
-        .filter((r) => r.status === "draft" || r.status === "scheduled");
+        .filter(
+          (r) =>
+            (r.status === "draft" || r.status === "scheduled") &&
+            r.created_by !== user.id, // hosts manage their own debate from the room
+        );
       setRows(next);
     };
     load();
