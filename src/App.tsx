@@ -11,6 +11,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import IncidentBanner from "@/components/IncidentBanner";
 import PastDueBanner from "@/components/PastDueBanner";
 import InstallAppChip from "@/components/InstallAppChip";
+import NotificationToaster from "@/components/NotificationToaster";
 import { LiveRegionProvider } from "@/components/a11y/LiveRegion";
 import Index from "./pages/Index";
 import ExplorePage from "./pages/ExplorePage";
@@ -95,6 +96,7 @@ const App = () => (
             <PastDueBanner />
             <OfflineBanner />
             <InstallAppChip />
+            <NotificationToaster />
             <Routes>
               <Route path="/waitlist" element={<WaitlistPage />} />
               <Route path="/" element={<LaunchGate><Index /></LaunchGate>} />
