@@ -42,6 +42,7 @@ import ContinueButton from "@/components/record/ContinueButton";
 import RecordShell from "@/components/record/RecordShell";
 import RecordEditDialog from "@/components/record/RecordEditDialog";
 import ParticipantsRow from "@/components/record/ParticipantsRow";
+import AnalysisProgress from "@/components/record/AnalysisProgress";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
 import { useDebateHostFailover } from "@/hooks/useDebateHostFailover";
 import { Lock, Globe } from "lucide-react";
