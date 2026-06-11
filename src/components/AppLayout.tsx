@@ -10,6 +10,7 @@ import { FloatingDMProvider } from "@/contexts/FloatingDMContext";
 import FloatingDMWindow from "@/components/messages/FloatingDMWindow";
 import VerifyEmailBanner from "@/components/VerifyEmailBanner";
 import MySanctionBanner from "@/components/sanctions/MySanctionBanner";
+import QueuedSessionStrip from "@/components/QueuedSessionStrip";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
@@ -132,6 +133,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         })}
       </nav>
       <FloatingDMWindow />
+      <QueuedSessionStrip />
     </div>
     </FloatingDMProvider>
   );
