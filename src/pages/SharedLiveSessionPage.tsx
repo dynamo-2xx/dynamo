@@ -5,6 +5,7 @@ import AppLayout from "@/components/AppLayout";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import RecordShell from "@/components/record/RecordShell";
 import ParticipantsRow from "@/components/record/ParticipantsRow";
+import AnalysisProgress from "@/components/record/AnalysisProgress";
 import { useLiveParticipants } from "@/hooks/useLiveParticipants";
 import { InsightsProvider } from "@/contexts/InsightsContext";
 
@@ -77,6 +78,18 @@ function SharedLiveBody({ session }: { session: any }) {
     timestamp: e.timestamp,
     ai_summary: e.ai_summary,
   }));
+  const speakerMeta = (() => {
+    const m: Record<string, { name: string; avatarUrl: string | null; userId: string | null }> = {};
+    pills.forEach((p) => {
+      m[p.name] = { name: p.name, avatarUrl: p.avatarUrl, userId: p.userId };
+      m[`Speaker ${p.slot + 1}`] = { name: p.name, avatarUrl: p.avatarUrl, userId: p.userId };
+    });
+    return m;
+  })();
+  const startMs = (() => {
+    const t = new Date(session.created_at).getTime();
+    return Number.isFinite(t) ? t : null;
+  })();
   return (
     <InsightsProvider sessionId={session.id} sessionKind="live">
       <RecordShell
@@ -86,6 +99,13 @@ function SharedLiveBody({ session }: { session: any }) {
         status="completed"
         coverImageUrl={session.cover_image_url ?? null}
         createdAt={session.created_at}
+        belowBack={
+          <AnalysisProgress
+            sessionId={session.id}
+            sessionKind="live"
+            transcriptEntries={transcriptInputs}
+          />
+        }
         pillsRow={
           pills.length > 0 ? (
             <ParticipantsRow
@@ -104,6 +124,8 @@ function SharedLiveBody({ session }: { session: any }) {
         sessionId={session.id}
         sessionKind="live"
         sessionComplete
+        sessionStartMs={startMs}
+        speakerMeta={speakerMeta}
       >
         <RecordCommentsSection recordType="live_session" recordId={session.id} />
       </RecordShell>

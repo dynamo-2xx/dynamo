@@ -10,6 +10,7 @@ import RecordEditDialog from "@/components/record/RecordEditDialog";
 import ParticipantsRow from "@/components/record/ParticipantsRow";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ContinueButton from "@/components/record/ContinueButton";
+import AnalysisProgress from "@/components/record/AnalysisProgress";
 import { useLiveParticipants } from "@/hooks/useLiveParticipants";
 import { InsightsProvider } from "@/contexts/InsightsContext";
 import LiveThreadView from "@/components/live/LiveThreadView";
@@ -781,6 +782,21 @@ function LiveEndedRecord(props: {
     avatarUrl: p.avatarUrl,
     userId: p.userId,
   }));
+  // speaker_side in transcriptInputs is `speakerNames[String(speaker_id)] ?? "Speaker N+1"`.
+  // Build a meta map keyed by that exact string so avatar/name resolve directly.
+  const speakerMeta = (() => {
+    const m: Record<string, { name: string; avatarUrl: string | null; userId: string | null }> = {};
+    pills.forEach((p) => {
+      // Match by both the resolved name and the slot-based default "Speaker N+1".
+      m[p.name] = { name: p.name, avatarUrl: p.avatarUrl, userId: p.userId };
+      m[`Speaker ${p.slot + 1}`] = { name: p.name, avatarUrl: p.avatarUrl, userId: p.userId };
+    });
+    return m;
+  })();
+  const startMs = (() => {
+    const t = new Date(props.createdAt).getTime();
+    return Number.isFinite(t) ? t : null;
+  })();
   return (
     <InsightsProvider sessionId={props.sessionId} sessionKind="live">
       <RecordShell
@@ -790,6 +806,15 @@ function LiveEndedRecord(props: {
         status="completed"
         coverImageUrl={props.coverImageUrl}
         createdAt={props.createdAt}
+        belowBack={
+          props.sessionId ? (
+            <AnalysisProgress
+              sessionId={props.sessionId}
+              sessionKind="live"
+              transcriptEntries={props.transcriptEntries}
+            />
+          ) : null
+        }
         editSlot={
           props.canContinue ? (
             <RecordEditDialog
@@ -835,6 +860,8 @@ function LiveEndedRecord(props: {
         sessionId={props.sessionId}
         sessionKind="live"
         sessionComplete
+        sessionStartMs={startMs}
+        speakerMeta={speakerMeta}
       >
         {props.sessionId && (
           <RecordCommentsSection recordType="live_session" recordId={props.sessionId} />

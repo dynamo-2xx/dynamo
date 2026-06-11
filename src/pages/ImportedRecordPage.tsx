@@ -6,6 +6,7 @@ import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import RecordShell from "@/components/record/RecordShell";
 import RecordEditDialog from "@/components/record/RecordEditDialog";
+import AnalysisProgress from "@/components/record/AnalysisProgress";
 import { toast } from "sonner";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { InsightsProvider } from "@/contexts/InsightsContext";
@@ -190,6 +191,13 @@ export default function ImportedRecordPage() {
                 Import failed{rec.progress?.message ? `: ${rec.progress.message}` : "."} Try a different source.
               </div>
             )}
+            {rec.status === "ready" && (
+              <AnalysisProgress
+                sessionId={rec.id}
+                sessionKind="imported"
+                transcriptEntries={(rec.transcript_entries as any[]) ?? []}
+              />
+            )}
           </>
         }
         subtopics={subtopics}
@@ -198,6 +206,10 @@ export default function ImportedRecordPage() {
         sessionId={rec.id}
         sessionKind="imported"
         sessionComplete
+        sessionStartMs={(() => {
+          const t = new Date(rec.created_at).getTime();
+          return Number.isFinite(t) ? t : null;
+        })()}
       >
         <RecordCommentsSection
           recordType={"imported_record" as any}
