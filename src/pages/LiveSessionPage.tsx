@@ -230,9 +230,6 @@ const LiveSessionPage = () => {
         setJoinCode(d.join_code || null);
         if (d.status === "ended") {
           setPhase("ended");
-        } else if (d.mode === "multi_device" && d.status !== "recording" && user?.id === d.created_by) {
-          navigate(`/live/${id}/lobby`, { replace: true });
-          return;
         } else {
           setPhase("recording");
         }
@@ -312,7 +309,7 @@ const LiveSessionPage = () => {
         .from("live_sessions")
         .update({ speaker_names: seeded })
         .eq("id", d.id);
-      navigate(`/live/${d.id}/lobby`, { replace: true });
+      navigate(`/live/${d.id}`, { replace: true });
       return;
     }
 
