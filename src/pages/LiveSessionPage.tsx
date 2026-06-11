@@ -32,6 +32,7 @@ import { useMicPolicy } from "@/hooks/useMicPolicy";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
 import FloatingTranscript from "@/components/live/FloatingTranscript";
+import SessionClockButton from "@/components/live/SessionClockButton";
 import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 import ShareDialog from "@/components/sharing/ShareDialog";
 import PauseButton from "@/components/sharing/PauseButton";
@@ -340,6 +341,13 @@ const LiveSessionPage = () => {
     }
     setPhase("ended");
   }, [endSession, sessionId, isMulti]);
+
+  // Auto-end when the 60-min hard cap is reached. The SessionClockButton
+  // owns the countdown and pause-pausing; we just react to onTimeUp.
+  const handleCapReached = useCallback(() => {
+    toast("Session ended — 1 hour limit reached.");
+    void handleEndSession();
+  }, [handleEndSession]);
 
   // Group entries by subtopic for the recording view
   const groupedEntries = useMemo(() => {
@@ -669,6 +677,13 @@ const LiveSessionPage = () => {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <SessionClockButton
+              startedAt={sessionData?.created_at ?? null}
+              paused={liveIsPaused}
+              isOwner={!!user?.id && user.id === sessionData?.created_by}
+              onTimeUp={handleCapReached}
+              onEndEarly={handleEndSession}
+            />
             <DisplayOptionsMenu prefs={prefs} update={updatePrefs} />
             {sessionId && user && (
               <>
