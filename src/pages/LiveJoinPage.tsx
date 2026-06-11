@@ -8,11 +8,10 @@ import { useDeviceTranscription } from "@/hooks/useDeviceTranscription";
 import { useLiveSessionRTC } from "@/hooks/useLiveSessionRTC";
 import { useLiveSessionPresence } from "@/hooks/useLiveSessionPresence";
 import VideoGrid from "@/components/live/VideoGrid";
-import DisplayOptionsMenu from "@/components/live/DisplayOptionsMenu";
-import { useLiveDisplayPrefs, themeWrapperClass } from "@/hooks/useLiveDisplayPrefs";
 import { toast } from "sonner";
 import WaitingForHost from "@/components/lobby/WaitingForHost";
 import { useMicLobbyAttachment } from "@/hooks/useMicLobbyAttachment";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const AVATAR_EMOJIS = ["🦊", "🐼", "🐙", "🦉", "🐝", "🦄", "🐯", "🐳", "🦁", "🐧", "🐢", "🐬"];
 
@@ -37,7 +36,8 @@ const LiveJoinPage = () => {
 
   const [phase, setPhase] = useState<Phase>("setup");
   const [errorMsg, setErrorMsg] = useState<string>("");
-  const { prefs, update: updatePrefs } = useLiveDisplayPrefs();
+  const { theme } = useTheme();
+  const liveThemeAttr = theme === "dark" ? "dark" : "light";
 
   const [displayName, setDisplayName] = useState("");
   const [emoji, setEmoji] = useState(AVATAR_EMOJIS[0]);
