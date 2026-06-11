@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { TranscriptDensity } from "@/hooks/useLiveDisplayPrefs";
+import type { TranscriptDensity } from "@/components/live/LiveThreadView";
 
 interface Props {
   speakerName: string;
