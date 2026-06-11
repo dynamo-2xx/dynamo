@@ -22,8 +22,10 @@ function formatRemaining(ms: number) {
 interface SessionClockButtonProps {
   /** ISO timestamp the session started (we use live_sessions.created_at). */
   startedAt: string | null | undefined;
-  /** When true, the clock pauses with the session. */
-  paused?: boolean;
+  /** ISO timestamp the current pause window began (null when running). */
+  pausedAt?: string | null;
+  /** Total ms accumulated across prior, already-resolved pause windows. */
+  accumulatedPausedMs?: number;
   /** Show owner-only "End early" affordance in the popover. */
   isOwner?: boolean;
   /** Called once when the cap is reached. */
@@ -39,37 +41,35 @@ interface SessionClockButtonProps {
  */
 export default function SessionClockButton({
   startedAt,
-  paused = false,
+  pausedAt = null,
+  accumulatedPausedMs = 0,
   isOwner = false,
   onTimeUp,
   onEndEarly,
 }: SessionClockButtonProps) {
-  // Tracks elapsed ms; advances 1s/tick when not paused.
-  const [elapsedMs, setElapsedMs] = useState(() => {
-    if (!startedAt) return 0;
-    const t = new Date(startedAt).getTime();
-    if (!Number.isFinite(t)) return 0;
-    return Math.max(0, Date.now() - t);
-  });
+  const paused = !!pausedAt;
+  // Drive re-renders so wall-clock derived elapsed updates while running.
+  const [, setNowTick] = useState(0);
   const [bubbleText, setBubbleText] = useState<string | null>(null);
   const firedThresholds = useRef<Set<number>>(new Set());
   const firedTimeUp = useRef(false);
 
-  // Reset baseline when startedAt changes.
-  useEffect(() => {
-    if (!startedAt) return;
-    const t = new Date(startedAt).getTime();
-    if (!Number.isFinite(t)) return;
-    setElapsedMs(Math.max(0, Date.now() - t));
-  }, [startedAt]);
-
-  // Tick every second, freeze when paused.
+  // Tick every second only when running. While paused, elapsed is frozen by
+  // pausedAt so we don't need to re-render.
   useEffect(() => {
     if (paused) return;
-    const i = setInterval(() => setElapsedMs((e) => e + 1000), 1000);
+    const i = setInterval(() => setNowTick((n) => n + 1), 1000);
     return () => clearInterval(i);
   }, [paused]);
 
+  const elapsedMs = (() => {
+    if (!startedAt) return 0;
+    const startMs = new Date(startedAt).getTime();
+    if (!Number.isFinite(startMs)) return 0;
+    // While paused, freeze elapsed at the moment the current pause began.
+    const refNow = paused ? new Date(pausedAt!).getTime() : Date.now();
+    return Math.max(0, refNow - startMs - (accumulatedPausedMs || 0));
+  })();
   const remainingMs = Math.max(0, HARD_CAP_MS - elapsedMs);
 
   // Threshold pulses + time-up.

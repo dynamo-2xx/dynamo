@@ -19,6 +19,7 @@ export function usePauseControl(opts: {
 }) {
   const { kind, id, isHost, remainingSeconds } = opts;
   const [pausedAt, setPausedAt] = useState<string | null>(null);
+  const [accumulatedPausedMs, setAccumulatedPausedMs] = useState<number>(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const table = kind === "live" ? "live_sessions" : "debates";
 
@@ -26,10 +27,14 @@ export function usePauseControl(opts: {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const { data } = await supabase.from(table).select("paused_at").eq("id", id).maybeSingle();
+      const cols = kind === "live" ? "paused_at, accumulated_paused_ms" : "paused_at";
+      const { data } = await supabase.from(table).select(cols).eq("id", id).maybeSingle();
       setPausedAt((data as any)?.paused_at ?? null);
+      if (kind === "live") {
+        setAccumulatedPausedMs(Number((data as any)?.accumulated_paused_ms ?? 0) || 0);
+      }
     })();
-  }, [id, table]);
+  }, [id, table, kind]);
 
   // Realtime sync
   useEffect(() => {
@@ -38,10 +43,15 @@ export function usePauseControl(opts: {
       .channel(`pause-${table}-${id}`)
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table, filter: `id=eq.${id}` },
-        (payload: any) => setPausedAt(payload.new?.paused_at ?? null))
+        (payload: any) => {
+          setPausedAt(payload.new?.paused_at ?? null);
+          if (kind === "live") {
+            setAccumulatedPausedMs(Number(payload.new?.accumulated_paused_ms ?? 0) || 0);
+          }
+        })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [id, table]);
+  }, [id, table, kind]);
 
   // Elapsed tick
   useEffect(() => {
@@ -71,11 +81,26 @@ export function usePauseControl(opts: {
       const { error } = await supabase.rpc("resume_debate" as any, { _debate_id: id });
       if (error) { toast.error(error.message); return; }
     } else {
-      const { error } = await supabase.from(table).update({ paused_at: null }).eq("id", id);
+      // Roll the just-ended pause window into accumulated_paused_ms so the
+      // session timer correctly excludes paused time across reloads / cycles.
+      const { data: row } = await supabase
+        .from(table)
+        .select("paused_at, accumulated_paused_ms")
+        .eq("id", id)
+        .maybeSingle();
+      const prevAcc = Number((row as any)?.accumulated_paused_ms ?? 0) || 0;
+      const pausedAtIso = (row as any)?.paused_at as string | null;
+      const addMs = pausedAtIso
+        ? Math.max(0, Date.now() - new Date(pausedAtIso).getTime())
+        : 0;
+      const { error } = await supabase
+        .from(table)
+        .update({ paused_at: null, accumulated_paused_ms: prevAcc + addMs } as any)
+        .eq("id", id);
       if (error) { toast.error(error.message); return; }
     }
     toast.success("Session resumed");
   }, [id, isHost, table, kind]);
 
-  return { isPaused: !!pausedAt, pausedAt, elapsedMs, pause, resume };
+  return { isPaused: !!pausedAt, pausedAt, accumulatedPausedMs, elapsedMs, pause, resume };
 }

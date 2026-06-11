@@ -1845,6 +1845,7 @@ export type Database = {
       }
       live_sessions: {
         Row: {
+          accumulated_paused_ms: number
           continuation_index: number
           continuation_root_id: string | null
           continued_from_id: string | null
@@ -1870,6 +1871,7 @@ export type Database = {
           transcript_entries: Json
         }
         Insert: {
+          accumulated_paused_ms?: number
           continuation_index?: number
           continuation_root_id?: string | null
           continued_from_id?: string | null
@@ -1895,6 +1897,7 @@ export type Database = {
           transcript_entries?: Json
         }
         Update: {
+          accumulated_paused_ms?: number
           continuation_index?: number
           continuation_root_id?: string | null
           continued_from_id?: string | null

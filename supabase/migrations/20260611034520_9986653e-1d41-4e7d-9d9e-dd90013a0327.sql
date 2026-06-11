@@ -1,0 +1,1 @@
+ALTER TABLE public.live_sessions ADD COLUMN IF NOT EXISTS accumulated_paused_ms bigint NOT NULL DEFAULT 0;
