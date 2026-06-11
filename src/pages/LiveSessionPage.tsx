@@ -97,6 +97,10 @@ const LiveSessionPage = () => {
   // Halt transcription + analysis whenever the host pauses the session.
   const isRecordingActive = rawIsRecordingActive && !liveIsPaused;
 
+  // Zoom-style mic toggle for the single-device path. When the user mutes,
+  // we also stop the Deepgram socket so we're not transcribing silence.
+  const [singleMicOn, setSingleMicOn] = useState(true);
+
   // Load host's display name from profile
   useEffect(() => {
     if (!user) return;
