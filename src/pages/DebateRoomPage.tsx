@@ -169,6 +169,7 @@ const DebateRoomPage = () => {
   const [preLiveWaitStream, setPreLiveWaitStream] = useState<MediaStream | null>(null);
   const [preLiveHostStream, setPreLiveHostStream] = useState<MediaStream | null>(null);
   const [maxPerSide, setMaxPerSide] = useState(2);
+  const preservePreLiveWaitStreamRef = useRef(false);
   const deviceId = useState(() => getDeviceId())[0];
   // In-person joiner: pick up the live MediaStream the pre-flight mic test
   // handed off so we can show the persistent mic bar without re-prompting.
@@ -409,7 +410,7 @@ const DebateRoomPage = () => {
       .catch(() => undefined);
     return () => {
       active = false;
-      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (stream && !preservePreLiveWaitStreamRef.current) stream.getTracks().forEach((t) => t.stop());
       setPreLiveHostStream(null);
       setPreLiveWaitStream(null);
     };
@@ -417,7 +418,10 @@ const DebateRoomPage = () => {
 
   useEffect(() => {
     if (debate?.status !== "live") return;
-    if (preLiveWaitStream) setHandoffStream(preLiveWaitStream);
+    if (preLiveWaitStream) {
+      preservePreLiveWaitStreamRef.current = true;
+      setHandoffStream(preLiveWaitStream);
+    }
   }, [debate?.status, preLiveWaitStream]);
 
   // Load data
