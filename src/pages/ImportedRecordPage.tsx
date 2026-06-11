@@ -63,10 +63,6 @@ interface ImportedRecord {
   progress?: { stage?: string; percent?: number; message?: string } | null;
 }
 
-const SOURCE_ICON: Record<string, typeof Link2> = {
-  url: Link2, article: Link2, pdf: FileImage, media: Mic, text: FileText,
-};
-
 export default function ImportedRecordPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
