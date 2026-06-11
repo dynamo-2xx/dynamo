@@ -72,7 +72,7 @@ function Segment({ label, done }: { label: string; done: boolean }) {
         {done ? (
           <div className="h-full w-full bg-foreground" />
         ) : (
-          <div className="h-full w-1/3 bg-foreground/40 animate-[shimmer_1.6s_ease-in-out_infinite]" />
+          <div className="h-full w-1/3 bg-foreground/40 animate-pulse" />
         )}
       </div>
     </div>
