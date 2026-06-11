@@ -9,7 +9,6 @@ import RecordShell from "@/components/record/RecordShell";
 import ParticipantsRow from "@/components/record/ParticipantsRow";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ContinueButton from "@/components/record/ContinueButton";
-import ShareDialog from "@/components/sharing/ShareDialog";
 import { useLiveParticipants } from "@/hooks/useLiveParticipants";
 import { InsightsProvider } from "@/contexts/InsightsContext";
 import LiveThreadView from "@/components/live/LiveThreadView";
