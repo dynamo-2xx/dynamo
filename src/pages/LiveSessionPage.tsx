@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import RecordShell from "@/components/record/RecordShell";
+import RecordEditDialog from "@/components/record/RecordEditDialog";
 import ParticipantsRow from "@/components/record/ParticipantsRow";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ContinueButton from "@/components/record/ContinueButton";
@@ -397,6 +398,7 @@ const LiveSessionPage = () => {
         <LiveEndedRecord
           sessionId={sessionId || ""}
           title={sd.title || title || "Live Session"}
+          description={sd.description ?? null}
           createdAt={sd.created_at || new Date().toISOString()}
           createdBy={sd.created_by ?? null}
           coverImageUrl={sd.cover_image_url || coverImageUrl}
@@ -407,6 +409,7 @@ const LiveSessionPage = () => {
           transcriptEntries={transcriptInputs}
           rawTranscriptEntries={endedEntries as any}
           rawSubtopicTitles={endedSubs as string[]}
+          onLocalUpdate={(patch) => setSessionData((prev: any) => ({ ...(prev || sd), ...patch }))}
         />
       </AppLayout>
     );
@@ -739,6 +742,7 @@ export default LiveSessionPage;
 function LiveEndedRecord(props: {
   sessionId: string;
   title: string;
+  description: string | null;
   createdAt: string;
   createdBy: string | null;
   coverImageUrl: string | null;
@@ -749,6 +753,7 @@ function LiveEndedRecord(props: {
   transcriptEntries: any[];
   rawTranscriptEntries: any[];
   rawSubtopicTitles: string[];
+  onLocalUpdate?: (patch: Record<string, any>) => void;
 }) {
   const pills = useLiveParticipants({
     sessionId: props.sessionId,
@@ -766,9 +771,38 @@ function LiveEndedRecord(props: {
       <RecordShell
         kind="live"
         topic={props.title}
+        description={props.description}
         status="completed"
         coverImageUrl={props.coverImageUrl}
         createdAt={props.createdAt}
+        editSlot={
+          props.canContinue ? (
+            <RecordEditDialog
+              initial={{
+                title: props.title,
+                description: props.description,
+                coverImageUrl: props.coverImageUrl,
+              }}
+              coverSeed={props.title}
+              dialogTitle="Edit live session"
+              onSave={async (next) => {
+                const patch: Record<string, any> = {
+                  description: next.description,
+                  cover_image_url: next.coverImageUrl,
+                };
+                if (typeof next.title === "string" && next.title.length > 0) {
+                  patch.title = next.title;
+                }
+                const { error } = await (supabase as any)
+                  .from("live_sessions")
+                  .update(patch)
+                  .eq("id", props.sessionId);
+                if (error) throw error;
+                props.onLocalUpdate?.(patch);
+              }}
+            />
+          ) : null
+        }
         pillsRow={pills.length > 0 ? <ParticipantsRow pills={sidePillProps} /> : null}
         actionsRow={
           <>
