@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Download, Link2, FileText, Mic, FileImage } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
-import ArgumentMapContent from "@/components/debate/ArgumentMapContent";
 import RecordCommentsSection from "@/components/comments/RecordCommentsSection";
 import RecordToolsMount from "@/components/record/RecordToolsMount";
+import RecordShell from "@/components/record/RecordShell";
 import { toast } from "sonner";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { InsightsProvider } from "@/contexts/InsightsContext";
-import { PerformanceInsightsToggle } from "@/components/insights/PerformanceInsightsToggle";
 import { useAuth } from "@/contexts/AuthContext";
 
 function ImportProgressBar({ progress }: { progress?: { stage?: string; percent?: number; message?: string } | null }) {
@@ -75,7 +73,6 @@ export default function ImportedRecordPage() {
   const { user } = useAuth();
   const [rec, setRec] = useState<ImportedRecord | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"transcript" | "threaded">("transcript");
 
   useDocumentMeta({ title: rec?.title ? `${rec.title} · Imported` : "Imported record · Dynamo" });
 
@@ -146,84 +143,42 @@ export default function ImportedRecordPage() {
     );
   }
 
-  const SourceIcon = SOURCE_ICON[rec.source_kind] ?? FileText;
-
   return (
     <AppLayout>
       <InsightsProvider sessionId={rec.id} sessionKind="imported" participantId={user?.id}>
-      <div className="max-w-3xl mx-auto px-4 py-6" data-record-root>
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
-
-        <div className="flex items-center gap-2 mb-1">
-          <Download className="w-4 h-4 text-muted-foreground" />
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-body">Imported record</span>
-        </div>
-        <h1 className="text-3xl font-serif text-foreground leading-tight mb-2">{rec.title}</h1>
-        {rec.status === "processing" && (
-          <ImportProgressBar progress={rec.progress} />
-        )}
-        {rec.status === "failed" && (
-          <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs font-body text-rose-700 dark:text-rose-300">
-            Import failed{rec.progress?.message ? `: ${rec.progress.message}` : "."} Try a different source.
-          </div>
-        )}
-        <div className="flex items-center gap-3 text-xs text-muted-foreground font-body mb-6">
-          <span className="inline-flex items-center gap-1">
-            <SourceIcon className="w-3.5 h-3.5" /> {rec.source_kind}
-          </span>
-          {rec.source_url && (
-            <a href={rec.source_url} target="_blank" rel="noreferrer" className="underline truncate max-w-[24rem]">
-              {rec.source_url}
-            </a>
-          )}
-          <span>·</span>
-          <span>{new Date(rec.created_at).toLocaleDateString()}</span>
-          <span>·</span>
-          <span>{rec.is_public ? "Public" : "Private"}</span>
-        </div>
-
-        <div className="flex gap-1 mb-3 border-b border-foreground/10">
-          <div className="flex flex-1 gap-1">
-            {(["transcript", "threaded"] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-3 py-2 text-xs uppercase tracking-widest font-body border-b-2 -mb-px transition-colors ${
-                  tab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t === "transcript" ? "Transcript" : "Argument map"}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center pb-2">
-            <PerformanceInsightsToggle />
-          </div>
-        </div>
-
-        <ArgumentMapContent
-          tab={tab}
-          subtopics={subtopics}
-          transcriptEntries={rec.transcript_entries as any}
-          argumentMap={rec.argument_map as any}
-          sessionId={rec.id}
-          sessionKind="imported"
-          sessionComplete
+      <RecordShell
+        kind="imported"
+        topic={rec.title}
+        description={rec.description}
+        status={rec.status === "ready" ? "completed" : (rec.status ?? "completed")}
+        createdAt={rec.created_at}
+        importedSourceUrl={rec.source_url}
+        importedSourceKind={rec.source_kind}
+        belowBack={
+          <>
+            {rec.status === "processing" && (
+              <ImportProgressBar progress={rec.progress} />
+            )}
+            {rec.status === "failed" && (
+              <div className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs font-body text-rose-700 dark:text-rose-300">
+                Import failed{rec.progress?.message ? `: ${rec.progress.message}` : "."} Try a different source.
+              </div>
+            )}
+          </>
+        }
+        subtopics={subtopics}
+        transcriptEntries={rec.transcript_entries as any}
+        argumentMap={rec.argument_map as any}
+        sessionId={rec.id}
+        sessionKind="imported"
+        sessionComplete
+      >
+        <RecordCommentsSection
+          recordType={"imported_record" as any}
+          recordId={rec.id}
+          title="Comments"
         />
-
-        <div className="mt-8 pt-6 border-t border-foreground/10">
-          <RecordCommentsSection
-            recordType={"imported_record" as any}
-            recordId={rec.id}
-            title="Comments"
-          />
-        </div>
-      </div>
+      </RecordShell>
       <RecordToolsMount
         recordType="imported_record"
         recordId={rec.id}
