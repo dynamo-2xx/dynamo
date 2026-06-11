@@ -204,7 +204,6 @@ const DebateRoomPage = () => {
     displayName: user?.email?.split("@")[0] || "Queued",
     mode: "own_mic",
     stream: preLiveWaitStream,
-    releaseOnUnmount: false,
   });
      const timerWasActiveRef = useRef(false);
    const prepExitRef = useRef(false);
