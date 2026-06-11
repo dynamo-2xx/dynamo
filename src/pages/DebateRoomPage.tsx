@@ -40,6 +40,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import RecordToolsMount from "@/components/record/RecordToolsMount";
 import ContinueButton from "@/components/record/ContinueButton";
 import RecordShell from "@/components/record/RecordShell";
+import RecordEditDialog from "@/components/record/RecordEditDialog";
 import ParticipantsRow from "@/components/record/ParticipantsRow";
 import DebateHighlightLayer from "@/components/debate/DebateHighlightLayer";
 import { useDebateHostFailover } from "@/hooks/useDebateHostFailover";
@@ -1756,6 +1757,34 @@ const DebateRoomPage = () => {
                 participantCount={participants.length}
                 importedSourceUrl={(debate as any).imported_source_url}
                 importedSourceKind={(debate as any).imported_source_kind}
+                editSlot={
+                  isCreator ? (
+                    <RecordEditDialog
+                      initial={{
+                        title: debate.topic,
+                        description: (debate as any).description ?? null,
+                        coverImageUrl: (debate as any).cover_image_url ?? null,
+                      }}
+                      coverSeed={debate.topic}
+                      dialogTitle="Edit debate"
+                      onSave={async (next) => {
+                        const patch: Record<string, any> = {
+                          description: next.description,
+                          cover_image_url: next.coverImageUrl,
+                        };
+                        if (typeof next.title === "string" && next.title.length > 0) {
+                          patch.topic = next.title;
+                        }
+                        const { error } = await supabase
+                          .from("debates" as any)
+                          .update(patch)
+                          .eq("id", debate.id);
+                        if (error) throw error;
+                        setDebate({ ...(debate as any), ...patch });
+                      }}
+                    />
+                  ) : null
+                }
                 belowBack={
                   debate.feedback_enabled && !!myParticipant ? (
                     <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mb-4 flex items-center justify-between gap-3">
