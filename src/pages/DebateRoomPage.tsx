@@ -1786,22 +1786,29 @@ const DebateRoomPage = () => {
                   ) : null
                 }
                 belowBack={
-                  debate.feedback_enabled && !!myParticipant ? (
-                    <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mb-4 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Award className="w-4 h-4 text-foreground shrink-0" />
-                        <p className="text-xs font-body text-foreground truncate">
-                          Your private performance report is ready.
-                        </p>
+                  <>
+                    <AnalysisProgress
+                      sessionId={debate.id}
+                      sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
+                      transcriptEntries={transcriptEntries.filter((e: any) => e.is_final)}
+                    />
+                    {debate.feedback_enabled && !!myParticipant ? (
+                      <div className="rounded-xl border border-border bg-accent/40 px-4 py-3 mb-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Award className="w-4 h-4 text-foreground shrink-0" />
+                          <p className="text-xs font-body text-foreground truncate">
+                            Your private performance report is ready.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/debate/${id}/grade`)}
+                          className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
+                        >
+                          View Your Performance
+                        </button>
                       </div>
-                      <button
-                        onClick={() => navigate(`/debate/${id}/grade`)}
-                        className="shrink-0 text-xs font-body font-semibold bg-foreground text-background px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity"
-                      >
-                        View Your Performance
-                      </button>
-                    </div>
-                  ) : null
+                    ) : null}
+                  </>
                 }
                 pillsRow={
                   sides.length > 0 ? (
