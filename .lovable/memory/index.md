@@ -85,3 +85,4 @@
 - [Sharing, Co-ownership & Pause](mem://features/sharing-coownership-pause) — Viewer/Co-owner tiers, fork-on-complete only, host-only uniform Pause/Resume across Debate/Live/CMM
 - [Continue button](mem://features/continue-records) — Linear-chain continuations (v1/v2/v3) for Debate/CMM/Live; never on Notebooks; per-click "bring participants?" prompt
 - [Import-to-Record](mem://features/import-to-record) — Second dropbox on /create ingests YouTube/file/PDF/URL into a fully threaded Debate record; private by default
+- [Unified Record Shell](mem://features/record-shell) — Shared RecordShell + ParticipantsRow + SidePill across debate / live / imported records
