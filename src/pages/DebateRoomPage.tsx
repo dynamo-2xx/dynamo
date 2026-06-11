@@ -1865,6 +1865,12 @@ const DebateRoomPage = () => {
                 sessionId={debate.id}
                 sessionKind={(debate as any).format === "change_my_mind" ? "cmm" : "debate"}
                 sessionComplete
+                sessionStartMs={(() => {
+                  const raw = (debate as any).started_at as string | null | undefined;
+                  if (!raw) return null;
+                  const t = new Date(raw).getTime();
+                  return Number.isFinite(t) ? t : null;
+                })()}
               >
                 <RecordCommentsSection
                   recordType={
