@@ -438,6 +438,64 @@ const LiveSessionPage = () => {
     void triggerStructurePass(sessionId, "live", "structure_live");
   }, [sessionId, isRecordingActive, transcriptEntries]);
 
+  // Local stream (for the voice-confirm RMS gate). Hoisted above the phase
+  // early-returns so the hook order stays stable. The actual local media
+  // objects (camera preview / RTC) are gated internally by `active`.
+  const localStreamForConfirm = isMulti ? rtc.localStream : localPreview.stream;
+  const micOnForConfirm = isMulti ? rtc.micOn : singleMicOn;
+  const voiceConfirmed = useLocalVoiceConfirm(
+    localStreamForConfirm,
+    isRecordingActive && micOnForConfirm,
+  );
+
+  // ArgumentMapContent inputs — also hoisted to keep hook order stable.
+  const subtopicInputs = useMemo(
+    () => groupedEntries.ordered.map((t) => ({ id: t, title: t })),
+    [groupedEntries.ordered],
+  );
+  const transcriptInputs = useMemo(
+    () =>
+      transcriptEntries
+        .filter((e) => e.is_final !== false)
+        .map((e) => {
+          const named = speakerNames[String(e.speaker_id)];
+          const speakerSide =
+            named ||
+            (!isMulti && hostDisplayName) ||
+            `Speaker ${e.speaker_id + 1}`;
+          return {
+            id: e.id,
+            speaker_side: speakerSide,
+            text: e.text,
+            subtopic: e.subtopic || groupedEntries.ordered[0] || "",
+            timestamp: e.timestamp,
+            ai_summary: e.ai_summary,
+          };
+        }),
+    [transcriptEntries, groupedEntries.ordered, speakerNames, hostDisplayName, isMulti],
+  );
+  const speakerMeta = useMemo(() => {
+    const m: Record<string, { name: string; avatarUrl: string | null; userId: string | null }> = {};
+    if (hostDisplayName) {
+      m[hostDisplayName] = {
+        name: hostDisplayName,
+        avatarUrl: hostAvatarUrl,
+        userId: user?.id ?? null,
+      };
+    }
+    presenceParticipants.forEach((p) => {
+      const name = p.display_name || `Speaker ${p.speaker_slot}`;
+      m[name] = {
+        name,
+        avatarUrl: p.avatar_url ?? null,
+        userId: (p as any).user_id ?? null,
+      };
+      m[`Speaker ${p.speaker_slot}`] = m[name];
+      m[`Speaker ${p.speaker_slot + 1}`] = m[name];
+    });
+    return m;
+  }, [hostDisplayName, hostAvatarUrl, user?.id, presenceParticipants]);
+
   // ── ENDED → Full record page ──
   if (phase === "ended") {
     const sd = sessionData || {};
@@ -606,52 +664,6 @@ const LiveSessionPage = () => {
   const onToggleMic = isMulti ? rtc.toggleMic : (() => setSingleMicOn((v) => !v));
   const localDisplayName = isMulti ? hostName : (hostDisplayName || "You");
   const mediaError = isMulti ? rtc.error : localPreview.error;
-  const voiceConfirmed = useLocalVoiceConfirm(localStream, isRecordingActive && micOn);
-
-  // Build ArgumentMapContent inputs from live transcript state.
-  const subtopicInputs = useMemo(
-    () => groupedEntries.ordered.map((t) => ({ id: t, title: t })),
-    [groupedEntries.ordered],
-  );
-  const transcriptInputs = useMemo(
-    () =>
-      transcriptEntries
-        .filter((e) => e.is_final !== false)
-        .map((e) => ({
-          id: e.id,
-          speaker_side: getSpeakerName(e.speaker_id),
-          text: e.text,
-          subtopic: e.subtopic || groupedEntries.ordered[0] || "",
-          timestamp: e.timestamp,
-          ai_summary: e.ai_summary,
-        })),
-    // getSpeakerName depends on speakerNames / hostDisplayName / isMulti.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [transcriptEntries, groupedEntries.ordered, speakerNames, hostDisplayName, isMulti],
-  );
-  const speakerMeta = useMemo(() => {
-    const m: Record<string, { name: string; avatarUrl: string | null; userId: string | null }> = {};
-    // Host (single-device or as a participant in multi-device).
-    if (hostDisplayName) {
-      m[hostDisplayName] = {
-        name: hostDisplayName,
-        avatarUrl: hostAvatarUrl,
-        userId: user?.id ?? null,
-      };
-    }
-    // Multi-device presence rows.
-    presenceParticipants.forEach((p) => {
-      const name = p.display_name || `Speaker ${p.speaker_slot}`;
-      m[name] = {
-        name,
-        avatarUrl: p.avatar_url ?? null,
-        userId: (p as any).user_id ?? null,
-      };
-      m[`Speaker ${p.speaker_slot}`] = m[name];
-      m[`Speaker ${p.speaker_slot + 1}`] = m[name];
-    });
-    return m;
-  }, [hostDisplayName, hostAvatarUrl, user?.id, presenceParticipants]);
   const sessionStartMs = sessionData?.created_at
     ? new Date(sessionData.created_at).getTime()
     : null;
