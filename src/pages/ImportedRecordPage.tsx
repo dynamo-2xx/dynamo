@@ -191,7 +191,7 @@ export default function ImportedRecordPage() {
                 Import failed{rec.progress?.message ? `: ${rec.progress.message}` : "."} Try a different source.
               </div>
             )}
-            {(rec.status === "ready" || rec.status === "completed") && (
+            {rec.status === "ready" && (
               <AnalysisProgress
                 sessionId={rec.id}
                 sessionKind="imported"
