@@ -1,155 +1,90 @@
-# Argument Map Redesign — Two Analyses, Two Displays
+## Goal
 
-## The mental model
+Make `/debate/:id`, `/import/:id`, and the completed `/live/:id` (+ `/live/shared/:token`) render with the exact same shell:
 
-"Argument map" = a dual surface with two tabs that share nothing analytically:
-
-
-| Tab                 | Source                                               | Analysis pass                                  | Purpose                                 |
-| ------------------- | ---------------------------------------------------- | ---------------------------------------------- | --------------------------------------- |
-| **Transcript**      | Pure speaker turns, grouped only by subtopic         | Rhetorical/logical (existing perf annotations) | "How well did I speak?"                 |
-| **Threaded Record** | AI-assembled argument units, threaded by proposition | Structural (new: anatomy + relationship tags)  | "How did the discussion actually move?" |
-
-
-Today the threaded record and transcript are tangled — transcript is fragmented into "threads" and the threaded record uses a thin claim/counter/support/quote/stake type system that doesn't represent real argumentation. This redesign separates them and makes the threaded record honest about the structure of a conversation.
-
-Applies everywhere "argument map" appears: imported records, debate room overlay, debate archive, live session record.
-
----
-
-## Part A — Transcript tab (simplify)
-
-Strip threading. Render the transcript exactly as spoken, grouped only by subtopic.
-
-- One collapsible per subtopic, in order.
-- Inside each subtopic: chronological speaker turns. Each turn shows speaker/side, optional timestamp, and the unedited text.
-- Rhetorical/logical analysis (existing `performance_annotations`, `pass_kind = 'rhetoric'`-ish) overlays as inline insight pills on the text — same `<InsightText>` mechanism already wired.
-- No claim/support/counter chips. No parent/child indenting. No round summary.
-
-This is what `tab === "transcript"` becomes — a clean reading view.
-
----
-
-## Part B — Threaded Record tab (rebuild)
-
-A two-layer structural product:
-
-### B1. Argument unit anatomy (per card)
-
-Each argument unit card renders its internal parts as labeled inline spans:
-
-```
-ARGUMENT
-├ CLAIM          — required, exactly one
-├ GROUNDS        — evidence/data; quotes nested with left-border indent
-├ WARRANT        — logical bridge; if absent → subtle gray "warrant: absent" note
-├ QUALIFIER      — hedge; if absent on a strong claim → subtle gray note
-├ CONCESSION     — speaker's own acknowledgment of limits
-└ REBUTTAL       — pushback on opposing argument
+```text
+[ Hero card (cover, title, status, meta) ]
+[ Row of pills — Side 1 / Side 2  OR  user pills ]
+[ Tabs: Transcript | Threaded record ]
+[ Pane content + comments ]
 ```
 
-A standalone CONCESSION turn (no attached claim) renders as a peer card with a slightly inset style (yield, not advance).
+Live's pills replace the two side pills with **identically-shaped** pills (same height, padding, border, font sizing as `Side 1 / Side 2`) — one per speaker, avatar + username inside. Arrangement: 1 row when ≤2 pills, 2×2 grid when 3–4, horizontal slider (Explore-style snap row with arrows) when ≥5. Pills that resolve to a real `user_id` are `<Link>`s to `/profile/:username`; unresolved ones render as the same pill without a link.
 
-### B2. Relationship tags (between cards)
+## New / reused components
 
-Neutral gray connector label between consecutive cards in a thread, taxonomy:
+`src/components/record/RecordShell.tsx` — presentational wrapper used by all three record pages.
+Props:
 
-`ANCHOR · SUPPORT · CHALLENGE · COUNTER · EXTENSION · CONCESSION · REFRAME · QUALIFICATION · SYNTHESIS · PIVOT · UNRESOLVED`
+- `topic`, `description`, `status` (`completed | live | scheduled | processing | failed`)
+- `coverImageUrl`, `publisherName`, `participantCount`, `createdAt`, `endedAt`
+- `kind`: `"debate" | "live" | "imported"` (controls back-link label + imported badge)
+- `sidesRow`: ReactNode (the pills row, computed by the page)
+- `headerActions`: ReactNode (Share, Continue, PerformanceInsightsToggle, etc.)
+- `children`: tab body
 
-Rules:
+Internally reuses the hero markup currently in `DebateRecordPreview` (gradient/cover, status pill, title, meta) so the look matches the screenshot exactly. Strip the rest of `DebateRecordPreview` (sides cards, threaded record section).
 
-- First unit of every thread = `ANCHOR`.
-- Exactly one tag per non-anchor unit.
-- Connectors are **neutral gray, never color-coded** (color is reserved for the rhetorical analysis).
-- Hover/tap a connector → expands to show the one-sentence `note`.
-- `UNRESOLVED` is post-session only.
+`src/components/record/SidePill.tsx` — the single canonical pill component. Variants:
 
-### B3. Hierarchy
+- `kind="side"`: shows `SIDE N` eyebrow + colored label (current look).
+- `kind="user"`: shows avatar (8px circle) + `@username` in the same outer pill (same border, padding, radius, height as `kind="side"`).
+Both render at the same min-height so a side row and a user row are visually interchangeable.
 
-`Topic → Subtopic → Threads → Argument Units (anatomy spans)` — all levels collapsible. Thread summary stays at the bottom of each thread.
+`src/components/record/ParticipantsRow.tsx` — layout-only:
 
----
+- 1–2 pills → `grid grid-cols-2 gap-3` (same as today's sides).
+- 3–4 pills → `grid grid-cols-2 gap-3` (auto wraps to 2×2).
+- ≥5 → horizontal scroll-snap row with left/right arrows (mirroring `src/components/explore/*` shelf arrows, using `useEdgeScroll`). Each pill fixed width so they line up.
 
-## Part C — Backend: two new analysis passes
+`src/components/record/RecordTabs.tsx` — the simple Transcript / Threaded record tabbed body lifted from `ImportedRecordPage` lines 190-217, including the `PerformanceInsightsToggle` slot. Wraps `<ArgumentMapContent tab={tab} … />`.
 
-### Tables (one new, one columns added)
+## Page-by-page changes
 
-`**argument_units**` (new) — replaces the role currently played by `arguments` rows on the threaded tab. Keep `arguments` table untouched for now (live-debate authoring still uses it); the post-session structural pass writes into `argument_units`.
+`**src/pages/ImportedRecordPage.tsx**`
 
+- Replace hand-rolled header + tabs with `<RecordShell kind="imported" sidesRow={null} … >` and `<RecordTabs … />`. (No pills row for imports.)
+- Keep `RecordCommentsSection`, `RecordToolsMount`, `InsightsProvider`, `useDocumentMeta`, status/progress banner unchanged.
+
+`**src/pages/DebateRoomPage.tsx**` (completed branch around line 1987) and `**src/pages/DebateScheduledPreviewPage.tsx**` (line 322)
+
+- Replace `<DebateRecordPreview … />` with the new shell:
+  - `sidesRow` = `<ParticipantsRow><SidePill kind="side" … /></ParticipantsRow>` driven by `sides` / `fallbackSideLabels`, identical look to today.
+  - Body = `<RecordTabs … />` instead of the threaded-only record + bottom transcript button.
+- Delete `DebateRecordPreview.tsx` once both call-sites migrate; move its hero markup into `RecordShell` and its "preview/ghost" rendering into `RecordTabs`' threaded pane (only active when `status !== "completed"` and no live data — `useDebatePreviewThreads` stays).
+- The "About this debate" `<details>` block stays, rendered by the shell when `description` is provided.
+
+`**src/pages/LiveSessionPage.tsx**` (ended phase) and `**src/pages/SharedLiveSessionPage.tsx**`
+
+- Stop using `SessionRecordViewV2`. Render the same `<RecordShell kind="live" … >` + `<RecordTabs … />`.
+- Build pills from `speakerNames`:
+  1. Resolve user_ids: query `live_session_participants` (multi-device) for `(speaker_slot, user_id)` and join `profiles` for `username` + `avatar_url`. For single-device sessions, treat `created_by` as speaker 0.
+  2. For each pill: if a `user_id` is resolved, link to `/p/:username` with avatar; otherwise render the same pill shape with initials + name, not clickable.
+- `headerActions` keeps Share, Continue, and the existing PerformanceInsightsToggle.
+- **Drop** the split-pane, notebook, highlight-annotate, citations, cross-refs, mobile threads/transcript toggle. `RecordToolsMount` is added for Q&A so live records keep the floating Q&A chat (already present on imported and debate). Comments section stays.
+- `SessionRecordViewV2.tsx`, `SessionRecordView.tsx`, and the now-unused notebook/annotation/citation hooks called only from V2 become dead code. Delete `SessionRecordViewV2.tsx` + `SessionRecordView.tsx`; leave the hooks alone (cheap, may be reused later) unless they reference deleted props.
+
+## Data: resolving live participants to users
+
+For multi-device sessions:
+
+```sql
+select speaker_slot, user_id from live_session_participants where session_id = :id
 ```
-session_id, session_kind ('debate'|'cmm'|'live'|'imported')
-subtopic_id (nullable), subtopic_title
-thread_id (uuid, groups units within a thread)
-speaker_label, speaker_side, turn_index
-source_text (the raw passage this unit was assembled from)
-anatomy jsonb           -- [{part, text, note}]
-relationship_tag text   -- enum
-relates_to uuid         -- argument_unit id, null for ANCHOR
-relationship_note text
-is_standalone_concession bool
-created_at
-```
 
-RLS: SELECT gated via `can_view_debate` / `can_view_imported_record` mirroring `performance_annotations`. INSERT denied to clients (edge functions only). GRANTs to authenticated + service_role.
+Join with `profiles` to get `username` + `avatar_url`. For single-device sessions, fall back to `live_sessions.created_by → profiles`.
 
-### Edge functions
+If a speaker_slot has no row, render the pill without a link. Result is a `participants: { slot, name, userId?, username?, avatarUrl? }[]` array, ordered by `slot`, that feeds `ParticipantsRow`.
 
-1. `**analyze-structure**` (new) — given a session's transcript:
-  - Step 1: chunk transcript into argument units (one per coherent move).
-  - Step 2: run **anatomy parsing prompt** per unit (Toulmin parse → `anatomy` jsonb).
-  - Step 3: assign threads by shared proposition (lightweight clustering by anchor claim).
-  - Step 4: run **relationship tagging prompt** per non-anchor unit within its thread.
-  - Delete-then-insert into `argument_units` scoped by `(session_id, session_kind)`.
-2. `**trigger-structure-pass**` (new, mirrors `trigger-deep-perf`) — invoked on record mount and on session completion. Live mode = incremental (no `UNRESOLVED`); post-session = full re-run with `UNRESOLVED` enabled.
+No schema changes. No edge function changes.
 
-Model: `google/gemini-3-flash-preview` via Lovable AI gateway. Same 150s edge-timeout discipline (chunked passages, no Pro model).
+## Styling parity
 
-Prompts live verbatim from the user's spec in `supabase/functions/_shared/structure-prompts.ts`.
+`SidePill` is the single source of truth. The side variant keeps the current `SIDE 1` eyebrow + colored label; the user variant uses the same outer container (same `rounded-xl border border-border bg-card`, same vertical padding) with avatar+username inside, so a row of two user pills and a row of two side pills are pixel-equivalent in height/border/spacing. Slider arrows reuse the styles already used by Explore shelves.
 
----
+## Out of scope
 
-## Part D — Frontend changes
-
-- `**ArgumentMapContent.tsx**` — split into two children:
-  - `TranscriptPane.tsx` — subtopic-grouped pure transcript + rhetorical insight overlay.
-  - `ThreadedRecordPane.tsx` — new threaded view consuming `argument_units` (anatomy spans + relationship connectors).
-- `**AnatomyCard.tsx**` (new) — renders one argument unit with labeled part spans and absence diagnostics.
-- `**RelationshipConnector.tsx**` (new) — gray connector between cards with tag label + hover note.
-- `**useArgumentUnits(sessionId, sessionKind)**` (new hook) — fetch + realtime subscribe to `argument_units`.
-- Wire into: `ImportedRecordPage`, `DebateRoomPage` (argument map overlay), `ExploreDebateDetailPage` (archive), `SessionRecordViewV2` (live).
-- Trigger `trigger-structure-pass` on mount (debounced) for any session lacking units, and on session completion.
-
----
-
-## Part E — Mode switching
-
-Track `{ isLive, sessionComplete }` per session:
-
-- `isLive` → incremental structural pass, `UNRESOLVED` suppressed.
-- `sessionComplete` → full re-pass, `UNRESOLVED` enabled, re-render adds "unresolved — this point was not addressed" badge on flagged cards.
-
----
-
-## Memory updates
-
-- Update `mem://index.md` Core: definition of "argument map" = dual feature (transcript + threaded record), two analyses (rhetorical vs structural).
-- New `mem://features/argument-map-structure` — taxonomy of anatomy parts + relationship tags + display rules (neutral gray connectors, standalone concession styling, UNRESOLVED is post-session only).
-
----
-
-## Build order
-
-1. Memory + schema (migration: `argument_units` table, RLS, GRANTs).
-2. `_shared/structure-prompts.ts` + `analyze-structure` + `trigger-structure-pass` edge functions.
-3. `TranscriptPane` (simplify — fastest visible win).
-4. `AnatomyCard` + `RelationshipConnector` + `ThreadedRecordPane` + `useArgumentUnits`.
-5. Wire into all four surfaces (imported, debate overlay, archive, live).
-6. Test on the imported record currently open, then on a completed debate.
-
-## Open questions before I start
-
-1. Should `argument_units` fully replace the `arguments` table for post-session display, or live alongside it (live authoring writes `arguments`, structural pass writes `argument_units`)? My default is the latter — safer.  
-What is the difference? Draw it up for me in html in the chat.
-2. For the imported pass, should structure run automatically on import (alongside rhetorical), or only when the user opens the threaded record tab? Default: auto on import for parity with `trigger-deep-perf`.  
-Auto on import. The argument mpa needs both. That is the full product. Users will be able to view the rhetorical/logical quality of the actual trasncript and view the anatomy of what went down.  
-Also, just for the record: the insights button will trigger the overlay (highlight + tag) above the transcript. there are no insights for the threaded record because it is just a display of the anatomy of the conversation that was had, which is assembled by the criteria that was recently transmitted with its corresponding tags. the tags determine the structure.
+- Renaming/restructuring the threaded record itself (`ArgumentMapContent`, `ThreadedRecordPane`).
+- Backend changes to `analyze-structure` / structure prompts.
+- Editing transcripts (split/merge UI) — that lived in `SessionRecordView`; live records become read-only in the new shell. If we want to keep that, it can be re-added in a follow-up.   
+MY COMMENT ON THIS LAST BULLET-POINT: USERS CAN HIGHLIGHT TO ANNOTATE ANY TEXT FROM THE TRANSCRIPT/THREADED RECORD WHICH SAID CONTENT CAN CREATE/WILL BE STORED IN THE CORRESPONDING NOTEBOOK AND STORED IN MYSTUDY. 
