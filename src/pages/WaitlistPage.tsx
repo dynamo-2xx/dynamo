@@ -57,7 +57,7 @@ const WaitlistPage = () => {
     <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center px-6">
       <div className="max-w-xl w-full text-center space-y-8">
         <div className="space-y-3">
-          <h1 className="text-5xl md:text-6xl font-serif tracking-tight">D.</h1>
+          <h1 className="text-5xl md:text-6xl font-serif tracking-tight">DYNAMO.</h1>
           <p className="text-base md:text-lg text-muted-foreground font-body">
             Turn the conversations that matter — debates, classes, civic meetings — into
             structured, searchable records. By invitation.
