@@ -191,7 +191,7 @@ const FacilitatorView = ({
                   <Zap className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-primary mb-1 font-display">DYNAMO.</p>
+                  <p className="text-xs font-semibold text-primary mb-1 font-display">DYNAMO</p>
                   <p className="text-sm text-foreground leading-relaxed font-body">{aiMessage}</p>
                 </div>
               </div>
