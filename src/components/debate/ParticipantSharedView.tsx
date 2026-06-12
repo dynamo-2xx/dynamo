@@ -418,7 +418,7 @@ const ParticipantSharedView = ({
                 <Zap className="w-3.5 h-3.5 text-primary" />
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-primary mb-0.5 font-display">DYNAMO.</p>
+                <p className="text-[10px] font-semibold text-primary mb-0.5 font-display">DYNAMO</p>
                 <p className="text-xs text-foreground leading-relaxed font-body">{aiMessage}</p>
               </div>
             </div>
