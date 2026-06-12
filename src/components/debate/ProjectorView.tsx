@@ -128,7 +128,7 @@ const ProjectorView = ({
 
       {/* Footer branding */}
       <div className="px-8 py-4 text-center">
-        <span className="text-sm font-display font-bold opacity-30">D.</span>
+        <span className="text-sm font-display font-bold opacity-30">DYNAMO.</span>
       </div>
     </div>
   );

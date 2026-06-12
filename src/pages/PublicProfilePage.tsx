@@ -89,7 +89,7 @@ const PublicProfilePage = () => {
           title: `${profile.display_name ?? "Profile"} — Dynamo`,
           description: profile.affiliation
             ? `${profile.display_name ?? "User"} on Dynamo · ${profile.affiliation}`
-            : `${profile.display_name ?? "User"} on D. Bring people to the power.`,
+            : `${profile.display_name ?? "User"} on DYNAMO. Bring people to the power.`,
           image: profile.avatar_url ?? undefined,
           type: "profile",
           canonical: typeof window !== "undefined" ? `${window.location.origin}/u/${userId}` : undefined,

@@ -45,9 +45,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           className="mb-6 flex items-center gap-3 group text-left"
           title="Minimize navigation"
         >
-          <img src={logoSmiley} alt="D. logo" className="w-9 h-9 dark:invert transition-transform group-hover:scale-105" />
+          <img src={logoSmiley} alt="DYNAMO. logo" className="w-9 h-9 dark:invert transition-transform group-hover:scale-105" />
           <span className="font-body text-foreground text-sm font-medium tracking-[0.16em] uppercase">
-            D.
+            DYNAMO.
           </span>
         </button>
         <nav className="flex flex-col gap-0.5 flex-1">
@@ -107,7 +107,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           className="hidden md:flex fixed top-3 left-3 sm:top-4 sm:left-4 z-40 w-11 h-11 items-center justify-center rounded-full bg-background/70 backdrop-blur-xl border border-border/60 shadow-sm hover:bg-background/90 transition-colors"
           title="Open navigation"
         >
-          <img src={logoSmiley} alt="D. logo" className="w-6 h-6 dark:invert" />
+          <img src={logoSmiley} alt="DYNAMO. logo" className="w-6 h-6 dark:invert" />
         </button>
       )}
 
